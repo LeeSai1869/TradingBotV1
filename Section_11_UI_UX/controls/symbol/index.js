@@ -22,18 +22,23 @@ export async function mount() {
     }
 }
 
-export async function applyPriceFormat(symbol) {
-    try {
-        const r = await fetch(`/api/symbol_meta?symbol=${encodeURIComponent(symbol)}`,
-                              { cache: "no-store" });
-        if (!r.ok) return;
-        const meta = await r.json();
-        if (el().value !== symbol) return;
-        const prec = meta.precision ?? 2;
-        setPriceFormat({ type: "price", precision: prec, minMove: Math.pow(10, -prec) });
-    } catch (e) {
-        console.warn("[symbol] price format failed:", e);
+export function applyPriceFormat(symbol, bars, configuredPrecision) {
+    if (el().value !== symbol) return;
+    let precision = Number.isInteger(configuredPrecision)
+        ? Math.max(0, Math.min(8, configuredPrecision)) : null;
+    if (precision === null) {
+        precision = 0;
+        for (const bar of bars.slice(-1000)) {
+            for (const key of ["open", "high", "low", "close"]) {
+                const value = bar.client[key];
+                if (!Number.isFinite(value)) continue;
+                const [base, exponent = "0"] = String(value).toLowerCase().split("e");
+                const decimals = (base.split(".")[1] || "").length - Number(exponent);
+                precision = Math.max(precision, Math.min(8, decimals));
+            }
+        }
     }
+    setPriceFormat({ type: "price", precision, minMove: Math.pow(10, -precision) });
 }
 
 export function value() { return el().value; }

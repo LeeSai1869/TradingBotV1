@@ -5,137 +5,130 @@ import vm from 'node:vm';
 import { logicalShift } from '../Section_11_UI_UX/web_root/window_state.js';
 
 function cache() {
-    const context = vm.createContext({window: {}, console: {log() {}, error() {}},
-        document: {getElementById: () => null}, Date, fetch: () => {throw Error('unexpected fetch');}});
-    vm.runInContext(fs.readFileSync(new URL('../Section_11_UI_UX/web_root/data_cache.js', import.meta.url), 'utf8'), context);
-    const c = context.window.DataCache;
-    c._readFlagsCurrent = async () => null;
-    return c;
+    const context = vm.createContext({window:{}, URLSearchParams,
+        fetch: () => { throw Error('unexpected network request'); }});
+    vm.runInContext(fs.readFileSync(new URL('../Section_11_UI_UX/web_root/data_cache.js',import.meta.url),'utf8'),context);
+    return context.window.DataCache;
 }
-const deferred = () => {let resolve; const promise = new Promise(r => resolve = r); return {promise, resolve};};
-const packet = (time, extra = {}) => ({klines: [{time}], features: [], flags_history: [], ...extra});
+const deferred = () => {let resolve; const promise=new Promise(r=>resolve=r); return {promise,resolve};};
+const bar = (time, extra={}) => ({open_time:time*1000,time,symbol:'BTCUSDT',interval:'1m',
+    client:{open:10,high:12,low:9,close:11},features:{ema50:10},adcn:null,...extra});
+const page = (times, next=null) => ({bars:times.map(t=>bar(t)),next_before:next});
 
-test('late initial response cannot overwrite a newer market', async () => {
-    const c = cache();
-    const old = deferred();
-    c._prefetchInitialOlder = async () => false;
-    c._fetchWindow = () => c.symbol === 'OLD' ? old.promise : Promise.resolve(packet(200));
-    const first = c.loadInitial('OLD', '1m');
-    await c.loadInitial('NEW', '5m');
-    old.resolve(packet(100));
-    assert.equal(await first, false);
-    assert.equal(c.symbol, 'NEW');
-    assert.equal(c.klines[0].time, 200);
+test('late initial response cannot overwrite a newer market', async()=>{
+    const c=cache(); const pending=deferred();
+    c._fetchPage=s=>s==='OLD'?pending.promise:Promise.resolve(page([200]));
+    const old=c.loadInitial('OLD','1m');
+    await c.loadInitial('NEW','5m');
+    pending.resolve(page([100]));
+    assert.equal(await old,false);
+    assert.equal(c.symbol,'NEW'); assert.equal(c.bars[0].time,200);
 });
 
-test('an old flags response cannot render data under the new selection', async () => {
-    const c = cache(); const old = deferred();
-    c._prefetchInitialOlder = async () => false;
-    c._fetchWindow = async () => packet(c.symbol === 'OLD' ? 100 : 200);
-    c._readFlagsCurrent = (s) => s === 'OLD' ? old.promise : Promise.resolve({symbol: 'NEW'});
-    const first = c.loadInitial('OLD', '1m');
-    await c.loadInitial('NEW', '1m');
-    old.resolve({symbol: 'OLD'});
-    await first;
-    assert.equal(c.flags_current.symbol, 'NEW');
-    assert.equal(c.klines[0].time, 200);
+test('one initial request carries candles, features and decisions together',async()=>{
+    const c=cache(); const calls=[];
+    c._fetchPage=async(...args)=>{calls.push(args);return {bars:[bar(60,{adcn:{signal_type:'BUY'}})],next_before:null};};
+    await c.loadInitial('BTCUSDT','1m');
+    assert.equal(calls.length,1); assert.equal(calls[0][2],1000);
+    assert.equal(c.bars[0].features.ema50,10);
+    assert.equal(c.bars[0].adcn.signal_type,'BUY');
+    assert.equal(c.latestBar,c.bars[0]);
 });
 
-test('reversing navigation invalidates an obsolete directional prefetch', async () => {
-    const c = cache(); const pending = deferred();
-    c.timeframe = '1m'; c.klines = [{time: 60}, {time: 120}];
-    c._fetchBlock = () => pending.promise;
-    const work = c.prefetchNextOlder(60000);
-    const reserve = {klines: [{time: 30}]};
-    c.setReadyOlder(reserve);
-    pending.resolve({klines: [{time: 10}]});
-    assert.equal(await work, false);
-    assert.equal(c.readyOlder, reserve);
+test('duplicate prefetch requests share one in-flight operation',async()=>{
+    const c=cache(); const pending=deferred(); let calls=0;
+    c.bars=[bar(120)];c.nextBefore=120000;
+    c._fetchPage=()=>{calls++;return pending.promise;};
+    const a=c.prefetchOlder(),b=c.prefetchOlder();
+    assert.equal(a,b); assert.equal(calls,1);
+    pending.resolve(page([60]));await a;
+    assert.deepEqual(Array.from(c.bars,b=>b.time),[60,120]);
 });
 
-test('partial history and gaps preserve the same visible candle positions', () => {
-    const old = [30, 40, 50, 60].map(time => ({time}));
-    assert.equal(logicalShift(old, [20, 30, 40, 50].map(time => ({time}))), 1);
-    assert.equal(logicalShift(old, [50, 60, 80].map(time => ({time}))), -2);
+test('prefetch arrival notifies the coordinator without another user gesture',async()=>{
+    const c=cache();c.bars=[bar(120)];c.nextBefore=120000;
+    c._fetchPage=async()=>page([60]);
+    let event; c.subscribe((_,op)=>event=op);
+    await c.prefetchOlder();assert.equal(event,'history');
 });
 
-test('month boundaries follow the UTC calendar, including leap years', () => {
-    const c = cache(); c.timeframe = '1M';
-    assert.equal(c._shiftMs(Date.UTC(2024, 1, 1), 1), Date.UTC(2024, 2, 1));
-    assert.equal(c._shiftMs(Date.UTC(2024, 2, 1), -1), Date.UTC(2024, 1, 1));
+test('stale prefetch cannot contaminate a newly selected market',async()=>{
+    const c=cache(); const pending=deferred();
+    c.bars=[bar(120)];c.nextBefore=120000;
+    c._fetchPage=()=>pending.promise;
+    const old=c.prefetchOlder();
+    c._fetchPage=async()=>page([500]);
+    await c.loadInitial('NEW','1m');
+    pending.resolve(page([60]));assert.equal(await old,false);
+    assert.deepEqual(Array.from(c.bars,b=>b.time),[500]);
 });
 
-test('live refresh is ignored if the user pans into history while fetching', async () => {
-    const c = cache(); const pending = deferred();
-    c.timeframe = '1m'; c.klines = [{time: 60}];
-    c._fetchWindow = () => pending.promise;
-    const refresh = c.refreshLive();
-    c.atLiveEdge = false;
-    pending.resolve(packet(120));
-    assert.equal(await refresh, false);
-    assert.equal(c.klines[0].time, 60);
+test('history exhaustion does not issue any more requests',async()=>{
+    const c=cache();assert.equal(await c.prefetchOlder(),false);
 });
 
-test('live rollover refreshes candles, features and markers as one packet', async () => {
-    const c = cache(); c.timeframe = '1m'; c.klines = [{time: 60}];
-    c._fetchWindow = async () => ({klines: [{time:60}, {time:120}],
-        features: [{time:120, ema50:42}], flags_history: [{bar_time:120000, signal_type:'BUY'}]});
-    let event;
-    c.subscribe((_, op) => event = op);
-    assert.equal(await c.refreshLive(), true);
-    assert.equal(c.features[0].ema50, 42);
-    assert.equal(c.flags_history[0].signal_type, 'BUY');
-    assert.equal(c.klines.length, 2);
-    assert.equal(event, 'live-refresh');
+test('prefetch failure preserves the cursor and can be retried',async()=>{
+    const c=cache();c.bars=[bar(120)];c.nextBefore=120000;
+    c._fetchPage=async()=>{throw Error('offline');};
+    assert.equal(await c.prefetchOlder(),false);assert.equal(c.nextBefore,120000);
+    c._fetchPage=async()=>page([60]);assert.equal(await c.prefetchOlder(),true);
+    assert.equal(c.error,null);
 });
 
-function pollHarness(c) {
-    let nextTimer;
-    const updates = [];
-    const elements = {symbol: {value: 'BTCUSDT'}, interval: {value: '1m'}};
-    const context = vm.createContext({DataCache:c, Date, console,
-        document: {getElementById: name => elements[name]},
-        candles: {updateLive: b => updates.push(b)}, flags: {update() {}},
-        setTimeout: fn => {nextTimer=fn; return 1;}, clearTimeout() {},
-        fetch: async () => ({ok:true,json:async () => ({time:180})}),
-    });
-    const source = fs.readFileSync(new URL('../Section_11_UI_UX/web_root/live_poll.js',import.meta.url),'utf8')
-        .replace(/^import .*;$/gm,'').replace(/export function/g,'function');
-    vm.runInContext(source + '\nglobalThis.controls={start,stop};',context);
-    return {context, updates, elements, timer: () => nextTimer};
-}
-const flush = () => new Promise(resolve => setImmediate(resolve));
-
-test('live rollover actually requests the newly closed canonical packet', async () => {
-    const c=cache(); c.symbol='BTCUSDT'; c.timeframe='1m'; c.klines=[{time:60}];
-    let refreshed=0;
-    c.refreshLive=async () => {refreshed++;};
-    const h=pollHarness(c);
-    h.context.controls.start();
-    await flush();
-    h.context.controls.stop();
-    assert.equal(refreshed,1);
-    assert.equal(h.updates[0].time,180);
+test('pan into history while a stored refresh is pending preserves the view',async()=>{
+    const c=cache();const pending=deferred();c.bars=[bar(60)];
+    c._fetchPage=()=>pending.promise;
+    const work=c.refreshStored();c.atLiveEdge=false;
+    pending.resolve(page([120]));assert.equal(await work,false);
+    assert.equal(c.bars[0].time,60);
 });
 
-test('live response for a previous selection cannot update the candles', async () => {
-    const c=cache(); c.symbol='BTCUSDT'; c.timeframe='1m';
-    const pending=deferred(); const h=pollHarness(c);
-    h.context.fetch=() => pending.promise;
-    h.context.controls.start();
-    c._reloadGeneration++; c.symbol='SUIUSDT'; h.elements.symbol.value='SUIUSDT';
-    pending.resolve({ok:true,json:async () => ({time:180})});
-    await flush(); h.context.controls.stop();
-    assert.equal(h.updates.length,0);
+test('stored refresh updates the unified record without dropping visited history',async()=>{
+    const c=cache();c.bars=[bar(30),bar(60)];
+    c._fetchPage=async()=>({bars:[bar(60,{features:{ema50:42}}),bar(120)],next_before:30000});
+    assert.equal(await c.refreshStored(),true);
+    assert.deepEqual(Array.from(c.bars,b=>b.time),[30,60,120]);
+    assert.equal(c.bars[1].features.ema50,42);
+    assert.equal(c.latestBar.time,120);
+    let emitted=false;c.subscribe(()=>emitted=true);
+    assert.equal(await c.refreshStored(),false);assert.equal(emitted,false);
 });
 
-test('the next poll is scheduled only after the active request finishes', async () => {
-    const c=cache(); c.symbol='BTCUSDT'; c.timeframe='1m';
-    const pending=deferred(); const h=pollHarness(c);
-    h.context.fetch=() => pending.promise;
-    h.context.controls.start();
-    assert.equal(h.timer(),undefined);
-    pending.resolve({ok:false});
-    await flush(); h.context.controls.stop();
-    assert.equal(typeof h.timer(),'function');
+test('active window is 1000 without evicting visible or visited history',()=>{
+    const c=cache();c.bars=Array.from({length:15000},(_,i)=>bar(i));
+    c.setVisibleWindow({from:300,to:1299});
+    assert.equal(c.activeBars.length,1000);assert.equal(c.bars.length,15000);
+    assert.equal(c.atLiveEdge,false);
+});
+
+test('prepend and gaps preserve the position of a shared candle',()=>{
+    const old=[30,40,50,60].map(time=>({time}));
+    assert.equal(logicalShift(old,[20,30,40,50,60].map(time=>({time}))),1);
+    assert.equal(logicalShift(old,[50,60,80].map(time=>({time}))),-2);
+});
+
+test('markers update one wrapper in place over repeated redraws',async()=>{
+    let created=0,updates=0,detached=0;
+    globalThis.LightweightCharts={CandlestickSeries:{},createSeriesMarkers:()=>{
+        created++;return {setMarkers:()=>updates++,detach:()=>detached++};
+    }};
+    const candles=await import('../Section_11_UI_UX/overlays/candles/index.js');
+    const markers=await import('../Section_11_UI_UX/overlays/markers/index.js');
+    candles.mount({addSeries:()=>({})});
+    for(let i=0;i<100;i++) markers.update(null,{bars:[bar(60,{adcn:{signal_type:'BUY',final_score:70}})]});
+    assert.equal(created,1);assert.equal(updates,99);assert.equal(detached,0);
+});
+
+test('stored polling is serial and uses only the cache local-store refresh',async()=>{
+    const pending=deferred();let scheduled;let calls=0;
+    const context=vm.createContext({DataCache:{refreshStored:()=>{calls++;return pending.promise;}},
+        console,setTimeout:fn=>{scheduled=fn;return 1;},clearTimeout(){}});
+    const source=fs.readFileSync(new URL('../Section_11_UI_UX/web_root/stored_poll.js',import.meta.url),'utf8')
+        .replace(/export function/g,'function');
+    vm.runInContext(source+'\nglobalThis.controls={start,stop};',context);
+    context.controls.start();assert.equal(calls,0);
+    const first=scheduled;scheduled=undefined;first();
+    assert.equal(calls,1);assert.equal(scheduled,undefined);
+    pending.resolve(false);await new Promise(r=>setImmediate(r));
+    assert.equal(typeof scheduled,'function');context.controls.stop();
 });

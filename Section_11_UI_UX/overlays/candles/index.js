@@ -1,4 +1,4 @@
-// VISUAL: candles — draws price candles from klines packet.
+// VISUAL: price candles from the unified stored-bar stream.
 
 export const name = "candles";
 
@@ -25,13 +25,10 @@ export function mount(chart) {
     );
 }
 
-function _toPoints(klines) {
-    return (klines || []).map(k => ({
-        time: k.time,
-        open: k.open,
-        high: k.high,
-        low: k.low,
-        close: k.close,
+function _toPoints(bars) {
+    return (bars || []).map(bar => ({
+        ...bar.client,
+        time: bar.time,
     }));
 }
 
@@ -40,12 +37,11 @@ function _toPoints(klines) {
 export function update(chart, data, options = {}) {
     if (!series) return;
 
-    series.setData(_toPoints(data.klines));
+    series.applyOptions({ visible: options.visible !== false });
+    series.setData(_toPoints(data.bars));
 
-    // Historical 500-bar window rotation must not continually
-    // reset the user's vertical scale. Full/reset loads may
-    // establish autoscale; the dedicated "A" control remains
-    // responsible for explicit user-requested autoscaling.
+    // Only an explicit reload establishes autoscale. Prefetch preserves
+    // the user's vertical scale; the "A" control can reset it manually.
     if (
         options.resetViewport &&
         chart &&
@@ -54,40 +50,6 @@ export function update(chart, data, options = {}) {
         chart
             .priceScale("right")
             .applyOptions({ autoScale: true });
-    }
-
-    if (
-        options.resetViewport &&
-        chart &&
-        chart.timeScale
-    ) {
-        const n = (data.klines || []).length;
-
-        if (n > 0) {
-            const barsToShow = Math.min(300, n);
-
-            chart.timeScale().setVisibleLogicalRange({
-                from: Math.floor(n - barsToShow),
-                to: Math.floor(n),
-            });
-        }
-    }
-}
-
-// Forming Binance candle only.
-export function updateLive(bar) {
-    if (!series || !bar || bar.time == null) return;
-
-    try {
-        series.update({
-            time: bar.time,
-            open: bar.open,
-            high: bar.high,
-            low: bar.low,
-            close: bar.close,
-        });
-    } catch (e) {
-        // A historical reload can transiently race a live update.
     }
 }
 

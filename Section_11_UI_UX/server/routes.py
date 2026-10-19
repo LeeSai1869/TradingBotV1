@@ -6,8 +6,6 @@ from urllib.parse import urlparse, parse_qs
 from Section_1_Global_Core.memory_storage.Storage import db
 
 from . import queries
-from . import live_candle as lc
-from . import symbol_meta as sm
 
 HERE = None
 UI_CONFIG = None
@@ -33,6 +31,19 @@ def handle_get(path, raw_qs, server):
     qs = parse_qs(raw_qs)
     for k in list(qs.keys()):
         qs[k] = [clean(x) for x in qs[k]]
+
+    if path == "/api/bars":
+        symbol = qs.get("symbol", [None])[0]
+        interval = qs.get("interval", [None])[0]
+        try:
+            limit = int(qs.get("limit", ["1000"])[0])
+            before = int(qs["before"][0]) if "before" in qs else None
+        except ValueError:
+            return 400, {"error": "limit and before must be integers"}
+        if not symbol or not interval or not 1 <= limit <= 1000:
+            return 400, {"error": "symbol, interval and limit between 1 and 1000 required"}
+        return 200, {"symbol": symbol, "interval": interval,
+                     **db.read_state_page(symbol, interval, limit, before=before)}
 
     # ---- complete chart window ----
     # One browser request returns every range-bound dataset required
@@ -115,7 +126,10 @@ def handle_get(path, raw_qs, server):
         symbol = qs.get("symbol", [None])[0]
         if not symbol:
             return 400, {"error": "symbol required"}
-        return 200, sm.get_meta(symbol)
+        # Compatibility endpoint; price formatting now comes from stored
+        # bars/config in the UI. Never contact an exchange for chart metadata.
+        precision = read_ui_config().get("price_precision", {}).get(symbol, 2)
+        return 200, {"precision": precision, "tickSize": 10 ** -precision}
 
     # ---- live candle ----
     if path == "/api/live_candle":
@@ -123,11 +137,7 @@ def handle_get(path, raw_qs, server):
         interval = qs.get("interval", [None])[0]
         if not symbol or not interval:
             return 400, {"error": "symbol and interval required"}
-        try:
-            bar = lc.fetch_forming_candle(symbol, interval)
-        except Exception as e:
-            return 502, {"error": str(e)}
-        return 200, bar or {}
+        return 410, {"error": "Chart UI uses stored closed bars via /api/bars"}
 
     # ---- ui config ----
     if path == "/api/ui_config":

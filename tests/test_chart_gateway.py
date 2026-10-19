@@ -55,6 +55,57 @@ class ChartGatewayTests(unittest.TestCase):
         self.assertEqual(packet['features'][0]['time'], 120)
         self.assertEqual(packet['flags_history'][0]['bar_time'], 180000)
 
+    def test_paged_bars_are_unified_and_cursor_is_exclusive(self):
+        packet = db.read_state_page('BTCUSDT', '1m', 2)
+        self.assertEqual([b['time'] for b in packet['bars']], [120, 180])
+        self.assertEqual(packet['next_before'], 120000)
+        self.assertEqual(packet['bars'][0]['features']['ema50'], 42)
+        self.assertEqual(packet['bars'][1]['adcn']['signal_type'], 'BUY')
+        older = db.read_state_page('BTCUSDT', '1m', 2, before=packet['next_before'])
+        self.assertEqual([b['time'] for b in older['bars']], [60])
+        self.assertIsNone(older['next_before'])
+        self.assertIsNone(older['bars'][0]['features'])
+        self.assertIsNone(older['bars'][0]['adcn'])
+
+    def test_exact_thousand_is_independent_of_wall_clock_and_gaps(self):
+        rows = [self.candle('SUIUSDT', 1000000 + i*120000) for i in range(1500)]
+        db.write_klines(rows)
+        latest = db.read_state_page('SUIUSDT', '1m', 1000)
+        self.assertEqual(len(latest['bars']), 1000)
+        self.assertEqual(latest['bars'][0]['open_time'], rows[500]['open_time'])
+        older = db.read_state_page('SUIUSDT', '1m', 500, before=latest['next_before'])
+        self.assertEqual(len(older['bars']), 500)
+        self.assertIsNone(older['next_before'])
+        self.assertEqual(older['bars'][-1]['open_time'], rows[499]['open_time'])
+
+    def test_calendar_month_pages_use_stored_keys(self):
+        from datetime import datetime, timezone
+        rows = []
+        for month in (1,2,3,5):
+            row = self.candle('BTCUSDT', int(datetime(2024,month,1,tzinfo=timezone.utc).timestamp()*1000))
+            row['interval'] = '1M'
+            rows.append(row)
+        db.write_klines(rows)
+        packet = db.read_state_page('BTCUSDT', '1M', 3)
+        self.assertEqual([b['open_time'] for b in packet['bars']], [r['open_time'] for r in rows[1:]])
+
+    def test_ui_bar_routes_never_contact_binance(self):
+        with patch('urllib.request.urlopen', side_effect=AssertionError('unexpected upstream request')):
+            status, packet = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&limit=2', None)
+            self.assertEqual(status,200)
+            self.assertEqual(len(packet['bars']),2)
+            self.assertNotIn('klines',packet)
+            self.assertNotIn('features',packet)
+            status, _ = routes.handle_get('/api/live_candle','symbol=BTCUSDT&interval=1m',None)
+            self.assertEqual(status,410)
+            status, _ = routes.handle_get('/api/symbol_meta','symbol=BTCUSDT',None)
+            self.assertEqual(status,200)
+
+    def test_invalid_cursor_and_page_size_are_rejected(self):
+        for query in ['limit=0','limit=1001','before=wrong','limit=wrong']:
+            status,_ = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&'+query,None)
+            self.assertEqual(status,400)
+
     def test_real_feature_builder_reaches_the_joined_gateway(self):
         from Section_4_Features.processor import _compute_and_write_one
         rows = []

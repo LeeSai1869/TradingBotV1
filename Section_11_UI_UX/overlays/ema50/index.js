@@ -1,4 +1,4 @@
-// VISUAL: ema50 — EMA-50 line from features packet.
+// VISUAL: EMA-50 from the same stored bars used by the candle series.
 export const name = "ema50";
 let series = null;
 
@@ -12,13 +12,15 @@ export function mount(chart) {
     });
 }
 
-export function update(chart, data) {
+export function update(chart, data, options = {}) {
     if (!series) return;
-    const features = data.features || [];
+    series.applyOptions({ visible: options.visible !== false });
+    const bars = data.bars || [];
     const points = [];
-    for (const row of features) {
-        if (row.ema50 == null) continue;
-        points.push({ time: row.time, value: row.ema50 });
+    for (const bar of bars) {
+        const value = bar.features?.ema50;
+        if (value == null || !Number.isFinite(value)) continue;
+        points.push({ time: bar.time, value });
     }
     series.setData(points);
 }

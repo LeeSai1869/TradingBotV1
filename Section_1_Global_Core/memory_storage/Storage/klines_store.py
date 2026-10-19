@@ -65,6 +65,28 @@ def read_last_n(conn, symbol, interval, n: int):
     return list(reversed(rows))
 
 
+def read_page(conn, symbol, interval, limit, *, before=None):
+    """Latest stored rows, or rows strictly before an existing candle key.
+
+    Count rows rather than estimating a duration: gaps and calendar months
+    must not shorten a page when enough stored history exists.
+    """
+    if not 1 <= limit <= 1001:
+        raise ValueError("limit must be between 1 and 1001")
+    where = "symbol=? AND interval=?"
+    params = [symbol, interval]
+    if before is not None:
+        where += " AND open_time<?"
+        params.append(before)
+    params.append(limit)
+    rows = conn.execute(
+        "SELECT symbol, interval, open_time, open, high, low, close, "
+        f"volume, close_time FROM klines WHERE {where} "
+        "ORDER BY open_time DESC LIMIT ?", params,
+    ).fetchall()
+    return list(reversed(rows))
+
+
 def read_after(conn, symbol, interval, after_open_time):
     """Every closed bar strictly after `after_open_time`, oldest first."""
     cur = conn.execute(
@@ -132,6 +154,7 @@ __all__ = [
     "read_row",
     "read_range",
     "read_last_n",
+    "read_page",
     "read_after",
     "last_open_time",
     "count_rows",

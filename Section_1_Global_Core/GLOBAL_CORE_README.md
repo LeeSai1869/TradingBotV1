@@ -196,3 +196,17 @@ Forbidden:
     Processors: 0 (scaffold only)
 
 Any subsequent change must update this record.
+
+### Stored-bar read contract 1.1 — 2026-10-19
+
+User-requested chart correction: `db.read_state_page()` exposes the existing
+three memories as one record per canonical candle, with count-based pages
+and an exclusive `before` cursor. `klines_store.read_page()` uses the existing
+primary key; no schema, ingestion, audit rule, BarEvent, processor, or stored
+data changes. Existing range readers remain compatible.
+
+Re-audit scope: isolated SQLite contract tests cover exact counts, gaps,
+calendar-month keys, missing derived rows, market identity and cursor edges.
+Browser flow tests exercise the same gateway. This is not a new market-data
+A1/A2/A5 certification: the cloud instance has no downloaded market history.
+The previously reported public-surface checker conflicts remain outstanding.

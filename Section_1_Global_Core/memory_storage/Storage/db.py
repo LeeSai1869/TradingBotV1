@@ -200,6 +200,50 @@ def read_state_range(symbol, interval, start_ms, end_ms):
     return state
 
 
+def read_state_page(symbol, interval, limit=1000, *, before=None):
+    """One combined record per stored candle, with an exclusive older cursor.
+
+    Keep the selected kline keys authoritative even while the ingestion
+    process commits new rows. Missing derived rows remain None.
+    """
+    if not 1 <= limit <= 1000:
+        raise ValueError("limit must be between 1 and 1000")
+    conn = klines_store.open_db()
+    try:
+        rows = klines_store.read_page(conn, symbol, interval, limit + 1, before=before)
+    finally:
+        conn.close()
+    has_more = len(rows) > limit
+    rows = rows[-limit:]
+    if not rows:
+        return {"bars": [], "next_before": None}
+    start_ms, end_ms = int(rows[0][2]), int(rows[-1][2]) + 1
+    conn = features_store.open_db()
+    try:
+        features = features_store.read_range(conn, symbol, interval, start_ms, end_ms)
+    finally:
+        conn.close()
+    conn = adcn_store.open_db()
+    try:
+        decisions = adcn_store.read_range(conn, symbol, interval, start_ms, end_ms)
+    finally:
+        conn.close()
+    features_by_time = {int(row["open_time"]): row for row in features}
+    decisions_by_time = {int(row["open_time"]): row for row in decisions}
+    bars = []
+    for row in rows:
+        client = dict(zip(_KLINE_COLUMNS, row))
+        open_time = int(client["open_time"])
+        bars.append({
+            "symbol": symbol, "interval": interval, "open_time": open_time,
+            "time": open_time // 1000,
+            "client": client,
+            "features": features_by_time.get(open_time),
+            "adcn": decisions_by_time.get(open_time),
+        })
+    return {"bars": bars, "next_before": start_ms if has_more else None}
+
+
 # ==============================================================================
 # ADCN
 # ==============================================================================
@@ -278,4 +322,5 @@ __all__ = [
 
     # canonical state
     "read_state_range",
+    "read_state_page",
 ]

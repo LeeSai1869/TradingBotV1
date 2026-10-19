@@ -19,6 +19,7 @@ const PANELS = [flagsPanel];
 
 const Composer = {
     mounted: false,
+    config: { display: {}, stored_refresh_ms: 5000, price_precision: {} },
 
     visuals: VISUALS,
     panels: PANELS,
@@ -32,6 +33,8 @@ const Composer = {
 
     async mountAll(chart) {
         if (this.mounted) return;
+        const response = await fetch("/api/ui_config", { cache: "no-store" });
+        if (response.ok) this.config = { ...this.config, ...await response.json() };
 
         for (const v of this.visuals) {
             try {
@@ -73,7 +76,7 @@ const Composer = {
         for (const v of this.visuals) {
             try {
                 if (v.update) {
-                    v.update(chart, data, options);
+                    v.update(chart, data, { ...options, visible: this.config.display?.[v.name] !== false });
                 }
             } catch (e) {
                 console.error(
