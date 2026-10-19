@@ -114,7 +114,7 @@ test('markers update one wrapper in place over repeated redraws',async()=>{
     }};
     const candles=await import('../Section_11_UI_UX/overlays/candles/index.js');
     const markers=await import('../Section_11_UI_UX/overlays/markers/index.js');
-    candles.mount({addSeries:()=>({})});
+    candles.mount({addSeries:()=>({attachPrimitive(){}})});
     for(let i=0;i<100;i++) markers.update(null,{bars:[bar(60,{adcn:{signal_type:'BUY',final_score:70}})]});
     assert.equal(created,1);assert.equal(updates,99);assert.equal(detached,0);
 });

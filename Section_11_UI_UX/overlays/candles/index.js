@@ -4,6 +4,50 @@ export const name = "candles";
 
 let series = null;
 let currentPriceLine = null;
+let currentPriceRay = null;
+
+// A native price line spans the entire pane. Draw the live-price ray ourselves
+// so it begins at the newest candle, with a dotted reference in history.
+class CurrentPriceRay {
+    attached({ chart, series, requestUpdate }) {
+        this.chart = chart;
+        this.series = series;
+        this.requestUpdate = requestUpdate;
+    }
+
+    detached() {
+        this.chart = this.series = this.requestUpdate = null;
+    }
+
+    setBar(bar) {
+        this.bar = bar;
+        this.requestUpdate?.();
+    }
+
+    paneViews() { return [this]; }
+    renderer() { return this; }
+    zOrder() { return "normal"; }
+
+    draw(target) {
+        if (!this.bar || !this.series?.options().visible) return;
+        const y = this.series.priceToCoordinate(this.bar.client.close);
+        const x = this.chart.timeScale().timeToCoordinate(this.bar.time);
+        if (y === null || x === null) return;
+        target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+            const visible = x >= 0 && x <= mediaSize.width;
+            context.save();
+            context.strokeStyle = this.bar.client.close >= this.bar.client.open
+                ? "#26a69a" : "#ef5350";
+            context.lineWidth = 1;
+            context.setLineDash(visible ? [] : [2, 3]);
+            context.beginPath();
+            context.moveTo(visible ? x : 0, y);
+            context.lineTo(mediaSize.width, y);
+            context.stroke();
+            context.restore();
+        });
+    }
+}
 
 let priceFormat = {
     type: "price",
@@ -25,6 +69,8 @@ export function mount(chart) {
             lastValueVisible: false,
         }
     );
+    currentPriceRay = new CurrentPriceRay();
+    series.attachPrimitive(currentPriceRay);
 }
 
 function _toPoints(bars) {
@@ -35,6 +81,7 @@ function _toPoints(bars) {
 }
 
 function updateCurrentPrice(bar) {
+    currentPriceRay.setBar(bar);
     if (!bar) {
         if (currentPriceLine) series.removePriceLine(currentPriceLine);
         currentPriceLine = null;
@@ -45,6 +92,7 @@ function updateCurrentPrice(bar) {
         color: bar.client.close >= bar.client.open ? "#26a69a" : "#ef5350",
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
+        lineVisible: false,
         axisLabelVisible: true,
     };
     if (currentPriceLine) currentPriceLine.applyOptions(options);
