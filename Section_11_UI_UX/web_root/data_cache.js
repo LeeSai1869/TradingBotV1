@@ -72,6 +72,7 @@ const DataCache = {
     // Reload generation invalidates every request belonging to
     // an older symbol/timeframe/load cycle.
     _reloadGeneration: 0,
+    loading: false,
 
     // Directional request ownership is independent.
     // Older navigation must never cancel newer navigation,
@@ -142,8 +143,6 @@ const DataCache = {
             return null;
         }
 
-        const step = this._stepMs();
-
         const firstMs = this._rowTimeMs(this.klines[0]);
         const lastMs = this._rowTimeMs(
             this.klines[this.klines.length - 1]
@@ -155,7 +154,7 @@ const DataCache = {
 
         return {
             startMs: firstMs,
-            endMs: lastMs + step,
+            endMs: this._shiftMs(lastMs, 1),
         };
     },
 
@@ -163,58 +162,73 @@ const DataCache = {
         this.symbol = symbol;
         this.timeframe = timeframe;
         this.atLiveEdge = true;
-
-        // A full load invalidates every request from the previous
-        // symbol/timeframe/load cycle.
+        this.loading = true;
         const generation = ++this._reloadGeneration;
-
         ++this._olderRequestId;
         ++this._newerRequestId;
-
         this.readyOlder = null;
         this.readyNewer = null;
+        this.klines = [];
+        this.features = [];
+        this.flags_history = [];
+        this.flags_current = null;
+        this.emit("loading", { resetViewport: false });
 
-        const step = this._stepMs();
         const end = Date.now();
-
-        const start =
-            Math.floor(
-                (end - WINDOW_BARS * step) / step
-            ) * step;
-
-        const packet = await this._fetchWindow(start, end);
-
-        this.startMs = start;
-        this.endMs = end;
-
-        this.klines = packet.klines;
-        this.features = packet.features;
-        this.flags_history = packet.flags_history;
-
-        console.log(
-            "[REG01 assign]",
-            "DataCache.klines=" + this.klines.length,
-            "DataCache.features=" + this.features.length
-        );
-
-        const debugStatus =
-            document.getElementById("status");
-
-        if (debugStatus) {
-            debugStatus.textContent =
-                "ASSIGN | cache=" + this.klines.length +
-                " | features=" + this.features.length;
+        const start = this._shiftMs(end, -WINDOW_BARS);
+        try {
+            const [packet, flags] = await Promise.all([
+                this._fetchWindow(start, end),
+                this._readFlagsCurrent(symbol, timeframe),
+            ]);
+            if (generation !== this._reloadGeneration) return false;
+            Object.assign(this, packet, {
+                startMs: start, endMs: end, flags_current: flags,
+            });
+            this.loading = false;
+            this.emit("reload", { resetViewport: true });
+            void this._prefetchInitialOlder(generation);
+            return true;
+        } finally {
+            if (generation === this._reloadGeneration) this.loading = false;
         }
+    },
 
-        await this._fetchFlagsCurrent();
+    // Calendar months are not fixed 30-day intervals. Boundaries are
+    // calculated from the canonical candle open time in UTC.
+    _shiftMs(time, bars) {
+        if (this.timeframe === "1M") {
+            const date = new Date(time);
+            return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + bars, 1);
+        }
+        return time + bars * this._stepMs();
+    },
 
-        // Existing initial-render event only.
-        this.emit("reload");
-
-        // Initial historical reserve:
-        // A is active/current. B must already be available.
-        // Do not request future blocks at the live edge.
-        void this._prefetchInitialOlder(generation);
+    async refreshLive() {
+        if (this.loading || !this.atLiveEdge) return false;
+        const generation = this._reloadGeneration;
+        const first = this.klines[0];
+        const start = first ? first.time * 1000 : this._shiftMs(Date.now(), -WINDOW_BARS);
+        const end = Date.now();
+        const packet = await this._fetchWindow(start, end);
+        // Panning while this request was pending must not return the user to now.
+        if (generation !== this._reloadGeneration || !this.atLiveEdge || this.loading) {
+            return false;
+        }
+        const previous = this.klines;
+        packet.klines = packet.klines.slice(-WINDOW_BARS);
+        const times = new Set(packet.klines.map(row => row.time));
+        packet.features = packet.features.filter(row => times.has(row.time));
+        packet.flags_history = packet.flags_history.filter(row =>
+            times.has(Math.floor(row.bar_time / 1000)));
+        Object.assign(this, packet, { startMs: start, endMs: end });
+        // A reserve based on the old active boundary is no longer adjacent.
+        if (previous[0]?.time !== this.klines[0]?.time) {
+            this.readyOlder = null;
+            void this._prefetchInitialOlder(generation);
+        }
+        this.emit("live-refresh", { previousKlines: previous, resetViewport: false });
+        return true;
     },
 
     async _fetchBlock(startMs, endMs) {
@@ -233,44 +247,10 @@ const DataCache = {
     async _prefetchInitialOlder(
         generation = this._reloadGeneration
     ) {
+        if (generation !== this._reloadGeneration) return false;
         const bounds = this._activeBounds();
-
-        if (!bounds) {
-            return false;
-        }
-
-        const span = BLOCK_BARS * this._stepMs();
-        const startMs = bounds.startMs - span;
-        const endMs = bounds.startMs;
-
-        try {
-            const block = await this._fetchBlock(
-                startMs,
-                endMs
-            );
-
-            if (generation !== this._reloadGeneration) {
-                return false;
-            }
-
-            this.readyOlder =
-                block.klines.length ? block : null;
-
-            console.log(
-                "[CACHE INITIAL READY]",
-                "older=" + block.klines.length,
-                "active=" + this.klines.length
-            );
-
-            return true;
-
-        } catch (e) {
-            console.error(
-                "[CACHE INITIAL READY] failed:",
-                e
-            );
-            return false;
-        }
+        if (!bounds) return false;
+        return this.prefetchNextOlder(bounds.startMs);
     },
 
     // --------------------------------------------------------
@@ -286,10 +266,12 @@ const DataCache = {
     },
 
     setReadyOlder(block) {
+        ++this._olderRequestId;
         this.readyOlder = block || null;
     },
 
     setReadyNewer(block) {
+        ++this._newerRequestId;
         this.readyNewer = block || null;
     },
 
@@ -304,9 +286,8 @@ const DataCache = {
     async prefetchNextOlder(newActiveStartMs) {
         const reloadGeneration = this._reloadGeneration;
         const requestId = ++this._olderRequestId;
-        const span = BLOCK_BARS * this._stepMs();
 
-        const startMs = newActiveStartMs - span;
+        const startMs = this._shiftMs(newActiveStartMs, -BLOCK_BARS);
         const endMs = newActiveStartMs;
 
         try {
@@ -317,15 +298,14 @@ const DataCache = {
 
             if (
                 reloadGeneration !== this._reloadGeneration ||
-                requestId !== this._olderRequestId
+                requestId !== this._olderRequestId ||
+                this._activeBounds()?.startMs !== newActiveStartMs
             ) {
                 return false;
             }
 
             this.readyOlder =
                 block.klines.length ? block : null;
-
-            this.atLiveEdge = false;
 
             console.log(
                 "[CACHE NEXT OLDER READY]",
@@ -347,10 +327,9 @@ const DataCache = {
     async prefetchNextNewer(newActiveEndMs) {
         const reloadGeneration = this._reloadGeneration;
         const requestId = ++this._newerRequestId;
-        const span = BLOCK_BARS * this._stepMs();
 
         const startMs = newActiveEndMs;
-        const endMs = newActiveEndMs + span;
+        const endMs = this._shiftMs(newActiveEndMs, BLOCK_BARS);
 
         try {
             const block = await this._fetchBlock(
@@ -360,7 +339,8 @@ const DataCache = {
 
             if (
                 reloadGeneration !== this._reloadGeneration ||
-                requestId !== this._newerRequestId
+                requestId !== this._newerRequestId ||
+                this._activeBounds()?.endMs !== newActiveEndMs
             ) {
                 return false;
             }
@@ -443,23 +423,16 @@ const DataCache = {
         };
     },
 
-    async _fetchFlagsCurrent() {
-        const s = this.symbol;
-        const tf = this.timeframe;
-
+    async _readFlagsCurrent(symbol, timeframe) {
         try {
             const r = await fetch(
-                `/api/flags_current?symbol=${encodeURIComponent(s)}` +
-                `&interval=${encodeURIComponent(tf)}` +
-                `&_=${Date.now()}`,
+                `/api/flags_current?symbol=${encodeURIComponent(symbol)}` +
+                `&interval=${encodeURIComponent(timeframe)}`,
                 { cache: "no-store" }
             );
-
-            this.flags_current =
-                r.ok ? await r.json() : null;
-
-        } catch (e) {
-            this.flags_current = null;
+            return r.ok ? await r.json() : null;
+        } catch {
+            return null;
         }
     },
 };

@@ -1,3 +1,4 @@
+import { logicalShift } from "./window_state.js";
 // ============================================================
 // APP — startup + controls + live polling.
 //
@@ -118,7 +119,7 @@ function buildBlockFromRows(
 
     return {
         startMs: first * 1000,
-        endMs: last * 1000 + DataCache._stepMs(),
+        endMs: DataCache._shiftMs(last * 1000, 1),
         klines,
         features: filterRowsToActive(
             features,
@@ -229,10 +230,8 @@ function applyActivePacket(direction, block) {
         flagTime
     );
 
-    const step = DataCache._stepMs();
-
     DataCache.startMs = bounds.first * 1000;
-    DataCache.endMs = bounds.last * 1000 + step;
+    DataCache.endMs = DataCache._shiftMs(bounds.last * 1000, 1);
 
     // The ready block used for this shift has now been
     // consumed. It must not remain available while the next
@@ -255,6 +254,7 @@ function applyActivePacket(direction, block) {
     return {
         bounds,
         displaced,
+        logicalShift: logicalShift(currentKlines, DataCache.klines),
     };
 }
 
@@ -317,7 +317,7 @@ async function navigate(chart, direction) {
             )
     );
 
-    if (navigationBusy || suppressNavigation) {
+    if (navigationBusy || suppressNavigation || DataCache.loading) {
         console.log(
             `[FLOW C${cycleId} NAV REJECTED]`,
             "busy/suppressed"
@@ -397,14 +397,10 @@ async function navigate(chart, direction) {
                 )
         );
 
-        // The active dataset rolls by exactly one 500-bar block.
-        // Preserve the same visible candles by compensating for that
-        // logical index displacement exactly once.
+        // A partial block or gap may move fewer than 500 candles.
+        // Compensate using the actual shared candle positions.
         if (visibleLogicalRange) {
-            const logicalShift =
-                direction === "left"
-                    ? BLOCK_BARS
-                    : -BLOCK_BARS;
+            const logicalShift = result.logicalShift;
 
             console.log(
                 `[FLOW C${cycleId} COMPENSATE REQUEST]`,
@@ -444,8 +440,7 @@ async function navigate(chart, direction) {
         if (bounds) {
             const newStartMs = bounds.first * 1000;
             const newEndMs =
-                bounds.last * 1000 +
-                DataCache._stepMs();
+                DataCache._shiftMs(bounds.last * 1000, 1);
 
             // A -> B means B was already ready.
             // After entering B, prepare C only.
@@ -647,33 +642,23 @@ function installHistoricalNavigation(chart) {
         );
 }
 
+let loadId = 0;
 async function loadAll() {
+    const id = ++loadId;
     const symbol = symbolControl.value();
     const timeframe = timeframeControl.value();
-
-    Canvas.resetViewportOnNextReload = true;
-    status().textContent =
-        `Loading ${symbol} ${timeframe}...`;
-
+    status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
+        // Begin invalidating the previous load before any metadata request.
+        const loaded = await DataCache.loadInitial(symbol, timeframe);
+        if (id !== loadId || !loaded) return;
         await symbolControl.applyPriceFormat(symbol);
-        await DataCache.loadInitial(
-            symbol,
-            timeframe
-        );
-
-        status().textContent =
-            `${symbol} ${timeframe} | ` +
-            `${DataCache.klines.length} candles`;
-
+        if (id !== loadId) return;
+        status().textContent = `${symbol} ${timeframe} | ${DataCache.klines.length} candles`;
     } catch (e) {
-        status().textContent =
-            "Error: " + e.message;
-
-        console.error(
-            "[app] load failed:",
-            e
-        );
+        if (id !== loadId) return;
+        status().textContent = "Error: " + e.message;
+        console.error("[app] load failed:", e);
     }
 }
 
@@ -688,21 +673,23 @@ async function loadAll() {
 
     DataCache.subscribe(
         (cache, op, meta = {}) => {
-            const resetViewport =
-                !!Canvas.resetViewportOnNextReload;
-
-            Canvas.resetViewportOnNextReload =
-                false;
-
-            Composer.updateAll(
-                chart,
-                cache,
-                op || "reload",
-                {
-                    resetViewport,
-                    ...meta,
-                }
-            );
+            const range = meta.previousKlines
+                ? chart.timeScale().getVisibleLogicalRange() : null;
+            suppressNavigation = true;
+            Composer.updateAll(chart, cache, op || "reload", meta);
+            if (range) {
+                const following = cache.atLiveEdge &&
+                    range.to >= meta.previousKlines.length - 1;
+                const shift = following
+                    ? cache.klines.length - meta.previousKlines.length
+                    : logicalShift(meta.previousKlines, cache.klines);
+                chart.timeScale().setVisibleLogicalRange({
+                    from: range.from + shift, to: range.to + shift,
+                });
+            }
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (!navigationBusy) suppressNavigation = false;
+            }));
         }
     );
 

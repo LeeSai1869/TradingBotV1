@@ -28,6 +28,7 @@ export async function applyPriceFormat(symbol) {
                               { cache: "no-store" });
         if (!r.ok) return;
         const meta = await r.json();
+        if (el().value !== symbol) return;
         const prec = meta.precision ?? 2;
         setPriceFormat({ type: "price", precision: prec, minMove: Math.pow(10, -prec) });
     } catch (e) {
