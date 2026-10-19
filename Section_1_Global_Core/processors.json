@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "description": "Downstream processors called by Global Core on each new closed bar.",
+  "processors": [
+    {"module": "Section_4_Features.processor", "function": "process_bar"}
+  ]
+}

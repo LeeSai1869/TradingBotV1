@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Indicator — Chart</title>
+    <link rel="stylesheet" href="/web_root/styles.css">
+    <script src="https://unpkg.com/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<div id="app">
+    <div id="toolbar">
+        <label>Symbol</label>
+        <select id="symbol"></select>
+
+        <label>Timeframe</label>
+        <select id="interval"></select>
+        <span id="tf-buttons"></span>
+
+        <button id="reload">Reload</button>
+        <div id="status">Loading...</div>
+    </div>
+    <div id="chart"></div>
+</div>
+
+<div id="flags-panel">
+    <div class="flags-title">FLAGS (LIVE)</div>
+    <div id="flags-tf" class="flags-row">tf: —</div>
+    <div id="flags-signal" style="font-weight: bold;">signal: —</div>
+    <div id="flags-score" class="flags-row">score: —</div>
+    <div id="flags-state" class="flags-row">state: —</div>
+    <div id="flags-memory" class="flags-row">signal history: —</div>
+</div>
+
+<!-- System -->
+<script type="module" src="/chart/index.js"></script>
+<script type="module" src="/web_root/data_cache.js"></script>
+<script type="module" src="/web_root/composer.js"></script>
+<script type="module" src="/web_root/live_poll.js"></script>
+<script type="module" src="/web_root/app.js"></script>
+
+</body>
+</html>

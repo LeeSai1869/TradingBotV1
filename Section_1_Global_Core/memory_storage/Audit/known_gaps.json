@@ -1,0 +1,1584 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "interval": "12h",
+    "from_ms": 1518091200000,
+    "to_ms": 1518134400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1504714500000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1512368100000,
+    "to_ms": 1512369900000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1513600200000,
+    "to_ms": 1513603800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1515035700000,
+    "to_ms": 1515042000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1518049800000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1518242400000,
+    "to_ms": 1518243300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1518322500000,
+    "to_ms": 1518323400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1530104400000,
+    "to_ms": 1530110700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1530664200000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1539928800000,
+    "to_ms": 1539941400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1559942100000,
+    "to_ms": 1559945700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1573610400000,
+    "to_ms": 1573618500000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1582112700000,
+    "to_ms": 1582133400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1583314200000,
+    "to_ms": 1583321400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1587780000000,
+    "to_ms": 1587789000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1593309600000,
+    "to_ms": 1593322200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1608559200000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1613015100000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1614996000000,
+    "to_ms": 1615001400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1618884000000,
+    "to_ms": 1618893000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1619324100000,
+    "to_ms": 1619340300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1628820000000,
+    "to_ms": 1628836200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "15m",
+    "from_ms": 1679661900000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1504717200000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1515038400000,
+    "to_ms": 1515042000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1518051600000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1530104400000,
+    "to_ms": 1530108000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1530666000000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1539928800000,
+    "to_ms": 1539939600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1573610400000,
+    "to_ms": 1573617600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1582113600000,
+    "to_ms": 1582131600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1583316000000,
+    "to_ms": 1583319600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1587780000000,
+    "to_ms": 1587787200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1593309600000,
+    "to_ms": 1593320400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1608559200000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1613016000000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1614996000000,
+    "to_ms": 1614999600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1618884000000,
+    "to_ms": 1618891200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1619326800000,
+    "to_ms": 1619337600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1628820000000,
+    "to_ms": 1628834400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "from_ms": 1679662800000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1504713660000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1512367260000,
+    "to_ms": 1512370140000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1513591260000,
+    "to_ms": 1513592040000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1513600200000,
+    "to_ms": 1513604040000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1515034860000,
+    "to_ms": 1515042360000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1518049740000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1518242400000,
+    "to_ms": 1518243300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1518321660000,
+    "to_ms": 1518323700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1530104400000,
+    "to_ms": 1530110700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1530663780000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1539928800000,
+    "to_ms": 1539941400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1559942040000,
+    "to_ms": 1559945700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1573610400000,
+    "to_ms": 1573618800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1573623000000,
+    "to_ms": 1573623180000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1582112160000,
+    "to_ms": 1582133400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1583313720000,
+    "to_ms": 1583321400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1587780000000,
+    "to_ms": 1587789000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1593309600000,
+    "to_ms": 1593322200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1608558480000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1613014860000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1614996000000,
+    "to_ms": 1615001400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1618884000000,
+    "to_ms": 1618893000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1619323260000,
+    "to_ms": 1619340300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1628820000000,
+    "to_ms": 1628836200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "from_ms": 1679661600000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1504720800000,
+    "to_ms": 1504735200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1518055200000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1530669600000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1539928800000,
+    "to_ms": 1539936000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1542160800000,
+    "to_ms": 1542182400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1557892800000,
+    "to_ms": 1557921600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1573610400000,
+    "to_ms": 1573617600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1582113600000,
+    "to_ms": 1582128000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1587780000000,
+    "to_ms": 1587787200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1593309600000,
+    "to_ms": 1593316800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1608559200000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1618884000000,
+    "to_ms": 1618891200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1619330400000,
+    "to_ms": 1619337600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "2h",
+    "from_ms": 1628820000000,
+    "to_ms": 1628834400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1504715400000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1513600200000,
+    "to_ms": 1513603800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1515036600000,
+    "to_ms": 1515042000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1518049800000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1530104400000,
+    "to_ms": 1530109800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1530664200000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1539928800000,
+    "to_ms": 1539941400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1559943000000,
+    "to_ms": 1559944800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1573610400000,
+    "to_ms": 1573617600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1582113600000,
+    "to_ms": 1582133400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1583314200000,
+    "to_ms": 1583321400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1587780000000,
+    "to_ms": 1587789000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1593309600000,
+    "to_ms": 1593322200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1608559200000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1613016000000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1614996000000,
+    "to_ms": 1615001400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1618884000000,
+    "to_ms": 1618893000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1619325000000,
+    "to_ms": 1619339400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1628820000000,
+    "to_ms": 1628836200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "30m",
+    "from_ms": 1679662800000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1504713780000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1512367380000,
+    "to_ms": 1512370080000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1513591380000,
+    "to_ms": 1513591920000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1513600200000,
+    "to_ms": 1513603980000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1515034980000,
+    "to_ms": 1515042360000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1518049800000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1518242400000,
+    "to_ms": 1518243300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1518321780000,
+    "to_ms": 1518323580000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1530104400000,
+    "to_ms": 1530110700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1530663840000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1539928800000,
+    "to_ms": 1539941400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1559942100000,
+    "to_ms": 1559945700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1573610400000,
+    "to_ms": 1573618680000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1573623000000,
+    "to_ms": 1573623180000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1582112160000,
+    "to_ms": 1582133400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1583313840000,
+    "to_ms": 1583321400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1587780000000,
+    "to_ms": 1587789000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1593309600000,
+    "to_ms": 1593322200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1608558480000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1613014920000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1614996000000,
+    "to_ms": 1615001400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1618884000000,
+    "to_ms": 1618893000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1619323380000,
+    "to_ms": 1619340300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1628820000000,
+    "to_ms": 1628836200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "3m",
+    "from_ms": 1679661720000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1518062400000,
+    "to_ms": 1518163200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1529985600000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1530676800000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1542168000000,
+    "to_ms": 1542182400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1552363200000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1557892800000,
+    "to_ms": 1557921600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1565841600000,
+    "to_ms": 1565856000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "4h",
+    "from_ms": 1582113600000,
+    "to_ms": 1582128000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1504713900000,
+    "to_ms": 1504738800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1512367500000,
+    "to_ms": 1512369900000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1513591500000,
+    "to_ms": 1513591800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1513600200000,
+    "to_ms": 1513603800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1515035100000,
+    "to_ms": 1515042300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1518049800000,
+    "to_ms": 1518170400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1518242400000,
+    "to_ms": 1518243300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1518321900000,
+    "to_ms": 1518323700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1529978400000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1530104400000,
+    "to_ms": 1530110700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1530663900000,
+    "to_ms": 1530691200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1539928800000,
+    "to_ms": 1539941400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1542160800000,
+    "to_ms": 1542186000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1552356000000,
+    "to_ms": 1552377600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1557889200000,
+    "to_ms": 1557925200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1559942100000,
+    "to_ms": 1559945700000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1565834400000,
+    "to_ms": 1565863200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1573610400000,
+    "to_ms": 1573618800000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1574647200000,
+    "to_ms": 1574654400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1581213600000,
+    "to_ms": 1581217200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1582112400000,
+    "to_ms": 1582133400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1583313900000,
+    "to_ms": 1583321400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1587780000000,
+    "to_ms": 1587789000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1593309600000,
+    "to_ms": 1593322200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1606716000000,
+    "to_ms": 1606719600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1608558600000,
+    "to_ms": 1608573600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1608861600000,
+    "to_ms": 1608865200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1613015100000,
+    "to_ms": 1613019600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1614996000000,
+    "to_ms": 1615001400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1618884000000,
+    "to_ms": 1618893000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1619323500000,
+    "to_ms": 1619340300000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1628820000000,
+    "to_ms": 1628836200000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1632898800000,
+    "to_ms": 1632906000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "from_ms": 1679661600000,
+    "to_ms": 1679666400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "6h",
+    "from_ms": 1518069600000,
+    "to_ms": 1518156000000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "6h",
+    "from_ms": 1529992800000,
+    "to_ms": 1530014400000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "6h",
+    "from_ms": 1557900000000,
+    "to_ms": 1557921600000,
+    "reason": "binance_source_gap"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "interval": "8h",
+    "from_ms": 1518076800000,
+    "to_ms": 1518163200000,
+    "reason": "binance_source_gap"
+  }
+]

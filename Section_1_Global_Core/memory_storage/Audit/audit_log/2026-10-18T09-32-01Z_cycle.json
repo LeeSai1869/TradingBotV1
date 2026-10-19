@@ -1,0 +1,111 @@
+{
+  "started_at": "2026-10-18T09:32:01Z",
+  "klines_sha256": "ed0eff4d9971afc4bc1608c4c3394fa343672a95eed010c15323589aca146580",
+  "pairs": 30,
+  "A1": {
+    "checked": 300,
+    "failed": 0,
+    "failures": []
+  },
+  "A2": [],
+  "A3": {
+    "ran": false
+  },
+  "A4": [
+    {
+      "enabled": true,
+      "symbol": "BTCUSDT",
+      "pairs": [
+        {
+          "short": "1m",
+          "long": "15m",
+          "checked": 500,
+          "mismatch_count": 1,
+          "mismatches": [
+            {
+              "bucket": 1792125000000,
+              "field": "volume",
+              "long": 76.8315,
+              "short_sum": 76.00854,
+              "diff_pct": 1.0711
+            }
+          ]
+        },
+        {
+          "short": "5m",
+          "long": "1h",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        },
+        {
+          "short": "15m",
+          "long": "4h",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        },
+        {
+          "short": "1h",
+          "long": "1d",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "symbol": "SUIUSDT",
+      "pairs": [
+        {
+          "short": "1m",
+          "long": "15m",
+          "checked": 500,
+          "mismatch_count": 1,
+          "mismatches": [
+            {
+              "bucket": 1791891900000,
+              "field": "volume",
+              "long": 438734.8,
+              "short_sum": 435593.0,
+              "diff_pct": 0.7161
+            }
+          ]
+        },
+        {
+          "short": "5m",
+          "long": "1h",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        },
+        {
+          "short": "15m",
+          "long": "4h",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        },
+        {
+          "short": "1h",
+          "long": "1d",
+          "checked": 500,
+          "mismatch_count": 0,
+          "mismatches": []
+        }
+      ]
+    }
+  ],
+  "A5": {
+    "enabled": true,
+    "checked": 30,
+    "fresh": 30,
+    "stale": [],
+    "stale_count": 0,
+    "missing": 0
+  },
+  "finished_at": "2026-10-18T09:32:06Z",
+  "duration_ms": 4477,
+  "pass": true
+}

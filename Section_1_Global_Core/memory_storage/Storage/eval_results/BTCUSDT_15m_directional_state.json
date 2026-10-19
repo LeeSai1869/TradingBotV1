@@ -1,0 +1,54 @@
+{
+  "strategy": "directional_state",
+  "symbol": "BTCUSDT",
+  "interval": "15m",
+  "trades": 3648,
+  "winners": 983,
+  "losers": 2665,
+  "breakeven": 0,
+  "take_profit_trades": 1514,
+  "stop_loss_trades": 2134,
+  "condition_hit_counts": {
+    "dom_band_flip": 180,
+    "dom_disp_flip": 688,
+    "trail_atr": 1061,
+    "hard_stop_1pct": 578,
+    "structural_stop": 1853
+  },
+  "selected_exit_counts": {
+    "dom_band_flip": 180,
+    "dom_disp_flip": 590,
+    "trail_atr": 744,
+    "hard_stop_1pct": 578,
+    "structural_stop": 1556
+  },
+  "simultaneous_condition_counts": {
+    "0": 0,
+    "1": 2983,
+    "2": 618,
+    "3": 47,
+    "4": 0,
+    "5": 0
+  },
+  "gross_mean": -3.433102991161544e-05,
+  "net_mean": -0.0020343310299116156,
+  "net_median": -0.00383257407529336,
+  "net_std": 0.009441163749638716,
+  "final_capital": 5.05674430315377,
+  "max_drawdown": 10142.143870771299,
+  "round_trip_fee": 0.002,
+  "hard_stop_pct": 0.01,
+  "dom_band": 0.05,
+  "dispersion_threshold": 0.25,
+  "trail_k": 2.0,
+  "arm_atr": 1.0,
+  "tp_priority": [
+    "dom_band_flip",
+    "dom_disp_flip",
+    "trail_atr"
+  ],
+  "sl_priority": [
+    "hard_stop_1pct",
+    "structural_stop"
+  ]
+}

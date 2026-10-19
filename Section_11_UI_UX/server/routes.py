@@ -1,0 +1,164 @@
+"""HTTP dispatch for /api/* endpoints."""
+from __future__ import annotations
+import json
+from urllib.parse import urlparse, parse_qs
+
+from Section_1_Global_Core.memory_storage.Storage import db
+
+from . import queries
+from . import live_candle as lc
+from . import symbol_meta as sm
+
+HERE = None
+UI_CONFIG = None
+
+
+def clean(v):
+    if v is None:
+        return None
+    return v.split("?", 1)[0]
+
+
+def _int(qs, name, default=None):
+    v = qs.get(name, [None])[0]
+    if v is None:
+        return default
+    try:
+        return int(v)
+    except ValueError:
+        return default
+
+
+def handle_get(path, raw_qs, server):
+    qs = parse_qs(raw_qs)
+    for k in list(qs.keys()):
+        qs[k] = [clean(x) for x in qs[k]]
+
+    # ---- complete chart window ----
+    # One browser request returns every range-bound dataset required
+    # to render the same chart window.
+    if path == "/api/chart_window":
+        symbol = qs.get("symbol", [None])[0]
+        interval = qs.get("interval", [None])[0]
+        start = _int(qs, "start")
+        end = _int(qs, "end")
+
+        if not symbol or not interval or start is None or end is None:
+            return 400, {
+                "error": "symbol, interval, start, end required"
+            }
+
+        # One Central Core read produces the complete canonical state
+        # for this chart window. Klines own the timeline; features and
+        # ADCN are already aligned by (symbol, interval, open_time).
+        state = db.read_state_range(symbol, interval, start, end)
+
+        klines = []
+        features = []
+        flags_history = []
+
+        for bar in state:
+            client = bar["client"]
+
+            klines.append({
+                "time": int(bar["open_time"]) // 1000,
+                "open": client["open"],
+                "high": client["high"],
+                "low": client["low"],
+                "close": client["close"],
+                "volume": client["volume"],
+            })
+
+            feature = bar["features"]
+            if feature is not None:
+                features.append({
+                    "time": int(bar["open_time"]) // 1000,
+                    "ema50": feature.get("ema50"),
+                    "ema200": feature.get("ema200"),
+                })
+
+            adcn = bar["adcn"]
+            if (
+                adcn is not None
+                and adcn.get("signal_type") in ("BUY", "SELL")
+            ):
+                flags_history.append({
+                    "symbol": bar["symbol"],
+                    "tf": bar["interval"],
+                    "bar_time": int(bar["open_time"]),
+                    "signal_type": adcn["signal_type"],
+                    "final_score": float(adcn.get("final_score") or 0.0),
+                })
+
+        return 200, {
+            "symbol": symbol,
+            "interval": interval,
+            "start": start,
+            "end": end,
+            "klines": klines,
+            "features": features,
+            "flags_history": flags_history,
+        }
+
+    if path == "/api/flags_current":
+        symbol = qs.get("symbol", [None])[0]
+        interval = qs.get("interval", [None])[0]
+        if not symbol or not interval:
+            return 400, {"error": "symbol and interval required"}
+        return 200, queries.get_flags_current(symbol, interval)
+
+    # ---- symbols ----
+    if path == "/api/symbols":
+        return 200, {"symbols": queries.get_symbols()}
+
+    if path == "/api/symbol_meta":
+        symbol = qs.get("symbol", [None])[0]
+        if not symbol:
+            return 400, {"error": "symbol required"}
+        return 200, sm.get_meta(symbol)
+
+    # ---- live candle ----
+    if path == "/api/live_candle":
+        symbol = qs.get("symbol", [None])[0]
+        interval = qs.get("interval", [None])[0]
+        if not symbol or not interval:
+            return 400, {"error": "symbol and interval required"}
+        try:
+            bar = lc.fetch_forming_candle(symbol, interval)
+        except Exception as e:
+            return 502, {"error": str(e)}
+        return 200, bar or {}
+
+    # ---- ui config ----
+    if path == "/api/ui_config":
+        return 200, read_ui_config()
+
+    return None, None
+
+
+def handle_post(path, body, server):
+    if path == "/api/ui_config":
+        try:
+            payload = json.loads(body)
+        except Exception as e:
+            return 400, {"error": str(e)}
+        write_ui_config(payload)
+        return 200, {"ok": True}
+    return None, None
+
+
+def read_ui_config():
+    global UI_CONFIG
+    if UI_CONFIG is None or not UI_CONFIG.exists():
+        return {"timeframes": {"all": [], "favorites": []}}
+    with open(UI_CONFIG, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def write_ui_config(payload):
+    existing = read_ui_config()
+    existing["timeframes"] = payload.get("timeframes", existing.get("timeframes", {}))
+    tmp = UI_CONFIG.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=2)
+    tmp.replace(UI_CONFIG)

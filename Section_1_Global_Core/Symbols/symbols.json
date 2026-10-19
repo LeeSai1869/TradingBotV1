@@ -1,0 +1,655 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-10-13T10:13:58Z",
+  "source_of_ranking": "coingecko_market_cap",
+  "approved": [
+    {
+      "symbol": "BTCUSDT",
+      "rank": 1,
+      "approved_at": "2026-10-12T22:30:00Z",
+      "tags": []
+    },
+    {
+      "symbol": "SUIUSDT",
+      "rank": 47,
+      "approved_at": "2026-10-12T22:30:00Z",
+      "tags": []
+    }
+  ],
+  "disapproved": [
+    {
+      "symbol": "USDCUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "USDTUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "DAIUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "FDUSDUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "TUSDUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "USDPUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "BUSDUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-12T22:30:00Z"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "reason": "auto:meme",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USDSUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "XMRUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "WBTUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "LEOUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "RAINUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "CCUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "BTWUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USDEUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USD1USDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USDGUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "SHIBUSDT",
+      "reason": "auto:meme",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "CROUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "PYUSDUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "OKBUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "RLUSDUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USYCUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "reason": "auto:meme",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "USDYUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "BUIDLUSDT",
+      "reason": "not_on_binance",
+      "disapproved_at": "2026-10-13T04:37:04Z"
+    },
+    {
+      "symbol": "BFUSDUSDT",
+      "reason": "auto:stablecoin",
+      "disapproved_at": "2026-10-13T04:51:16Z"
+    }
+  ],
+  "pending": [],
+  "top50": [
+    {
+      "symbol": "BTCUSDT",
+      "rank": 1
+    },
+    {
+      "symbol": "ETHUSDT",
+      "rank": 2
+    },
+    {
+      "symbol": "BNBUSDT",
+      "rank": 4
+    },
+    {
+      "symbol": "XRPUSDT",
+      "rank": 5
+    },
+    {
+      "symbol": "SOLUSDT",
+      "rank": 7
+    },
+    {
+      "symbol": "TRXUSDT",
+      "rank": 8
+    },
+    {
+      "symbol": "ZECUSDT",
+      "rank": 10
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "rank": 11
+    },
+    {
+      "symbol": "LINKUSDT",
+      "rank": 15
+    },
+    {
+      "symbol": "ADAUSDT",
+      "rank": 17
+    },
+    {
+      "symbol": "NEARUSDT",
+      "rank": 20
+    },
+    {
+      "symbol": "XLMUSDT",
+      "rank": 21
+    },
+    {
+      "symbol": "BCHUSDT",
+      "rank": 22
+    },
+    {
+      "symbol": "LTCUSDT",
+      "rank": 25
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "rank": 27
+    },
+    {
+      "symbol": "UNIUSDT",
+      "rank": 28
+    },
+    {
+      "symbol": "SUIUSDT",
+      "rank": 30
+    },
+    {
+      "symbol": "GRAMUSDT",
+      "rank": 32
+    },
+    {
+      "symbol": "HBARUSDT",
+      "rank": 33
+    },
+    {
+      "symbol": "QNTUSDT",
+      "rank": 35
+    },
+    {
+      "symbol": "TAOUSDT",
+      "rank": 36
+    },
+    {
+      "symbol": "ENAUSDT",
+      "rank": 41
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "rank": 43
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "rank": 46
+    },
+    {
+      "symbol": "DOTUSDT",
+      "rank": 51
+    },
+    {
+      "symbol": "WLDUSDT",
+      "rank": 52
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "rank": 53
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "rank": 56
+    },
+    {
+      "symbol": "SKYUSDT",
+      "rank": 57
+    },
+    {
+      "symbol": "ICPUSDT",
+      "rank": 60
+    },
+    {
+      "symbol": "MORPHOUSDT",
+      "rank": 62
+    },
+    {
+      "symbol": "BFUSDUSDT",
+      "rank": 67
+    },
+    {
+      "symbol": "ETCUSDT",
+      "rank": 68
+    },
+    {
+      "symbol": "ARBUSDT",
+      "rank": 70
+    },
+    {
+      "symbol": "JSTUSDT",
+      "rank": 72
+    },
+    {
+      "symbol": "RENDERUSDT",
+      "rank": 73
+    },
+    {
+      "symbol": "JUPUSDT",
+      "rank": 74
+    },
+    {
+      "symbol": "POLUSDT",
+      "rank": 75
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "rank": 77
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "rank": 80
+    },
+    {
+      "symbol": "FILUSDT",
+      "rank": 81
+    },
+    {
+      "symbol": "AEROUSDT",
+      "rank": 84
+    },
+    {
+      "symbol": "ZROUSDT",
+      "rank": 86
+    },
+    {
+      "symbol": "NEXOUSDT",
+      "rank": 87
+    },
+    {
+      "symbol": "STXUSDT",
+      "rank": 89
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "rank": 91
+    },
+    {
+      "symbol": "INJUSDT",
+      "rank": 92
+    },
+    {
+      "symbol": "CAKEUSDT",
+      "rank": 93
+    },
+    {
+      "symbol": "APTUSDT",
+      "rank": 94
+    },
+    {
+      "symbol": "ETHFIUSDT",
+      "rank": 98
+    }
+  ],
+  "active_cap": 50,
+  "inactive_log": [],
+  "staged": [
+    {
+      "symbol": "ETHUSDT",
+      "rank": 2,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "rank": 4,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "rank": 5,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "rank": 7,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "TRXUSDT",
+      "rank": 8,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ZECUSDT",
+      "rank": 10,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "rank": 11,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "rank": 15,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "rank": 17,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "NEARUSDT",
+      "rank": 20,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "XLMUSDT",
+      "rank": 21,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "rank": 22,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "LTCUSDT",
+      "rank": 25,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "rank": 27,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "UNIUSDT",
+      "rank": 28,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "GRAMUSDT",
+      "rank": 32,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "HBARUSDT",
+      "rank": 33,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "QNTUSDT",
+      "rank": 35,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "TAOUSDT",
+      "rank": 36,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ENAUSDT",
+      "rank": 41,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "rank": 43,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "rank": 46,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "DOTUSDT",
+      "rank": 51,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "WLDUSDT",
+      "rank": 52,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "rank": 53,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "rank": 56,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "SKYUSDT",
+      "rank": 57,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ICPUSDT",
+      "rank": 60,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "MORPHOUSDT",
+      "rank": 62,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ETCUSDT",
+      "rank": 68,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ARBUSDT",
+      "rank": 70,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "JSTUSDT",
+      "rank": 72,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "RENDERUSDT",
+      "rank": 73,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "JUPUSDT",
+      "rank": 74,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "POLUSDT",
+      "rank": 75,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "rank": 77,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "rank": 80,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "FILUSDT",
+      "rank": 81,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "AEROUSDT",
+      "rank": 84,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ZROUSDT",
+      "rank": 86,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "NEXOUSDT",
+      "rank": 87,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "STXUSDT",
+      "rank": 89,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "rank": 91,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "INJUSDT",
+      "rank": 92,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "CAKEUSDT",
+      "rank": 93,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "APTUSDT",
+      "rank": 94,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    },
+    {
+      "symbol": "ETHFIUSDT",
+      "rank": 98,
+      "staged_at": "2026-10-13T10:12:33Z",
+      "note": "moved from approved during BTC+SUI-only phase"
+    }
+  ]
+}

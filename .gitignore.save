@@ -1,0 +1,27 @@
+# Rust / Tauri build output
+target/
+**/target/
+Cargo.lock
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+build/
+
+# Env / secrets
+.env
+*.env
