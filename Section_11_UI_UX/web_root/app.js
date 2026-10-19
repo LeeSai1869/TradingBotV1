@@ -2,6 +2,7 @@ import { logicalShift } from "./window_state.js";
 import * as symbolControl from "../controls/symbol/index.js";
 import * as timeframeControl from "../controls/timeframe/index.js";
 import * as reloadControl from "../controls/reload/index.js";
+import * as latestControl from "../controls/latest/index.js";
 import * as storedPoll from "./stored_poll.js";
 
 const PREFETCH_BARS = 500;
@@ -41,6 +42,7 @@ async function loadAll() {
         if (rendering || pending || DataCache.loading) return;
         const range = chart.timeScale().getVisibleLogicalRange();
         DataCache.setVisibleWindow(range);
+        latestControl.update(chart, DataCache);
         updateStatus();
         // The preceding page is already part of the render dataset before
         // it enters view. Arrival runs this check again and prepares the next.
@@ -51,14 +53,18 @@ async function loadAll() {
 
     function render() {
         if (rendering || !pending) return;
-        const { op, reset } = pending;
+        const { op, reset, latest, span } = pending;
         pending = null;
         rendering = true;
         const generation = ++renderGeneration;
         const range = chart.timeScale().getVisibleLogicalRange();
         const bars = DataCache.renderBars;
         let target = null;
-        if (reset && bars.length) {
+        if (latest && bars.length) {
+            const last = bars.length - 1;
+            target = { from: last - span, to: last };
+            chart.priceScale("right").applyOptions({ autoScale: true });
+        } else if (reset && bars.length) {
             target = { from: Math.max(0, bars.length - 1000), to: bars.length - 1 };
             symbolControl.applyPriceFormat(DataCache.symbol, bars,
                 Composer.config.price_precision?.[DataCache.symbol]);
@@ -83,6 +89,7 @@ async function loadAll() {
     }
 
     DataCache.subscribe((cache, op) => {
+        if (op === "loading") latestControl.update(chart, cache);
         if (op === "error") { updateStatus(); return; }
         if (op === "live" && !rendering && !pending && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
@@ -92,7 +99,8 @@ async function loadAll() {
             updateStatus();
             return;
         }
-        pending = { op, reset: op === "reload" || !!pending?.reset };
+        pending = { op, reset: op === "reload" || !!pending?.reset,
+            latest: pending?.latest, span: pending?.span };
         render();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(checkBoundary);
@@ -102,6 +110,17 @@ async function loadAll() {
         void loadAll();
     });
     reloadControl.bind(loadAll);
+    latestControl.bind(() => {
+        if (DataCache.loading || !DataCache.renderBars.length) return;
+        const range = chart.timeScale().getVisibleLogicalRange();
+        DataCache.atLiveEdge = true;
+        pending = { op: "latest", reset: false, latest: true,
+            span: range ? range.to - range.from : 999 };
+        render();
+        void DataCache.refreshStored().catch(error => {
+            status().textContent = `Latest candle refresh failed: ${error.message}`;
+        });
+    });
     await loadAll();
     const interval = Composer.config.stored_refresh_ms ?? 5000;
     storedPoll.start(DataCache.liveEnabled && interval > 0 ? Math.min(interval, 1000) : interval);

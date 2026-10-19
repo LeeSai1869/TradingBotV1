@@ -38,6 +38,27 @@ button:hover { background: #333; }
 .flags-title { color: #888; margin-bottom: 4px; }
 .flags-row { color: #666; }
 
+#latest-candle-button {
+    position: absolute;
+    right: 84px;
+    bottom: 44px;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #42536c;
+    border-radius: 50%;
+    background: #1e293b;
+    color: #dce7f9;
+    box-shadow: 0 2px 8px #0006;
+}
+#latest-candle-button[hidden] { display: none; }
+#latest-candle-button:hover { background: #30445f; }
+#latest-candle-button:focus-visible { outline: 2px solid #699dff; outline-offset: 2px; }
+
 /* TF favorite buttons — inline beside the dropdown */
 #tf-buttons {
     display: inline-flex;
