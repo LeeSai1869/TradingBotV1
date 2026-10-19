@@ -72,6 +72,14 @@ const Composer = {
         this.mounted = true;
     },
 
+    updateLive(chart, data) {
+        for (const v of this.visuals) {
+            if (v.updateLive && this.config.display?.[v.name] !== false) {
+                v.updateLive(chart, data.formingBar);
+            }
+        }
+    },
+
     updateAll(chart, data, op = "reload", options = {}) {
         for (const v of this.visuals) {
             try {

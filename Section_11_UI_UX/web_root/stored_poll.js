@@ -1,4 +1,5 @@
-// Refresh only the local combined bar stream. No Binance or forming-candle calls.
+// One local combined-stream request: stored bars plus the server's provisional
+// live snapshot. Exchange I/O is independent of HTTP/history requests.
 let timer = null;
 let cycle = 0;
 

@@ -101,6 +101,21 @@ class ChartGatewayTests(unittest.TestCase):
             status, _ = routes.handle_get('/api/symbol_meta','symbol=BTCUSDT',None)
             self.assertEqual(status,200)
 
+    def test_forming_snapshot_is_in_latest_packet_only(self):
+        snapshot = {"bar": {"time": 240, "provisional": True}, "status": "live"}
+        with patch.object(routes.live_candle, 'get_snapshot', return_value=snapshot) as live:
+            status, packet = routes.handle_get('/api/bars',
+                'symbol=BTCUSDT&interval=1m&live=1', None)
+            self.assertEqual(status,200)
+            self.assertEqual(packet['live'],snapshot)
+            self.assertEqual(len(packet['bars']),3)
+            live.reset_mock()
+            status, packet = routes.handle_get('/api/bars',
+                'symbol=BTCUSDT&interval=1m&limit=2&before=180000&live=1',None)
+            self.assertEqual(status,200)
+            self.assertNotIn('live',packet)
+            live.assert_not_called()
+
     def test_invalid_cursor_and_page_size_are_rejected(self):
         for query in ['limit=0','limit=1001','before=wrong','limit=wrong']:
             status,_ = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&'+query,None)

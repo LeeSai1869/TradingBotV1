@@ -7,6 +7,9 @@ const DataCache = {
     symbol: null,
     timeframe: null,
     bars: [],
+    liveEnabled: true,
+    formingBar: null,
+    liveStatus: "loading",
     activeBars: [],
     latestBar: null,
     nextBefore: null,
@@ -19,6 +22,32 @@ const DataCache = {
     _latestSignature: null,
     listeners: [],
 
+    get renderBars() {
+        return this.formingBar ? [...this.bars, this.formingBar] : this.bars;
+    },
+
+    _applyLive(live) {
+        const previous = JSON.stringify([this.formingBar, this.liveStatus]);
+        const latest = this.bars.at(-1);
+        if (!this.liveEnabled || !latest || this.formingBar?.open_time <= latest.open_time) {
+            this.formingBar = null;
+        }
+        if (live && this.liveEnabled) {
+            this.liveStatus = live.status;
+            const candidate = live.bar;
+            if (candidate && latest) {
+                // Do not jump over missing audited history. At rollover keep
+                // the prior provisional bar until the store replaces it.
+                if (candidate.open_time === latest.client.close_time + 1) {
+                    this.formingBar = candidate;
+                } else if (candidate.open_time > latest.open_time) {
+                    this.liveStatus = "waiting for stored bar";
+                }
+            }
+        }
+        return previous !== JSON.stringify([this.formingBar, this.liveStatus]);
+    },
+
     subscribe(fn) { this.listeners.push(fn); },
     emit(op, meta = {}) {
         for (const fn of this.listeners) fn(this, op, meta);
@@ -27,6 +56,7 @@ const DataCache = {
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if (before !== null) qs.set("before", before);
+        else if (this.liveEnabled) qs.set("live", "1");
         const response = await fetch(`/api/bars?${qs}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`Stored bars: HTTP ${response.status}`);
         const packet = await response.json();
@@ -55,7 +85,8 @@ const DataCache = {
         const generation = ++this._reloadGeneration;
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
-            _olderPromise: null, _refreshPromise: null, _latestSignature: null });
+            _olderPromise: null, _refreshPromise: null, _latestSignature: null,
+            formingBar: null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
@@ -65,6 +96,7 @@ const DataCache = {
             this.latestBar = this.bars.at(-1) || null;
             this.nextBefore = packet.next_before;
             this._latestSignature = JSON.stringify(packet.bars);
+            this._applyLive(packet.live);
             this.loading = false;
             this.emit("reload");
             return true;
@@ -109,12 +141,16 @@ const DataCache = {
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
             const signature = JSON.stringify(packet.bars);
-            if (signature === this._latestSignature) return false;
-            this._latestSignature = signature;
-            this._merge(packet.bars);
-            this.latestBar = packet.bars.at(-1) || null;
-            this.emit("stored-refresh");
-            return true;
+            const changed = signature !== this._latestSignature;
+            if (changed) {
+                this._latestSignature = signature;
+                this._merge(packet.bars);
+                this.latestBar = packet.bars.at(-1) || null;
+            }
+            const liveChanged = this._applyLive(packet.live);
+            if (changed) this.emit("stored-refresh");
+            else if (liveChanged) this.emit("live");
+            return changed || liveChanged;
         }).finally(() => {
             if (this._refreshPromise === work) this._refreshPromise = null;
         });

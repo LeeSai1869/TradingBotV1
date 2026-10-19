@@ -33,7 +33,8 @@ renderer configuration, rapid selection/reload, and local ingestion/derived-stat
 updates that follow the newest edge without interrupting historical browsing.
 Older requests are delayed
 150 ms so readiness/viewport assertions exercise asynchronous rendering.
-It asserts there are no Binance or separate candle/EMA/current-flags requests.
+The historical scenario disables live quotes and asserts there are no Binance
+or separate candle/EMA/current-flags requests.
 Browser time-range endpoints round fractional edge candles; anchor pixel
 continuity is checked to 0.1 pixel instead of relying on endpoint rounding.
 
@@ -51,16 +52,43 @@ Optional fields in `Section_11_UI_UX/config/ui_config.json`:
 {
   "display": {"candles": true, "ema50": true, "markers": true},
   "stored_refresh_ms": 5000,
+  "live_candle": true,
   "price_precision": {"BTCUSDT": 2, "SUIUSDT": 4}
 }
 ```
 
-Merge these fields with the existing `timeframes` settings. Zero disables stored
-refresh. Refreshes query the local combined stores only and pause while browsing
-history. Precision otherwise comes from stored prices; it is display formatting,
+Merge these fields with the existing `timeframes` settings. Zero disables
+all automatic refresh. `live_candle` defaults to true: latest-page requests add
+`live=1` and the server includes a cached provisional candle in the same response.
+The server fetches Binance quotes in a background worker (at most once a second
+per market/timeframe), so slow exchange I/O cannot block historical requests.
+Automatic refresh uses a one-second cadence while live quotes are enabled and
+pauses while browsing history. Set `live_candle` to false for stored-only browsing.
+The provisional record has the same client/features/adcn shape, but features and
+decisions are null until confirmed; it never enters the permanent bar cache or
+databases. The chart updates the forming price using `series.update`, not a full
+history/indicator redraw. At rollover, it waits for the stored closed candle
+before displaying the next forming interval, avoiding gaps and duplicate bars.
+Unavailability is shown in the status text; the last provisional quote may remain
+visible without being labelled live. Precision otherwise comes from stored prices; it is display formatting,
 not an exchange tick-size contract. The ingestion runner is unchanged.
-The old `/api/live_candle` endpoint returns 410 and cannot initiate a Binance
-request from the chart server.
+The old `/api/live_candle` endpoint returns 410; live preview is part of
+`/api/bars?live=1`, rather than a separate browser candle request. Older cursor
+pages never request a live snapshot.
+
+The dedicated live browser scenario uses a controlled source, without network:
+
+```bash
+PYTHONPATH=. python3 tests/browser_live.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+It verifies incremental price ticks without `setData` or permanent writes,
+paused history browsing, rollover, replacement by audited state, and source
+failure status. Python tests also cover nonblocking/deduplicated requests and
+snapshot expiry. Live Binance access from the cloud machine returned HTTP 451
+on verification; source connectivity is not claimed from these simulated tests.
+The desktop chart server needs access to api.binance.com for live preview.
+
 
 The uploaded live configuration registers only `Section_4_Features.processor`.
 No application caller persists decisions with `db.write_adcn()`. Existing stored

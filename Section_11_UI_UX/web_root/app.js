@@ -23,6 +23,7 @@ async function loadAll() {
 (async () => {
     const chart = Canvas.init(document.getElementById("chart"));
     await Composer.mountAll(chart);
+    DataCache.liveEnabled = Composer.config.live_candle !== false;
     let renderedBars = [];
     let rendering = false;
     let pending = null;
@@ -32,7 +33,8 @@ async function loadAll() {
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
-              `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached`;
+              `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
+              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "");
     }
 
     function checkBoundary() {
@@ -54,14 +56,14 @@ async function loadAll() {
         rendering = true;
         const generation = ++renderGeneration;
         const range = chart.timeScale().getVisibleLogicalRange();
-        const bars = DataCache.bars;
+        const bars = DataCache.renderBars;
         let target = null;
         if (reset && bars.length) {
             target = { from: Math.max(0, bars.length - 1000), to: bars.length - 1 };
             symbolControl.applyPriceFormat(DataCache.symbol, bars,
                 Composer.config.price_precision?.[DataCache.symbol]);
         } else if (range && renderedBars.length && bars.length) {
-            const following = op === "stored-refresh" && DataCache.atLiveEdge &&
+            const following = (op === "stored-refresh" || op === "live") && DataCache.atLiveEdge &&
                 range.to >= renderedBars.length - 2;
             const shift = following ? bars.length - renderedBars.length
                 : logicalShift(renderedBars, bars);
@@ -69,7 +71,7 @@ async function loadAll() {
         }
         // All consumers receive the same canonical bars. No visual fetches
         // its own candles/features/decisions, and no visible history is evicted.
-        Composer.updateAll(chart, DataCache, op, { resetViewport: reset });
+        Composer.updateAll(chart, { ...DataCache, bars }, op, { resetViewport: reset });
         renderedBars = bars;
         if (target) chart.timeScale().setVisibleLogicalRange(target);
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -82,6 +84,14 @@ async function loadAll() {
 
     DataCache.subscribe((cache, op) => {
         if (op === "error") { updateStatus(); return; }
+        if (op === "live" && !rendering && !pending && cache.formingBar &&
+            renderedBars.at(-1)?.provisional &&
+            renderedBars.at(-1).time === cache.formingBar.time) {
+            Composer.updateLive(chart, cache);
+            renderedBars[renderedBars.length - 1] = cache.formingBar;
+            updateStatus();
+            return;
+        }
         pending = { op, reset: op === "reload" || !!pending?.reset };
         render();
     });
@@ -93,5 +103,6 @@ async function loadAll() {
     });
     reloadControl.bind(loadAll);
     await loadAll();
-    storedPoll.start(Composer.config.stored_refresh_ms ?? 5000);
+    const interval = Composer.config.stored_refresh_ms ?? 5000;
+    storedPoll.start(DataCache.liveEnabled && interval > 0 ? Math.min(interval, 1000) : interval);
 })();

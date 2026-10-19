@@ -53,6 +53,12 @@ export function update(chart, data, options = {}) {
     }
 }
 
+// A forming-price tick updates one point, without rebuilding history/EMA/markers.
+export function updateLive(chart, bar) {
+    if (!series || !bar) return;
+    series.update({ ...bar.client, time: bar.time });
+}
+
 export function setPriceFormat(fmt) {
     if (!series) return;
 

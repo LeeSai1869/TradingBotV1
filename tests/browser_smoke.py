@@ -219,7 +219,7 @@ async def settle(page):
     await page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))))')
 
 
-def run(library):
+def run(library, scenario=exercise):
     with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
         for module,name in [(klines_store,'klines'),(features_store,'features'),
                             (adcn_store,'adcn'),(downloader,'klines')]:
@@ -238,14 +238,14 @@ def run(library):
                 if i%100==0:decisions.append(dict(symbol=symbol,interval=interval,open_time=t,signal_type='BUY',final_score=73))
             db.write_klines(klines);db.write_features(features);db.write_adcn(decisions)
         config=json.loads(routes.UI_CONFIG.read_text())
-        config.update(stored_refresh_ms=0,price_precision={'BTCUSDT':2,'SUIUSDT':4})
+        config.update(stored_refresh_ms=0,live_candle=False,price_precision={'BTCUSDT':2,'SUIUSDT':4})
         stack.enter_context(patch.object(routes,'read_ui_config',lambda:config))
         class QuietHandler(ui_server.Handler):
             def log_message(self,*args):pass
         server=HTTPServer(('127.0.0.1',0),QuietHandler)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:
-            asyncio.run(exercise(f'http://127.0.0.1:{server.server_port}',library))
+            asyncio.run(scenario(f'http://127.0.0.1:{server.server_port}',library))
         finally:
             server.shutdown();thread.join();server.server_close()
 

@@ -132,3 +132,41 @@ test('stored polling is serial and uses only the cache local-store refresh',asyn
     pending.resolve(false);await new Promise(r=>setImmediate(r));
     assert.equal(typeof scheduled,'function');context.controls.stop();
 });
+
+const provisional = (time, close=12) => bar(time,{
+    provisional:true, client:{open_time:time*1000,close_time:time*1000+59999,open:10,high:13,low:9,close,volume:5},
+    features:null,adcn:null,
+});
+const closed = time => bar(time,{client:{open_time:time*1000,close_time:time*1000+59999,open:10,high:12,low:9,close:11}});
+
+test('forming price shares the bar shape but never enters permanent cached rows',async()=>{
+    const c=cache();c.bars=[closed(60)];c._latestSignature=JSON.stringify(c.bars);
+    c._fetchPage=async()=>({bars:[closed(60)],live:{bar:provisional(120),status:'live'}});
+    let op;c.subscribe((_,event)=>op=event);
+    assert.equal(await c.refreshStored(),true);
+    assert.equal(c.bars.length,1);assert.equal(c.renderBars.length,2);
+    assert.equal(c.renderBars.at(-1).features,null);assert.equal(op,'live');
+});
+
+test('rollover waits for audited closure and replaces provisional bar exactly once',async()=>{
+    const c=cache();c.bars=[closed(60)];c._latestSignature=JSON.stringify(c.bars);
+    c._applyLive({bar:provisional(120),status:'live'});
+    c._fetchPage=async()=>({bars:[closed(60)],live:{bar:provisional(180),status:'live'}});
+    await c.refreshStored();
+    assert.equal(c.formingBar.time,120);assert.equal(c.liveStatus,'waiting for stored bar');
+    c._fetchPage=async()=>({bars:[closed(60),closed(120)],live:{bar:provisional(180),status:'live'}});
+    await c.refreshStored();
+    assert.deepEqual(Array.from(c.renderBars,b=>b.time),[60,120,180]);
+    assert.equal(c.renderBars[1].provisional,undefined);
+    assert.equal(c.formingBar.time,180);
+});
+
+test('stale forming response cannot follow a new symbol selection',async()=>{
+    const c=cache();c.bars=[closed(60)];const pending=deferred();
+    c._fetchPage=()=>pending.promise;
+    const work=c.refreshStored();
+    c._fetchPage=async()=>({bars:[closed(300)],next_before:null});
+    await c.loadInitial('NEW','1m');
+    pending.resolve({bars:[closed(60)],live:{bar:provisional(120),status:'live'}});
+    assert.equal(await work,false);assert.equal(c.formingBar,null);
+});
