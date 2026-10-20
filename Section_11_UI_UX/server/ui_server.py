@@ -4,7 +4,9 @@ Serves static files from Section 11's root and dispatches /api/* to routes.py.
 """
 from __future__ import annotations
 import json
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+import logging
+import sqlite3
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -26,7 +28,26 @@ class Handler(SimpleHTTPRequestHandler):
         # /controls/, /web_root/ all resolve as real paths.
         super().__init__(*args, directory=str(SECTION_11), **kwargs)
 
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(10)
+
+    def _dispatch(self, callback):
+        try:
+            callback()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # Browser cancelled an obsolete chart/HUD request.
+        except (TimeoutError, sqlite3.OperationalError) as error:
+            logging.warning("UI request unavailable: %s: %s", self.path, error)
+            self._json({"error": "Market data is busy or unavailable. Retry shortly."}, 503)
+        except Exception:
+            logging.exception("UI request failed: %s", self.path)
+            self._json({"error": "UI server could not load this request. Check the UI server log."}, 500)
+
     def do_GET(self):
+        self._dispatch(self._get)
+
+    def _get(self):
         if not self._local_host():
             self._json({"error": "Invalid Host"}, 403)
             return
@@ -59,6 +80,9 @@ class Handler(SimpleHTTPRequestHandler):
         return self.headers.get("Host") in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
 
     def do_POST(self):
+        self._dispatch(self._post)
+
+    def _post(self):
         if not self._local_host():
             self._json({"error": "Invalid Host"}, 403)
             return
@@ -84,6 +108,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _json(self, obj, status=200):
         body = json.dumps(obj, default=str).encode("utf-8")
         self.send_response(status)
+        if status == 503:
+            self.send_header("Retry-After", "1")
         if getattr(self, "response_cookie", None):
             self.send_header("Set-Cookie", self.response_cookie)
         self.send_header("Content-Type", "application/json")
@@ -93,7 +119,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    server = HTTPServer(("127.0.0.1", PORT), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     stop_alerts = routes.alert_routes.alerts.start()
     print(f"chart server on http://localhost:{PORT}/")
     print(f"root:  {SECTION_11}")

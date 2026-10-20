@@ -31,7 +31,7 @@ def handle_get(path, raw_qs):
         return 400, {'error':'Choose a symbol, 1–8 distinct timeframes and 1–20 supported feature rows.'}
     now = int(time.time()*1000)
     columns = []
-    with data_policy.locked():
+    with data_policy.locked(timeout=1):
         for interval in intervals:
             bars = db.read_state_page(symbol,interval,1)['bars']
             bar = bars[-1] if bars else None

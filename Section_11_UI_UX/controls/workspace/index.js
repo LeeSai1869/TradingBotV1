@@ -1,12 +1,11 @@
+import {hudRequest} from './requests.js';
 import {normalizeHud} from './preferences.js';
 export const name = 'workspace';
 let panel, hud, hudToggle, table, heading, status, toggle, timer, request, generation = 0, pending = false;
 let catalogPromise;
 export function catalog() {
-    if (!catalogPromise) catalogPromise = fetch('/api/hud/catalog',{cache:'no-store'}).then(async response => {
-        if (!response.ok) throw new Error('Cannot load HUD choices. Restart the updated UI server.');
-        return response.json();
-    }).catch(error => {catalogPromise=null; throw error;});
+    if (!catalogPromise) catalogPromise = hudRequest('/api/hud/catalog')
+        .catch(error => {catalogPromise=null; throw error;});
     return catalogPromise;
 }
 function el(tag, text, parent, className) {
@@ -38,10 +37,9 @@ async function refresh() {
     heading.textContent=`${symbol} · closed candles`;
     status.textContent='Updating comparison…';
     try {
-        const response=await fetch('/api/hud?'+new URLSearchParams({symbol,intervals:config.intervals.join(','),fields:config.fields.join(',')}),
-            {cache:'no-store',signal:request.signal});
-        if(!response.ok)throw new Error('Cannot load comparison. Restart the updated UI server.');
-        const packet=await response.json(), choices=await catalog();
+        const packet=await hudRequest('/api/hud?'+new URLSearchParams({symbol,intervals:config.intervals.join(','),fields:config.fields.join(',')}),
+            {signal:request.signal});
+        const choices=await catalog();
         if(version!==generation || hud.hidden)return;
         table.replaceChildren();
         const caption=el('caption',`${symbol} multi-timeframe comparison`,table);

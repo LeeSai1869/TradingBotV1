@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { logicalShift } from '../Section_11_UI_UX/web_root/window_state.js';
 
-function cache() {
-    const context = vm.createContext({window:{}, URLSearchParams,
-        fetch: () => { throw Error('unexpected network request'); }});
+function cache(fetcher) {
+    const context = vm.createContext({window:{}, URLSearchParams, AbortController, setTimeout, clearTimeout,
+        fetch: fetcher || (() => { throw Error('unexpected network request'); })});
     vm.runInContext(fs.readFileSync(new URL('../Section_11_UI_UX/web_root/data_cache.js',import.meta.url),'utf8'),context);
     return context.window.DataCache;
 }
@@ -190,4 +190,16 @@ test('deletion observed by an older request reloads instead of merging old cache
     await c.prefetchOlder();
     assert.equal(c.bars.length,0);
     assert.equal(c.nextBefore,null);
+});
+
+
+test('a busy stored-bar response is retried without losing the initial chart load',async()=>{
+    let calls=0;
+    const c=cache(async()=>{
+        calls++;
+        return calls===1?{status:503,ok:false,json:async()=>({error:'Market data is busy'})}
+            :{status:200,ok:true,json:async()=>page([60,120])};
+    });
+    await c.loadInitial('BTCUSDT','1m');
+    assert.equal(calls,2);assert.equal(c.bars.length,2);assert.equal(c.loading,false);assert.equal(c.error,null);
 });

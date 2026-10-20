@@ -220,3 +220,27 @@ PYTHONPATH=. python3 tests/browser_workspace.py /path/to/lightweight-charts.stan
 and bounded reads. `test_restart_runner.py` checks exact process matching, verified
 checkout replacement and preservation of unrelated applications. macOS launchd
 operations are mocked here; actual download progress must be checked on the Mac.
+
+
+UI request availability under runner load
+----------------------------------------
+The UI uses a threaded HTTP server so an idle browser socket or waiting HUD
+request cannot monopolize chart/static/account requests. Chart/HUD policy-lock
+waits are capped at one second; temporary lock/SQLite contention returns JSON
+HTTP 503 (Retry-After: 1), while unexpected API errors are logged with a traceback
+and return JSON HTTP 500 instead of dropping the connection. Stored-bar requests
+retry HTTP 503 up to twice. Chart and HUD fetches have finite deadlines; failed
+HUD catalog requests clear their shared promise so Retry can work. HUD failure
+never gates initial chart loading.
+
+```sh
+PYTHONPATH=. python3 tests/browser_hud_failure.py /path/to/lightweight-charts.standalone.production.js
+node --test tests/hud_requests.test.mjs tests/ui_lifecycle.test.mjs
+```
+
+`test_ui_availability.py` verifies idle sockets, concurrent blocked HUD requests,
+bounded real policy-lock waits and structured error responses. Browser fixtures
+use the production threaded server. `browser_hud_failure.py` forces HUD and
+catalog failures while confirming the chart loads and settings retry recovers.
+These checks reproduce failure modes in isolation; they cannot identify a Mac
+network/process failure without that machine's server response or logs.

@@ -4,6 +4,7 @@ import fcntl
 import json
 from pathlib import Path
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parent
 POLICY_FILE = ROOT / 'runtime_policy.json'
@@ -12,9 +13,20 @@ INTERVALS = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d'
 
 
 @contextmanager
-def locked():
+def locked(*, timeout=None):
     with LOCK_FILE.open('a') as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX)
+        if timeout is None:
+            fcntl.flock(stream, fcntl.LOCK_EX)
+        else:
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError('Market data is busy. Retry shortly.')
+                    time.sleep(min(.02, max(0, deadline-time.monotonic())))
         try:
             yield
         finally:

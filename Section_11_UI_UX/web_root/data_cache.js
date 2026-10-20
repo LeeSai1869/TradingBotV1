@@ -59,11 +59,25 @@ const DataCache = {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if (before !== null) qs.set("before", before);
         else if (this.liveEnabled) qs.set("live", "1");
-        const response = await fetch(`/api/bars?${qs}`, { cache: "no-store" });
-        if (!response.ok) throw new Error(`Stored bars: HTTP ${response.status}`);
-        const packet = await response.json();
-        if (!Array.isArray(packet.bars)) throw new Error("Invalid stored-bar packet");
-        return packet;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
+            try {
+                const response = await fetch(`/api/bars?${qs}`, { cache: "no-store", signal: controller.signal });
+                const packet = await response.json();
+                if (response.status === 503 && attempt < 2) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    continue;
+                }
+                if (!response.ok) throw new Error(packet.error || `Stored bars: HTTP ${response.status}`);
+                if (!Array.isArray(packet.bars)) throw new Error("Invalid stored-bar packet");
+                return packet;
+            } catch (error) {
+                if (error.name === "AbortError") throw new Error("Chart server timed out. Use Reload to retry.");
+                if (error instanceof TypeError) throw new Error("Cannot reach the chart server. Run python3 restart_ui.py, then Reload.");
+                throw error;
+            } finally { clearTimeout(timer); }
+        }
     },
 
     _merge(rows) {
