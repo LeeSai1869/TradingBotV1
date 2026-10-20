@@ -13,7 +13,7 @@ export async function renderHudSettings(container,draft) {
     if(!loading.isConnected)return;
     loading.remove();draft.hud=normalizeHud(draft.hud);
     const state=draft.hud;
-    const note=el('p','Choose a reference coin, 1–8 timeframe columns and up to 20 feature rows. Values use the latest stored closed candle for each timeframe, independently of chart navigation.',container);
+    const note=el('p','Choose a reference coin, 1–8 timeframe columns and up to 20 feature rows. Values reuse the chart candle for a matching coin/timeframe. Other columns use the same combined stored/live bar service. Live values are provisional until closure.',container);
     note.className='settings-note';
     const visibleLabel=el('label','',container);visibleLabel.className='settings-row';
     el('span','Show comparison HUD on chart',visibleLabel);

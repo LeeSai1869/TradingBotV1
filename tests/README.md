@@ -206,7 +206,8 @@ connected. Settings → HUD chooses a pinned reference coin or follows the chart
 1–8 timeframe columns in selection order, and 1–20 reorderable feature rows.
 Preferences, HUD visibility and its chart corner (top/bottom left/right) persist
 in the browser, independently of analysis-panel visibility. Values come from one
-combined latest stored bar per timeframe, with candle UTC timestamps, stale and
+combined latest bar per timeframe (shared provisional live snapshot when available,
+otherwise stored closed), with candle UTC timestamps, stale and
 inactive labels, and missing values shown as an em dash. This view does not infer
 trade direction from numeric indicators. The HUD polls every five seconds while visible,
 pauses while hidden, and never requests Binance or full chart history. The chart
@@ -225,7 +226,7 @@ operations are mocked here; actual download progress must be checked on the Mac.
 UI request availability under runner load
 ----------------------------------------
 The UI uses a threaded HTTP server so an idle browser socket or waiting HUD
-request cannot monopolize chart/static/account requests. Chart/HUD policy-lock
+request cannot monopolize chart/static/account requests. Chart/HUD deletion-guard
 waits are capped at one second; temporary lock/SQLite contention returns JSON
 HTTP 503 (Retry-After: 1), while unexpected API errors are logged with a traceback
 and return JSON HTTP 500 instead of dropping the connection. Stored-bar requests
@@ -244,3 +245,36 @@ use the production threaded server. `browser_hud_failure.py` forces HUD and
 catalog failures while confirming the chart loads and settings retry recovers.
 These checks reproduce failure modes in isolation; they cannot identify a Mac
 network/process failure without that machine's server response or logs.
+
+
+Shared chart/HUD reads without runner contention
+-----------------------------------------------
+Chart `/api/bars` and other-pair HUD columns use Core's `db.read_state_page`.
+That reader opens SQLite in `mode=ro`, avoiding schema initialization during reads.
+Neither endpoint acquires the runner's calculation/write policy lock. They instead
+hold a shared deletion guard; administrator deletion holds that guard exclusively
+through its epoch change and three-store transaction. Ordinary ingestion/features
+keep their existing writer coordination and do not block these readers while
+calculating. SQLite still protects committed reads during actual database writes.
+
+A HUD column matching the current chart pair uses `DataCache.latestBar` or its
+available live `formingBar`, without a HUD data request. Chart events project tick
+changes directly into the table. Only other pairs (or a chart browsing history)
+need a bounded latest-bar snapshot. Their live values use the existing shared
+forming-candle cache, never a separate feature calculator. HUD requests wait for
+initial chart loading to finish. Missing provisional features remain missing.
+
+The existing Section 3 `MTF Data.py` describes a timeframe-only in-memory contract
+and explicitly leaves its provider unconnected. Section 2 contains input settings;
+neither is currently a populated, symbol-aware source for the UI.
+
+```sh
+PYTHONPATH=. python3 tests/browser_hud_reuse.py /path/to/lightweight-charts.standalone.production.js
+node --test tests/hud_chart_column.test.mjs
+```
+
+The browser regression holds the real runner policy lock during initial chart
+loading and verifies live/closed HUD projection with zero HUD data requests.
+Gateway tests hold an uncommitted feature write and verify that reads see the last
+committed value without opening schema-initializing store connections. Separate
+checks preserve deletion exclusion and epoch invalidation.

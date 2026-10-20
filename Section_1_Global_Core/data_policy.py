@@ -1,4 +1,4 @@
-"""Shared runtime policy and cross-process coordination for runner/admin writes."""
+"""Runtime policy, runner write coordination, and a separate reader/deletion guard."""
 from contextlib import contextmanager
 import fcntl
 import json
@@ -13,15 +13,15 @@ INTERVALS = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d'
 
 
 @contextmanager
-def locked(*, timeout=None):
-    with LOCK_FILE.open('a') as stream:
+def _file_lock(path, mode, timeout):
+    with path.open('a') as stream:
         if timeout is None:
-            fcntl.flock(stream, fcntl.LOCK_EX)
+            fcntl.flock(stream, mode)
         else:
             deadline = time.monotonic() + timeout
             while True:
                 try:
-                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(stream, mode | fcntl.LOCK_NB)
                     break
                 except BlockingIOError:
                     if time.monotonic() >= deadline:
@@ -31,6 +31,20 @@ def locked(*, timeout=None):
             yield
         finally:
             fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+@contextmanager
+def locked(*, timeout=None):
+    with _file_lock(LOCK_FILE, fcntl.LOCK_EX, timeout):
+        yield
+
+
+@contextmanager
+def snapshot_guard(*, exclusive=False, timeout=1):
+    # Readers coordinate with destructive deletion only, never feature processing.
+    path = LOCK_FILE.with_name(LOCK_FILE.name + '.snapshot')
+    with _file_lock(path, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH, timeout):
+        yield
 
 
 def read():

@@ -22,6 +22,7 @@ directly. Everything goes through db.py.
 
 from __future__ import annotations
 from pathlib import Path
+import sqlite3
 
 from . import klines_store
 from . import features_store
@@ -219,6 +220,21 @@ def read_state_range(symbol, interval, start_ms, end_ms):
     return state
 
 
+def _read_connection(path):
+    """Read committed data without schema creation or a writer connection."""
+    return sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True, timeout=1)
+
+
+def _read_derived(store, symbol, interval, start_ms, end_ms):
+    if not store.DB_PATH.exists():
+        return []
+    conn = _read_connection(store.DB_PATH)
+    try:
+        return store.read_range(conn, symbol, interval, start_ms, end_ms)
+    finally:
+        conn.close()
+
+
 def read_state_page(symbol, interval, limit=1000, *, before=None):
     """One combined record per stored candle, with an exclusive older cursor.
 
@@ -227,7 +243,9 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
     """
     if not 1 <= limit <= 1000:
         raise ValueError("limit must be between 1 and 1000")
-    conn = klines_store.open_db()
+    if not klines_store.DB_PATH.exists():
+        return {"bars": [], "next_before": None}
+    conn = _read_connection(klines_store.DB_PATH)
     try:
         rows = klines_store.read_page(conn, symbol, interval, limit + 1, before=before)
     finally:
@@ -237,16 +255,8 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
     if not rows:
         return {"bars": [], "next_before": None}
     start_ms, end_ms = int(rows[0][2]), int(rows[-1][2]) + 1
-    conn = features_store.open_db()
-    try:
-        features = features_store.read_range(conn, symbol, interval, start_ms, end_ms)
-    finally:
-        conn.close()
-    conn = adcn_store.open_db()
-    try:
-        decisions = adcn_store.read_range(conn, symbol, interval, start_ms, end_ms)
-    finally:
-        conn.close()
+    features = _read_derived(features_store, symbol, interval, start_ms, end_ms)
+    decisions = _read_derived(adcn_store, symbol, interval, start_ms, end_ms)
     features_by_time = {int(row["open_time"]): row for row in features}
     decisions_by_time = {int(row["open_time"]): row for row in decisions}
     bars = []

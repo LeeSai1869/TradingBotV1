@@ -43,3 +43,13 @@ class HudTests(unittest.TestCase):
             self.assertEqual(hud.handle_get('/api/hud','symbol=BTCUSDT&intervals='+','.join(intervals))[0],200)
         self.assertEqual(read.call_count,8)
         self.assertTrue(all(call.args[2]==1 for call in read.call_args_list))
+
+    def test_live_column_uses_existing_shared_forming_snapshot(self):
+        candidate=dict(symbol='BTCUSDT',interval='1m',open_time=240000,provisional=True,
+                       client=dict(close=13,close_time=299999),features=dict(rsi=82),adcn=None)
+        with patch.object(hud.data_policy,'enabled',return_value=True),patch.object(hud.live_candle,'get_snapshot',return_value={'bar':candidate,'status':'live'}) as snapshot:
+            status, packet=hud.handle_get('/api/hud','symbol=BTCUSDT&intervals=1m&fields=client.close,features.rsi&live=1')
+        self.assertEqual(status,200)
+        self.assertEqual(packet['columns'][0]['values'],{'client.close':13,'features.rsi':82})
+        self.assertEqual(packet['columns'][0]['status'],'live provisional candle')
+        snapshot.assert_called_once_with('BTCUSDT','1m')

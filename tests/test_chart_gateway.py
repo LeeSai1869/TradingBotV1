@@ -136,6 +136,18 @@ class ChartGatewayTests(unittest.TestCase):
         self.assertIsNotNone(state[0]['features']['ema50'])
         self.assertIsNone(state[0]['adcn'])
 
+    def test_page_reads_committed_features_without_schema_writes_during_ingest(self):
+        conn=features_store.open_db()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            conn.execute('UPDATE features SET ema50=99 WHERE symbol=? AND interval=? AND open_time=?',('BTCUSDT','1m',120000))
+            with patch.object(features_store,'open_db',side_effect=AssertionError('reader must not initialize schema')),patch.object(adcn_store,'open_db',side_effect=AssertionError('reader must not initialize schema')):
+                packet=db.read_state_page('BTCUSDT','1m',3)
+            self.assertEqual(packet['bars'][1]['features']['ema50'],42)
+            conn.commit()
+            self.assertEqual(db.read_state_page('BTCUSDT','1m',3)['bars'][1]['features']['ema50'],99)
+        finally:conn.close()
+
     def test_real_http_serves_chart_and_complete_memory_packet(self):
         sessions = patch.object(auth, 'SESSIONS', {'test-http': ('user','user',9999999999)})
         sessions.start(); self.addCleanup(sessions.stop)

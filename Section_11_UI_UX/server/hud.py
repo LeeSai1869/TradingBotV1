@@ -7,6 +7,7 @@ from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db, features_store
 from Section_1_Global_Core.memory_storage.market_data.update_klines import INTERVAL_MS
 from .settings_catalog import read_coin_catalog
+from . import live_candle
 
 FIELDS = {f'client.{key}': key.capitalize() for key in ('open','high','low','close','volume')}
 FIELDS.update({f'features.{key}': key.replace('_',' ').upper()
@@ -31,10 +32,17 @@ def handle_get(path, raw_qs):
         return 400, {'error':'Choose a symbol, 1–8 distinct timeframes and 1–20 supported feature rows.'}
     now = int(time.time()*1000)
     columns = []
-    with data_policy.locked(timeout=1):
+    with data_policy.snapshot_guard():
         for interval in intervals:
             bars = db.read_state_page(symbol,interval,1)['bars']
             bar = bars[-1] if bars else None
+            active = data_policy.enabled(symbol,interval)
+            if qs.get('live',['0'])[0] == '1' and active:
+                snapshot = live_candle.get_snapshot(symbol,interval)
+                candidate = snapshot.get('bar')
+                if (snapshot.get('status') == 'live' and candidate and bar
+                        and candidate['open_time'] == bar['client']['close_time']+1):
+                    bar = candidate
             values = {}
             for field in fields:
                 group, key = field.split('.',1)
@@ -43,7 +51,7 @@ def handle_get(path, raw_qs):
             close_time = bar['client']['close_time'] if bar else None
             columns.append({'interval':interval,'open_time':bar['open_time'] if bar else None,
                             'close_time':close_time,'values':values,
-                            'active':data_policy.enabled(symbol,interval),
+                            'active':active,
                             'stale':close_time is not None and now-close_time > 2*INTERVAL_MS[interval],
-                            'status':'stored closed candle' if bar else 'waiting for downloaded candles'})
+                            'status':('live provisional candle' if bar.get('provisional') else 'stored closed candle') if bar else 'waiting for downloaded candles'})
     return 200, {'symbol':symbol,'as_of':now,'fields':fields,'columns':columns}

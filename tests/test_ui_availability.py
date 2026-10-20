@@ -70,12 +70,18 @@ class UiAvailabilityTests(unittest.TestCase):
                 self.assertLess(time.monotonic()-start,.5)
             with data_policy.locked(timeout=.05):pass
 
-    def test_chart_read_times_out_on_writer_lock_but_session_stays_available(self):
+    def test_chart_reads_while_runner_owns_writer_lock(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(data_policy,'LOCK_FILE',Path(directory)/'lock'):
             with data_policy.locked():
+                with patch.object(routes.db,'read_state_page',return_value={'bars':[],'next_before':None}):
+                    self.assertEqual(json.loads(self.get('/api/bars?symbol=BTCUSDT&interval=1m'))['bars'],[])
+                self.assertEqual(json.loads(self.get('/api/session'))['role'],'user')
+
+    def test_only_destructive_deletion_blocks_chart_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory,patch.object(data_policy,'LOCK_FILE',Path(directory)/'lock'):
+            with data_policy.snapshot_guard(exclusive=True):
                 with self.assertRaises(HTTPError) as result:
                     self.get('/api/bars?symbol=BTCUSDT&interval=1m')
                 self.assertEqual(result.exception.code,503)
                 self.assertEqual(result.exception.headers['Retry-After'],'1')
-                self.assertIn('busy',json.load(result.exception)['error'])
                 self.assertEqual(json.loads(self.get('/api/session'))['role'],'user')

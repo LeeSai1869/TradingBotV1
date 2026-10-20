@@ -54,7 +54,7 @@ def handle_get(path, raw_qs, server):
             return 400, {"error": "limit and before must be integers"}
         if not symbol or not interval or not 1 <= limit <= 1000:
             return 400, {"error": "symbol, interval and limit between 1 and 1000 required"}
-        with data_policy.locked(timeout=1):
+        with data_policy.snapshot_guard():
             epochs = data_policy.read()['epochs']
             packet = {"symbol": symbol, "interval": interval,
                       "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",

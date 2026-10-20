@@ -1,8 +1,9 @@
+import {chartColumn} from './chart_column.js';
 import {hudRequest} from './requests.js';
 import {normalizeHud} from './preferences.js';
 export const name = 'workspace';
 let panel, hud, hudToggle, table, heading, status, toggle, timer, request, generation = 0, pending = false;
-let catalogPromise;
+let catalogPromise, lastPacket, lastChoices;
 export function catalog() {
     if (!catalogPromise) catalogPromise = hudRequest('/api/hud/catalog')
         .catch(error => {catalogPromise=null; throw error;});
@@ -22,7 +23,7 @@ function format(value) {
 }
 function invalidate() {
     generation++; request?.abort();pending=false;
-    table?.replaceChildren();
+    table?.replaceChildren();lastPacket=null;
     if(hud) {
         const config=preferences();hud.hidden=!config.visible;hud.dataset.position=config.position;
         hudToggle.setAttribute("aria-pressed",String(config.visible));
@@ -32,15 +33,27 @@ function invalidate() {
 async function refresh() {
     if(hud.hidden || pending || document.hidden)return;
     const config=preferences(), symbol=selectedSymbol(config);
-    if(!symbol)return;
+    if(!symbol || !window.DataCache?.symbol || window.DataCache.loading)return;
     const version=generation;pending=true;request=new AbortController();
-    heading.textContent=`${symbol} · closed candles`;
+    heading.textContent=`${symbol} · latest candles`;
     status.textContent='Updating comparison…';
     try {
-        const packet=await hudRequest('/api/hud?'+new URLSearchParams({symbol,intervals:config.intervals.join(','),fields:config.fields.join(',')}),
-            {signal:request.signal});
+        const reused=config.intervals.map(interval=>chartColumn(window.DataCache,symbol,interval,config.fields)).filter(Boolean);
+        const missing=config.intervals.filter(interval=>!reused.some(column=>column.interval===interval));
+        const packet=missing.length ? await hudRequest('/api/hud?'+new URLSearchParams({symbol,intervals:missing.join(','),fields:config.fields.join(','),live:window.DataCache.liveEnabled?'1':'0'}),
+            {signal:request.signal}) : {symbol,columns:[],as_of:Date.now()};
+        packet.columns=config.intervals.map(interval=>reused.find(column=>column.interval===interval) || packet.columns.find(column=>column.interval===interval));
         const choices=await catalog();
         if(version!==generation || hud.hidden)return;
+        lastPacket=packet;lastChoices=choices;
+        renderPacket(packet,choices,config,symbol);
+    } catch(error) {
+        if(version===generation && error.name!=='AbortError') {
+            table.replaceChildren();status.textContent=error.message;
+        }
+    } finally {if(version===generation)pending=false;}
+}
+function renderPacket(packet,choices,config,symbol) {
         table.replaceChildren();
         const caption=el('caption',`${symbol} multi-timeframe comparison`,table);
         caption.className='sr-only';
@@ -48,7 +61,7 @@ async function refresh() {
         el('th','Feature',headRow).scope='col';
         for(const column of packet.columns) {
             const cell=el('th',column.interval,headRow);cell.scope='col';
-            const state=!column.active?'Inactive':column.stale?'Stale':column.open_time==null?'Waiting':'Stored';
+            const state=column.status==='live provisional candle'?'Live':!column.active?'Inactive':column.stale?'Stale':column.open_time==null?'Waiting':'Stored';
             el('small',state,cell,column.stale?'hud-stale':'');
             const time=el('small',column.open_time==null?'No candles':new Date(column.open_time).toISOString().replace('T',' ').slice(0,16)+' UTC',cell);
             time.title='Open time of the latest stored candle';
@@ -61,12 +74,7 @@ async function refresh() {
                 cell.title=value==null?'Not calculated or downloaded yet':`${symbol} ${column.interval} · ${choices.fields[field] || field}: ${value}`;
             }
         }
-        status.textContent='Latest stored values · refreshed '+new Date(packet.as_of).toLocaleTimeString()+'. Missing values appear as —.';
-    } catch(error) {
-        if(version===generation && error.name!=='AbortError') {
-            table.replaceChildren();status.textContent=error.message;
-        }
-    } finally {if(version===generation)pending=false;}
+        status.textContent='Latest candle values · refreshed '+new Date(packet.as_of).toLocaleTimeString()+'. Missing values appear as —.';
 }
 export function mount() {
     panel=document.getElementById('analysis-panel');
@@ -108,6 +116,17 @@ export function mount() {
     document.getElementById('symbol').addEventListener('change',invalidate);
     window.addEventListener('chart-settings-change',invalidate);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+    window.DataCache.subscribe((cache,op)=>{
+        if(hud.hidden || !['reload','stored-refresh','live'].includes(op))return;
+        const config=preferences(), symbol=selectedSymbol(config);
+        if(!lastPacket) {void refresh();return;}
+        const column=chartColumn(cache,symbol,cache.timeframe,config.fields);
+        if(column && config.intervals.includes(column.interval)) {
+            lastPacket.as_of=Date.now();
+            lastPacket.columns=lastPacket.columns.map(previous=>previous.interval===column.interval?column:previous);
+            renderPacket(lastPacket,lastChoices,config,symbol);
+        }
+    });
     invalidate();
     timer=setInterval(()=>void refresh(),5000);
     window.addEventListener('pagehide',()=>{clearInterval(timer);request?.abort();},{once:true});

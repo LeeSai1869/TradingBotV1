@@ -65,7 +65,7 @@ def delete_data(*, interval=None, symbol=None):
         raise ValueError('Choose exactly one coin or timeframe')
     if interval is not None and interval not in policy.INTERVALS:
         raise ValueError('Unknown timeframe')
-    with policy.locked():
+    with policy.locked(), policy.snapshot_guard(exclusive=True, timeout=None):
         if symbol is not None and not any(symbol == r['symbol'] for k in ('approved','disapproved','pending','staged','top50') for r in catalog().get(k, [])):
             raise ValueError('Unknown coin')
         # Pause first. A failed delete remains paused and can safely be retried.
