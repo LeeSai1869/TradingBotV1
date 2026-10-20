@@ -187,8 +187,13 @@ button:hover { background: #333; }
 /* Independent comparison workspace; chart resizes without rebuilding its data. */
 #chart-workspace {display:flex; flex:1 1 auto; min-height:0; min-width:0; position:relative;}
 #chart-workspace > #chart {width:0; min-width:0; overflow:hidden;}
-#analysis-panel {flex:0 0 min(480px,45vw); width:min(480px,45vw); min-width:0; overflow:auto; background:#171c24; border-left:1px solid #364152; padding:16px;}
+#analysis-panel {flex:0 0 min(480px,45vw); width:min(480px,45vw); min-width:0; min-height:0; overflow:hidden; display:flex; flex-direction:column; background:#171c24; border-left:1px solid #364152; padding:16px;}
 #analysis-panel[hidden] {display:none;}
+#analysis-panel > header {flex-shrink:0;}
+#analysis-panel > .workspace-card {flex-shrink:0;}
+.workspace-body {flex:1 1 auto; min-height:0; overflow-y:scroll; scrollbar-gutter:stable; padding-right:8px;}
+.workspace-body::-webkit-scrollbar {width:8px;}
+.workspace-body::-webkit-scrollbar-thumb {background:#536177; border-radius:5px;}
 #analysis-panel header {display:flex; align-items:center; justify-content:space-between; gap:12px;}
 #analysis-panel h2 {font-size:17px; margin:0 0 12px;}
 #analysis-panel h3 {font-size:15px; margin:0 0 10px;}
@@ -197,13 +202,20 @@ button:hover { background: #333; }
 .workspace-chat textarea {width:100%; min-height:64px; background:#171c24; color:#aab6c7; border:1px solid #465267; padding:10px; border-radius:5px; resize:vertical;}
 .workspace-chat button {margin-top:8px;}
 #analysis-panel button:disabled {opacity:.5; cursor:default;}
-.hud-scroll {overflow:auto; margin-top:12px; max-height:52vh;}
-#comparison-hud {border-collapse:separate; border-spacing:0; font-size:12px; width:100%; font-variant-numeric:tabular-nums;}
-#comparison-hud th, #comparison-hud td {text-align:right; white-space:nowrap; padding:9px; border-bottom:1px solid #3b4657;}
-#comparison-hud th:first-child {text-align:left; position:sticky; left:0; background:#202733; z-index:1;}
-#comparison-hud thead th {position:sticky; top:0; background:#293444; z-index:2;}
-#comparison-hud thead th:first-child {z-index:3;}
-#comparison-hud small {display:block; font-size:10px; font-weight:normal; margin-top:4px; color:#aab6c7;}
+.chart-hud {position:absolute; z-index:24; max-width:calc(100% - 105px); max-height:calc(100% - 85px); display:flex; flex-direction:column; color:#e3e9f2; background:transparent; text-shadow:0 1px 2px #000; font-size:11px;}
+.chart-hud[hidden] {display:none;}
+.chart-hud[data-position="top-left"] {top:12px; left:12px;}
+.chart-hud[data-position="top-right"] {top:12px; right:85px;}
+.chart-hud[data-position="bottom-left"] {bottom:40px; left:12px;}
+.chart-hud[data-position="bottom-right"] {bottom:40px; right:85px;}
+.hud-header {display:flex; gap:10px; align-items:center; justify-content:space-between; flex-shrink:0; padding:3px 0;}
+.hud-header button {height:24px; padding:0 5px; background:transparent; border-color:#637089;}
+.chart-hud .workspace-note {font-size:10px; margin:5px 0 0; max-width:460px;}
+.hud-scroll {overflow:auto; min-height:0;}
+#comparison-hud {border-collapse:collapse; font-size:11px; font-variant-numeric:tabular-nums; background:transparent;}
+#comparison-hud th, #comparison-hud td {text-align:right; white-space:nowrap; padding:6px 8px; border:1px solid #73849a99; background:transparent;}
+#comparison-hud th:first-child {text-align:left;}
+#comparison-hud small {display:block; font-size:9px; font-weight:normal; margin-top:3px; color:#b9c5d6;}
 #comparison-hud .hud-stale {color:#f1bb65;}
 .hud-timeframe-choice {display:inline-flex; gap:6px; align-items:center; margin:6px 12px 6px 0; font-size:13px;}
 .settings-content fieldset {border:1px solid #465267; margin-top:18px; border-radius:5px;}
@@ -215,3 +227,5 @@ button:hover { background: #333; }
 @media(max-width:760px) {
     #analysis-panel {position:absolute; top:0; bottom:0; right:0; width:min(480px,95vw); z-index:40; box-shadow:-8px 0 20px #0008;}
 }
+/* Keep the existing stored-signal box clear of a HUD in the same corner. */
+#chart:has(.chart-hud[data-position="top-right"]:not([hidden])) #flags-panel {top:auto; bottom:45px;}

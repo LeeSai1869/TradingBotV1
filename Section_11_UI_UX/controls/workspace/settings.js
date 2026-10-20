@@ -1,5 +1,5 @@
 import {catalog} from './index.js';
-import {normalizeHud} from './preferences.js';
+import {normalizeHud, POSITIONS} from './preferences.js';
 function el(tag,text,parent) {const node=document.createElement(tag);node.textContent=text;parent.append(node);return node;}
 export async function renderHudSettings(container,draft) {
     const loading=el('p','Loading HUD settings…',container);
@@ -15,6 +15,14 @@ export async function renderHudSettings(container,draft) {
     const state=draft.hud;
     const note=el('p','Choose a reference coin, 1–8 timeframe columns and up to 20 feature rows. Values use the latest stored closed candle for each timeframe, independently of chart navigation.',container);
     note.className='settings-note';
+    const visibleLabel=el('label','',container);visibleLabel.className='settings-row';
+    el('span','Show comparison HUD on chart',visibleLabel);
+    const visible=el('input','',visibleLabel);visible.type='checkbox';visible.checked=state.visible;
+    visible.setAttribute('aria-label','Show comparison HUD on chart');visible.onchange=()=>{state.visible=visible.checked;};
+    const positionLabel=el('label','Chart position ',container);
+    const position=el('select','',positionLabel);position.setAttribute('aria-label','HUD chart position');
+    for(const corner of POSITIONS){const option=el('option',corner.replace('-',' '),position);option.value=corner;}
+    position.value=state.position;position.onchange=()=>{state.position=position.value;};
     const label=el('label','Reference coin ',container);
     const select=el('select','',label);select.setAttribute('aria-label','HUD reference coin');
     const symbols=[...new Set([state.symbol,...choices.symbols].filter(Boolean))];

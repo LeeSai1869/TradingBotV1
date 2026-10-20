@@ -275,6 +275,11 @@ export async function mount() {
             if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});
     };
+    window.addEventListener("hud-visibility-change", event => {
+        saved.hud.visible = event.detail === true;
+        try {localStorage.setItem(STORAGE, JSON.stringify(saved));} catch {}
+        apply(); window.dispatchEvent(new Event("chart-settings-change"));
+    });
     window.addEventListener("open-hud-settings", () => {section="hud";item="Comparison";gear.click();});
     dialog.addEventListener("close", () => gear.focus());
 }

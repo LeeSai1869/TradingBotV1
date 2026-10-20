@@ -198,14 +198,17 @@ gapped history, and launchd configuration/installation with mocked macOS command
 
 Comparison HUD / analysis workspace
 ----------------------------------
-The toolbar's **Analysis / HUD** button opens a collapsible right panel. AI ranking,
+The toolbar's **Analysis** button opens a collapsible right panel, with Best
+opportunity pinned above a separately scrollable analysis/chat region. The
+independent **HUD** toggle shows a transparent comparison table on the chart. AI ranking,
 chart analysis and chat are labelled placeholders; no provider or predictions are
 connected. Settings → HUD chooses a pinned reference coin or follows the chart,
 1–8 timeframe columns in selection order, and 1–20 reorderable feature rows.
-Preferences and panel visibility persist in the browser. Values come from one
+Preferences, HUD visibility and its chart corner (top/bottom left/right) persist
+in the browser, independently of analysis-panel visibility. Values come from one
 combined latest stored bar per timeframe, with candle UTC timestamps, stale and
 inactive labels, and missing values shown as an em dash. This view does not infer
-trade direction from numeric indicators. It polls every five seconds while open,
+trade direction from numeric indicators. The HUD polls every five seconds while visible,
 pauses while hidden, and never requests Binance or full chart history. The chart
 resizes with the desktop panel; small screens use a drawer.
 

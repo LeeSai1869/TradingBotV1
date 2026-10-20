@@ -1,6 +1,6 @@
 import {normalizeHud} from './preferences.js';
 export const name = 'workspace';
-let panel, table, heading, status, toggle, timer, request, generation = 0, pending = false;
+let panel, hud, hudToggle, table, heading, status, toggle, timer, request, generation = 0, pending = false;
 let catalogPromise;
 export function catalog() {
     if (!catalogPromise) catalogPromise = fetch('/api/hud/catalog',{cache:'no-store'}).then(async response => {
@@ -24,10 +24,14 @@ function format(value) {
 function invalidate() {
     generation++; request?.abort();pending=false;
     table?.replaceChildren();
-    if(panel && !panel.hidden) void refresh();
+    if(hud) {
+        const config=preferences();hud.hidden=!config.visible;hud.dataset.position=config.position;
+        hudToggle.setAttribute("aria-pressed",String(config.visible));
+        if(config.visible)void refresh();
+    }
 }
 async function refresh() {
-    if(panel.hidden || pending || document.hidden)return;
+    if(hud.hidden || pending || document.hidden)return;
     const config=preferences(), symbol=selectedSymbol(config);
     if(!symbol)return;
     const version=generation;pending=true;request=new AbortController();
@@ -38,7 +42,7 @@ async function refresh() {
             {cache:'no-store',signal:request.signal});
         if(!response.ok)throw new Error('Cannot load comparison. Restart the updated UI server.');
         const packet=await response.json(), choices=await catalog();
-        if(version!==generation || panel.hidden)return;
+        if(version!==generation || hud.hidden)return;
         table.replaceChildren();
         const caption=el('caption',`${symbol} multi-timeframe comparison`,table);
         caption.className='sr-only';
@@ -69,27 +73,36 @@ async function refresh() {
 export function mount() {
     panel=document.getElementById('analysis-panel');
     document.getElementById('chart').append(document.getElementById('flags-panel'));
-    toggle=el('button','Analysis / HUD',document.getElementById('toolbar'));
+    toggle=el('button','Analysis',document.getElementById('toolbar'));
     toggle.id='workspace-button';toggle.setAttribute('aria-controls','analysis-panel');toggle.setAttribute('aria-expanded','false');
     const header=el('header','',panel);el('h2','Analysis workspace',header);
     const close=el('button','Collapse panel',header);close.onclick=()=>setOpen(false);
     const opportunity=el('section','',panel,'workspace-card');el('h3','Best opportunity',opportunity);
     el('p','AI ranking is not connected yet. Opportunities across coins will appear here once the prediction engine is ready.',opportunity);
-    const hud=el('section','',panel,'workspace-card hud-card');el('h3','Comparison HUD',hud);
-    heading=el('p','',hud);const settings=el('button','Configure HUD',hud);
+    const body=el('div','',panel,'workspace-body');
+    body.tabIndex=0;body.setAttribute('role','region');body.setAttribute('aria-label','Analysis and chat');
+    hud=el('section','',document.getElementById('chart'),'chart-hud');
+    hud.id='chart-hud';hud.setAttribute('aria-label','Comparison HUD');
+    hudToggle=el('button','HUD',document.getElementById('toolbar'));
+    hudToggle.setAttribute('aria-label','Show comparison HUD');hudToggle.setAttribute('aria-controls','chart-hud');
+    hudToggle.onclick=()=>window.dispatchEvent(new CustomEvent('hud-visibility-change',{detail:!preferences().visible}));
+    const hudHeader=el('header','',hud,'hud-header');
+    heading=el('strong','',hudHeader);const settings=el('button','⚙',hudHeader);
+    settings.setAttribute('aria-label','Configure HUD');
     settings.onclick=()=>window.dispatchEvent(new Event('open-hud-settings'));
     const scroll=el('div','',hud,'hud-scroll');table=el('table','',scroll);table.id='comparison-hud';
     status=el('p','',hud,'workspace-note');status.setAttribute('role','status');
-    const analysis=el('section','',panel,'workspace-card');el('h3','Chart analysis',analysis);
+    // Interacting with the overlay must not pan or zoom the chart underneath it.
+    for(const event of ['pointerdown','mousedown','touchstart','wheel','dblclick'])hud.addEventListener(event,event=>event.stopPropagation());
+    const analysis=el('section','',body,'workspace-card');el('h3','Chart analysis',analysis);
     el('p','Coin and timeframe analysis will be connected here later.',analysis);
-    const chat=el('section','',panel,'workspace-card workspace-chat');el('h3','AI chat',chat);
+    const chat=el('section','',body,'workspace-card workspace-chat');el('h3','AI chat',chat);
     el('p','Chat will be available when an AI provider is connected.',chat);
     const input=el('textarea','',chat);input.disabled=true;input.placeholder='AI chat is not connected yet';input.setAttribute('aria-label','AI chat message');
     const send=el('button','Send',chat);send.disabled=true;
     function setOpen(open) {
         panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));
-        if(!open){generation++;request?.abort();pending=false;toggle.focus();}
-        else void refresh();
+        if(!open)toggle.focus();
         try{localStorage.setItem('tradingbot.workspace-open',String(open));}catch{}
     }
     toggle.onclick=()=>setOpen(panel.hidden);
@@ -97,6 +110,7 @@ export function mount() {
     document.getElementById('symbol').addEventListener('change',invalidate);
     window.addEventListener('chart-settings-change',invalidate);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+    invalidate();
     timer=setInterval(()=>void refresh(),5000);
     window.addEventListener('pagehide',()=>{clearInterval(timer);request?.abort();},{once:true});
     try{if(localStorage.getItem('tradingbot.workspace-open')==='true')setOpen(true);}catch{}
