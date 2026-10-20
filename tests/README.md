@@ -26,7 +26,8 @@ PYTHONPATH=. python3 tests/browser_smoke.py /workspace/.cache/package/dist/light
 The browser runs at 2560 x 1440 using 14,000 stored BTCUSDT 15-minute candles,
 matching features, periodic decisions, and additional market/timeframe fixtures.
 The history deliberately ends in June 2026, independent of today's clock.
-It verifies 1,000 initially visible candles, 20 consecutive 500-candle pages
+It verifies 200 initially visible candles with right margin, then user zoom-out
+and 20 consecutive 500-candle pages
 (10,000 candles back), timestamp/pixel continuity, reversal without refetch,
 stationary boundary arrival, reversal during prefetch, one marker wrapper,
 renderer configuration, rapid selection/reload, and local ingestion/derived-state
@@ -110,7 +111,7 @@ PYTHONPATH=. python3 tests/browser_settings.py /path/to/lightweight-charts.stand
 ```
 
 Covers Apply/Cancel, EMA period/style, viewport preservation, browser persistence,
-coin registry categories, disabled runner actions, keyboard close/focus and mobile
+coin registry categories, signed-out policy restrictions, keyboard close/focus and mobile
 layout. `test_settings_catalog.py` verifies read-only registry grouping and failure
 handling. Settings do not enable runner-policy changes or deletion yet.
 
@@ -122,3 +123,16 @@ node --test tests/feature_styles.test.mjs tests/ui_lifecycle.test.mjs
 
 The settings browser scenario also checks separate EMA colors/widths/styles,
 feature submenus and saved RSI/ADX output preferences.
+
+Administrator workflow (isolated databases and temporary accounts):
+
+```bash
+PYTHONPATH=. python3 tests/browser_admin.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Tests actual HTTP sessions, normal-user permission denials, immediate timeframe
+policy, typed administrator deletion, cache invalidation, scoped coin deletion
+and reapproval. `test_data_admin.py` covers three-store rollback, eligibility,
+reactivation bootstrap with actual feature computation, epoch invalidation,
+policy changes during in-flight downloads/calculation, and failed-bar retries.
+Exchange requests use fixtures; this does not establish Binance connectivity.

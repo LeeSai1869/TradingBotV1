@@ -12,6 +12,7 @@ import json
 import sqlite3
 import time
 from pathlib import Path
+from Section_1_Global_Core import data_policy
 
 from . import (
     audit_config as cfg,
@@ -252,7 +253,7 @@ def run(*, sample_rows_per_pair: int = 200,
     manifest["A4"] = a4_results
 
     # -------- A5: freshness --------
-    manifest["A5"] = audit_freshness.run(pairs)
+    manifest["A5"] = audit_freshness.run([pair for pair in pairs if data_policy.enabled(*pair)])
 
     finished_iso = _now()
     duration_ms = int((time.time() - started) * 1000)

@@ -33,9 +33,7 @@ async def exercise_live(base, library):
             page.on('request',lambda r:requests.append(r.url))
             await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
             await page.goto(base)
-            await page.wait_for_function('window.DataCache && DataCache.bars.length >= 1500 && !DataCache._olderPromise && DataCache.formingBar')
-            await settle(page)
-            await page.evaluate('DataCache.prefetchOlder()')
+            await page.wait_for_function('window.DataCache && DataCache.bars.length === 2000 && !DataCache._olderPromise && DataCache.formingBar')
             await settle(page)
             assert await page.evaluate('DataCache.formingBar.time') == T//1000
             assert await page.evaluate('DataCache.renderBars.length') == 2001

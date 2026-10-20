@@ -20,6 +20,7 @@ import datetime as _dt
 import json
 import sys
 from pathlib import Path
+from Section_1_Global_Core import data_policy
 
 
 _DIR = Path(__file__).resolve().parent
@@ -32,14 +33,19 @@ def _now():
 
 
 def _read():
-    return json.loads(_JSON.read_text(encoding="utf-8"))
+    global _read_snapshot
+    _read_snapshot = _JSON.read_text(encoding="utf-8")
+    return json.loads(_read_snapshot)
 
 
 def _write(data):
-    data["updated_at"] = _now()
-    tmp = _JSON.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(_JSON)
+    with data_policy.locked():
+        if _JSON.read_text(encoding="utf-8") != _read_snapshot:
+            raise RuntimeError("Coin registry changed during operation; rerun the command")
+        data["updated_at"] = _now()
+        tmp = _JSON.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(_JSON)
 
 
 def _log(action, symbol, detail):

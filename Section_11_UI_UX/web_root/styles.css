@@ -146,3 +146,12 @@ button:hover { background: #333; }
     .settings-style-row input[type="color"] { width: 40px; }
     .settings-style-heading { display: none; }
 }
+
+.settings-policy-item { padding: 8px 0 14px; border-bottom: 1px solid #323643; }
+.settings-policy-item .settings-note:empty { display: none; }
+.settings-coin-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.settings-login { display: grid; gap: 16px; max-width: 320px; }
+.settings-login label, .settings-delete-confirm label { display: grid; gap: 8px; }
+.settings-login input, .settings-delete-confirm input { background: #252a35; color: #eee; border: 1px solid #454b5b; border-radius: 4px; padding: 9px; min-width: 0; }
+.settings-delete-confirm { border: 1px solid #ad5353; padding: 14px; margin: 12px 0; font-size: 13px; line-height: 1.6; }
+.settings-delete-confirm button { margin: 8px 8px 0 0; }

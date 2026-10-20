@@ -20,6 +20,7 @@ const DataCache = {
     _olderPromise: null,
     _refreshPromise: null,
     _latestSignature: null,
+    _storageEpoch: "0:0",
     listeners: [],
 
     get renderBars() {
@@ -34,6 +35,7 @@ const DataCache = {
         }
         if (live && this.liveEnabled) {
             this.liveStatus = live.status;
+            if (live.status === "inactive") this.formingBar = null;
             const candidate = live.bar;
             if (candidate && latest) {
                 // Do not jump over missing audited history. At rollover keep
@@ -91,6 +93,7 @@ const DataCache = {
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
+            this._storageEpoch = packet.storage_epoch ?? "0:0";
             this.bars = packet.bars;
             this.activeBars = this.bars;
             this.latestBar = this.bars.at(-1) || null;
@@ -113,6 +116,9 @@ const DataCache = {
         const request = this._fetchPage(this.symbol, this.timeframe, BLOCK_BARS, cursor);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || cursor !== this.nextBefore) return false;
+            if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
+                return this.loadInitial(this.symbol, this.timeframe);
+            }
             this._merge(packet.bars);
             this.nextBefore = packet.next_before;
             this.error = null;
@@ -140,6 +146,9 @@ const DataCache = {
         const request = this._fetchPage(this.symbol, this.timeframe, WINDOW_BARS);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
+            if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
+                return this.loadInitial(this.symbol, this.timeframe);
+            }
             const signature = JSON.stringify(packet.bars);
             const changed = signature !== this._latestSignature;
             if (changed) {

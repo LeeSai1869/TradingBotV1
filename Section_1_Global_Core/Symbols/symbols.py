@@ -104,7 +104,9 @@ def get_active_symbols() -> list[str]:
     _ensure_cache()
     top = set(get_top50())
     approved = [e["symbol"] for e in _CACHE["approved"]]
-    active = [s for s in approved if s in top]
+    from Section_1_Global_Core import data_policy
+    paused = set(data_policy.read()["paused_coins"])
+    active = [s for s in approved if s in top and s not in paused]
     cap = get_active_cap()
     return active[:cap]
 
@@ -112,8 +114,8 @@ def get_active_symbols() -> list[str]:
 def get_inactive_symbols() -> list[str]:
     """approved − top50."""
     _ensure_cache()
-    top = set(get_top50())
-    return [e["symbol"] for e in _CACHE["approved"] if e["symbol"] not in top]
+    active = set(get_active_symbols())
+    return [e["symbol"] for e in _CACHE["approved"] if e["symbol"] not in active]
 
 
 def get_processing_symbols() -> list[str]:

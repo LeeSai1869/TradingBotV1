@@ -23,6 +23,8 @@ lookbacks, and everything in market_context / market_location.
 from __future__ import annotations
 
 import pandas as pd
+from contextvars import ContextVar
+from Section_1_Global_Core import data_policy
 
 from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core.memory_storage.Storage import features_store
@@ -108,7 +110,39 @@ def _compute_and_write_one(symbol, interval, bar_open_ms):
     return db.write_features([row])
 
 
+_catch_epoch = ContextVar('feature_catch_epoch', default=None)
+
+
+def _epoch(symbol, interval):
+    state = data_policy.read()['epochs']
+    return (state.get(f'symbol:{symbol}', 0), state.get(f'interval:{interval}', 0))
+
+
+def _write_catchup(symbol, interval, rows):
+    with data_policy.locked():
+        if not data_policy.enabled(symbol, interval) or _catch_epoch.get() != _epoch(symbol, interval):
+            raise RuntimeError('Catch-up cancelled after data policy changed')
+        return db.write_features(rows)
+
+
+def reset_pair(symbol, interval):
+    from Section_4_Features.features import support_resistance, bos_structure, market_imbalance, market_location, market_liquidity
+    for store in [support_resistance._sr_memory_store, bos_structure._structure_memory_store,
+                  bos_structure._SWING_PIVOT_STATES, bos_structure._FLIP_CANDIDATE_STATES,
+                  market_imbalance._imbalance_memory_store, market_location._location_memory_store]:
+        store.pop((symbol, interval), None)
+    market_liquidity._liquidity_memory_store.pop(interval, None)
+
+
 def catch_up(symbol, interval):
+    token = _catch_epoch.set(_epoch(symbol, interval))
+    try:
+        return _catch_up(symbol, interval)
+    finally:
+        _catch_epoch.reset(token)
+
+
+def _catch_up(symbol, interval):
     """
     Fill any missing feature rows for (symbol, interval).
 
@@ -265,11 +299,11 @@ def _fill_gap(symbol, interval, gap_rows, t0,
                   flush=True)
 
         if len(rows_to_write) >= WRITE_BATCH:
-            written += db.write_features(rows_to_write)
+            written += _write_catchup(symbol, interval, rows_to_write)
             rows_to_write = []
 
     if rows_to_write:
-        written += db.write_features(rows_to_write)
+        written += _write_catchup(symbol, interval, rows_to_write)
 
     if not silent:
         dt = _t.time() - t0
@@ -279,10 +313,8 @@ def _fill_gap(symbol, interval, gap_rows, t0,
 
 
 def process_bar(ev):
-    """Called by Section 1's orchestrator on every new closed bar."""
-    try:
-        return _compute_and_write_one(ev.symbol, ev.timeframe, ev.open_time)
-    except Exception as e:
-        print(f"[processor] process_bar failed {ev.symbol} {ev.timeframe}: {e}",
-              flush=True)
-        return 0
+    """A failed write must propagate so the orchestrator retries this bar."""
+    result = _compute_and_write_one(ev.symbol, ev.timeframe, ev.open_time)
+    if not result:
+        raise RuntimeError(f'No features produced for {ev.symbol} {ev.timeframe} {ev.open_time}')
+    return result

@@ -21,6 +21,8 @@ Interruptible. Re-run to resume from the last stored bar.
 
 from __future__ import annotations
 
+from Section_1_Global_Core import data_policy
+
 import sqlite3
 import time
 import urllib.request
@@ -122,6 +124,13 @@ def last_stored_open_time(conn, symbol: str, interval: str):
 
 
 def insert_page(conn, symbol, interval, page, now_ms):
+    with data_policy.locked():
+        if not data_policy.enabled(symbol, interval):
+            return 0
+        return _insert_page(conn, symbol, interval, page, now_ms)
+
+
+def _insert_page(conn, symbol, interval, page, now_ms):
     """
     Insert a page of klines. Skips any candle whose close_time >= now_ms.
 
@@ -221,6 +230,8 @@ def download_one(conn, symbol, interval):
     last_report = time.time()
 
     while True:
+        if not data_policy.enabled(symbol, interval):
+            break
         try:
             page = fetch_klines(symbol, interval, start_ms, limit=PAGE_LIMIT)
         except RateLimitError as e:
@@ -272,8 +283,8 @@ def main():
     print("BINANCE HISTORY DOWNLOADER")
     print("=" * 78)
     print("DB        : " + str(DB_PATH))
-    print("Symbols   : " + str(SYMBOLS))
-    print("Intervals : " + str(INTERVALS))
+    print("Symbols   : " + str(data_policy.active_symbols()))
+    print("Intervals : " + str(data_policy.active_intervals()))
     print("")
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -286,10 +297,10 @@ def main():
 
     abort_triggered = False
 
-    for symbol in SYMBOLS:
+    for symbol in data_policy.active_symbols():
         if abort_triggered:
             break
-        for interval in INTERVALS:
+        for interval in data_policy.active_intervals():
             try:
                 n, err = download_one(conn, symbol, interval)
                 summary[(symbol, interval)] = n

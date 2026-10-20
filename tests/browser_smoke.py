@@ -53,12 +53,16 @@ window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
         await settle(page)
         assert await page.evaluate('DataCache.activeBars.length') == 1000
         visible = await page.evaluate('Canvas.chart.timeScale().getVisibleLogicalRange()')
-        assert abs(visible['to']-visible['from']-999) < .01, visible
+        assert abs(visible['to']-visible['from']-207) < .01, visible
+        assert abs(visible['to']-(await page.evaluate('DataCache.renderBars.length')+7)) < .01, visible
         assert await page.evaluate('DataCache.latestBar.time') == 1781653500
         assert await page.locator('#chart canvas').count() > 0
         assert await page.evaluate('DataCache.bars.every(b => b.client && b.features && "adcn" in b)')
-        print('PASS: exactly 1000 initially visible, old stored history, combined bar records',flush=True)
+        print('PASS: 200 initial candles with right margin, 1000 active cached, combined bar records',flush=True)
 
+        # User zoom-out: retain the existing 1000-candle navigation regression.
+        await page.evaluate('() => {const n=DataCache.bars.length;Canvas.chart.timeScale().setVisibleLogicalRange({from:n-1000,to:n-1});}')
+        await settle(page)
         # A -> B -> C... across 10,000 bars. Every prepend must keep the
         # requested visible timestamps and center candle pixel coordinate.
         initial = await page.evaluate('Canvas.chart.timeScale().getVisibleRange()')

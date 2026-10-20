@@ -16,6 +16,8 @@ INVARIANT:
 
 from __future__ import annotations
 
+from Section_1_Global_Core import data_policy
+
 import sqlite3
 import time
 import urllib.request
@@ -148,18 +150,19 @@ def update_one(symbol, interval, conn):
     key = (symbol, interval)
     step = INTERVAL_MS[interval]
 
-    last_ms = _LAST_UPDATE_MS.get(key)
+    if not data_policy.enabled(symbol, interval):
+        return 0
+    stored = _last_stored_open_time(conn, symbol, interval)
+    last_ms = _LAST_UPDATE_MS.get(key) if stored is not None else None
     if last_ms is not None:
         # Same interval bucket as the last fetch — the bar we would
         # fetch hasn't closed yet. Nothing new to do.
         if (last_ms // step) == (now_ms // step):
             return 0
 
-    start_ms = _last_stored_open_time(conn, symbol, interval)
-    if start_ms is None:
-        return 0
-
-    start_ms = start_ms + 1
+    # Missing/deleted pairs bootstrap from exchange history, one page per cycle.
+    from .download_binance_history import FALLBACK_START_MS
+    start_ms = stored + 1 if stored is not None else FALLBACK_START_MS
 
     try:
         page = _fetch(symbol, interval, start_ms)
@@ -172,8 +175,16 @@ def update_one(symbol, interval, conn):
         return 0
 
     now_ms = int(time.time() * 1000)
-    n = _insert(conn, symbol, interval, page, now_ms)
-    _LAST_UPDATE_MS[key] = now_ms
+    with data_policy.locked():
+        if not data_policy.enabled(symbol, interval):
+            return 0
+        n = _insert(conn, symbol, interval, page, now_ms)
+    # A full page can mean backlog; continue next cycle rather than waiting
+    # an entire 1w/1M interval. Throttle only when caught up.
+    if len(page) < PAGE_LIMIT or int(page[-1][6]) >= now_ms:
+        _LAST_UPDATE_MS[key] = now_ms
+    else:
+        _LAST_UPDATE_MS.pop(key, None)
     if n > 0:
         print("[update_klines] " + symbol + " " + interval + ": +" + str(n) + " bars", flush=True)
     return n
@@ -192,8 +203,8 @@ def update_all():
     conn = _open_db()
     total = 0
     try:
-        for symbol in SYMBOLS:
-            for interval in INTERVALS:
+        for symbol in data_policy.active_symbols():
+            for interval in data_policy.active_intervals():
                 total += update_one(symbol, interval, conn)
     finally:
         conn.close()

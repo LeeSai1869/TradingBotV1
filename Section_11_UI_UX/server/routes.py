@@ -4,9 +4,10 @@ import json
 from urllib.parse import urlparse, parse_qs
 
 from Section_1_Global_Core.memory_storage.Storage import db
+from Section_1_Global_Core import data_policy
 
 from . import queries
-from . import live_candle
+from . import live_candle, admin_routes
 from .settings_catalog import read_coin_catalog
 
 HERE = None
@@ -30,6 +31,9 @@ def _int(qs, name, default=None):
 
 
 def handle_get(path, raw_qs, server):
+    status, payload = admin_routes.handle_get(path, server)
+    if status is not None:
+        return status, payload
     qs = parse_qs(raw_qs)
     for k in list(qs.keys()):
         qs[k] = [clean(x) for x in qs[k]]
@@ -44,10 +48,15 @@ def handle_get(path, raw_qs, server):
             return 400, {"error": "limit and before must be integers"}
         if not symbol or not interval or not 1 <= limit <= 1000:
             return 400, {"error": "symbol, interval and limit between 1 and 1000 required"}
-        packet = {"symbol": symbol, "interval": interval,
-                  **db.read_state_page(symbol, interval, limit, before=before)}
+        with data_policy.locked():
+            epochs = data_policy.read()['epochs']
+            packet = {"symbol": symbol, "interval": interval,
+                      "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",
+                      **db.read_state_page(symbol, interval, limit, before=before)}
+            active = data_policy.enabled(symbol, interval)
         if before is None and qs.get("live", ["0"])[0] == "1":
-            packet["live"] = live_candle.get_snapshot(symbol, interval)
+            packet["live"] = live_candle.get_snapshot(symbol, interval) if active else {
+                "bar": None, "status": "inactive", "as_of": None, "error": None}
         return 200, packet
 
     # ---- complete chart window ----
@@ -158,6 +167,9 @@ def handle_get(path, raw_qs, server):
 
 
 def handle_post(path, body, server):
+    status, payload = admin_routes.handle_post(path, body, server)
+    if status is not None:
+        return status, payload
     if path == "/api/ui_config":
         try:
             payload = json.loads(body)

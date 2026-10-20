@@ -170,3 +170,24 @@ test('stale forming response cannot follow a new symbol selection',async()=>{
     pending.resolve({bars:[closed(60)],live:{bar:provisional(120),status:'live'}});
     assert.equal(await work,false);assert.equal(c.formingBar,null);
 });
+
+test('deletion in another session invalidates cached candles on refresh',async()=>{
+    const c=cache();
+    c._fetchPage=async()=>({...page([60,120]),storage_epoch:'0:0'});
+    await c.loadInitial('BTCUSDT','1m');
+    c._fetchPage=async()=>({...page([]),storage_epoch:'0:1'});
+    await c.refreshStored();
+    assert.equal(c.bars.length,0);
+    assert.equal(c.latestBar,null);
+    assert.equal(c._storageEpoch,'0:1');
+});
+
+test('deletion observed by an older request reloads instead of merging old cached data',async()=>{
+    const c=cache();
+    c._fetchPage=async()=>({...page([60,120],60000),storage_epoch:'0:0'});
+    await c.loadInitial('BTCUSDT','1m');
+    c._fetchPage=async()=>({...page([]),storage_epoch:'1:0'});
+    await c.prefetchOlder();
+    assert.equal(c.bars.length,0);
+    assert.equal(c.nextBefore,null);
+});

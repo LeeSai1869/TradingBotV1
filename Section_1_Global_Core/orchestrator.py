@@ -39,6 +39,7 @@ from Section_1_Global_Core.memory_storage.market_data.update_klines import (
 from Section_1_Global_Core.memory_storage.Storage import klines_store
 from Section_1_Global_Core.memory_storage.Audit import audit_runner
 from Section_1_Global_Core.Symbols import symbols as sym
+from Section_1_Global_Core import data_policy
 
 
 # ------------------------------------------------------------
@@ -185,15 +186,33 @@ class GlobalCoreOrchestrator:
         #    bar as baseline and fire nothing. Processors start
         #    receiving events from the NEXT bar forward.
         events_fired = 0
-        for s in sym.get_active_symbols():
-            for iv in _KLINES_INTERVALS:
+        for s in data_policy.active_symbols():
+            for iv in data_policy.active_intervals():
                 key = f"{s}|{iv}"
+                epochs = data_policy.read()['epochs']
+                epoch = [epochs.get(f'symbol:{s}', 0), epochs.get(f'interval:{iv}', 0)]
+                seen = self._state.setdefault('__epochs__', {})
+                if seen.get(key, [0, 0]) != epoch:
+                    self._state.pop(key, None)
+                    for name, fn in self._processors:
+                        module = importlib.import_module(name.rsplit('.', 1)[0])
+                        reset = getattr(module, 'reset_pair', None)
+                        if reset:
+                            reset(s, iv)
+                seen[key] = epoch
                 since = self._state.get(key)
                 bars = _fetch_bars_since(s, iv, since if since is not None else -1)
 
                 if since is None:
                     # First sight: seed baseline, do NOT fire events.
                     if bars:
+                        if not data_policy.enabled(s, iv):
+                            continue
+                        for name, fn in self._processors:
+                            module = importlib.import_module(name.rsplit('.', 1)[0])
+                            catch = getattr(module, 'catch_up', None)
+                            if catch:
+                                catch(s, iv)
                         latest_ot = bars[-1][0]
                         self._state[key] = latest_ot
                         print(
@@ -212,16 +231,21 @@ class GlobalCoreOrchestrator:
                         low=float(l), close=float(c),
                         volume=float(v),
                     )
-                    for name, fn in self._processors:
-                        try:
-                            fn(ev)
-                        except Exception as e:
-                            print(
-                                f"[orchestrator] {name} failed on "
-                                f"{s} {iv} {ot}: {e}",
-                                flush=True,
-                            )
-                            traceback.print_exc()
+                    success = True
+                    with data_policy.locked():
+                        current = data_policy.read()['epochs']
+                        if not data_policy.enabled(s, iv) or epoch != [current.get(f'symbol:{s}', 0), current.get(f'interval:{iv}', 0)]:
+                            break
+                        for name, fn in self._processors:
+                            try:
+                                fn(ev)
+                            except Exception as e:
+                                print(f"[orchestrator] {name} failed on {s} {iv} {ot}: {e}", flush=True)
+                                traceback.print_exc()
+                                success = False
+                                break
+                    if not success:
+                        break  # Retry this bar next cycle; do not advance past failure.
                     self._state[key] = ot
                     events_fired += 1
 
@@ -252,8 +276,8 @@ class GlobalCoreOrchestrator:
         # other downstream store) on cold start.
         # ------------------------------------------------------------
         print("[orchestrator] startup catch-up...", flush=True)
-        for s in sym.get_active_symbols():
-            for iv in _KLINES_INTERVALS:
+        for s in data_policy.active_symbols():
+            for iv in data_policy.active_intervals():
                 for name, fn in self._processors:
                     catch_fn = None
                     try:
@@ -265,6 +289,8 @@ class GlobalCoreOrchestrator:
                     if catch_fn is None:
                         continue
                     try:
+                        if not data_policy.enabled(s, iv):
+                            continue
                         n = catch_fn(s, iv)
                         if n:
                             print(f"[orchestrator]   {name} {s} {iv}: +{n}",
@@ -279,7 +305,7 @@ class GlobalCoreOrchestrator:
         print("GLOBAL CORE ORCHESTRATOR", flush=True)
         print("=" * 60, flush=True)
         print("active symbols :", sym.get_active_symbols(), flush=True)
-        print("intervals      :", _KLINES_INTERVALS, flush=True)
+        print("intervals      :", data_policy.active_intervals(), flush=True)
         print("processors     :", [n for n, _ in self._processors], flush=True)
         print("poll seconds   :", self.poll_seconds, flush=True)
         print("state file     :", STATE_FILE, flush=True)

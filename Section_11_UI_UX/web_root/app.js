@@ -16,6 +16,11 @@ async function loadAll() {
     status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
         await DataCache.loadInitial(symbol, timeframe);
+        // Keep an older buffer ready even though the readable initial view
+        // now contains fewer candles than the cached active window.
+        for (let page = 0; page < 2 && id === loadId && DataCache.nextBefore !== null; page++) {
+            await DataCache.prefetchOlder();
+        }
     } catch (error) {
         if (id === loadId) status().textContent = `Error: ${error.message}`;
     }
@@ -65,7 +70,7 @@ async function loadAll() {
             target = { from: last - span, to: last };
             chart.priceScale("right").applyOptions({ autoScale: true });
         } else if (reset && bars.length) {
-            target = { from: Math.max(0, bars.length - 1000), to: bars.length - 1 };
+            target = { from: Math.max(0, bars.length - 200), to: bars.length + 7 };
             symbolControl.applyPriceFormat(DataCache.symbol, bars,
                 Composer.config.price_precision?.[DataCache.symbol]);
         } else if (range && renderedBars.length && bars.length) {
@@ -113,6 +118,11 @@ async function loadAll() {
     document.getElementById("interval").addEventListener("change", () => {
         timeframeControl.refreshButtons();
         void loadAll();
+    });
+    window.addEventListener("data-policy-change", event => {
+        void symbolControl.refresh();
+        const scope = event.detail?.deleted;
+        if (scope && (scope.interval === DataCache.timeframe || scope.symbol === DataCache.symbol)) void loadAll();
     });
     reloadControl.bind(loadAll);
     latestControl.bind(() => {

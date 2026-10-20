@@ -25,3 +25,7 @@ build/
 # Env / secrets
 .env
 *.env
+
+# Local runner policy and administration coordination
+Section_1_Global_Core/runtime_policy.json
+Section_1_Global_Core/.data-policy.lock

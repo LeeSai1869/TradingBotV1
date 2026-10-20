@@ -210,3 +210,25 @@ calendar-month keys, missing derived rows, market identity and cursor edges.
 Browser flow tests exercise the same gateway. This is not a new market-data
 A1/A2/A5 certification: the cloud instance has no downloaded market history.
 The previously reported public-surface checker conflicts remain outstanding.
+
+### Runtime data policy 2.0 — 2026-10-20
+
+User-requested timeframe and coin administration adds a shared runtime policy,
+manual coin pauses, role-checked Section 11 operations and three-memory deletion.
+The registry remains permanent; pending/staged/eligibility remain rule-driven.
+Ingestion and processing read the same policy, recheck it before writes, and
+coordinate with deletion through a cross-process lock. Proposer/verifier reject
+stale registry writes. Freshness checks exclude inactive pairs; structural audits
+continue to cover stored history. Reactivation bootstraps missing candle pages;
+delete epochs reset runner cursors and invalidate stale catch-up/browser caches.
+Processor errors propagate so the runner does not advance past failed bars.
+
+Required deployment: restart all writer processes and the UI server after pulling
+before using administration. Local accounts are provisioned separately; there
+are no default passwords. See Section 11's controls/settings/README.md.
+
+Validation covers isolated three-store transaction rollback, scoped deletion,
+registry preservation, role bypass attempts, stale writes, re-download and actual
+feature calculation. No real market history was deleted and no new market-data
+A1/A2/A5 certification is claimed. Existing import-policy checker conflicts remain
+outside this change. The previous 1.1 chart read APIs remain compatible.

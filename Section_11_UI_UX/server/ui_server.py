@@ -27,6 +27,9 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(SECTION_11), **kwargs)
 
     def do_GET(self):
+        if not self._local_host():
+            self._json({"error": "Invalid Host"}, 403)
+            return
         parsed = urlparse(self.path)
 
         # API dispatch
@@ -49,9 +52,22 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def _local_host(self):
+        return self.headers.get("Host") in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+
     def do_POST(self):
+        if not self._local_host():
+            self._json({"error": "Invalid Host"}, 403)
+            return
+        self.response_cookie = None
         parsed = urlparse(self.path)
-        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 <= length <= 16384:
+                raise ValueError()
+        except ValueError:
+            self._json({"error": "Invalid request size"}, 413)
+            return
         body = self.rfile.read(length).decode("utf-8") if length else ""
         status, payload = routes.handle_post(parsed.path, body, self)
         if status is not None:
@@ -62,6 +78,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _json(self, obj, status=200):
         body = json.dumps(obj, default=str).encode("utf-8")
         self.send_response(status)
+        if getattr(self, "response_cookie", None):
+            self.send_header("Set-Cookie", self.response_cookie)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
