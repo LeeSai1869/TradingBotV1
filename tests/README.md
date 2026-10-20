@@ -370,3 +370,11 @@ faulthandler's SIGUSR1 traceback handler for diagnosing a stall without killing 
 process; never send that signal to an older runner that has not been restarted.
 `test_fast_audit.py` verifies bounded sampling, deferred gap repair and exclusion of
 full hashing/scanning/network work from the ingest audit.
+
+Restart process identity
+------------------------
+Runner discovery checks process state and the actual executable (`ps comm`) in
+addition to the exact `-m` module. Launcher shells, `-c` command text, and zombie
+processes cannot count as active Python writers. A process disappearing during
+inspection is tolerated. If a real writer persists after termination, restart
+still refuses a competing start and reports PID/parent/state/command for diagnosis.

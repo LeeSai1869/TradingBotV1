@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import plistlib
+import re
 import shlex
 import signal
 import subprocess
@@ -24,18 +25,30 @@ def configuration(python, logs):
 
 
 def runner_processes():
-    result = subprocess.run(['ps','-axo','pid=,command='], capture_output=True,text=True,check=True)
+    result = subprocess.run(['ps','-axo','pid=,stat=,command='], capture_output=True,text=True,check=True)
     found = []
     for line in result.stdout.splitlines():
         try:
-            pid, command = line.strip().split(None,1)
+            pid, state, command = line.strip().split(None,2)
             args = shlex.split(command)
         except ValueError:
             continue
-        if any(args[i:i+2] == ['-m',module] for i in range(len(args)-1)
-               for module in MODULES):
+        if 'Z' in state or '-c' in args:
+            continue  # Zombies cannot write; shell/python -c text is not a runner.
+        if not any(args[i:i+2] == ['-m',module] for i in range(len(args)-1) for module in MODULES):
+            continue
+        # ps command strings can contain a parent shell's launch script. Verify
+        # the actual executable separately, rather than killing a text match.
+        executable = subprocess.run(['ps','-p',pid,'-o','comm='],capture_output=True,text=True).stdout.strip()
+        if re.fullmatch(r'python(?:[0-9]+(?:\.[0-9]+)*)?',Path(executable).name,re.IGNORECASE):
             found.append(int(pid))
     return found
+
+
+def describe_processes(pids):
+    if not pids:
+        return ''
+    return subprocess.run(['ps','-p',','.join(map(str,pids)),'-o','pid=,ppid=,stat=,command='],capture_output=True,text=True).stdout.strip()
 
 
 def runner_job(label):
@@ -90,9 +103,12 @@ def stop_existing(service):
             try: os.kill(pid,signal.SIGTERM)
             except ProcessLookupError: pass
     deadline = time.monotonic()+20
-    while runner_processes():
+    while True:
+        remaining = runner_processes()
+        if not remaining:
+            break
         if time.monotonic() >= deadline:
-            raise SystemExit('Runner has not stopped, or another supervisor restarted it. No competing writer was started.')
+            raise SystemExit('Python runner(s) still active after stop; no competing writer started.\nPID PPID STATE COMMAND\n'+describe_processes(remaining))
         time.sleep(.25)
 
 
