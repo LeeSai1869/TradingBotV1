@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import plistlib
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -57,6 +58,9 @@ def main():
     parser.add_argument('symbol',nargs='?',default='ETHUSDT')
     parser.add_argument('--verify',nargs='+',choices=data_policy.INTERVALS,help='Read-only exchange comparison of the latest stored candle for each selected timeframe')
     args=parser.parse_args(); symbol=args.symbol.upper()
+    project=Path(__file__).resolve().parent
+    print('Checked project:',project)
+    print('Candle database:',Path(klines_store.DB_PATH).resolve())
     registry=data_admin.catalog()
     print(f'{symbol}: ' + ', '.join(key for key in ('approved','pending','staged','disapproved','top50') if any(r['symbol']==symbol for r in registry.get(key,[]))))
     print('Runner policy:', 'ACTIVE' if symbol in data_policy.active_symbols() else 'INACTIVE')
@@ -64,6 +68,22 @@ def main():
         result=subprocess.run(['launchctl','list'],capture_output=True,text=True)
         rows=[line.split() for line in result.stdout.splitlines() if line.split() and line.split()[-1]=='com.scalp.liverunner']
         print('Runner launchd PID:',rows[0][0] if rows else 'not loaded (a manual runner may still be running)')
+        if rows and rows[0][0].isdigit():
+            cwd=subprocess.run(['lsof','-a','-p',rows[0][0],'-d','cwd','-Fn'],capture_output=True,text=True)
+            paths=[line[1:] for line in cwd.stdout.splitlines() if line.startswith('n')]
+            print('Runner working folder:',paths[0] if paths else 'unknown')
+            if paths and Path(paths[0]).resolve()!=project:
+                print('WARNING: runner is in a DIFFERENT project folder. These counts may belong to another copy.')
+        plist=Path.home()/'Library'/'LaunchAgents'/'com.scalp.liverunner.plist'
+        if plist.exists():
+            try:
+                installed=plistlib.loads(plist.read_bytes()).get('WorkingDirectory')
+                print('Login runner configured folder:',installed or 'not set')
+                if installed and Path(installed).resolve()!=project:
+                    print('WARNING: login runner configuration points to a different or renamed project folder.')
+            except (OSError,ValueError,TypeError) as error:
+                print('Cannot read runner configuration:',error)
+
     if sys.platform=='darwin' and not rows:
         print('To install/re-enable the login runner: python3 restart_runner.py')
     print('Run again in 30–60 seconds; increasing 1m counts/timestamps confirm progress; current timestamps can mean already caught up.')
