@@ -298,3 +298,25 @@ and indicators remain above its text and borders. The chart container supplies
 the dark background. Only HUD settings/resize controls remain above the canvas;
 the table's scroll region remains keyboard-focusable. The workspace browser
 regression checks layer order and continues to exercise settings and resizing.
+
+Saved-alert manager and independent editor
+-----------------------------------------
+Alerts opens the saved-alert list and activity. The + New alert button opens a
+separate modal editor; Edit opens that editor for the selected rule. Successful
+saves close the editor, release its saving state immediately and refresh the list
+independently. New creates clear the editing ID and default to the current chart
+pair. Failed saves keep the form and re-enable submission. In-flight saves prevent
+closing/replacing the editor; requests have a finite deadline and timeout messages
+advise checking saved alerts before retrying an uncertain submission.
+
+Saving uses the same deletion guard as chart snapshots rather than waiting for
+runner feature-processing locks. Browser audio resume is attempted independently
+and cannot delay the save request. Existing per-account alert storage is retained.
+
+```sh
+PYTHONPATH=. python3 tests/browser_alert_editor.py /path/to/lightweight-charts.standalone.production.js
+```
+
+This browser regression creates three alerts successively while holding the runner
+lock and mocking audio resume to remain pending. It verifies separate list/editor,
+edit identity, deletion, and successful retry after an HTTP save failure.

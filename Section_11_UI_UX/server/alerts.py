@@ -79,7 +79,7 @@ def list_rules(owner):
 def save(owner,data):
     spec=validate(data); key=data.get('id') or uuid.uuid4().hex
     if not isinstance(key,str): raise ValueError('Invalid rule ID')
-    with data_policy.locked():
+    with data_policy.snapshot_guard():
         last=db.last_kline_time(spec['symbol'],spec['interval']) or 0
         version=epoch(spec['symbol'],spec['interval'])
     conn=open_db()

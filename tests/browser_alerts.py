@@ -33,6 +33,9 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Alerts',exact=True).click()
         dialog=page.get_by_role('dialog',name='Alerts',exact=True)
         await dialog.get_by_role('button',name='Enable notifications and sound',exact=True).click()
+        await dialog.get_by_role('button',name='New alert',exact=True).click()
+        manager=dialog
+        dialog=page.get_by_role('dialog',name='Create alert',exact=True)
         await dialog.get_by_label('Alert name',exact=True).fill('RSI crossing test')
         await dialog.get_by_label('Timeframe',exact=True).select_option('1m')
         await dialog.get_by_label('Field',exact=True).select_option('features.rsi')
@@ -42,6 +45,7 @@ async def exercise(base,library):
         await dialog.get_by_label('Sound',exact=True).select_option('bell')
         await dialog.get_by_role('button',name='Test selected sound',exact=True).click()
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
+        dialog=manager
         await dialog.locator('.alert-rule').get_by_text('RSI crossing test',exact=True).wait_for()
         await dialog.get_by_role('button',name='Close alerts',exact=True).click()
         before=await page.evaluate('soundEvents')
@@ -59,6 +63,8 @@ async def exercise(base,library):
         assert await page.evaluate("noticeEvents.some(e=>e.name==='RSI crossing test')")
         assert await page.evaluate('DataCache.atLiveEdge') is False
         await page.get_by_role('button',name='Alerts',exact=True).click()
+        await dialog.get_by_role('button',name='New alert',exact=True).click()
+        dialog=page.get_by_role('dialog',name='Create alert',exact=True)
         assert await dialog.get_by_label('Coin',exact=True).input_value()==await page.locator('#symbol').input_value()
         assert await dialog.get_by_label('Timeframe',exact=True).input_value()==await page.locator('#interval').input_value()
         await dialog.get_by_label('Alert name',exact=True).fill('Live SUI alert')
@@ -70,6 +76,7 @@ async def exercise(base,library):
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('10')
         await dialog.get_by_label('Sound',exact=True).select_option('alarm')
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
+        dialog=manager
         await dialog.locator('.alert-rule').get_by_text('Live SUI alert',exact=True).wait_for()
         await dialog.get_by_role('button',name='Close alerts',exact=True).click()
         bar=dict(symbol='SUIUSDT',interval='1m',open_time=t,time=t//1000,client=dict(close=9,high=9,low=8))

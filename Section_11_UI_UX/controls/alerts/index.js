@@ -1,7 +1,7 @@
 // Alert configuration is per account; evaluation happens in the local backend.
 export const name = 'alerts';
-let dialog, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
-let polling=false, timer, editing=null, refreshId=0;
+let dialog, editor, editorTitle, editorStatus, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
+let polling=false, timer, editing=null, refreshId=0, saving=false;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
 function el(tag,text,parent,className) {
@@ -9,8 +9,14 @@ function el(tag,text,parent,className) {
     if(parent)parent.append(node);if(className)node.className=className;return node;
 }
 async function request(path,data) {
-    const response=await fetch(path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{cache:'no-store'});
-    const packet=await response.json();if(!response.ok)throw new Error(packet.error||`Alert API: ${response.status}`);return packet;
+    const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),15000);
+    try {
+        const response=await fetch(path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:controller.signal}:{cache:'no-store',signal:controller.signal});
+        const packet=await response.json();if(!response.ok)throw new Error(packet.error||`Alert API: ${response.status}`);return packet;
+    } catch(error) {
+        if(error.name==='AbortError')throw new Error('Alert request timed out. Check Saved alerts before retrying.');
+        throw error;
+    } finally {clearTimeout(timeout);}
 }
 function select(label,key,options,parent) {
     const row=el('label',label,parent), input=el('select','',row);input.name=key;input.setAttribute('aria-label',label);
@@ -77,12 +83,12 @@ async function poll() {
 }
 async function refresh() {
     const id=++refreshId, packet=await request('/api/alerts');if(id!==refreshId)return;rules.replaceChildren();
-    if(!packet.rules.length)el('p','No saved alerts. Create a rule below.',rules,'settings-note');
+    if(!packet.rules.length)el('p','No saved alerts. Use + to create your first alert.',rules,'settings-note');
     for(const rule of packet.rules) {
         const row=el('div','',rules,'alert-rule');
         el('strong',rule.name,row);el('p',`${rule.symbol} ${rule.interval} · ${rule.field} ${rule.operator.replaceAll('_',' ')} ${rule.target_field||rule.value} · ${rule.status}`,row,'settings-note');
         const buttons=el('div','',row,'settings-coin-actions');
-        const edit=el('button','Edit',buttons);edit.onclick=()=>fill(rule);
+        const edit=el('button','Edit',buttons);edit.onclick=()=>{if(saving)return;fill(rule);editorTitle.textContent='Edit alert';editorStatus.textContent='';editor.showModal();};
         const toggle=el('button',rule.enabled?'Pause':'Re-arm',buttons);
         toggle.onclick=async()=>{try{await request('/api/alerts',{...rule,enabled:!rule.enabled});await refresh();}catch(error){status.textContent=error.message;}};
         const remove=el('button','Delete rule',buttons);
@@ -102,7 +108,7 @@ function fill(rule) {
     }
     syncMode();
     form.querySelector('button[type=submit]').textContent=editing?'Save changes':'Create alert';
-    form.scrollIntoView({block:'nearest'});
+
 }
 function reset() {
     form.reset();editing=null;
@@ -116,7 +122,7 @@ function reset() {
 async function build() {
     if(form)return;
     catalog=await request('/api/alerts/catalog');
-    el('p','Live rules watch candle high, low and close. Feature rules use newly stored closed candles and wait for their calculation. Rules run independently of your chart. Keep the app open for sound/notifications; use Enable notifications and sound after opening the app. Old downloaded history does not trigger new closed-feature alerts.',dialog,'settings-note');
+    el('p','Live rules watch price and provisional EMA/RSI. Other feature rules use newly stored closed candles and wait for their calculation. Rules run independently of your chart. Keep the app open for sound/notifications; use Enable notifications and sound after opening the app. Old downloaded history does not trigger new closed-feature alerts.',dialog,'settings-note');
     const enable=el('button','Enable notifications and sound',dialog);
     enable.onclick=async()=>{
         const messages=[];
@@ -128,8 +134,17 @@ async function build() {
     };
     const slider=input('Sound volume','volume','range',dialog);slider.min=0;slider.max=100;slider.value=Math.round(volume*100);
     slider.oninput=()=>{volume=Number(slider.value)/100;try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}};
-    el('h3','Saved alerts',dialog);rules=el('section','',dialog);
-    el('h3','Create / edit alert',dialog);form=el('form','',dialog,'alert-form');
+    const savedHeader=el('div','',dialog,'alert-list-header');el('h3','Saved alerts',savedHeader);
+    const add=el('button','＋ New alert',savedHeader);add.setAttribute('aria-label','New alert');
+    add.onclick=()=>{if(saving)return;reset();editorStatus.textContent='';editorTitle.textContent='Create alert';editor.showModal();};
+    rules=el('section','',dialog);rules.setAttribute('aria-label','Saved alerts');
+    editor=el('dialog','',document.body,'alerts-dialog alert-editor');editor.setAttribute('aria-labelledby','alert-editor-title');
+    const header=el('header','',editor);editorTitle=el('h2','Create alert',header);editorTitle.id='alert-editor-title';
+    const close=el('button','Close alert editor',header);close.onclick=()=>{if(!saving)editor.close();};
+    editor.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
+    editor.addEventListener('close',()=>{if(!saving)reset();add.focus();});
+    editorStatus=el('p','',editor,'settings-note');editorStatus.setAttribute('role','status');
+    form=el('form','',editor,'alert-form');
     const title=input('Alert name','name','text',form);title.required=true;title.maxLength=120;
     select('Coin','symbol',catalog.symbols.map(value=>[value,value]),form);
     select('Timeframe','interval',catalog.intervals.map(value=>[value,value]),form);
@@ -140,18 +155,23 @@ async function build() {
     select('Or compare with field','target_field',[['','Use numeric threshold'],...Object.entries(catalog.fields)],form).onchange=syncMode;
     select('Frequency','repeat',[['once','Once, then pause'],['per_bar','Once per matching candle']],form);
     const sounds=select('Sound','sound',catalog.sounds.map(value=>[value,value]),form);
-    const test=el('button','Test selected sound',form);test.type='button';test.onclick=async()=>{try{await unlock();sound(sounds.value);status.textContent='Sound test played.';}catch(error){status.textContent=error.message;}};
+    const test=el('button','Test selected sound',form);test.type='button';test.onclick=async()=>{try{await unlock();sound(sounds.value);editorStatus.textContent='Sound test played.';}catch(error){editorStatus.textContent=error.message;}};
     input('System notification','notify','checkbox',form);
     input('Alert enabled','enabled','checkbox',form);
     const save=el('button','Create alert',form);save.type='submit';
-    const cancel=el('button','New / cancel edit',form);cancel.type='button';cancel.onclick=reset;
+    const cancel=el('button','Cancel',form);cancel.type='button';cancel.onclick=()=>{if(!saving)editor.close();};
     form.onsubmit=async event=>{
-        event.preventDefault();save.disabled=true;
-        try{await unlock();}catch{ /* In-app alerts still work without audio support. */ }
+        event.preventDefault();if(saving)return;saving=true;save.disabled=true;close.disabled=true;cancel.disabled=true;
+        editorStatus.textContent='Saving alert…';
+        // Browser audio permission/resume must never block saving another rule.
+        void unlock().catch(()=>{});
+        let completed=false;
         try{
             const packet=Object.fromEntries(new FormData(form));packet.value=Number(packet.value);packet.notify=form.elements.notify.checked;packet.enabled=form.elements.enabled.checked;if(editing)packet.id=editing;
-            await request('/api/alerts',packet);reset();await refresh();status.textContent='Alert saved. Watching the selected evaluation mode.';
-        }catch(error){status.textContent=error.message;}finally{save.disabled=false;}
+            await request('/api/alerts',packet);
+            completed=true;editor.close();reset();status.textContent='Alert saved. Watching the selected evaluation mode.';
+        }catch(error){editorStatus.textContent=error.message;}finally{saving=false;save.disabled=false;close.disabled=false;cancel.disabled=false;}
+        if(completed)void refresh().catch(error=>{status.textContent='Alert saved. Could not refresh the list: '+error.message;});
     };
     el('h3','Recent activity',dialog);activity=el('section','',dialog,'alert-activity');renderActivity();reset();
 }
@@ -163,7 +183,7 @@ export function mount() {
     const header=el('header','',dialog);el('h2','Alerts',header).id='alerts-title';const close=el('button','Close alerts',header);close.onclick=()=>dialog.close();
     status=el('p','',dialog,'settings-note');status.setAttribute('role','status');
     el('div','',document.body).id='alert-toasts';
-    open.onclick=async()=>{dialog.showModal();try{await build();reset();await refresh();}catch(error){status.textContent=error.message+' Restart the updated UI backend if this API is missing.';}};
+    open.onclick=async()=>{dialog.showModal();try{await build();await refresh();}catch(error){status.textContent=error.message+' Restart the updated UI backend if this API is missing.';}};
     dialog.addEventListener('close',()=>open.focus());
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.

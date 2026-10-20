@@ -256,3 +256,6 @@ button:hover { background: #333; }
 .chart-hud .hud-header button, .chart-hud .hud-resize {position:relative; z-index:2; pointer-events:auto;}
 .chart-hud .hud-resize {position:absolute;}
 .chart-hud .hud-header {position:relative;}
+.alert-list-header {display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px;}
+.alert-list-header h3 {margin:0;}
+.alert-editor {width:min(700px,calc(100vw - 24px));}

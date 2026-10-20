@@ -1,10 +1,11 @@
 """Stored/live alert conditions, isolation, deduplication and durable login."""
 import json
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from unittest.mock import patch
 import test_data_admin as fixtures
 from Section_11_UI_UX.server import alerts, auth
-from Section_1_Global_Core import data_admin, orchestrator
+from Section_1_Global_Core import data_admin, data_policy, orchestrator
 from Section_1_Global_Core.memory_storage.Storage import db
 
 
@@ -125,3 +126,16 @@ class AlertTests(unittest.TestCase):
         account['hash']=auth.digest('different-password',salt)
         auth.USERS_FILE.write_text(json.dumps({'admin':account}))
         self.assertEqual(auth.identity(token)['role'],'guest')
+
+    def test_multiple_new_alerts_save_during_runner_processing_and_edit_preserves_identity(self):
+        with ThreadPoolExecutor(1) as pool:
+            with data_policy.locked():
+                first=pool.submit(self.create,name='First').result(timeout=2)
+                second=pool.submit(self.create,name='Second').result(timeout=2)
+                third=pool.submit(self.create,name='Third').result(timeout=2)
+        self.assertEqual(len({first,second,third}),3)
+        self.assertEqual(len(alerts.list_rules('admin')),3)
+        alerts.save('admin',self.rule(id=first,name='First edited'))
+        self.assertEqual(len(alerts.list_rules('admin')),3)
+        alerts.delete('admin',second)
+        self.assertEqual({r['id'] for r in alerts.list_rules('admin')},{first,third})
