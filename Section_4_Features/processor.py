@@ -85,14 +85,9 @@ def _row_from_packet(symbol, interval, open_time, packet):
 def _compute_and_write_one(symbol, interval, bar_open_ms):
     """Compute features for one bar and write the row."""
     # Read the warmup window ending at bar_open_ms (inclusive).
-    rows = db.read_klines(
-        symbol, interval,
-        start_ms=0, end_ms=bar_open_ms + 1,
-    )
+    rows = db.read_klines_tail(symbol, interval, bar_open_ms + 1, WARMUP_BARS)
     if not rows:
         return 0
-    # Keep only the last WARMUP_BARS.
-    rows = rows[-WARMUP_BARS:]
     df = _df_from_rows(rows)
     if df is None or df.empty:
         return 0

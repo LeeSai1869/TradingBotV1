@@ -89,12 +89,19 @@ export function renderTimeframes(parent, refresh) {
 }
 export function coinActions(parent, selection, refresh) {
     if (loadError) { message(parent).textContent = loadError; return; }
-    el('p','Administrator actions apply immediately. Eligibility, pending and staged categories follow registry rules. Select one coin for an action.',parent).className='settings-note';
+    el('p','Administrator actions apply immediately. Eligibility, pending and staged categories follow registry rules. Select coins for status changes; select one coin to delete its data.',parent).className='settings-note';
     const single=selection.size===1, symbol=[...selection][0];
     const status=message(parent), buttons=el('div','',parent); buttons.className='settings-coin-actions';
     for (const [title, actionName] of [['Approve / activate','approve'],['Make inactive','inactive'],['Disapprove','disapprove']]) {
-        action(buttons,title,session.role!=='admin'||!single,async()=>{
-            try { await request('/api/settings/coins',{symbol,action:actionName});selection.clear();changed({});await refresh(); }
+        action(buttons,title,session.role!=='admin'||selection.size===0,async()=>{
+            try {
+                const result=await request('/api/settings/coins/batch',{symbols:[...selection],action:actionName});
+                const failed=result.results.filter(row=>!row.ok);
+                for(const row of result.results)if(row.ok)selection.delete(row.symbol);
+                changed({});await refresh();
+                const feedback=document.querySelector('#settings-dialog footer [role=status]');
+                feedback.textContent=`${result.results.length-failed.length} updated; ${failed.length} rejected. `+failed.slice(0,5).map(row=>`${row.symbol}: ${row.error}`).join(' · ');
+            }
             catch(e) {status.textContent=e.message;}
         });
     }

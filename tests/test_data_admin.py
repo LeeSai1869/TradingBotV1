@@ -96,6 +96,16 @@ class DataAdminTests(unittest.TestCase):
             self.assertEqual(routes.handle_get(path,'',self.server('guest'))[0],401)
             self.assertEqual(routes.handle_get(path,'',self.server('admin'))[0],200)
 
+    def test_bulk_status_changes_report_eligibility_failures_and_require_admin(self):
+        body=json.dumps({'symbols':['NEWUSDT','DOGEUSDT'],'action':'approve'})
+        from Section_11_UI_UX.server import admin_routes
+        self.assertEqual(admin_routes.handle_post('/api/settings/coins/batch',body,self.server('user'))[0],403)
+        status,packet=admin_routes.handle_post('/api/settings/coins/batch',body,self.server('admin'))
+        self.assertEqual(status,200)
+        self.assertEqual([row['ok'] for row in packet['results']],[True,False])
+        self.assertIn('NEWUSDT',symbols.get_active_symbols())
+        self.assertIn('DOGEUSDT',symbols.get_disapproved_symbols())
+
     def test_registry_actions_preserve_entries_and_enforce_eligibility(self):
         data_admin.set_coin('NEWUSDT','approve')
         self.assertIn('NEWUSDT',symbols.get_active_symbols())

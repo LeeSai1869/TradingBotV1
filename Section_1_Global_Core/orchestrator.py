@@ -136,7 +136,7 @@ def _fetch_bars_since(symbol: str, interval: str, since_open_ms: int):
                 (r[2], r[8], r[3], r[4], r[5], r[6], r[7])
                 for r in rows
             ]
-        rows = klines_store.read_after(conn, symbol, interval, since_open_ms)
+        rows = klines_store.read_after_page(conn, symbol, interval, since_open_ms, 200)
         return [
             (r[2], r[8], r[3], r[4], r[5], r[6], r[7])
             for r in rows

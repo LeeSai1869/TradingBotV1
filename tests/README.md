@@ -143,3 +143,18 @@ also covers stale-backend recovery, first-time setup guidance, wrong passwords,
 normal-user tab hiding and GET/POST denials, sign-out and expired sessions.
 `test_restart_ui.py` checks safe process selection and launchd/manual restart
 branches with mocked process controls (never stopping a real process).
+
+Live/stored alerts, sound/notification delivery, Remember Me and category selection:
+
+```bash
+PYTHONPATH=. python3 tests/browser_alerts.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Uses isolated market/alert/session databases, controlled live snapshots and browser
+audio/notification mocks. It verifies stored RSI waits for features, a live price
+crossing on an unviewed coin, deduplication, account isolation, delivery while
+browsing history, Select All/Deselect All, remembered login after in-memory session
+reset, and logout revocation. `test_alerts.py` covers field comparisons, signed
+thresholds, readiness, edit revisions, dataset epochs, historical bootstrap,
+bounded readers, token hashing and password-change invalidation. These tests do
+not establish Binance connectivity or native Mac notification support.

@@ -87,6 +87,15 @@ def read_page(conn, symbol, interval, limit, *, before=None):
     return list(reversed(rows))
 
 
+def read_after_page(conn, symbol, interval, after_open_time, limit=500):
+    if not 1 <= limit <= 1000:
+        raise ValueError('limit must be 1..1000')
+    return conn.execute(
+        "SELECT symbol,interval,open_time,open,high,low,close,volume,close_time "
+        "FROM klines WHERE symbol=? AND interval=? AND open_time>? ORDER BY open_time LIMIT ?",
+        (symbol,interval,after_open_time,limit)).fetchall()
+
+
 def read_after(conn, symbol, interval, after_open_time):
     """Every closed bar strictly after `after_open_time`, oldest first."""
     cur = conn.execute(
@@ -155,7 +164,7 @@ __all__ = [
     "read_range",
     "read_last_n",
     "read_page",
-    "read_after",
+    "read_after", "read_after_page",
     "last_open_time",
     "count_rows",
     "insert_rows",

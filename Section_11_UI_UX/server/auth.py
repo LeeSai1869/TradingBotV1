@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import time
 
 USERS_FILE = Path.home() / '.tradingbot' / 'users.json'
@@ -22,7 +23,31 @@ def digest(password, salt):
     return hashlib.pbkdf2_hmac('sha256', password.encode(), bytes.fromhex(salt), 260000).hex()
 
 
-def login(username, password):
+REMEMBER_SECONDS = 30 * 24 * 3600
+
+
+def _remember_db():
+    path = USERS_FILE.with_name('remembered_sessions.sqlite3')
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600); os.close(fd)
+    conn = sqlite3.connect(path, timeout=5)
+    conn.execute('CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, username TEXT, expires REAL, credential TEXT)')
+    return conn
+
+
+def _token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def logout(token):
+    SESSIONS.pop(token, None)
+    if USERS_FILE.with_name('remembered_sessions.sqlite3').exists():
+        with _remember_db() as conn:
+            conn.execute('DELETE FROM sessions WHERE token_hash=?', (_token_hash(token),))
+        conn.close()
+
+
+def login(username, password, remember=False):
     now = time.time()
     ATTEMPTS[:] = [t for t in ATTEMPTS if now - t < 60]
     if len(ATTEMPTS) >= 10:
@@ -34,7 +59,13 @@ def login(username, password):
     if not account or not hmac.compare_digest(actual, account['hash']):
         raise ValueError('Incorrect username or password')
     token = secrets.token_urlsafe(32)
-    SESSIONS[token] = (username, account['role'], now + 8 * 3600)
+    if remember:
+        with _remember_db() as conn:
+            conn.execute('DELETE FROM sessions WHERE expires<?', (now,))
+            conn.execute('INSERT INTO sessions VALUES (?,?,?,?)', (_token_hash(token),username,now+REMEMBER_SECONDS,account['hash']))
+        conn.close()
+    else:
+        SESSIONS[token] = (username, account['role'], now + 8 * 3600)
     # Bound session memory and discard expired sessions.
     for key, value in list(SESSIONS.items()):
         if value[2] < now:
@@ -45,6 +76,18 @@ def login(username, password):
 
 
 def identity(token):
+    if token and USERS_FILE.with_name('remembered_sessions.sqlite3').exists():
+        conn = _remember_db()
+        try:
+            row = conn.execute('SELECT username,expires,credential FROM sessions WHERE token_hash=?', (_token_hash(token),)).fetchone()
+        finally:
+            conn.close()
+        if row and row[1] > time.time():
+            account = users().get(row[0])
+            if account and hmac.compare_digest(row[2], account['hash']):
+                return {'username':row[0],'role':account['role'],'configured':True,'remembered':True}
+        if row:
+            logout(token)
     session = SESSIONS.get(token)
     if not session or session[2] < time.time():
         SESSIONS.pop(token, None)

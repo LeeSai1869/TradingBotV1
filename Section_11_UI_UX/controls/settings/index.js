@@ -165,6 +165,15 @@ function render() {
             const rows = registry[item.toLowerCase()] || [];
             el("p", `${rows.length} coins`, content, "settings-note");
             const count = el("p", `${selectedCoins.size} selected`, content, "settings-note");
+            const selection = el("button", rows.length && rows.every(coin => selectedCoins.has(coin.symbol)) ? "Deselect all" : "Select all", content);
+            selection.disabled = !rows.length;
+            selection.onclick = () => {
+                const all = rows.every(coin => selectedCoins.has(coin.symbol));
+                for (const coin of rows) {
+                    if (all) selectedCoins.delete(coin.symbol); else selectedCoins.add(coin.symbol);
+                }
+                render();
+            };
             if (!rows.length) note("No coins in this category.");
             for (const coin of rows) {
                 const row = el("label", "", content, "settings-coin");

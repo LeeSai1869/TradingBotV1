@@ -169,3 +169,17 @@ button:hover { background: #333; }
 #login-screen :focus-visible { outline: 2px solid #8cb5ff; outline-offset: 2px; }
 .settings-tabs button[hidden] { display: none; }
 #account-button { flex-shrink: 0; color: #a9c9ff; font-size: 12px; }
+#login-form .remember-me { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #b8c6dc; }
+#login-form .remember-me input { width: 17px; height: 17px; accent-color: #669dff; }
+.alerts-dialog { width: min(820px,calc(100vw - 24px)); max-height: calc(100dvh - 40px); padding: 24px; border: 1px solid #393e4b; border-radius: 12px; background: #171a21; color: #e2e5ed; }
+.alerts-dialog::backdrop { background: #0009; }
+.alerts-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.alert-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 18px 0; }
+.alert-form label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.alert-form input:not([type=checkbox]), .alert-form select { width: 100%; min-width: 0; padding: 9px; background: #252a35; border: 1px solid #454b5b; border-radius: 5px; color: #eee; }
+.alert-form input[type=checkbox] { align-self: flex-start; accent-color: #669dff; }
+.alert-rule { padding: 12px 0; border-bottom: 1px solid #323643; }
+.alert-activity { font-size: 12px; line-height: 1.6; color: #acb8cb; }
+#alert-toasts { position: fixed; left: 20px; bottom: 20px; z-index: 30000; width: min(400px,calc(100vw - 40px)); pointer-events: none; }
+.alert-toast { padding: 14px; margin-top: 10px; background: #223451; color: #e5edff; border: 1px solid #699dff; border-radius: 8px; font-size: 13px; }
+@media(max-width:600px) { .alert-form { grid-template-columns: 1fr; } }

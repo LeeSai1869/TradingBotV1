@@ -94,6 +94,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     server = HTTPServer(("127.0.0.1", PORT), Handler)
+    stop_alerts = routes.alert_routes.alerts.start()
     print(f"chart server on http://localhost:{PORT}/")
     print(f"root:  {SECTION_11}")
     print(f"web:   {WEB_ROOT}")
@@ -101,6 +102,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nstopped")
+    finally:
+        stop_alerts.set()
         server.server_close()
 
 

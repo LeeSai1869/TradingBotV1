@@ -14,6 +14,7 @@ import * as timeframeControl from "../controls/timeframe/index.js";
 import * as reloadControl from "../controls/reload/index.js";
 import * as autoscaleControl from "../controls/autoscale/index.js";
 import * as latestControl from "../controls/latest/index.js";
+import * as alertsControl from "../controls/alerts/index.js";
 import * as settingsControl from "../controls/settings/index.js";
 
 const VISUALS = [candles, markers, ema50];
@@ -33,6 +34,7 @@ const Composer = {
         autoscale: autoscaleControl,
         latest: latestControl,
         settings: settingsControl,
+        alerts: alertsControl,
     },
 
     async mountAll(chart) {

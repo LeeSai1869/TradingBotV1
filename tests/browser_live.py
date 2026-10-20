@@ -61,10 +61,10 @@ async def exercise_live(base, library):
             await settle(page)
             historical=await page.evaluate('Canvas.chart.timeScale().getVisibleRange()')
             state['bar']=quote(T,132)
-            before=len(requests)
+            before=len([url for url in requests if '/api/bars?' in url])
             assert await page.evaluate('DataCache.refreshStored()') is False
             assert await page.evaluate('Canvas.chart.timeScale().getVisibleRange()') == historical
-            assert len(requests) == before
+            assert len([url for url in requests if '/api/bars?' in url]) == before
             await page.evaluate('''() => {const n=DataCache.renderBars.length;
                 Canvas.chart.timeScale().setVisibleLogicalRange({from:n-1000,to:n-1});}''')
             await settle(page)

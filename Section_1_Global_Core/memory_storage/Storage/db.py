@@ -77,6 +77,25 @@ def read_klines_after(symbol, interval, after_open_ms):
         conn.close()
 
 
+def read_klines_tail(symbol, interval, end_ms, n=500):
+    conn = klines_store.open_db()
+    try:
+        return klines_store.read_page(conn, symbol, interval, n, before=end_ms)
+    finally:
+        conn.close()
+
+
+def read_state_after(symbol, interval, after_ms, limit=500):
+    conn = klines_store.open_db()
+    try:
+        rows = klines_store.read_after_page(conn, symbol, interval, after_ms, limit)
+    finally:
+        conn.close()
+    if not rows:
+        return []
+    return read_state_range(symbol, interval, int(rows[0][2]), int(rows[-1][2]) + 1)
+
+
 def last_kline_time(symbol, interval):
     conn = klines_store.open_db()
     try:
@@ -312,7 +331,7 @@ __all__ = [
 
     # klines
     "write_klines", "read_klines", "read_last_klines", "read_klines_after",
-    "last_kline_time", "count_klines",
+    "last_kline_time", "count_klines", "read_klines_tail",
 
     # features
     "write_features", "read_features", "last_feature_time", "count_features",
@@ -322,5 +341,5 @@ __all__ = [
 
     # canonical state
     "read_state_range",
-    "read_state_page",
+    "read_state_page", "read_state_after",
 ]

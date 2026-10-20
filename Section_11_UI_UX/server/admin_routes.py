@@ -33,7 +33,7 @@ def handle_get(path, server):
 
 
 def handle_post(path, body, server):
-    if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/delete'}:
+    if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/coins/batch','/api/settings/delete'}:
         return None, None
     origin = server.headers.get('Origin')
     if origin and urlparse(origin).netloc != server.headers.get('Host'):
@@ -47,13 +47,14 @@ def handle_post(path, body, server):
             if not isinstance(username, str) or not isinstance(password, str):
                 raise ValueError('Username and password required')
             try:
-                session = auth.login(username, password)
+                session = auth.login(username, password, data.get("remember") is True)
             except ValueError as error:
                 return 401, {'error': str(error)}
-            server.response_cookie = f'{auth.COOKIE}={session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800'
+            age = auth.REMEMBER_SECONDS if data.get('remember') is True else 28800
+            server.response_cookie = f'{auth.COOKIE}={session}; HttpOnly; SameSite=Strict; Path=/; Max-Age={age}'
             return 200, auth.identity(session)
         if path == '/api/logout':
-            auth.SESSIONS.pop(token(server), None)
+            auth.logout(token(server))
             server.response_cookie = f'{auth.COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
             return 200, {'ok': True}
         identity = user(server)
@@ -63,6 +64,20 @@ def handle_post(path, body, server):
             return 403, {'error': 'Administrator access required'}
         if path == '/api/settings/timeframes':
             data_admin.set_timeframe(data.get('interval'), data.get('status'))
+        elif path == '/api/settings/coins/batch':
+            symbols = data.get('symbols')
+            if not isinstance(symbols,list) or not 1 <= len(symbols) <= 200 or not all(isinstance(symbol,str) for symbol in symbols):
+                raise ValueError('Select 1..200 coins')
+            if data.get('action') not in {'approve','active','inactive','disapprove'}:
+                raise ValueError('Invalid coin action')
+            results = []
+            for symbol in dict.fromkeys(symbols):
+                try:
+                    data_admin.set_coin(symbol,data['action'])
+                    results.append({'symbol':symbol,'ok':True})
+                except ValueError as error:
+                    results.append({'symbol':symbol,'ok':False,'error':str(error)})
+            return 200, {'results':results}
         elif path == '/api/settings/coins':
             data_admin.set_coin(data.get('symbol'), data.get('action'))
         else:

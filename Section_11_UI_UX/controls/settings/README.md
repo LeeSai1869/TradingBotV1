@@ -111,3 +111,16 @@ starting a competing server. For a manually started backend it starts the new
 server in the foreground; leave that terminal open. It does not stop the runner.
 Then reopen the app or hard-refresh. Missing API and first-time setup screens
 include a Check again button; they do not admit the user into a broken chart.
+
+Select all / Deselect all acts on the currently displayed coin category, retaining
+selections in other categories. Bulk approve/activate, inactive and disapprove
+report per-coin successes and eligibility/capacity rejections. Failed selections
+remain selected. Deletion still requires exactly one selected coin and typed
+confirmation; selecting all does not bypass this check.
+
+Remember me for 30 days is optional on the startup login form. Remembered sessions
+use opaque HttpOnly cookies and hashed tokens in a private SQLite file beside
+users.json; passwords are not saved in the browser. They survive backend restarts,
+expire after 30 days and are revoked by Sign out or a password change. Without
+Remember me, reopening/reloading still requires sign-in. The account's server role
+continues to control Timeframes/Coins permissions.

@@ -232,3 +232,20 @@ registry preservation, role bypass attempts, stale writes, re-download and actua
 feature calculation. No real market history was deleted and no new market-data
 A1/A2/A5 certification is claimed. Existing import-policy checker conflicts remain
 outside this change. The previous 1.1 chart read APIs remain compatible.
+
+### Bounded readers 2.1 — 2026-10-20
+
+User-requested Ethereum download diagnostics and alerts add read-only
+`read_klines_tail`, `read_state_after` and `read_after_page` readers. Feature
+processing now reads exactly the same final 500-row warmup using a bounded index
+query, rather than loading all preceding history. Orchestrator event delivery is
+bounded at 200 rows per pair per cycle, advancing only through processed rows so
+other pairs get turns while catching up. No formulas or store schemas change.
+Closed alert reads use the shared DB gateway/data lock; live alert reads reuse
+the shared Section 11 snapshot cache and never write provisional market rows.
+
+Isolated tests compare warmup rows, verify bounded chronological delivery, and
+exercise real feature computation. Actual Ethereum download progress must be
+checked on the user's machine with `python3 check_coin.py ETHUSDT`; this cloud
+checkout does not contain their current registry or historical data. Restart the
+runner after pulling so its in-memory code adopts the bounded reads.
