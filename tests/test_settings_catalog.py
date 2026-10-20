@@ -8,6 +8,10 @@ from Section_11_UI_UX.server import settings_catalog, routes
 
 
 class SettingsCatalogTests(unittest.TestCase):
+    def setUp(self):
+        admin = patch.object(routes.admin_routes, 'user', return_value={'role':'admin'})
+        admin.start(); self.addCleanup(admin.stop)
+
     def test_categories_keep_status_and_eligibility_separate(self):
         source = dict(approved=[dict(symbol='BTCUSDT'), dict(symbol='OLDUSDT')],
                       top50=[dict(symbol='BTCUSDT')],

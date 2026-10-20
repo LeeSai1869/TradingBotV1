@@ -136,3 +136,10 @@ and reapproval. `test_data_admin.py` covers three-store rollback, eligibility,
 reactivation bootstrap with actual feature computation, epoch invalidation,
 policy changes during in-flight downloads/calculation, and failed-bar retries.
 Exchange requests use fixtures; this does not establish Binance connectivity.
+
+Authentication now gates chart startup. Browser fixtures provision temporary
+accounts and sign in through the actual startup form. The administrator scenario
+also covers stale-backend recovery, first-time setup guidance, wrong passwords,
+normal-user tab hiding and GET/POST denials, sign-out and expired sessions.
+`test_restart_ui.py` checks safe process selection and launchd/manual restart
+branches with mocked process controls (never stopping a real process).

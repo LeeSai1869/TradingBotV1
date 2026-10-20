@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from unittest.mock import patch
 from playwright.async_api import async_playwright
-from browser_smoke import run, settle, db, routes
+from browser_smoke import run, settle, sign_in, db, routes
 
 T = 1781654400000
 STEP = 900000
@@ -33,6 +33,7 @@ async def exercise_live(base, library):
             page.on('request',lambda r:requests.append(r.url))
             await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
             await page.goto(base)
+            await sign_in(page)
             await page.wait_for_function('window.DataCache && DataCache.bars.length === 2000 && !DataCache._olderPromise && DataCache.formingBar')
             await settle(page)
             assert await page.evaluate('DataCache.formingBar.time') == T//1000

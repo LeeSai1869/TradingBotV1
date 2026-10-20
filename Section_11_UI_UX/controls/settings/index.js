@@ -117,6 +117,12 @@ function renderFeature() {
 }
 
 function render() {
+    for (const tab of tabs.children) {
+        tab.hidden = ["timeframes", "coins"].includes(tab.dataset.section) && !admin.isAdmin();
+    }
+    if (["timeframes", "coins"].includes(section) && !admin.isAdmin()) {
+        section = "general"; item = "Account";
+    }
     document.getElementById("settings-body").setAttribute("aria-labelledby", `settings-tab-${section}`);
     for (const tab of tabs.children) {
         const active = tab.dataset.section === section;
@@ -147,7 +153,7 @@ function render() {
     } else if (section === "timeframes") {
         admin.renderTimeframes(content, render);
     } else if (section === "coins") {
-        note("Registry entries are permanent. Future actions will move categories or delete stored candles, features and decisions separately.");
+        note("Registry entries are permanent. Category changes and data deletion apply immediately and preserve these entries.");
         if (item === "Approved") note("Approved coins currently in the top 50.");
         if (item === "Inactive") note("Still approved, but manually paused, outside the eligible top 50, or beyond the active cap. Downloads and processing are paused.");
         if (item === "Ineligible") note("Rule-based exclusions from the existing registry, including memes and stablecoins.");
@@ -180,6 +186,7 @@ function render() {
     }
 }
 async function loadRegistry() {
+    if (!admin.isAdmin()) return;
     registryError = ""; registry = null; if (section === "coins") render();
     try {
         const response = await fetch("/api/settings/coins", { cache: "no-store" });
@@ -189,7 +196,8 @@ async function loadRegistry() {
     if (dialog.open && section === "coins") render();
 }
 
-export function mount() {
+export async function mount() {
+    await admin.load();
     try {
         const raw = localStorage.getItem(STORAGE);
         // Preserve server display defaults until the user saves preferences.
@@ -201,6 +209,10 @@ export function mount() {
     } catch { saved = validated(defaults); }
     apply();
     const gear = el("button", "", document.getElementById("toolbar"));
+    const accountButton = el("button", `${window.AppSession.username} · ${window.AppSession.role === "admin" ? "Administrator" : "Normal user"}`, document.getElementById("toolbar"));
+    accountButton.id = "account-button";
+    gear.before(accountButton);
+    accountButton.onclick = () => { section = "general"; item = "Account"; gear.click(); };
     gear.id = "settings-button"; gear.title = "Settings";
     gear.setAttribute("aria-label", "Open settings");
     gear.innerHTML = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9.5 3h5l.6 2.4 2 1.2 2.4-.7 2.5 4.2-1.8 1.8v2.3l1.8 1.7-2.5 4.2-2.4-.7-2 1.2-.6 2.4h-5l-.6-2.4-2-1.2-2.4.7L2 15.9l1.8-1.7v-2.3L2 10.1l2.5-4.2 2.4.7 2-1.2Z"/><circle cx="12" cy="13" r="3"/></svg>';
@@ -215,14 +227,14 @@ export function mount() {
         tab.setAttribute("role", "tab"); tab.setAttribute("aria-controls", "settings-body");
         tab.onclick = () => {
             section = key; item = sections[key][0]; render();
-            if (key === "coins" && !registry) void loadRegistry();
+            if (key === "coins" && admin.isAdmin() && !registry) void loadRegistry();
         };
     }
     tabs.onkeydown = event => {
         const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
         if (!keys.includes(event.key)) return;
         event.preventDefault();
-        const buttons = [...tabs.children], current = buttons.indexOf(document.activeElement);
+        const buttons = [...tabs.children].filter(button => !button.hidden), current = buttons.indexOf(document.activeElement);
         const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
             : (current + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
         buttons[next].focus(); buttons[next].click();
@@ -243,7 +255,7 @@ export function mount() {
     gear.onclick = () => {
         draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
         tabs.querySelector('[aria-selected="true"]').focus();
-        if (section === "coins") void loadRegistry();
+        if (section === "coins" && admin.isAdmin()) void loadRegistry();
         void admin.load().then(() => {
             if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});

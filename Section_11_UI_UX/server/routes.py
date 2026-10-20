@@ -137,6 +137,9 @@ def handle_get(path, raw_qs, server):
         return 200, {"symbols": queries.get_symbols()}
 
     if path == "/api/settings/coins":
+        identity = admin_routes.user(server)
+        if identity["role"] != "admin":
+            return (401 if identity["role"] == "guest" else 403), {"error": "Administrator access required"}
         try:
             return 200, read_coin_catalog()
         except (OSError, ValueError, KeyError, TypeError):

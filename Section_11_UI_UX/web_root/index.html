@@ -9,7 +9,25 @@
 </head>
 <body>
 
-<div id="app">
+<main id="login-screen">
+    <section class="login-card" aria-labelledby="login-title">
+        <h1 id="login-title">Trading Indicator</h1>
+        <p class="login-subtitle">Sign in to your workspace</p>
+        <p id="login-status" role="status" aria-live="polite">Connecting to the app server…</p>
+        <div id="login-setup" hidden>
+            <p>In your project terminal, run:</p>
+            <code>python3 -m Section_11_UI_UX.server.auth</code>
+            <p>Set separate passwords for <strong>admin</strong> and <strong>user</strong>. Passwords stay on your computer.</p>
+        </div>
+        <form id="login-form" hidden>
+            <label>Username<input name="username" autocomplete="username" required></label>
+            <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+            <button type="submit">Sign in</button>
+        </form>
+        <button id="login-retry" hidden>Check again</button>
+    </section>
+</main>
+<div id="app" hidden>
     <div id="toolbar">
         <label>Symbol</label>
         <select id="symbol"></select>
@@ -24,7 +42,7 @@
     <div id="chart"></div>
 </div>
 
-<div id="flags-panel">
+<div id="flags-panel" hidden>
     <div class="flags-title">FLAGS (STORED)</div>
     <div id="flags-tf" class="flags-row">tf: —</div>
     <div id="flags-signal" style="font-weight: bold;">signal: —</div>

@@ -5,7 +5,7 @@ PYTHONPATH=. python3 tests/browser_settings.py /path/to/lightweight-charts.stand
 from pathlib import Path
 import sys
 from playwright.async_api import async_playwright
-from browser_smoke import run, settle, db
+from browser_smoke import run, settle, sign_in, db
 
 
 async def exercise_settings(base, library):
@@ -18,7 +18,7 @@ async def exercise_settings(base, library):
         page = await browser.new_page(viewport={'width':1500, 'height':1000})
         errors = []; mutations = []
         page.on('pageerror', lambda e: errors.append(str(e)))
-        page.on('request', lambda r: mutations.append(r.url) if r.method != 'GET' else None)
+        page.on('request', lambda r: mutations.append(r.url) if r.method != 'GET' and not any(path in r.url for path in ['/api/login','/api/logout']) else None)
         await page.route('https://unpkg.com/**', lambda route: route.fulfill(path=str(library), content_type='application/javascript'))
         async def capture_series(route):
             response = await route.fetch()
@@ -35,6 +35,7 @@ Canvas.init = (...args) => {
             await route.fulfill(response=response, body=source)
         await page.route('**/chart/index.js', capture_series)
         await page.goto(base)
+        await sign_in(page)
         await page.wait_for_function('window.DataCache && DataCache.bars.length===2000 && !DataCache._olderPromise')
         await settle(page)
         await page.evaluate('''() => {
@@ -85,6 +86,7 @@ Canvas.init = (...args) => {
         assert not await page.locator('#flags-panel').is_visible()
         assert await page.evaluate('Canvas.chart.timeScale().getVisibleLogicalRange()') == before
         await page.reload()
+        await sign_in(page)
         await page.wait_for_function('window.DataCache && DataCache.bars.length>=1500')
         assert await page.evaluate('Composer.config.ema.periods') == [25,50]
         assert not await page.locator('#flags-panel').is_visible()
@@ -95,9 +97,9 @@ Canvas.init = (...args) => {
         await dialog.get_by_text('1 selected', exact=True).wait_for()
         await dialog.get_by_role('button', name='Ineligible', exact=True).click()
         await dialog.get_by_text('DOGEUSDT', exact=True).wait_for()
-        assert await dialog.get_by_role('button', name='Disapprove', exact=True).is_disabled()
+        assert await dialog.get_by_role('button', name='Disapprove', exact=True).is_visible()
         await dialog.get_by_role('tab', name='Timeframes', exact=True).click()
-        assert await dialog.get_by_label('3m download status', exact=True).is_disabled()
+        assert await dialog.get_by_label('3m download status', exact=True).is_enabled()
         await page.keyboard.press('Escape')
         assert not await dialog.is_visible()
         assert await page.get_by_role('button', name='Open settings').evaluate('(e)=>e===document.activeElement')

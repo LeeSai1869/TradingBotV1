@@ -31,8 +31,9 @@ Delete requires typing the exact scope, pauses it, and deletes raw candles,
 features and decisions without removing the setting/registry entry. Re-activation
 bootstraps history from Binance a page per runner cycle, then computes features.
 
-General > Account provides local login. No default passwords exist. Before using
-policy controls after updating, restart the runner and UI server, then provision:
+The app opens on a login screen before mounting the chart or requesting chart data.
+Sign in on every app/page opening, including reload. General > Account provides
+account details and sign-out; the toolbar always shows username and role. No default passwords exist. For first-time account setup, provision:
 
 ```bash
 python3 -m Section_11_UI_UX.server.auth
@@ -43,13 +44,16 @@ minimum). Salted PBKDF2 hashes live at `~/.tradingbot/users.json` (mode 600), ou
 the served repository. Never commit/copy that file. Re-running provisioning
 resets both passwords; restart the UI server afterward to clear old sessions.
 Browser sessions expire after eight hours and are HttpOnly, SameSite=Strict.
-Requests changing policy are checked on the backend. The UI server remains a
+An unauthorized chart API response returns the app to login.
+Timeframes and Coins tabs and all corresponding read/write APIs are restricted
+to administrators. Normal users never request these policies when loading
+their account. All chart API reads require a valid session too. The UI server remains a
 loopback service, not an externally hosted authentication service.
 
 | Role | Chart preferences | Timeframe Active/Inactive | Coin approvals/status | Delete data |
 |---|---|---|---|---|
-| Signed out | Yes | No | No | No |
-| user | Yes | Yes | No | No |
+| Signed out | Login screen only | No | No | No |
+| user | Yes | No | No | No |
 | admin | Yes | Yes | Yes | Yes, typed confirmation |
 
 Coin changes apply immediately; they are independent of Apply/Cancel for chart
@@ -93,3 +97,17 @@ already runs it, use `bash restart_runner.sh`. Otherwise, start it in another
 terminal with `python3 -u -m Section_1_Global_Core.memory_storage.Runner.live_runner`.
 Keep that terminal open and inspect processor/catch-up messages. Do not run two
 writers. A desktop UI launcher need not start the runner.
+
+If account/settings endpoints are missing or the backend is stale, run from the
+project root:
+
+```bash
+python3 restart_ui.py
+```
+
+The helper validates the process on port 8000 before stopping it. It restarts
+the matching launchd job when present, waits for the session API, and avoids
+starting a competing server. For a manually started backend it starts the new
+server in the foreground; leave that terminal open. It does not stop the runner.
+Then reopen the app or hard-refresh. Missing API and first-time setup screens
+include a Check again button; they do not admit the user into a broken chart.

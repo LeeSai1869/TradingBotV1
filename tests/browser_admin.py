@@ -6,7 +6,7 @@ import sys
 import tempfile
 from unittest.mock import patch
 from playwright.async_api import async_playwright
-from browser_smoke import run, settle, db
+from browser_smoke import run, settle, sign_in, db
 from Section_1_Global_Core import data_policy, data_admin
 from Section_1_Global_Core.Symbols import symbols
 from Section_11_UI_UX.server import auth, settings_catalog
@@ -18,32 +18,60 @@ async def exercise_admin(base, library):
         page=await browser.new_page(viewport={'width':1500,'height':1000})
         errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
         await page.route('https://unpkg.com/**',lambda r:r.fulfill(path=str(library),content_type='application/javascript'))
+        requests=[];page.on('request',lambda r:requests.append(r.url))
+        await page.route('**/api/session',lambda route:route.fulfill(status=404,body='old backend'))
         await page.goto(base)
+        screen=page.locator('#login-screen')
+        await screen.get_by_text('Restart the UI backend',exact=False).wait_for()
+        assert await page.locator('#app').is_hidden()
+        await page.unroute('**/api/session')
+        await page.route('**/api/session',lambda route:route.fulfill(json={'role':'guest','configured':False}))
+        await screen.get_by_role('button',name='Check again',exact=True).click()
+        await screen.get_by_text('python3 -m Section_11_UI_UX.server.auth',exact=True).wait_for()
+        assert await page.locator('#login-form').is_hidden()
+        await page.unroute('**/api/session')
+        await screen.get_by_role('button',name='Check again',exact=True).click()
+        await screen.get_by_label('Username',exact=True).fill('user')
+        assert await page.locator('#app').is_hidden()
+        assert not [url for url in requests if '/api/bars?' in url]
+        denied=await page.request.get(base+'/api/bars?symbol=BTCUSDT&interval=15m&limit=1')
+        assert denied.status==401
+        await screen.get_by_label('Password',exact=True).fill('wrong-password')
+        await screen.get_by_role('button',name='Sign in',exact=True).click()
+        await screen.get_by_text('Incorrect username or password',exact=True).wait_for()
+        assert await page.locator('#app').is_hidden()
+        await sign_in(page,'user')
         await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
         await settle(page)
+        await page.reload()
+        await screen.get_by_label('Username',exact=True).wait_for()
+        assert await page.locator('#app').is_hidden()
+        assert (await page.request.get(base+'/api/bars?symbol=BTCUSDT&interval=15m&limit=1')).status==401
+        await sign_in(page,'user')
+        await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
+        await settle(page)
+        assert 'Normal user' in await page.locator('#account-button').inner_text()
         await page.get_by_role('button',name='Open settings').click()
         dialog=page.get_by_role('dialog',name='Settings')
-        await dialog.get_by_role('tab',name='Timeframes',exact=True).click()
-        assert await dialog.get_by_label('3m download status',exact=True).is_disabled()
-        async def login(name):
-            await dialog.get_by_role('tab',name='General',exact=True).click()
-            await dialog.get_by_role('button',name='Account',exact=True).click()
-            await dialog.get_by_label('Username',exact=True).fill(name)
-            await dialog.get_by_label('Password',exact=True).fill('test-password-long')
-            await dialog.get_by_role('button',name='Sign in',exact=True).click()
-            await dialog.get_by_text(f'Signed in as {name} ({name}).',exact=True).wait_for()
-        await login('user')
-        await dialog.get_by_role('tab',name='Timeframes',exact=True).click()
-        await dialog.get_by_label('3m download status',exact=True).select_option('inactive')
-        await dialog.get_by_label('3m download status',exact=True).wait_for(state='visible')
-        assert await dialog.get_by_role('button',name='Delete data',exact=True).first.is_disabled()
+        assert await dialog.get_by_role('tab',name='Timeframes',exact=True).count()==0
+        assert await dialog.get_by_role('tab',name='Coins',exact=True).count()==0
+        assert await dialog.get_by_role('tab',name='Features',exact=True).is_visible()
+        for path in ['/api/settings/timeframes','/api/settings/coins']:
+            assert (await page.request.get(base+path)).status==403
+        denied=await page.request.post(base+'/api/settings/timeframes',data={'interval':'3m','status':'inactive'})
+        assert denied.status==403
         denied=await page.request.post(base+'/api/settings/delete',data={'interval':'15m','confirmation':'DELETE 15m'})
         assert denied.status==403
         assert db.count_klines('BTCUSDT','15m')==14000
-        await dialog.get_by_role('tab',name='General',exact=True).click()
         await dialog.get_by_role('button',name='Account',exact=True).click()
         await dialog.get_by_role('button',name='Sign out',exact=True).click()
-        await login('admin')
+        await screen.get_by_label('Username',exact=True).wait_for()
+        assert await page.locator('#app').is_hidden()
+        await sign_in(page,'admin')
+        await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
+        await settle(page)
+        assert 'Administrator' in await page.locator('#account-button').inner_text()
+        await page.get_by_role('button',name='Open settings').click()
         await dialog.get_by_role('tab',name='Timeframes',exact=True).click()
         section=dialog.locator('.settings-policy-item').filter(has=page.get_by_text('15m',exact=True))
         await section.get_by_role('button',name='Delete data',exact=True).click()
@@ -80,9 +108,13 @@ async def exercise_admin(base, library):
         assert 'SUIUSDT' in data_policy.active_symbols()
         await page.wait_for_function("[...document.querySelector('#symbol').options].some(o=>o.value==='SUIUSDT')")
         assert await page.locator('#symbol').input_value() == 'BTCUSDT'
+        auth.SESSIONS.clear()
+        await page.evaluate('void DataCache.refreshStored().catch(()=>{})')
+        await screen.get_by_label('Username',exact=True).wait_for()
+        assert await page.locator('#app').is_hidden()
         assert not errors,errors
         await browser.close()
-        print('PASS: real login/user/admin sessions, normal-user deletion denied, immediate timeframe policy, typed deletion, chart cache cleared, scoped coin deletion and reapproval without removing registry entries')
+        print('PASS: startup login gate, wrong password denied, no pre-login chart requests, normal-user admin tabs hidden and APIs denied, logout/relogin as admin, scoped deletion and reapproval')
 
 
 if __name__=='__main__':

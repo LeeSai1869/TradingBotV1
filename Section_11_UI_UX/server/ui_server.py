@@ -32,6 +32,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         parsed = urlparse(self.path)
 
+        if parsed.path.startswith("/api/") and parsed.path != "/api/session" and routes.admin_routes.user(self)["role"] == "guest":
+            self._json({"error": "Sign in required"}, 401)
+            return
         # API dispatch
         status, payload = routes.handle_get(parsed.path, parsed.query, self)
         if status is not None:
@@ -61,6 +64,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self.response_cookie = None
         parsed = urlparse(self.path)
+        if parsed.path not in {"/api/login", "/api/logout"} and routes.admin_routes.user(self)["role"] == "guest":
+            self._json({"error": "Sign in required"}, 401)
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 <= length <= 16384:

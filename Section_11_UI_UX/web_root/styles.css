@@ -155,3 +155,17 @@ button:hover { background: #333; }
 .settings-login input, .settings-delete-confirm input { background: #252a35; color: #eee; border: 1px solid #454b5b; border-radius: 4px; padding: 9px; min-width: 0; }
 .settings-delete-confirm { border: 1px solid #ad5353; padding: 14px; margin: 12px 0; font-size: 13px; line-height: 1.6; }
 .settings-delete-confirm button { margin: 8px 8px 0 0; }
+
+#app[hidden], #login-screen[hidden], #login-form[hidden], #login-setup[hidden], #login-retry[hidden] { display: none; }
+#login-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #11151d; }
+.login-card { width: min(440px, 100%); padding: 32px; background: #1b202b; border: 1px solid #353d4c; border-radius: 14px; box-shadow: 0 20px 70px #0005; }
+.login-card h1 { margin: 0 0 10px; font-size: 25px; }
+.login-card p { line-height: 1.6; font-size: 14px; color: #acb8cb; }
+.login-card code { display: block; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; color: #d5e3ff; }
+#login-form { display: grid; gap: 18px; margin-top: 24px; }
+#login-form label { display: grid; gap: 8px; font-size: 14px; }
+#login-form input { width: 100%; padding: 12px; border: 1px solid #4b576b; border-radius: 6px; background: #101722; color: #fff; font: inherit; }
+#login-form button { height: 42px; background: #356be5; border-color: #5284ef; }
+#login-screen :focus-visible { outline: 2px solid #8cb5ff; outline-offset: 2px; }
+.settings-tabs button[hidden] { display: none; }
+#account-button { flex-shrink: 0; color: #a9c9ff; font-size: 12px; }

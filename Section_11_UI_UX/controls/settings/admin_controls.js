@@ -14,8 +14,9 @@ async function request(path, data) {
 }
 export async function load() {
     try {
-        const [account, policy] = await Promise.all([request('/api/session'), request('/api/settings/timeframes')]);
-        session = account; timeframes = policy.timeframes; loadError = '';
+        session = await request('/api/session');
+        timeframes = session.role === 'admin' ? (await request('/api/settings/timeframes')).timeframes : [];
+        loadError = '';
     } catch {
         session = {role:'guest',configured:false}; timeframes = [];
         loadError = 'Cannot load account/download settings. Restart the updated UI server and reopen settings.';
@@ -33,35 +34,17 @@ function action(parent, title, disabled, callback) {
     return button;
 }
 function changed(detail) { window.dispatchEvent(new CustomEvent('data-policy-change', {detail})); }
-export function account(parent, refresh) {
+export function isAdmin() { return session.role === 'admin'; }
+export function account(parent) {
     if (loadError) { message(parent).textContent = loadError; return; }
-    el('p', session.role === 'guest' ? 'Not signed in. Chart viewing is available.' : `Signed in as ${session.username} (${session.role}).`, parent);
+    el('p', session.role === 'guest' ? 'Your session has expired. Sign in again.' : `Signed in as ${session.username} (${session.role}).`, parent);
     const status = message(parent);
-    if (session.role !== 'guest') {
-        action(parent, 'Sign out', false, async () => {
-            try { await request('/api/logout', {}); await load(); refresh(); }
-            catch (e) { status.textContent = e.message; }
-        });
-        return;
-    }
-    if (!session.configured) {
-        el('p', 'Create local admin and user accounts in your project terminal:', parent);
-        el('code', 'python3 -m Section_11_UI_UX.server.auth', parent);
-        el('p', 'Passwords are entered privately in the terminal. Reload settings after setup.', parent);
-        return;
-    }
-    const form = el('form','',parent); form.className = 'settings-login';
-    const usernameLabel = el('label','Username',form), username = el('input','',usernameLabel);
-    username.name = 'username'; username.autocomplete = 'username'; username.required = true;
-    const passwordLabel = el('label','Password',form), password = el('input','',passwordLabel);
-    password.name = 'password'; password.type = 'password'; password.autocomplete = 'current-password'; password.required = true;
-    const submit = el('button','Sign in',form); submit.type = 'submit';
-    form.onsubmit = async event => {
-        event.preventDefault(); submit.disabled = true;
-        try { await request('/api/login',{username:username.value,password:password.value}); password.value=''; await load(); refresh(); }
-        catch (e) { status.textContent = e.message; }
-        finally { submit.disabled = false; }
-    };
+    action(parent, session.role === 'guest' ? 'Sign in again' : 'Sign out', false, async () => {
+        try {
+            await request('/api/logout', {});
+            window.location.reload();
+        } catch (e) { status.textContent = e.message; }
+    });
 }
 function deleteControl(parent, scope, disabled, after) {
     action(parent, 'Delete data', disabled, async () => {
@@ -85,7 +68,7 @@ function deleteControl(parent, scope, disabled, after) {
 }
 export function renderTimeframes(parent, refresh) {
     if (loadError) { message(parent).textContent = loadError; return; }
-    el('p','Policy changes apply immediately to the runner. Inactive retains stored data; deletion also pauses downloads. Sign in under General → Account.',parent).className='settings-note';
+    el('p','Policy changes apply immediately to the runner. Inactive retains stored data; deletion also pauses downloads. Administrator settings.',parent).className='settings-note';
     for (const row of timeframes) {
         const wrap=el('div','',parent); wrap.className='settings-policy-item';
         const line=el('div','',wrap); line.className='settings-row';
@@ -93,13 +76,13 @@ export function renderTimeframes(parent, refresh) {
         const label=el('label','Status ',line), select=el('select','',label);
         select.setAttribute('aria-label',`${row.interval} download status`);
         for (const value of ['active','inactive']) { const option=el('option',value,select); option.value=value; select.append(option); }
-        select.value=row.status; select.disabled=session.role==='guest';
+        select.value=row.status; select.disabled=session.role!=='admin';
         const status=message(wrap);
         select.onchange=async()=>{
             select.disabled=true;
             try { await request('/api/settings/timeframes',{interval:row.interval,status:select.value}); await load(); changed({}); refresh(); }
             catch(e) {status.textContent=e.message;select.value=row.status;}
-            finally {select.disabled=session.role==='guest';}
+            finally {select.disabled=session.role!=='admin';}
         };
         deleteControl(wrap,{interval:row.interval},session.role!=='admin',async()=>{await load();refresh();});
     }

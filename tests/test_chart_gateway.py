@@ -4,13 +4,13 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from unittest.mock import patch
 from http.server import HTTPServer
 
 from Section_1_Global_Core.memory_storage.Storage import db, klines_store, features_store, adcn_store
 from Section_1_Global_Core.memory_storage.market_data import download_binance_history as downloader
-from Section_11_UI_UX.server import routes, ui_server
+from Section_11_UI_UX.server import routes, ui_server, auth
 
 
 class ChartGatewayTests(unittest.TestCase):
@@ -137,6 +137,9 @@ class ChartGatewayTests(unittest.TestCase):
         self.assertIsNone(state[0]['adcn'])
 
     def test_real_http_serves_chart_and_complete_memory_packet(self):
+        sessions = patch.object(auth, 'SESSIONS', {'test-http': ('user','user',9999999999)})
+        sessions.start(); self.addCleanup(sessions.stop)
+        headers = {'Cookie': f'{auth.COOKIE}=test-http'}
         server = HTTPServer(('127.0.0.1',0), ui_server.Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -144,11 +147,11 @@ class ChartGatewayTests(unittest.TestCase):
             base = f'http://127.0.0.1:{server.server_port}'
             with urlopen(base + '/') as r:
                 self.assertIn(b'/web_root/app.js', r.read())
-            with urlopen(base + '/api/chart_window?symbol=BTCUSDT&interval=1m&start=60000&end=180001') as r:
+            with urlopen(Request(base + '/api/chart_window?symbol=BTCUSDT&interval=1m&start=60000&end=180001',headers=headers)) as r:
                 packet = json.load(r)
             self.assertEqual(len(packet['klines']),3)
             self.assertEqual(packet['flags_history'][0]['signal_type'],'BUY')
-            with urlopen(base + '/api/flags_current?symbol=BTCUSDT&interval=1m') as r:
+            with urlopen(Request(base + '/api/flags_current?symbol=BTCUSDT&interval=1m',headers=headers)) as r:
                 self.assertEqual(json.load(r)['final_score'],73)
         finally:
             server.shutdown()

@@ -85,9 +85,16 @@ class DataAdminTests(unittest.TestCase):
         self.assertEqual(admin_routes.handle_post('/api/settings/delete','{"interval":"1m"}',self.server('admin'))[0],400)
         self.assertEqual(admin_routes.handle_post('/api/settings/delete',body,self.server('admin','https://evil.example'))[0],403)
         self.assertEqual(db.last_kline_time('BTCUSDT','1m'),60000)
-        self.assertEqual(admin_routes.handle_post('/api/settings/timeframes','{"interval":"3m","status":"inactive"}',self.server('user'))[0],200)
+        self.assertEqual(admin_routes.handle_post('/api/settings/timeframes','{"interval":"3m","status":"inactive"}',self.server('user'))[0],403)
         self.assertEqual(admin_routes.handle_post('/api/settings/coins','{"symbol":"BTCUSDT","action":"disapprove"}',self.server('user'))[0],403)
         self.assertEqual(admin_routes.handle_post('/api/settings/delete',body,self.server('admin'))[0],200)
+
+    def test_both_admin_settings_endpoints_reject_normal_users(self):
+        from Section_11_UI_UX.server import routes
+        for path in ['/api/settings/timeframes','/api/settings/coins']:
+            self.assertEqual(routes.handle_get(path,'',self.server('user'))[0],403)
+            self.assertEqual(routes.handle_get(path,'',self.server('guest'))[0],401)
+            self.assertEqual(routes.handle_get(path,'',self.server('admin'))[0],200)
 
     def test_registry_actions_preserve_entries_and_enforce_eligibility(self):
         data_admin.set_coin('NEWUSDT','approve')

@@ -24,6 +24,9 @@ def handle_get(path, server):
     if path == '/api/session':
         return 200, user(server)
     if path == '/api/settings/timeframes':
+        identity = user(server)
+        if identity['role'] != 'admin':
+            return (401 if identity['role'] == 'guest' else 403), {'error': 'Administrator access required'}
         state = data_policy.read()
         return 200, {'timeframes': [{'interval': iv, 'status': state['timeframes'].get(iv, 'active')} for iv in data_policy.INTERVALS]}
     return None, None
@@ -56,7 +59,7 @@ def handle_post(path, body, server):
         identity = user(server)
         if identity['role'] == 'guest':
             return 401, {'error': 'Sign in to change download policy'}
-        if path != '/api/settings/timeframes' and identity['role'] != 'admin':
+        if identity['role'] != 'admin':
             return 403, {'error': 'Administrator access required'}
         if path == '/api/settings/timeframes':
             data_admin.set_timeframe(data.get('interval'), data.get('status'))

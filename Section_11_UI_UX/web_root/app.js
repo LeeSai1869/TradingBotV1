@@ -1,3 +1,4 @@
+import { requireSignIn } from "./login.js";
 import { logicalShift } from "./window_state.js";
 import * as symbolControl from "../controls/symbol/index.js";
 import * as timeframeControl from "../controls/timeframe/index.js";
@@ -27,6 +28,7 @@ async function loadAll() {
 }
 
 (async () => {
+    await requireSignIn();
     const chart = Canvas.init(document.getElementById("chart"));
     await Composer.mountAll(chart);
     DataCache.liveEnabled = Composer.config.live_candle !== false;

@@ -17,7 +17,7 @@ from unittest.mock import patch
 from playwright.async_api import async_playwright
 from Section_1_Global_Core.memory_storage.Storage import db, klines_store, features_store, adcn_store
 from Section_1_Global_Core.memory_storage.market_data import download_binance_history as downloader
-from Section_11_UI_UX.server import routes, ui_server
+from Section_11_UI_UX.server import routes, ui_server, auth
 
 
 async def exercise(base, library):
@@ -49,6 +49,7 @@ window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
             await route.continue_()
         await page.route('**/api/bars?*',slow_history)
         await page.goto(base)
+        await sign_in(page)
         await page.wait_for_function('window.DataCache && !DataCache.loading && DataCache.bars.length === 2000 && !DataCache._olderPromise')
         await settle(page)
         assert await page.evaluate('DataCache.activeBars.length') == 1000
@@ -219,6 +220,14 @@ window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
         await browser.close()
 
 
+async def sign_in(page, username='admin'):
+    screen=page.locator('#login-screen')
+    await screen.get_by_label('Username',exact=True).fill(username)
+    await screen.get_by_label('Password',exact=True).fill('test-password-long')
+    await screen.get_by_role('button',name='Sign in',exact=True).click()
+    await screen.wait_for(state='hidden')
+
+
 async def settle(page):
     await page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))))')
 
@@ -228,6 +237,11 @@ def run(library, scenario=exercise):
         for module,name in [(klines_store,'klines'),(features_store,'features'),
                             (adcn_store,'adcn'),(downloader,'klines')]:
             stack.enter_context(patch.object(module,'DB_PATH',Path(directory)/f'{name}.db'))
+        stack.enter_context(patch.object(auth,'USERS_FILE',Path(directory)/'users.json'))
+        stack.enter_context(patch.object(auth,'SESSIONS',{}))
+        stack.enter_context(patch.object(auth,'ATTEMPTS',[]))
+        salt='12'*16
+        auth.USERS_FILE.write_text(json.dumps({name:dict(role=name,salt=salt,hash=auth.digest('test-password-long',salt)) for name in ['admin','user']}))
         downloader.open_db().close()
         for symbol,interval,step,count in [('BTCUSDT','15m',900000,14000),
                 ('BTCUSDT','1m',60000,2200),('SUIUSDT','1m',60000,2200),('SUIUSDT','15m',900000,2200)]:
