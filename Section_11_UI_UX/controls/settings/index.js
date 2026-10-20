@@ -1,10 +1,11 @@
 // Chart preferences are browser-local. Runner policies remain owned by Core.
+import { FEATURE_STYLES, migrateStyles } from "./feature_styles.js";
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
 const PERIODS = [7, 25, 50, 100, 200, 300];
-const defaults = { candles: true, markers: true, flags: true, ema: true,
-    periods: [50], color: "#f5c542", width: 2, style: 0 };
+const defaults = { candles: true, markers: true, flags: true, ema: true };
 let saved = { ...defaults }, draft, dialog, content, sidebar, tabs;
+let featureTab = "Style";
 let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
@@ -18,21 +19,19 @@ const titles = { general: "General", inputs: "Inputs", features: "Features",
 
 function validated(value) {
     const result = { ...defaults };
-    if (!value || typeof value !== "object") return result;
+    if (!value || typeof value !== "object") value = {};
     for (const key of ["candles", "markers", "flags", "ema"]) {
         if (typeof value[key] === "boolean") result[key] = value[key];
     }
-    if (Array.isArray(value.periods)) result.periods = PERIODS.filter(p => value.periods.includes(p));
-    if (/^#[0-9a-f]{6}$/i.test(value.color)) result.color = value.color;
-    if ([1, 2, 3, 4].includes(value.width)) result.width = value.width;
-    if ([0, 1, 2].includes(value.style)) result.style = value.style;
+    result.outputs = migrateStyles(value);
     return result;
 }
 
 function apply() {
     const config = window.Composer.config;
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
-    config.ema = { periods: saved.periods, color: saved.color, lineWidth: saved.width, lineStyle: saved.style };
+    config.featureStyles = saved.outputs;
+    config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
     document.getElementById("flags-panel").hidden = !saved.flags;
 }
 
@@ -58,6 +57,64 @@ function reserved(label, explanation) {
     control.disabled = true;
     note(explanation);
 }
+function renderFeature() {
+    const feature = FEATURE_STYLES[item];
+    const subnav = el("nav", "", content, "settings-subtabs");
+    subnav.setAttribute("aria-label", `${item} options`);
+    for (const title of ["Display", "Style"]) {
+        const button = el("button", title, subnav);
+        button.setAttribute("aria-pressed", String(featureTab === title));
+        button.onclick = () => {
+            featureTab = title; render();
+            content.querySelector(`[aria-pressed="true"]`).focus();
+        };
+    }
+    if (item === "EMA") toggle("Show EMA", "ema");
+    else note("Style preferences can be saved now. This feature’s chart renderer is not connected yet.");
+    if (featureTab === "Display") {
+        for (const [key, label] of feature.outputs) {
+            const row = el("label", "", content, "settings-row");
+            el("span", label, row);
+            const check = el("input", "", row); check.type = "checkbox";
+            check.checked = draft.outputs[key].visible;
+            check.disabled = !feature.connected;
+            check.onchange = () => { draft.outputs[key].visible = check.checked; };
+        }
+        note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
+        return;
+    }
+    const table = el("div", "", content, "settings-style-table");
+    const heading = el("div", "", table, "settings-style-row settings-style-heading");
+    for (const title of ["Output", "Color", "Width", "Line style"]) el("span", title, heading);
+    for (const [key, label, , presentation = "line"] of feature.outputs) {
+        const state = draft.outputs[key];
+        const row = el("div", "", table, "settings-style-row");
+        const name = el("label", "", row, "settings-output-name");
+        const check = el("input", "", name); check.type = "checkbox";
+        check.checked = state.visible; check.disabled = !feature.connected;
+        check.onchange = () => { state.visible = check.checked; };
+        el("span", label, name);
+        const color = el("input", "", row); color.type = "color";
+        color.value = state.color; color.setAttribute("aria-label", `${label} color`);
+        color.oninput = () => { state.color = color.value; };
+        for (const [field, title, options] of [
+            ["width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
+            ["style", "line style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
+        ]) {
+            const select = el("select", "", row);
+            select.setAttribute("aria-label", `${label} ${title}`);
+            for (const [value, text] of options) { const option = el("option", text, select); option.value = value; }
+            select.value = state[field];
+            select.onchange = () => { state[field] = Number(select.value); };
+            if (presentation !== "line") {
+                select.disabled = true;
+                select.title = "Histogram output uses bar color; line controls do not apply.";
+            }
+        }
+    }
+    note("Each output keeps its own style. Unchecking an output preserves its color, width and line style.");
+}
+
 function render() {
     document.getElementById("settings-body").setAttribute("aria-labelledby", `settings-tab-${section}`);
     for (const tab of tabs.children) {
@@ -82,34 +139,8 @@ function render() {
     } else if (section === "candles") {
         toggle("Show candles and current-price line", "candles");
         note("Candles and features come from the combined bar stream.");
-    } else if (section === "features" && item === "EMA") {
-        toggle("Show EMA", "ema");
-        el("h4", "Display", content);
-        const group = el("div", "", content, "settings-periods");
-        for (const period of PERIODS) {
-            const label = el("label", "", group);
-            const input = el("input", "", label); input.type = "checkbox";
-            input.checked = draft.periods.includes(period);
-            input.onchange = () => { draft.periods = PERIODS.filter(p => p === period ? input.checked : draft.periods.includes(p)); };
-            el("span", `EMA ${period}`, label);
-        }
-        el("h4", "Style", content);
-        const colorRow = el("label", "Color", content, "settings-row");
-        const color = el("input", "", colorRow); color.type = "color"; color.value = draft.color;
-        color.oninput = () => { draft.color = color.value; };
-        for (const [label, key, options] of [
-            ["Line width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
-            ["Line style", "style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
-        ]) {
-            const row = el("label", label, content, "settings-row");
-            const select = el("select", "", row);
-            select.setAttribute("aria-label", label);
-            for (const [value, title] of options) { const option = el("option", title, select); option.value = value; }
-            select.value = draft[key]; select.onchange = () => { draft[key] = Number(select.value); };
-        }
-        note("Uses the stored EMA values for each bar. Display settings do not change feature calculations.");
     } else if (section === "features") {
-        reserved(`Show ${item}`, "This feature has a place in settings. Its chart renderer and style controls will be connected next.");
+        renderFeature();
     } else if (section === "timeframes") {
         note("Download switches will control the runner, independently of the chart timeframe selector. They are not connected yet.");
         for (const tf of window.Composer.config.timeframes?.all || []) {
@@ -166,11 +197,11 @@ export function mount() {
         const raw = localStorage.getItem(STORAGE);
         // Preserve server display defaults until the user saves preferences.
         saved = raw ? validated(JSON.parse(raw)) : validated({
-            ...defaults, candles: window.Composer.config.display?.candles !== false,
+            outputs: migrateStyles(), candles: window.Composer.config.display?.candles !== false,
             markers: window.Composer.config.display?.markers !== false,
             ema: window.Composer.config.display?.ema50 !== false,
         });
-    } catch { saved = { ...defaults }; }
+    } catch { saved = validated(defaults); }
     apply();
     const gear = el("button", "", document.getElementById("toolbar"));
     gear.id = "settings-button"; gear.title = "Settings";

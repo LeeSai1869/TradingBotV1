@@ -19,9 +19,10 @@ export function update(chart, data, options = {}) {
     const config = window.Composer?.config.ema || {};
     const periods = config.periods || [50];
     for (const [period, line] of series) {
-        const visible = options.visible !== false && periods.includes(period);
-        line.applyOptions({ visible, color: config.color || "#f5c542",
-            lineWidth: config.lineWidth || 2, lineStyle: config.lineStyle ?? 0 });
+        const style = window.Composer?.config.featureStyles?.[`ema${period}`];
+        const visible = options.visible !== false && (style ? style.visible : periods.includes(period));
+        line.applyOptions({ visible, color: style?.color || config.color || "#f5c542",
+            lineWidth: style?.width || config.lineWidth || 2, lineStyle: style?.style ?? config.lineStyle ?? 0 });
         if (!visible) continue;
         const points = [];
         for (const bar of data.bars || []) {

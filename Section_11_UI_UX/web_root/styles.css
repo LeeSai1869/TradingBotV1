@@ -130,3 +130,19 @@ button:hover { background: #333; }
     #status { white-space: nowrap; }
     #settings-button { position: sticky; right: 0; background: #252525; }
 }
+
+.settings-subtabs { display: flex; gap: 20px; margin: -6px 0 16px; border-bottom: 1px solid #323643; }
+.settings-subtabs button { background: transparent; border: 0; border-radius: 0; color: #a4adbd; padding: 0 2px; height: 38px; }
+.settings-subtabs [aria-pressed="true"] { border-bottom: 2px solid #6399f9; color: #8cb5ff; }
+.settings-style-table { margin-top: 16px; }
+.settings-style-row { display: grid; grid-template-columns: minmax(115px, 1fr) 55px 78px 100px; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #292e39; font-size: 13px; }
+.settings-style-heading { color: #9aa5b8; font-size: 12px; }
+.settings-output-name { display: flex; gap: 8px; align-items: center; }
+.settings-output-name input { accent-color: #669dff; }
+.settings-style-row input[type="color"] { width: 48px; height: 32px; padding: 3px; border: 1px solid #454b5b; border-radius: 5px; background: #252a35; }
+.settings-style-row select { width: 100%; padding: 0 6px; }
+@media (max-width: 640px) {
+    .settings-style-row { grid-template-columns: minmax(100px, 1fr) 42px; gap: 10px; }
+    .settings-style-row input[type="color"] { width: 40px; }
+    .settings-style-heading { display: none; }
+}

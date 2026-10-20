@@ -8,15 +8,24 @@ arrow keys, Home and End. The native dialog traps focus and restores it on close
 Connected controls:
 - General: stored flags panel and BUY/SELL marker visibility.
 - Candles: candle and current-price-line visibility.
-- Features > EMA: visibility, periods 7/25/50/100/200/300, shared color, width and
-  solid/dotted/dashed style. Values come from the existing combined bar stream.
+- Features > EMA: visibility, periods 7/25/50/100/200/300, independent color, width and
+  solid/dotted/dashed style per output. Values come from the existing combined bar stream.
 
 Settings apply through Composer and the existing render coordinator, preserving
 market selection, cached history and viewport. Preferences use the versioned
 `tradingbot.chart-settings.v1` localStorage key. They do not modify calculations.
 
-Inputs, other features, and timeframe download switches reserve space for later
-connections. Download switches are disabled, with no implied runner state.
+Features have Display and Style submenus. `feature_styles.js` declares each
+output's identity, default color and presentation (line or histogram). The same
+row builder renders each output independently. RSI, ADX (+DI, -DI, spread,
+direction), ATR, Volume and VWAP already expose saved style preferences, but
+their visibility switches stay disabled until their renderers are connected.
+Histogram outputs have color and disable line-only controls. Adding an output
+requires a catalog entry and connecting its renderer to `config.featureStyles`.
+Existing shared EMA preferences migrate to independent rows without changing
+the selected periods or saved styling; styles are retained when hidden.
+
+Inputs and timeframe download switches reserve space for later connections. Download switches are disabled, with no implied runner state.
 Coin lists use a read-only `/api/settings/coins` endpoint. Approved here means
 approved and in the current top50; Inactive contains other approved entries.
 Rule exclusions (meme, stablecoin, unavailable on Binance) appear as Ineligible.

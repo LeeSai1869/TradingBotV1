@@ -56,17 +56,32 @@ Canvas.init = (...args) => {
         await dialog.get_by_role('switch', name='Show stored signal panel').uncheck()
         await dialog.get_by_role('tab', name='Features', exact=True).click()
         await dialog.get_by_label('EMA 25', exact=True).check()
-        await dialog.get_by_label('Line width', exact=True).select_option('3')
-        await dialog.get_by_label('Line style', exact=True).select_option('2')
+        await dialog.get_by_label('EMA 25 width', exact=True).select_option('3')
+        await dialog.get_by_label('EMA 25 line style', exact=True).select_option('2')
+        await dialog.get_by_label('EMA 25 color', exact=True).fill('#ff1234')
+        await dialog.get_by_role('button', name='RSI', exact=True).click()
+        await dialog.get_by_label('RSI width', exact=True).select_option('4')
+        await dialog.get_by_label('RSI color', exact=True).fill('#1234ff')
+        await dialog.get_by_role('button', name='ADX', exact=True).click()
+        assert await dialog.get_by_role('combobox').count() == 10
+        await dialog.get_by_label('+DI color', exact=True).fill('#abcdef')
+        await dialog.get_by_role('button', name='EMA', exact=True).click()
+        await dialog.get_by_role('button', name='Display', exact=True).click()
+        assert await dialog.get_by_label('EMA 25', exact=True).is_checked()
+        await dialog.get_by_role('button', name='Style', exact=True).click()
         await dialog.get_by_role('button', name='Apply', exact=True).click()
         await settle(page)
         assert await page.evaluate('Composer.config.ema.periods') == [25,50]
-        assert await page.evaluate('Composer.config.ema.lineWidth') == 3
-        assert await page.evaluate('Composer.config.ema.lineStyle') == 2
+        assert await page.evaluate('Composer.config.featureStyles.ema25.width') == 3
+        assert await page.evaluate('Composer.config.featureStyles.ema25.style') == 2
         assert await page.evaluate('emaWrites.length') > 0
         assert await page.evaluate('''() => settingsSeries.some(s =>
             s.data().some(p => p.value === 244) && s.options().visible &&
-            s.options().lineWidth === 3 && s.options().lineStyle === 2)''')
+            s.options().lineWidth === 3 && s.options().lineStyle === 2 && s.options().color === '#ff1234')''')
+        assert await page.evaluate('Composer.config.featureStyles.ema25.color') == '#ff1234'
+        assert await page.evaluate('Composer.config.featureStyles.ema50.width') == 2
+        assert await page.evaluate('Composer.config.featureStyles.rsi.width') == 4
+        assert await page.evaluate('Composer.config.featureStyles.di_plus.color') == '#abcdef'
         assert not await page.locator('#flags-panel').is_visible()
         assert await page.evaluate('Canvas.chart.timeScale().getVisibleLogicalRange()') == before
         await page.reload()

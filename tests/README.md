@@ -113,3 +113,12 @@ Covers Apply/Cancel, EMA period/style, viewport preservation, browser persistenc
 coin registry categories, disabled runner actions, keyboard close/focus and mobile
 layout. `test_settings_catalog.py` verifies read-only registry grouping and failure
 handling. Settings do not enable runner-policy changes or deletion yet.
+
+Independent output styles and migration of shared EMA preferences:
+
+```bash
+node --test tests/feature_styles.test.mjs tests/ui_lifecycle.test.mjs
+```
+
+The settings browser scenario also checks separate EMA colors/widths/styles,
+feature submenus and saved RSI/ADX output preferences.
