@@ -24,6 +24,8 @@ def main():
         result=subprocess.run(['launchctl','list'],capture_output=True,text=True)
         rows=[line.split() for line in result.stdout.splitlines() if line.split() and line.split()[-1]=='com.scalp.liverunner']
         print('Runner launchd PID:',rows[0][0] if rows else 'not loaded (a manual runner may still be running)')
+    if sys.platform=='darwin' and not rows:
+        print('To install/re-enable the login runner: python3 restart_runner.py')
     print('Run again in 30–60 seconds; increasing 1m counts/timestamps confirm progress; current timestamps can mean already caught up.')
     print('Timeframe   candles       latest candle UTC                 features      latest feature UTC')
     errors=set()

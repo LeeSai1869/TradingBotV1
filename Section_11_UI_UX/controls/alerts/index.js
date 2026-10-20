@@ -90,7 +90,7 @@ async function refresh() {
     }
 }
 function syncMode() {
-    const features=[form.elements.field.value,form.elements.target_field.value].some(field=>field.startsWith('features.'));
+    const features=[form.elements.field.value,form.elements.target_field.value].some(field=>field && !(catalog.live_fields || ['client.high','client.low','client.close']).includes(field));
     form.elements.mode.querySelector('[value="live"]').disabled=features;
     if(features)form.elements.mode.value='closed';
 }
@@ -133,7 +133,7 @@ async function build() {
     const title=input('Alert name','name','text',form);title.required=true;title.maxLength=120;
     select('Coin','symbol',catalog.symbols.map(value=>[value,value]),form);
     select('Timeframe','interval',catalog.intervals.map(value=>[value,value]),form);
-    select('Evaluation','mode',[['live','Live candle price'],['closed','Closed candle / stored features']],form);
+    select('Evaluation','mode',[['live','Live candle / provisional EMA / RSI'],['closed','Closed candle / stored features']],form);
     select('Field','field',Object.entries(catalog.fields),form).onchange=syncMode;
     select('Condition','operator',catalog.operators.map(value=>[value,value.replaceAll('_',' ')]),form);
     const threshold=input('Threshold (signed numbers allowed)','value','number',form);threshold.step='any';threshold.required=true;
@@ -163,7 +163,7 @@ export function mount() {
     const header=el('header','',dialog);el('h2','Alerts',header).id='alerts-title';const close=el('button','Close alerts',header);close.onclick=()=>dialog.close();
     status=el('p','',dialog,'settings-note');status.setAttribute('role','status');
     el('div','',document.body).id='alert-toasts';
-    open.onclick=async()=>{dialog.showModal();try{await build();await refresh();}catch(error){status.textContent=error.message+' Restart the updated UI backend if this API is missing.';}};
+    open.onclick=async()=>{dialog.showModal();try{await build();reset();await refresh();}catch(error){status.textContent=error.message+' Restart the updated UI backend if this API is missing.';}};
     dialog.addEventListener('close',()=>open.focus());
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.

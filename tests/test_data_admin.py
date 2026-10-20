@@ -132,6 +132,19 @@ class DataAdminTests(unittest.TestCase):
             self.assertEqual(db.last_kline_time('BTCUSDT','1m'),120000)
         finally: conn.close()
 
+    def test_newly_approved_coin_bootstraps_without_runner_restart(self):
+        data_admin.set_coin('NEWUSDT','approve')
+        self.assertIn('NEWUSDT', data_policy.active_symbols())
+        page=[[120000,'10','12','9','11','5',179999]]
+        conn=updater._open_db()
+        try:
+            with patch.object(updater,'_fetch',return_value=page) as fetch:
+                self.assertEqual(updater.update_one('NEWUSDT','1m',conn),1)
+                self.assertEqual(fetch.call_args.args[2],downloader.FALLBACK_START_MS)
+            self.assertEqual(db.last_kline_time('NEWUSDT','1m'),120000)
+        finally:
+            conn.close()
+
     def test_backlog_full_page_continues_without_waiting_whole_interval(self):
         page=[[120000+i*60000,'10','12','9','11','5',179999+i*60000] for i in range(1000)]
         conn=updater._open_db()

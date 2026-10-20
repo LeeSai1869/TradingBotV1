@@ -36,7 +36,7 @@ async def exercise(base,library):
         await dialog.get_by_label('Alert name',exact=True).fill('RSI crossing test')
         await dialog.get_by_label('Timeframe',exact=True).select_option('1m')
         await dialog.get_by_label('Field',exact=True).select_option('features.rsi')
-        assert await dialog.get_by_label('Evaluation',exact=True).input_value()=='closed'
+        await dialog.get_by_label('Evaluation',exact=True).select_option('closed')
         await dialog.get_by_label('Condition',exact=True).select_option('above')
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('70')
         await dialog.get_by_label('Sound',exact=True).select_option('bell')
@@ -59,6 +59,8 @@ async def exercise(base,library):
         assert await page.evaluate("noticeEvents.some(e=>e.name==='RSI crossing test')")
         assert await page.evaluate('DataCache.atLiveEdge') is False
         await page.get_by_role('button',name='Alerts',exact=True).click()
+        assert await dialog.get_by_label('Coin',exact=True).input_value()==await page.locator('#symbol').input_value()
+        assert await dialog.get_by_label('Timeframe',exact=True).input_value()==await page.locator('#interval').input_value()
         await dialog.get_by_label('Alert name',exact=True).fill('Live SUI alert')
         await dialog.get_by_label('Coin',exact=True).select_option('SUIUSDT')
         await dialog.get_by_label('Timeframe',exact=True).select_option('1m')

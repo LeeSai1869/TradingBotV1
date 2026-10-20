@@ -158,3 +158,35 @@ reset, and logout revocation. `test_alerts.py` covers field comparisons, signed
 thresholds, readiness, edit revisions, dataset epochs, historical bootstrap,
 bounded readers, token hashing and password-change invalidation. These tests do
 not establish Binance connectivity or native Mac notification support.
+
+Live EMA/RSI and runner recovery
+-------------------------------
+The shared forming-candle worker calculates provisional EMA and RSI using the
+same pure Section 4 formulas and 500-bar window as permanent processing. It
+requires contiguous stored history through the prior candle. Each tick replaces
+the forming input, without mutating processor state or writing features. The
+runner still calculates and stores final features after downloading the closed
+candle. Other indicators remain closed-candle only. Live alerts support EMA and
+RSI as well as price. New alert forms take the current chart symbol/timeframe
+on every opening.
+
+On macOS, from the checkout, using the Python environment with pipeline dependencies:
+
+```sh
+python3 restart_runner.py
+python3 check_coin.py ETHUSDT
+```
+
+The installer recreates the user launchd plist with this checkout and interpreter,
+enables the service even if it was disabled, and starts it on future logins.
+It refuses to start alongside a detected manual runner; stop that runner with
+Ctrl+C and retry. Startup catch-up can take time before the download loop runs.
+Check both logs for progress or exchange/network failures:
+
+```sh
+tail -n 60 "$HOME/Library/Logs/TradingBotV1/runner.log"
+tail -n 60 "$HOME/Library/Logs/TradingBotV1/runner-error.log"
+```
+
+`tests/test_live_features.py` checks provisional formula parity, tick replacement,
+gapped history, and launchd configuration/installation with mocked macOS commands.

@@ -12,7 +12,7 @@ def handle_get(path,query,server):
     if path=='/api/alerts/catalog':
         registry=data_admin.catalog()
         symbols=sorted({r['symbol'] for key in ('approved','disapproved','pending','staged','top50') for r in registry.get(key,[])})
-        return 200,{'fields':alerts.FIELDS,'operators':sorted(alerts.OPERATORS),'symbols':symbols,'intervals':data_policy.INTERVALS,'sounds':sorted(alerts.SOUNDS)}
+        return 200,{'fields':alerts.FIELDS,'live_fields':sorted(alerts.LIVE_FIELDS),'operators':sorted(alerts.OPERATORS),'symbols':symbols,'intervals':data_policy.INTERVALS,'sounds':sorted(alerts.SOUNDS)}
     if path=='/api/alerts': return 200,{'rules':alerts.list_rules(identity['username'])}
     try:
         raw=parse_qs(query).get('after',[None])[0]

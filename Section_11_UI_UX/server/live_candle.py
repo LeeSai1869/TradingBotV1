@@ -99,6 +99,15 @@ class FormingCandleCache:
                            "client": {"symbol": symbol, "interval": interval,
                                       "open_time": open_time, "close_time": close_time, **values},
                            "features": None, "adcn": None}
+            if bar is not None:
+                try:
+                    from .live_features import calculate
+                    bar['features'] = calculate(symbol, interval, bar['client'])
+                    bar['features_status'] = 'provisional' if bar['features'] else 'waiting for stored history'
+                except Exception as feature_error:
+                    # Missing dependencies/history must not interrupt the price feed.
+                    bar['features_status'] = 'unavailable'
+                    bar['features_error'] = str(feature_error)
             with self._lock:
                 entry.update(bar=bar, received=self.clock(), as_of=int(self.wall_clock()*1000), error=None)
         except Exception as error:

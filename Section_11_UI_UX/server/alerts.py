@@ -13,6 +13,7 @@ from Section_1_Global_Core.memory_storage.market_data.update_klines import INTER
 
 FIELDS = {f'client.{key}': f'Candle {key}' for key in ('high','low','close')}
 FIELDS.update({f'features.{key}': key.replace('_',' ').upper() for key in features_store.COLUMNS if key not in {'symbol','interval','open_time'}})
+LIVE_FIELDS = {f'client.{key}' for key in ('high','low','close')} | {f'features.ema{p}' for p in (7,25,50,100,200,300)} | {'features.rsi','features.prev_rsi','features.rsi_change'}
 FIELDS.update({'features.di_plus':'+DI','features.di_minus':'−DI','features.di_direction':'DI direction (signed)','features.di_spread':'DI spread'})
 OPERATORS = {'above','at_or_above','below','at_or_below','equals','crosses_above','crosses_below'}
 SOUNDS = {'chime','bell','alarm','none'}
@@ -53,8 +54,8 @@ def validate(data):
     target_field=data.get('target_field') or None
     if target_field is not None and target_field not in FIELDS:
         raise ValueError('Unsupported comparison field')
-    if mode=='live' and any(field and not field.startswith('client.') for field in (data['field'],target_field)):
-        raise ValueError('Live rules support candle high, low and close. Features require closed candles.')
+    if mode=='live' and any(field and field not in LIVE_FIELDS for field in (data['field'],target_field)):
+        raise ValueError('Live rules support candle high, low, close, EMA and RSI. Other features require closed candles.')
     value=data.get('value',0)
     if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):
         raise ValueError('Threshold must be a finite number')

@@ -33,3 +33,12 @@ export function update(chart, data, options = {}) {
         line.setData(points);
     }
 }
+
+// Update the existing point on each tick; never append another copy of the candle.
+export function updateLive(chart, bar) {
+    if (!bar) return;
+    for (const [period, line] of series) {
+        const value = bar.features?.[`ema${period}`];
+        line.update(Number.isFinite(value) ? {time: bar.time, value} : {time: bar.time});
+    }
+}

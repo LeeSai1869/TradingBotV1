@@ -23,3 +23,21 @@ test('stored per-output styling survives normalization and invalid fields fall b
     assert.deepEqual(migrateStyles({outputs:styles}),styles);
     assert.equal(normalizeStyles().ema50.visible,true);
 });
+
+
+test('live EMA ticks replace the current point without rebuilding history', async () => {
+    const overlay = await import('../Section_11_UI_UX/overlays/ema50/index.js');
+    globalThis.LightweightCharts = {LineSeries: {}};
+    const lines = [];
+    overlay.mount({addSeries() {
+        const points = new Map();
+        const line = {points, update(point) {points.set(point.time, point);}};
+        lines.push(line);return line;
+    }});
+    overlay.updateLive(null, {time: 60, features: {ema50: 101}});
+    overlay.updateLive(null, {time: 60, features: {ema50: 103}});
+    assert.equal(lines[2].points.size, 1);
+    assert.equal(lines[2].points.get(60).value, 103);
+    overlay.updateLive(null, {time: 120, features: null});
+    assert.deepEqual(lines[2].points.get(120), {time:120});
+});

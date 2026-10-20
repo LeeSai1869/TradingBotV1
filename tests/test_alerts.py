@@ -72,9 +72,11 @@ class AlertTests(unittest.TestCase):
             alerts.evaluate_once();live.assert_not_called()
         self.assertIn('Suspended',alerts.list_rules('admin')[0]['status'])
 
-    def test_validation_prevents_live_features_and_nonfinite_thresholds(self):
-        for kwargs in [dict(mode='live'),dict(value=float('nan')),dict(field='adcn.score'),dict(target_field='adcn.signal'),dict(mode='live',field='client.close',target_field='features.rsi')]:
+    def test_validation_allows_live_ema_rsi_but_rejects_other_features_and_nonfinite_thresholds(self):
+        for kwargs in [dict(mode='live',field='features.adx'),dict(value=float('nan')),dict(field='adcn.score'),dict(target_field='adcn.signal'),dict(mode='live',field='client.close',target_field='features.di_plus')]:
             with self.assertRaises(ValueError): alerts.validate(self.rule(**kwargs))
+        alerts.validate(self.rule(mode='live',field='features.rsi'))
+        alerts.validate(self.rule(mode='live',field='features.ema50'))
         self.assertIn('features.rsi',alerts.FIELDS)
         self.assertIn('features.di_direction',alerts.FIELDS)
 
