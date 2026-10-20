@@ -165,6 +165,7 @@ class GlobalCoreOrchestrator:
         t0 = time.time()
 
         # 1) Ingest
+        print("[orchestrator] download phase starting",flush=True)
         try:
             inserted = update_klines_all()
         except Exception as e:
@@ -223,6 +224,8 @@ class GlobalCoreOrchestrator:
                         )
                     continue
 
+                if bars:
+                    print(f"[orchestrator] feature batch {s} {iv}: {len(bars)} bars after {since}",flush=True)
                 for row in bars:
                     (ot, ct, o, h, l, c, v) = row
                     ev = BarEvent(

@@ -212,9 +212,10 @@ def update_all():
     finally:
         conn.close()
 
-    # Best-effort audit after every ingest pass. Does not block.
+    # Bounded audit after ingest. Full verification/repairs are a separate run.
     if _audit_runner is not None and total > 0:
         try:
+            print("[audit] recent-row audit starting",flush=True)
             manifest = _audit_runner.run_fast(sample_rows_per_pair=10)
             LAST_AUDIT = manifest.get('summary') or _audit_runner.summarize(manifest)
             print('[audit] '+_json.dumps(LAST_AUDIT,sort_keys=True),flush=True)

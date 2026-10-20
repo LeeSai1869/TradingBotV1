@@ -348,3 +348,25 @@ remains post-ingest/best-effort and does not stop a legitimate historical backfi
 read-only operation. `test_audit_reporting.py` distinguishes stale history, missing
 rows, source failures and skipped source verification. The cloud cannot validate
 the Mac's saved prices; the command above must run against that local database.
+
+Runner progress and bounded ingest audit
+---------------------------------------
+The ingest `run_fast` audit now samples at most 1000 recent rows per active pair
+(10 requested by the runner), checks continuity within that bounded window, and
+checks latest-candle freshness via the indexed latest open time. It does not hash
+the entire database, scan complete histories, run cross-interval/source checks or
+perform network gap repair inline. Detected recent gaps are reported with
+`repair_deferred`; A3/A4 are explicitly skipped, never reported as verified.
+`audit_runner.run()` retains full-history checks and optional repairs for a
+separate full audit. The fast manifest and metadata retain their bounded scope.
+This prevents full-history audit/repair work from monopolizing each ingest cycle;
+it does not claim all older rows have been audited by the recent sample.
+
+Runner logs identify download, audit and feature-batch phases. After installing
+updates, restart the existing runner with `python3 restart_runner.py`; pulling
+source files does not reload a running Python process. Startup feature catch-up
+may take time before normal cycles resume. Current wrapper versions register
+faulthandler's SIGUSR1 traceback handler for diagnosing a stall without killing the
+process; never send that signal to an older runner that has not been restarted.
+`test_fast_audit.py` verifies bounded sampling, deferred gap repair and exclusion of
+full hashing/scanning/network work from the ingest audit.

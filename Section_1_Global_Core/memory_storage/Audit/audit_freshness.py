@@ -17,7 +17,7 @@ def _last_close_time(symbol: str, interval: str) -> int | None:
     conn = sqlite3.connect(str(cfg.KLINES_DB))
     try:
         cur = conn.execute(
-            "SELECT MAX(close_time) FROM klines WHERE symbol=? AND interval=?",
+            "SELECT close_time FROM klines WHERE symbol=? AND interval=? ORDER BY open_time DESC LIMIT 1",
             (symbol, interval),
         )
         row = cur.fetchone()

@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import faulthandler
+import signal
 import sys
 import os
 from pathlib import Path
@@ -18,6 +20,9 @@ from Section_1_Global_Core.orchestrator import (
 
 
 def main():
+    faulthandler.enable()
+    if hasattr(signal,"SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1,all_threads=True)
     root=Path(__file__).resolve().parents[3]
     print(f"[runner] started={datetime.now(timezone.utc).isoformat()} pid={os.getpid()} project={root} python={sys.executable}",flush=True)
     orch = GlobalCoreOrchestrator(poll_seconds=DEFAULT_POLL_SECONDS)

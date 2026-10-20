@@ -181,13 +181,13 @@ def summarize(manifest):
         'schema_pass': (manifest.get('A1') or {}).get('failed',0)==0,
         'continuity_pass': not manifest.get('A2'),
         'source_verification': source,
-        'consistency_pass': not any(pair.get('mismatch_count',0) for item in manifest.get('A4') or [] for pair in item.get('pairs',[])),
+        'consistency_pass': None if manifest.get('A4_ran') is False else not any(pair.get('mismatch_count',0) for item in manifest.get('A4') or [] for pair in item.get('pairs',[])),
         'stale_count': (manifest.get('A5') or {}).get('stale_count',0),
         'missing_count': (manifest.get('A5') or {}).get('missing',0),
     }
     result['freshness_pass'] = result['stale_count']==0 and result['missing_count']==0
     result['pass'] = (result['schema_pass'] and result['continuity_pass'] and source!='failed'
-                      and result['consistency_pass'] and result['freshness_pass'])
+                      and result['consistency_pass'] is not False and result['freshness_pass'])
     return result
 
 
@@ -318,6 +318,52 @@ def run(*, sample_rows_per_pair: int = 200,
 
 
 def run_fast(*, sample_rows_per_pair: int = 200) -> dict:
-    """A1 + A2 + A5 only (for the ingest loop)."""
-    return run(sample_rows_per_pair=sample_rows_per_pair,
-               continuity_refetch=True, include_daily=False)
+    """Bounded recent-row A1/A2 plus A5. No full scan, hash or inline repair.
+
+    Full-history continuity, source comparison, consistency and repairs remain in
+    run(). They must not monopolize the runner's incremental download loop.
+    """
+    limit = max(2, min(int(sample_rows_per_pair), 1000))
+    started = time.time()
+    pairs = [(symbol, interval) for symbol in data_policy.active_symbols()
+             for interval in data_policy.active_intervals()]
+    failures, issues, checked = [], [], 0
+    conn = (sqlite3.connect(cfg.KLINES_DB.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)
+            if cfg.KLINES_DB.exists() else None)
+    try:
+        for symbol, interval in pairs:
+            rows = conn.execute(
+                'SELECT symbol,interval,open_time,open,high,low,close,volume,close_time '
+                'FROM klines WHERE symbol=? AND interval=? ORDER BY open_time DESC LIMIT ?',
+                (symbol,interval,limit)).fetchall() if conn else []
+            result = audit_schema.run(rows)
+            checked += result['checked']; failures.extend(result['failures'])
+            if not cfg.A2_ENABLED or not rows:
+                continue
+            times = sorted(row[2] for row in rows)
+            gaps = (audit_continuity._find_monthly_gaps(times) if interval=='1M'
+                    else audit_continuity._find_gaps(times,audit_continuity.INTERVAL_MS[interval]))
+            gaps = [(start,end) for start,end in gaps if not audit_continuity._is_known(symbol,interval,start,end)]
+            overlaps = audit_continuity._find_overlaps(times)
+            if gaps or overlaps:
+                issues.append({'symbol':symbol,'interval':interval,'gap_count':len(gaps),
+                               'overlap_count':len(overlaps),'gaps':gaps,'overlaps':overlaps,
+                               'repair_deferred':True,'scope':'recent rows'})
+    finally:
+        if conn: conn.close()
+    manifest = {'started_at':_now(),'finished_at':_now(),'mode':'fast','scope':'recent rows only',
+                'sample_rows_per_pair':limit,'klines_sha256':None,'pairs':len(pairs),
+                'A1':{'checked':checked,'failed':len(failures),'failures':failures[:cfg.A1_MAX_FAILURES_REPORTED]},
+                'A2':issues,'A3':{'ran':False},'A4':[],'A4_ran':False,
+                'A5':audit_freshness.run(pairs)}
+    manifest['duration_ms']=int((time.time()-started)*1000)
+    manifest['summary']=summarize(manifest);manifest['pass']=manifest['summary']['pass']
+    cfg.LOG_DIR.mkdir(parents=True,exist_ok=True)
+    (cfg.LOG_DIR/f"{time.time_ns()}_fast.json").write_text(json.dumps(manifest,indent=2)+'\n')
+    metadata = _open_metadata()
+    try:
+        metadata.execute('INSERT INTO audit_runs(started_at,finished_at,duration_ms,klines_sha256,pass,summary) VALUES(?,?,?,?,?,?)',
+            (manifest['started_at'],manifest['finished_at'],manifest['duration_ms'],None,int(manifest['pass']),json.dumps(manifest['summary'])))
+        metadata.commit()
+    finally:metadata.close()
+    return manifest
