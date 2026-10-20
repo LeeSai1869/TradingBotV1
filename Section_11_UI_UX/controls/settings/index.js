@@ -275,6 +275,11 @@ export async function mount() {
             if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});
     };
+    window.addEventListener("hud-size-change", event => {
+        saved.hud = normalizeHud({...saved.hud,size:event.detail});
+        try {localStorage.setItem(STORAGE,JSON.stringify(saved));} catch {}
+        apply();
+    });
     window.addEventListener("hud-visibility-change", event => {
         saved.hud.visible = event.detail === true;
         try {localStorage.setItem(STORAGE, JSON.stringify(saved));} catch {}

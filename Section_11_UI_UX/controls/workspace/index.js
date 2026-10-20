@@ -1,3 +1,4 @@
+import {mountResize} from './resize.js';
 import {chartColumn} from './chart_column.js';
 import {hudRequest} from './requests.js';
 import {normalizeHud} from './preferences.js';
@@ -26,6 +27,12 @@ function invalidate() {
     table?.replaceChildren();lastPacket=null;
     if(hud) {
         const config=preferences();hud.hidden=!config.visible;hud.dataset.position=config.position;
+        const style=config.style;
+        for(const [key,value] of Object.entries({
+            '--hud-font-size':style.fontSize+'px','--hud-font':{system:'-apple-system, BlinkMacSystemFont, Arial, sans-serif',monospace:'Menlo, Consolas, monospace',serif:'Georgia, serif'}[style.fontFamily],
+            '--hud-color':style.textColor,'--hud-weight':style.bold?'700':'400','--hud-border-color':style.borderColor,
+            '--hud-border-width':style.borderWidth+'px','--hud-border-style':style.borderStyle,'--hud-padding':style.padding+'px'}))hud.style.setProperty(key,value);
+        hud.style.width=config.size.width?config.size.width+'px':'';hud.style.height=config.size.height?config.size.height+'px':'';
         hudToggle.setAttribute("aria-pressed",String(config.visible));
         if(config.visible)void refresh();
     }
@@ -63,8 +70,10 @@ function renderPacket(packet,choices,config,symbol) {
             const cell=el('th',column.interval,headRow);cell.scope='col';
             const state=column.status==='live provisional candle'?'Live':!column.active?'Inactive':column.stale?'Stale':column.open_time==null?'Waiting':'Stored';
             el('small',state,cell,column.stale?'hud-stale':'');
+            if(config.style.showDates) {
             const time=el('small',column.open_time==null?'No candles':new Date(column.open_time).toISOString().replace('T',' ').slice(0,16)+' UTC',cell);
-            time.title='Open time of the latest stored candle';
+            time.title='Open time of the latest stored candle';time.className='hud-candle-date';
+            }
         }
         const body=el('tbody','',table);
         for(const field of config.fields) {
@@ -98,6 +107,7 @@ export function mount() {
     settings.onclick=()=>window.dispatchEvent(new Event('open-hud-settings'));
     const scroll=el('div','',hud,'hud-scroll');table=el('table','',scroll);table.id='comparison-hud';
     status=el('p','',hud,'workspace-note');status.setAttribute('role','status');
+    mountResize(hud,preferences);
     // Interacting with the overlay must not pan or zoom the chart underneath it.
     for(const event of ['pointerdown','mousedown','touchstart','wheel','dblclick'])hud.addEventListener(event,event=>event.stopPropagation());
     const analysis=el('section','',body,'workspace-card');el('h3','Chart analysis',analysis);

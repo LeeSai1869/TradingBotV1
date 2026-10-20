@@ -1,5 +1,5 @@
 import {catalog} from './index.js';
-import {normalizeHud, POSITIONS} from './preferences.js';
+import {normalizeHud, POSITIONS, FONTS} from './preferences.js';
 function el(tag,text,parent) {const node=document.createElement(tag);node.textContent=text;parent.append(node);return node;}
 export async function renderHudSettings(container,draft) {
     const loading=el('p','Loading HUD settings…',container);
@@ -25,9 +25,26 @@ export async function renderHudSettings(container,draft) {
     position.value=state.position;position.onchange=()=>{state.position=position.value;};
     const label=el('label','Reference coin ',container);
     const select=el('select','',label);select.setAttribute('aria-label','HUD reference coin');
-    const symbols=[...new Set([state.symbol,...choices.symbols].filter(Boolean))];
-    for(const symbol of ['',...symbols]){const option=el('option',symbol||'Follow current chart',select);option.value=symbol;}
+    for(const symbol of ['','BTCUSDT']){const option=el('option',symbol||'Follow current chart',select);option.value=symbol;}
     select.value=state.symbol;select.onchange=()=>{state.symbol=select.value;};
+    const style=el('fieldset','',container);el('legend','HUD style',style);
+    function control(title,key,type,options) {
+        const row=el('label','',style);row.className='settings-row';el('span',title,row);
+        const input=el(type==='select'?'select':'input','',row);input.setAttribute('aria-label',title);
+        if(type==='select')for(const [value,label] of options){const option=el('option',label,input);option.value=value;}
+        else input.type=type;
+        if(type==='number'){input.min=options[0];input.max=options[1];input.step=1;}
+        if(type==='checkbox')input.checked=state.style[key];else input.value=state.style[key];
+        input.onchange=()=>{state.style[key]=type==='checkbox'?input.checked:type==='number'?Number(input.value):input.value;};
+    }
+    control('HUD font','fontFamily','select',Object.entries(FONTS));
+    control('HUD font size','fontSize','number',[9,24]);
+    control('HUD text color','textColor','color');control('HUD bold text','bold','checkbox');
+    control('HUD border color','borderColor','color');control('HUD border width','borderWidth','number',[0,4]);
+    control('HUD border style','borderStyle','select',[['solid','Solid'],['dashed','Dashed'],['dotted','Dotted']]);
+    control('HUD cell spacing','padding','number',[2,16]);control('Show candle dates','showDates','checkbox');
+    const resetSize=el('button','Reset HUD size',style);resetSize.onclick=()=>{state.size={width:null,height:null};};
+    el('p','Drag the HUD corner handle to resize. Size and style are saved in this browser.',style).className='settings-note';
     const timeframes=el('fieldset','',container);el('legend','Timeframe columns (1–8)',timeframes);
     const controls=[];
     for(const interval of choices.intervals) {

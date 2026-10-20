@@ -34,6 +34,11 @@ async def exercise(base,library):
         await hud.get_by_role('table',name='SUIUSDT multi-timeframe comparison').wait_for()
         await hud.get_by_role('button',name='Configure HUD',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)
+        assert await settings.get_by_label('HUD reference coin',exact=True).locator('option').count()==2
+        await settings.get_by_label('HUD font size',exact=True).fill('16')
+        await settings.get_by_label('HUD border width',exact=True).fill('2')
+        await settings.get_by_label('HUD border style',exact=True).select_option('dotted')
+        await settings.get_by_label('Show candle dates',exact=True).check()
         await settings.get_by_label('HUD chart position',exact=True).select_option('bottom-right')
         await settings.get_by_label('HUD reference coin',exact=True).select_option('BTCUSDT')
         await settings.get_by_label('HUD timeframe 1m',exact=True).check()
@@ -45,6 +50,9 @@ async def exercise(base,library):
         await settings.get_by_role('button',name='Apply',exact=True).click()
         await hud.get_by_role('table',name='BTCUSDT multi-timeframe comparison').wait_for()
         assert await hud.locator('thead th').count()==2
+        assert await hud.locator('.hud-candle-date').count()==1
+        assert await hud.locator('table').evaluate('node=>getComputedStyle(node).fontSize')=='16px'
+        assert await hud.locator('td').first.evaluate('node=>getComputedStyle(node).borderTopStyle')=='dotted'
         assert await hud.get_by_role('rowheader',name='DI DIRECTION',exact=True).is_visible()
         assert await hud.locator('tbody tr').filter(has_text='EMA50').locator('td').inner_text()!='—'
         assert await page.locator('#symbol').input_value()=='SUIUSDT'
@@ -60,6 +68,13 @@ async def exercise(base,library):
         assert await page.locator('#chart').evaluate('(node)=>node.clientWidth')==width
         assert await hud.is_visible()
         assert await hud.get_attribute('data-position')=='bottom-right'
+        # Bottom-right anchor uses the top-left free corner.
+        box=await hud.bounding_box();handle=await hud.get_by_role('button',name='Resize HUD',exact=True).bounding_box()
+        await page.mouse.move(handle['x']+7,handle['y']+7);await page.mouse.down()
+        await page.mouse.move(handle['x']-50,handle['y']-30,steps=5);await page.mouse.up()
+        resized=await hud.bounding_box();assert resized['width']>box['width']+30
+        assert resized['height']>box['height']+10
+
         assert await hud.evaluate("node=>getComputedStyle(node).backgroundColor")=='rgba(0, 0, 0, 0)'
         hud_toggle=page.get_by_role('button',name='Show comparison HUD',exact=True)
         await hud_toggle.click()
@@ -73,10 +88,22 @@ async def exercise(base,library):
         await hud_toggle.click()
         await hud.get_by_role('table',name='BTCUSDT multi-timeframe comparison').wait_for()
         assert await hud.locator('thead th').count()==2
+        assert abs((await hud.bounding_box())['width']-resized['width'])<2
         await page.set_viewport_size({'width':650,'height':850});await settle(page)
+        toolbar=page.locator('#toolbar')
+        assert await toolbar.evaluate('node=>node.scrollWidth<=node.clientWidth+1')
+        for button in ['Open settings','Analysis','Show comparison HUD']:
+            bounds=await page.get_by_role('button',name=button,exact=True).bounding_box()
+            assert bounds['x']>=0 and bounds['x']+bounds['width']<=650
+
         await toggle.click()
         assert await panel.is_visible()
         assert await page.locator('#chart').evaluate('(node)=>node.clientWidth')==650
+        await page.set_viewport_size({'width':375,'height':812});await settle(page)
+        assert await toolbar.evaluate('node=>node.scrollWidth<=node.clientWidth+1')
+        for button in ['Open settings','Analysis','Show comparison HUD']:
+            bounds=await page.get_by_role('button',name=button,exact=True).bounding_box()
+            assert bounds['x']>=0 and bounds['x']+bounds['width']<=375
         assert not errors,errors
         assert not any('binance.com' in url for url in requests)
         print('PASS: transparent chart HUD independent of panel, persistent corner and visibility; pinned opportunity and scrollable chat;  collapsible panel resizes chart; HUD follows or pins coin; editable rows/timeframes persist; normal-user access; stale timestamps; hidden HUD stops requests; mobile drawer',flush=True)

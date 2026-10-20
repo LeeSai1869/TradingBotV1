@@ -278,3 +278,17 @@ loading and verifies live/closed HUD projection with zero HUD data requests.
 Gateway tests hold an uncommitted feature write and verify that reads see the last
 committed value without opening schema-initializing store connections. Separate
 checks preserve deletion exclusion and epoch invalidation.
+
+HUD appearance and compact toolbar
+----------------------------------
+HUD reference choices are restricted to Follow current chart and BTCUSDT; old
+other-coin preferences migrate to Follow current chart. Settings → HUD controls
+font family/size/color/weight, border color/width/style, cell spacing and optional
+candle dates (hidden by default). Status labels remain visible. A keyboard-accessible
+corner handle resizes the overlay relative to its selected anchor; dimensions are
+saved alongside existing preferences and constrained to chart bounds. Reset HUD
+size restores content-based dimensions. The toolbar wraps into available width;
+favorite timeframe buttons and status text wrap too, preserving access to controls.
+
+`browser_workspace.py` verifies the two reference options, style/date application,
+corner dragging, reload persistence and narrow-window toolbar button bounds.
