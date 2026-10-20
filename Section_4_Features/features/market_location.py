@@ -205,7 +205,10 @@ def _calculate_volume_profile(
     while accumulated < value_target and (va_low_idx > 0 or va_high_idx < bins-1):
         left = volume_bins[va_low_idx-1] if va_low_idx > 0 else 0
         right = volume_bins[va_high_idx+1] if va_high_idx < bins-1 else 0
-        if left >= right:
+        # A missing neighbor is not an empty available bin. At the left
+        # boundary a zero/zero tie used to decrement below zero forever.
+        # Expand one valid bin per iteration, even across zero-volume gaps.
+        if va_low_idx > 0 and (va_high_idx == bins-1 or left >= right):
             va_low_idx -= 1
             accumulated += left
         else:

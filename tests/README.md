@@ -389,3 +389,17 @@ on disk but disabled across logins. Coin diagnostics recognize both labels and
 warn if multiple jobs are loaded. This avoids restarting one identity while the
 other supervisor respawns its writer. The regression uses the observed legacy
 PID/job mapping to verify both jobs are stopped and the original identity reused.
+
+Volume-profile infinite-loop regression
+--------------------------------------
+A value-area expansion with POC in the first histogram bin and an empty right
+neighbor previously treated an unavailable left neighbor as an available zero
+bin. A zero/zero tie decremented the lower index below zero forever. The runner's
+Python traceback confirmed it was stuck at this loop during ETH 1m catch-up.
+Expansion now selects only available sides, crossing empty bins when necessary;
+each iteration adds one valid bin, so expansion is bounded by the histogram size.
+
+`test_volume_profile_progress.py` runs the original sparse left-edge failure in a
+subprocess with a deadline, and checks right-edge, single-bin and dense profiles.
+The correction does not alter stored candles or require clearing feature memory;
+restart the runner to resume catch-up from its last committed feature rows.
