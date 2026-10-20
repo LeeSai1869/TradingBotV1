@@ -247,3 +247,12 @@ button:hover { background: #333; }
 .chart-hud[data-position="bottom-left"] .hud-resize {top:0; right:0; transform:rotate(-90deg); cursor:nesw-resize;}
 .chart-hud[data-position="bottom-right"] .hud-resize {top:0; left:0; transform:rotate(180deg); cursor:nwse-resize;}
 @media(max-width:760px) {#toolbar {gap:6px; padding:8px;} #tf-buttons {flex-basis:100%;} #status {flex-basis:100%; order:10;}}
+
+/* Paint the HUD below the transparent chart canvas, with controls above it. */
+#chart {isolation:isolate; background:#111111;}
+#chart > .tv-lightweight-charts {position:relative; z-index:1;}
+.chart-hud {z-index:auto; pointer-events:none;}
+.chart-hud .hud-scroll, .chart-hud .workspace-note {position:relative; z-index:0;}
+.chart-hud .hud-header button, .chart-hud .hud-resize {position:relative; z-index:2; pointer-events:auto;}
+.chart-hud .hud-resize {position:absolute;}
+.chart-hud .hud-header {position:relative;}

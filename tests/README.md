@@ -292,3 +292,9 @@ favorite timeframe buttons and status text wrap too, preserving access to contro
 
 `browser_workspace.py` verifies the two reference options, style/date application,
 corner dragging, reload persistence and narrow-window toolbar button bounds.
+
+The HUD table paints beneath the chart's transparent canvas so candles, grid,
+and indicators remain above its text and borders. The chart container supplies
+the dark background. Only HUD settings/resize controls remain above the canvas;
+the table's scroll region remains keyboard-focusable. The workspace browser
+regression checks layer order and continues to exercise settings and resizing.

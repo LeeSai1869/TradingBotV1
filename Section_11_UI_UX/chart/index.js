@@ -12,7 +12,7 @@ const Canvas = {
         this.container = container;
         this.chart = LightweightCharts.createChart(container, {
             layout: {
-                background: { type: "solid", color: "#111111" },
+                background: { type: "solid", color: "transparent" },
                 textColor: "#CCCCCC",
             },
             grid: { vertLines: { color: "#222222" }, horzLines: { color: "#222222" } },

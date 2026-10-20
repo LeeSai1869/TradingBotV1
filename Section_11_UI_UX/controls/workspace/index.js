@@ -105,7 +105,7 @@ export function mount() {
     heading=el('strong','',hudHeader);const settings=el('button','⚙',hudHeader);
     settings.setAttribute('aria-label','Configure HUD');
     settings.onclick=()=>window.dispatchEvent(new Event('open-hud-settings'));
-    const scroll=el('div','',hud,'hud-scroll');table=el('table','',scroll);table.id='comparison-hud';
+    const scroll=el('div','',hud,'hud-scroll');scroll.tabIndex=0;scroll.setAttribute('aria-label','HUD table scroll area');table=el('table','',scroll);table.id='comparison-hud';
     status=el('p','',hud,'workspace-note');status.setAttribute('role','status');
     mountResize(hud,preferences);
     // Interacting with the overlay must not pan or zoom the chart underneath it.

@@ -76,6 +76,11 @@ async def exercise(base,library):
         assert resized['height']>box['height']+10
 
         assert await hud.evaluate("node=>getComputedStyle(node).backgroundColor")=='rgba(0, 0, 0, 0)'
+        assert await page.evaluate("Canvas.chart.options().layout.background.color")=='transparent'
+        assert await page.locator('.tv-lightweight-charts').evaluate('node=>getComputedStyle(node).zIndex')=='1'
+        assert await hud.locator('.hud-scroll').evaluate('node=>getComputedStyle(node).zIndex')=='0'
+        assert await hud.get_by_role('button',name='Configure HUD',exact=True).evaluate('node=>getComputedStyle(node).zIndex')=='2'
+
         hud_toggle=page.get_by_role('button',name='Show comparison HUD',exact=True)
         await hud_toggle.click()
         assert await hud.is_hidden()
