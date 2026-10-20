@@ -26,6 +26,8 @@ const Canvas = {
         const resize = () => {
             this.chart.resize(container.clientWidth, container.clientHeight);
         };
+        this.resizeObserver = new ResizeObserver(resize);
+        this.resizeObserver.observe(container);
         window.addEventListener("resize", resize);
         resize();
 

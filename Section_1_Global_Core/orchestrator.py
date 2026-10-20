@@ -275,6 +275,14 @@ class GlobalCoreOrchestrator:
         # historical gap between klines.db and features.db (or any
         # other downstream store) on cold start.
         # ------------------------------------------------------------
+        # Give newly approved pairs their first download page before a potentially
+        # lengthy feature backlog on existing pairs. Normal cycles continue ingest.
+        print("[orchestrator] active downloads:", data_policy.active_symbols(), data_policy.active_intervals(), flush=True)
+        print("[orchestrator] startup download pass...", flush=True)
+        try:
+            update_klines_all()
+        except Exception:
+            traceback.print_exc()
         print("[orchestrator] startup catch-up...", flush=True)
         for s in data_policy.active_symbols():
             for iv in data_policy.active_intervals():
@@ -291,6 +299,7 @@ class GlobalCoreOrchestrator:
                     try:
                         if not data_policy.enabled(s, iv):
                             continue
+                        print(f"[orchestrator] catching up {name} {s} {iv}", flush=True)
                         n = catch_fn(s, iv)
                         if n:
                             print(f"[orchestrator]   {name} {s} {iv}: +{n}",

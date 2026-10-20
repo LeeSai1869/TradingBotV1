@@ -132,6 +132,17 @@ class DataAdminTests(unittest.TestCase):
             self.assertEqual(db.last_kline_time('BTCUSDT','1m'),120000)
         finally: conn.close()
 
+    def test_startup_downloads_before_feature_backlog(self):
+        from Section_4_Features import processor
+        order=[]
+        orch=orchestrator.GlobalCoreOrchestrator(poll_seconds=0)
+        orch._processors=[('Section_4_Features.processor.process_bar',processor.process_bar)]
+        def cycle():
+            order.append('cycle');orch.stop()
+        with patch.object(orchestrator,'update_klines_all',side_effect=lambda:order.append('download')), patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']), patch.object(data_policy,'active_intervals',return_value=['1m']), patch.object(processor,'catch_up',side_effect=lambda *args:order.append('features')), patch.object(orch,'cycle',side_effect=cycle), patch.object(orchestrator._signal,'signal'):
+            orch.run_forever()
+        self.assertEqual(order,['download','features','cycle'])
+
     def test_newly_approved_coin_bootstraps_without_runner_restart(self):
         data_admin.set_coin('NEWUSDT','approve')
         self.assertIn('NEWUSDT', data_policy.active_symbols())

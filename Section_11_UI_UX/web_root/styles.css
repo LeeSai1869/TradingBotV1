@@ -183,3 +183,35 @@ button:hover { background: #333; }
 #alert-toasts { position: fixed; left: 20px; bottom: 20px; z-index: 30000; width: min(400px,calc(100vw - 40px)); pointer-events: none; }
 .alert-toast { padding: 14px; margin-top: 10px; background: #223451; color: #e5edff; border: 1px solid #699dff; border-radius: 8px; font-size: 13px; }
 @media(max-width:600px) { .alert-form { grid-template-columns: 1fr; } }
+
+/* Independent comparison workspace; chart resizes without rebuilding its data. */
+#chart-workspace {display:flex; flex:1 1 auto; min-height:0; min-width:0; position:relative;}
+#chart-workspace > #chart {width:0; min-width:0; overflow:hidden;}
+#analysis-panel {flex:0 0 min(480px,45vw); width:min(480px,45vw); min-width:0; overflow:auto; background:#171c24; border-left:1px solid #364152; padding:16px;}
+#analysis-panel[hidden] {display:none;}
+#analysis-panel header {display:flex; align-items:center; justify-content:space-between; gap:12px;}
+#analysis-panel h2 {font-size:17px; margin:0 0 12px;}
+#analysis-panel h3 {font-size:15px; margin:0 0 10px;}
+#analysis-panel p {font-size:12px; color:#aab6c7; line-height:1.5;}
+.workspace-card {margin:0 0 16px; padding:14px; background:#202733; border:1px solid #354154; border-radius:8px;}
+.workspace-chat textarea {width:100%; min-height:64px; background:#171c24; color:#aab6c7; border:1px solid #465267; padding:10px; border-radius:5px; resize:vertical;}
+.workspace-chat button {margin-top:8px;}
+#analysis-panel button:disabled {opacity:.5; cursor:default;}
+.hud-scroll {overflow:auto; margin-top:12px; max-height:52vh;}
+#comparison-hud {border-collapse:separate; border-spacing:0; font-size:12px; width:100%; font-variant-numeric:tabular-nums;}
+#comparison-hud th, #comparison-hud td {text-align:right; white-space:nowrap; padding:9px; border-bottom:1px solid #3b4657;}
+#comparison-hud th:first-child {text-align:left; position:sticky; left:0; background:#202733; z-index:1;}
+#comparison-hud thead th {position:sticky; top:0; background:#293444; z-index:2;}
+#comparison-hud thead th:first-child {z-index:3;}
+#comparison-hud small {display:block; font-size:10px; font-weight:normal; margin-top:4px; color:#aab6c7;}
+#comparison-hud .hud-stale {color:#f1bb65;}
+.hud-timeframe-choice {display:inline-flex; gap:6px; align-items:center; margin:6px 12px 6px 0; font-size:13px;}
+.settings-content fieldset {border:1px solid #465267; margin-top:18px; border-radius:5px;}
+.settings-content h4 {margin-bottom:8px;}
+.sr-only {position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
+#flags-panel {position:absolute; top:15px; right:85px; z-index:20;}
+#toolbar {overflow-x:auto;}
+#toolbar > * {flex-shrink:0;}
+@media(max-width:760px) {
+    #analysis-panel {position:absolute; top:0; bottom:0; right:0; width:min(480px,95vw); z-index:40; box-shadow:-8px 0 20px #0008;}
+}

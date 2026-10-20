@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core import data_policy
 
-from . import queries
+from . import queries, hud
 from . import live_candle, admin_routes, alert_routes
 from .settings_catalog import read_coin_catalog
 
@@ -31,6 +31,9 @@ def _int(qs, name, default=None):
 
 
 def handle_get(path, raw_qs, server):
+    status, payload = hud.handle_get(path, raw_qs)
+    if status is not None:
+        return status, payload
     status, payload = alert_routes.handle_get(path, raw_qs, server)
     if status is not None:
         return status, payload

@@ -2,12 +2,16 @@
 from pathlib import Path
 import os
 import plistlib
+import shlex
+import signal
 import subprocess
 import sys
 import time
 
 LABEL = 'com.scalp.liverunner'
 ROOT = Path(__file__).resolve().parent
+MODULES = ('Section_1_Global_Core.memory_storage.Runner.live_runner',
+           'Section_1_Global_Core.orchestrator')
 
 
 def configuration(python, logs):
@@ -19,24 +23,90 @@ def configuration(python, logs):
             'StandardErrorPath': str(logs/'runner-error.log')}
 
 
+def runner_processes():
+    result = subprocess.run(['ps','-axo','pid=,command='], capture_output=True,text=True,check=True)
+    found = []
+    for line in result.stdout.splitlines():
+        try:
+            pid, command = line.strip().split(None,1)
+            args = shlex.split(command)
+        except ValueError:
+            continue
+        if any(args[i:i+2] == ['-m',module] for i in range(len(args)-1)
+               for module in MODULES):
+            found.append(int(pid))
+    return found
+
+
+def runner_job(label):
+    if label == LABEL:
+        return True
+    try:
+        config = plistlib.loads((Path.home()/'Library'/'LaunchAgents'/f'{label}.plist').read_bytes())
+        args = config.get('ProgramArguments',[])
+        return (Path(config.get('WorkingDirectory','')).resolve()==ROOT
+                and any(args[i:i+2]==['-m',module] for i in range(len(args)-1) for module in MODULES))
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def stop_existing(service):
+    existing = runner_processes()
+    # Verify cwd before stopping either a process or its supervising service.
+    for pid in existing:
+        result = subprocess.run(['lsof','-a','-p',str(pid),'-d','cwd','-Fn'], capture_output=True,text=True,check=True)
+        paths = [line[1:] for line in result.stdout.splitlines() if line.startswith('n')]
+        if str(ROOT) not in paths:
+            raise SystemExit(f'Runner PID {pid} belongs to another/unknown folder; left it running. Stop it explicitly before retrying.')
+    jobs = subprocess.run(['launchctl','list'],capture_output=True,text=True,check=True)
+    owners = {}
+    for line in jobs.stdout.splitlines():
+        fields = line.split()
+        if len(fields)==3 and fields[0].isdigit(): owners[int(fields[0])] = fields[2]
+    domain = service.rsplit('/',1)[0]
+    supervisors = set()
+    for pid in existing:
+        parent = pid
+        for _ in range(8):
+            if parent in owners:
+                label = owners[parent]
+                # Terminal/VS Code can themselves be launchd applications. Never
+                # stop a general application just because it owns a manual runner.
+                if runner_job(label):
+                    supervisors.add(label)
+                break
+            value = subprocess.run(['ps','-p',str(parent),'-o','ppid='],capture_output=True,text=True).stdout.strip()
+            if not value.isdigit() or int(value) <= 1 or int(value)==parent: break
+            parent = int(value)
+    for label in supervisors:
+        job = f'{domain}/{label}'
+        # An obsolete login service must not respawn the old writer.
+        subprocess.run(['launchctl','disable',job],check=True)
+        subprocess.run(['launchctl','bootout',job],capture_output=True)
+    subprocess.run(['launchctl','bootout',service],capture_output=True)
+    for pid in existing:
+        if pid in runner_processes():
+            print(f'Stopping existing project runner PID {pid}',flush=True)
+            try: os.kill(pid,signal.SIGTERM)
+            except ProcessLookupError: pass
+    deadline = time.monotonic()+20
+    while runner_processes():
+        if time.monotonic() >= deadline:
+            raise SystemExit('Runner has not stopped, or another supervisor restarted it. No competing writer was started.')
+        time.sleep(.25)
+
+
 def main():
     if sys.platform != 'darwin':
         raise SystemExit('This installer is for macOS launchd. Run the live_runner module directly on other systems.')
-    # launchd must use the same interpreter in which the pipeline dependencies work.
     subprocess.run([sys.executable, '-c', 'import pandas, numpy, requests; import Section_4_Features.processor'], cwd=ROOT, check=True)
     domain = f'gui/{os.getuid()}'
     service = f'{domain}/{LABEL}'
-    subprocess.run(['launchctl','bootout',service], capture_output=True)
-    # Do not start a second writer alongside an independently started runner.
-    time.sleep(1)
-    processes = subprocess.run(['ps','-axo','pid=,command='], capture_output=True,text=True,check=True)
-    manual = [line for line in processes.stdout.splitlines()
-              if (' -m Section_1_Global_Core.memory_storage.Runner.live_runner' in line
-                  or ' -m Section_1_Global_Core.orchestrator' in line)]
-    if manual:
-        raise SystemExit('A runner is still running. Stop it with Ctrl+C in its terminal, then retry:\n'+'\n'.join(manual))
     logs = Path.home()/'Library'/'Logs'/'TradingBotV1'
     logs.mkdir(parents=True,exist_ok=True)
+    for filename in ('runner.log','runner-error.log'):
+        (logs/filename).touch(exist_ok=True)
+    stop_existing(service)
     plist = Path.home()/'Library'/'LaunchAgents'/f'{LABEL}.plist'
     plist.parent.mkdir(parents=True,exist_ok=True)
     plist.write_bytes(plistlib.dumps(configuration(Path(sys.executable).absolute(),logs)))

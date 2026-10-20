@@ -179,8 +179,12 @@ python3 check_coin.py ETHUSDT
 
 The installer recreates the user launchd plist with this checkout and interpreter,
 enables the service even if it was disabled, and starts it on future logins.
-It refuses to start alongside a detected manual runner; stop that runner with
-Ctrl+C and retry. Startup catch-up can take time before the download loop runs.
+It verifies the working folder of an existing runner before replacing it. It
+stops a verified project runner and its dedicated launchd job, preserving general
+Terminal/VS Code applications. An unknown checkout or respawning writer prevents
+a competing start. Logs are created before recovery, even if recovery fails.
+The runner performs an initial download pass before feature catch-up; catch-up
+can still delay subsequent cycles.
 Check both logs for progress or exchange/network failures:
 
 ```sh
@@ -190,3 +194,26 @@ tail -n 60 "$HOME/Library/Logs/TradingBotV1/runner-error.log"
 
 `tests/test_live_features.py` checks provisional formula parity, tick replacement,
 gapped history, and launchd configuration/installation with mocked macOS commands.
+
+
+Comparison HUD / analysis workspace
+----------------------------------
+The toolbar's **Analysis / HUD** button opens a collapsible right panel. AI ranking,
+chart analysis and chat are labelled placeholders; no provider or predictions are
+connected. Settings → HUD chooses a pinned reference coin or follows the chart,
+1–8 timeframe columns in selection order, and 1–20 reorderable feature rows.
+Preferences and panel visibility persist in the browser. Values come from one
+combined latest stored bar per timeframe, with candle UTC timestamps, stale and
+inactive labels, and missing values shown as an em dash. This view does not infer
+trade direction from numeric indicators. It polls every five seconds while open,
+pauses while hidden, and never requests Binance or full chart history. The chart
+resizes with the desktop panel; small screens use a drawer.
+
+```sh
+PYTHONPATH=. python3 tests/browser_workspace.py /path/to/lightweight-charts.standalone.production.js
+```
+
+`test_hud.py` checks joined snapshots, absent/stale/inactive values, request limits
+and bounded reads. `test_restart_runner.py` checks exact process matching, verified
+checkout replacement and preservation of unrelated applications. macOS launchd
+operations are mocked here; actual download progress must be checked on the Mac.

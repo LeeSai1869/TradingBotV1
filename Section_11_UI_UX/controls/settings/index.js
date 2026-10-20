@@ -1,5 +1,7 @@
 // Chart preferences are browser-local. Runner policies remain owned by Core.
 import { FEATURE_STYLES, migrateStyles } from "./feature_styles.js";
+import {normalizeHud} from "../workspace/preferences.js";
+import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
@@ -12,11 +14,11 @@ const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
     features: ["EMA", "RSI", "ADX", "ATR", "Volume", "VWAP"],
-    candles: ["Display"], timeframes: ["Downloads"],
+    hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
 const titles = { general: "General", inputs: "Inputs", features: "Features",
-    candles: "Candles", timeframes: "Timeframes", coins: "Coins" };
+    hud: "HUD", candles: "Candles", timeframes: "Timeframes", coins: "Coins" };
 
 function validated(value) {
     const result = { ...defaults };
@@ -25,11 +27,13 @@ function validated(value) {
         if (typeof value[key] === "boolean") result[key] = value[key];
     }
     result.outputs = migrateStyles(value);
+    result.hud = normalizeHud(value.hud);
     return result;
 }
 
 function apply() {
     const config = window.Composer.config;
+    config.hud = saved.hud;
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
     config.featureStyles = saved.outputs;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
@@ -150,6 +154,8 @@ function render() {
         note("Candles and features come from the combined bar stream.");
     } else if (section === "features") {
         renderFeature();
+    } else if (section === "hud") {
+        void renderHudSettings(content, draft);
     } else if (section === "timeframes") {
         admin.renderTimeframes(content, render);
     } else if (section === "coins") {
@@ -269,5 +275,6 @@ export async function mount() {
             if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});
     };
+    window.addEventListener("open-hud-settings", () => {section="hud";item="Comparison";gear.click();});
     dialog.addEventListener("close", () => gear.focus());
 }
