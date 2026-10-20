@@ -67,3 +67,18 @@ class RestartRunnerTests(unittest.TestCase):
         with patch.object(runner,'runner_processes',return_value=[767]),patch.object(runner.subprocess,'run',side_effect=run),patch.object(runner.os,'kill'),patch.object(runner.time,'monotonic',side_effect=[0,21]):
             with self.assertRaisesRegex(SystemExit,'767 1 S Python still running'):
                 runner.stop_existing('gui/501/com.scalp.liverunner')
+
+    def test_original_service_is_reused_and_duplicate_disabled(self):
+        commands=[]
+        def run(command,**kwargs):
+            commands.append(command)
+            if command[0]=='lsof':stdout='n'+str(runner.ROOT)+'\n'
+            elif command[:2]==['launchctl','list']:stdout='74597 -15 com.tradingindicator.liverunner\n'
+            else:stdout=''
+            return subprocess.CompletedProcess(command,0,stdout=stdout)
+        with patch.object(runner,'runner_processes',side_effect=[[74597],[],[]]),patch.object(runner.subprocess,'run',side_effect=run):
+            runner.stop_existing('gui/501/'+runner.LABEL)
+        self.assertEqual(runner.LABEL,'com.tradingindicator.liverunner')
+        for label in ['com.tradingindicator.liverunner','com.scalp.liverunner']:
+            self.assertIn(['launchctl','disable','gui/501/'+label],commands)
+            self.assertIn(['launchctl','bootout','gui/501/'+label],commands)

@@ -11,6 +11,7 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import sys
+from restart_runner import LABEL, LEGACY_LABELS
 from Section_1_Global_Core import data_policy, data_admin
 from Section_1_Global_Core.memory_storage.Storage import klines_store, features_store
 
@@ -66,7 +67,10 @@ def main():
     print('Runner policy:', 'ACTIVE' if symbol in data_policy.active_symbols() else 'INACTIVE')
     if sys.platform=='darwin':
         result=subprocess.run(['launchctl','list'],capture_output=True,text=True)
-        rows=[line.split() for line in result.stdout.splitlines() if line.split() and line.split()[-1]=='com.scalp.liverunner']
+        rows=[line.split() for line in result.stdout.splitlines() if line.split() and line.split()[-1] in {LABEL,*LEGACY_LABELS}]
+        rows.sort(key=lambda row:row[-1]!=LABEL)
+        for row in rows: print('Runner service:',row[-1],'PID:',row[0])
+        if len(rows)>1: print('WARNING: multiple runner services are loaded. Run python3 restart_runner.py to consolidate them.')
         print('Runner launchd PID:',rows[0][0] if rows else 'not loaded (a manual runner may still be running)')
         if rows and rows[0][0].isdigit():
             cwd=subprocess.run(['lsof','-a','-p',rows[0][0],'-d','cwd','-Fn'],capture_output=True,text=True)
@@ -74,7 +78,8 @@ def main():
             print('Runner working folder:',paths[0] if paths else 'unknown')
             if paths and Path(paths[0]).resolve()!=project:
                 print('WARNING: runner is in a DIFFERENT project folder. These counts may belong to another copy.')
-        plist=Path.home()/'Library'/'LaunchAgents'/'com.scalp.liverunner.plist'
+        agents=Path.home()/'Library'/'LaunchAgents'
+        plist=next((agents/f'{label}.plist' for label in [LABEL,*LEGACY_LABELS] if (agents/f'{label}.plist').exists()),agents/f'{LABEL}.plist')
         if plist.exists():
             try:
                 installed=plistlib.loads(plist.read_bytes()).get('WorkingDirectory')

@@ -51,5 +51,5 @@ class LiveFeaturesTests(unittest.TestCase):
                 commands=[call.args[0] for call in run.call_args_list]
             self.assertTrue(any(command[:2]==['launchctl','enable'] for command in commands))
             self.assertTrue(any(command[:2]==['launchctl','bootstrap'] for command in commands))
-            config=plistlib.loads((Path(directory)/'Library/LaunchAgents/com.scalp.liverunner.plist').read_bytes())
+            config=plistlib.loads((Path(directory)/'Library/LaunchAgents/com.tradingindicator.liverunner.plist').read_bytes())
             self.assertTrue(config['RunAtLoad'])

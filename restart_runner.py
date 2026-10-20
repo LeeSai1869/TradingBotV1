@@ -9,7 +9,8 @@ import subprocess
 import sys
 import time
 
-LABEL = 'com.scalp.liverunner'
+LABEL = 'com.tradingindicator.liverunner'
+LEGACY_LABELS = {'com.scalp.liverunner'}
 ROOT = Path(__file__).resolve().parent
 MODULES = ('Section_1_Global_Core.memory_storage.Runner.live_runner',
            'Section_1_Global_Core.orchestrator')
@@ -52,7 +53,7 @@ def describe_processes(pids):
 
 
 def runner_job(label):
-    if label == LABEL:
+    if label in {LABEL, *LEGACY_LABELS}:
         return True
     try:
         config = plistlib.loads((Path.home()/'Library'/'LaunchAgents'/f'{label}.plist').read_bytes())
@@ -91,7 +92,9 @@ def stop_existing(service):
             value = subprocess.run(['ps','-p',str(parent),'-o','ppid='],capture_output=True,text=True).stdout.strip()
             if not value.isdigit() or int(value) <= 1 or int(value)==parent: break
             parent = int(value)
-    for label in supervisors:
+    # Retire both prior service identities before starting the original job.
+    # Disabling persists across logins; leave old plist/data files intact.
+    for label in supervisors | {LABEL, *LEGACY_LABELS}:
         job = f'{domain}/{label}'
         # An obsolete login service must not respawn the old writer.
         subprocess.run(['launchctl','disable',job],check=True)

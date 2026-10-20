@@ -378,3 +378,14 @@ addition to the exact `-m` module. Launcher shells, `-c` command text, and zombi
 processes cannot count as active Python writers. A process disappearing during
 inspection is tolerated. If a real writer persists after termination, restart
 still refuses a competing start and reports PID/parent/state/command for diagnosis.
+
+One login service
+-----------------
+The canonical launchd label is the existing `com.tradingindicator.liverunner`.
+Restart verifies running processes belong to this checkout, disables/boots out both
+that job and the earlier helper's `com.scalp.liverunner`, waits for Python writers
+to exit, then enables/starts only the original label. The duplicate plist remains
+on disk but disabled across logins. Coin diagnostics recognize both labels and
+warn if multiple jobs are loaded. This avoids restarting one identity while the
+other supervisor respawns its writer. The regression uses the observed legacy
+PID/job mapping to verify both jobs are stopped and the original identity reused.
