@@ -102,3 +102,14 @@ and the gateway enforce conflicting contracts. This change does not suppress
 that check or claim it passes. The additive read-contract version and isolated
 validation scope are recorded in Global Core's README; no new market-data audit
 certification is claimed.
+
+Settings navigation and chart preferences (isolated databases, real chart):
+
+```bash
+PYTHONPATH=. python3 tests/browser_settings.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Covers Apply/Cancel, EMA period/style, viewport preservation, browser persistence,
+coin registry categories, disabled runner actions, keyboard close/focus and mobile
+layout. `test_settings_catalog.py` verifies read-only registry grouping and failure
+handling. Settings do not enable runner-policy changes or deletion yet.

@@ -7,6 +7,7 @@ from Section_1_Global_Core.memory_storage.Storage import db
 
 from . import queries
 from . import live_candle
+from .settings_catalog import read_coin_catalog
 
 HERE = None
 UI_CONFIG = None
@@ -125,6 +126,12 @@ def handle_get(path, raw_qs, server):
     # ---- symbols ----
     if path == "/api/symbols":
         return 200, {"symbols": queries.get_symbols()}
+
+    if path == "/api/settings/coins":
+        try:
+            return 200, read_coin_catalog()
+        except (OSError, ValueError, KeyError, TypeError):
+            return 503, {"error": "Coin registry is unavailable"}
 
     if path == "/api/symbol_meta":
         symbol = qs.get("symbol", [None])[0]

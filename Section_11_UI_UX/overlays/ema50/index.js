@@ -1,26 +1,34 @@
-// VISUAL: EMA-50 from the same stored bars used by the candle series.
+// EMA overlays read the same combined stored bars as candles.
+// Keep the legacy name so existing display.ema50 configuration stays valid.
 export const name = "ema50";
-let series = null;
+const PERIODS = [7, 25, 50, 100, 200, 300];
+const series = new Map();
 
 export function mount(chart) {
-    series = chart.addSeries(LightweightCharts.LineSeries, {
-        color: "#f5c542",
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-    });
+    for (const period of PERIODS) {
+        series.set(period, chart.addSeries(LightweightCharts.LineSeries, {
+            color: "#f5c542", lineWidth: 2,
+            visible: period === 50,
+            priceLineVisible: false, lastValueVisible: false,
+            crosshairMarkerVisible: false,
+        }));
+    }
 }
 
 export function update(chart, data, options = {}) {
-    if (!series) return;
-    series.applyOptions({ visible: options.visible !== false });
-    const bars = data.bars || [];
-    const points = [];
-    for (const bar of bars) {
-        const value = bar.features?.ema50;
-        if (value == null || !Number.isFinite(value)) continue;
-        points.push({ time: bar.time, value });
+    const config = window.Composer?.config.ema || {};
+    const periods = config.periods || [50];
+    for (const [period, line] of series) {
+        const visible = options.visible !== false && periods.includes(period);
+        line.applyOptions({ visible, color: config.color || "#f5c542",
+            lineWidth: config.lineWidth || 2, lineStyle: config.lineStyle ?? 0 });
+        if (!visible) continue;
+        const points = [];
+        for (const bar of data.bars || []) {
+            const value = bar.features?.[`ema${period}`];
+            if (value == null || !Number.isFinite(value)) continue;
+            points.push({ time: bar.time, value });
+        }
+        line.setData(points);
     }
-    series.setData(points);
 }

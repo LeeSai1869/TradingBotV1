@@ -104,6 +104,11 @@ async function loadAll() {
         render();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(checkBoundary);
+    window.addEventListener("chart-settings-change", () => {
+        pending = { op: "settings", reset: !!pending?.reset,
+            latest: pending?.latest, span: pending?.span };
+        render();
+    });
     document.getElementById("symbol").addEventListener("change", loadAll);
     document.getElementById("interval").addEventListener("change", () => {
         timeframeControl.refreshButtons();

@@ -1,0 +1,221 @@
+// Chart preferences are browser-local. Runner policies remain owned by Core.
+export const name = "settings";
+const STORAGE = "tradingbot.chart-settings.v1";
+const PERIODS = [7, 25, 50, 100, 200, 300];
+const defaults = { candles: true, markers: true, flags: true, ema: true,
+    periods: [50], color: "#f5c542", width: 2, style: 0 };
+let saved = { ...defaults }, draft, dialog, content, sidebar, tabs;
+let section = "general", item = "Chart", registry = null, registryError = "";
+const selectedCoins = new Set();
+const sections = {
+    general: ["Chart"], inputs: ["Overview"],
+    features: ["EMA", "RSI", "ADX", "ATR", "Volume", "VWAP"],
+    candles: ["Display"], timeframes: ["Downloads"],
+    coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
+};
+const titles = { general: "General", inputs: "Inputs", features: "Features",
+    candles: "Candles", timeframes: "Timeframes", coins: "Coins" };
+
+function validated(value) {
+    const result = { ...defaults };
+    if (!value || typeof value !== "object") return result;
+    for (const key of ["candles", "markers", "flags", "ema"]) {
+        if (typeof value[key] === "boolean") result[key] = value[key];
+    }
+    if (Array.isArray(value.periods)) result.periods = PERIODS.filter(p => value.periods.includes(p));
+    if (/^#[0-9a-f]{6}$/i.test(value.color)) result.color = value.color;
+    if ([1, 2, 3, 4].includes(value.width)) result.width = value.width;
+    if ([0, 1, 2].includes(value.style)) result.style = value.style;
+    return result;
+}
+
+function apply() {
+    const config = window.Composer.config;
+    config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
+    config.ema = { periods: saved.periods, color: saved.color, lineWidth: saved.width, lineStyle: saved.style };
+    document.getElementById("flags-panel").hidden = !saved.flags;
+}
+
+function el(tag, text, parent, className) {
+    const node = document.createElement(tag);
+    if (text) node.textContent = text;
+    if (className) node.className = className;
+    if (parent) parent.append(node);
+    return node;
+}
+function note(text) { el("p", text, content, "settings-note"); }
+function toggle(label, key, parent = content) {
+    const row = el("label", "", parent, "settings-row");
+    el("span", label, row);
+    const input = el("input", "", row);
+    input.type = "checkbox"; input.role = "switch"; input.checked = draft[key];
+    input.addEventListener("change", () => { draft[key] = input.checked; });
+}
+function reserved(label, explanation) {
+    const row = el("div", "", content, "settings-row");
+    el("span", label, row);
+    const control = el("button", "Not connected yet", row);
+    control.disabled = true;
+    note(explanation);
+}
+function render() {
+    document.getElementById("settings-body").setAttribute("aria-labelledby", `settings-tab-${section}`);
+    for (const tab of tabs.children) {
+        const active = tab.dataset.section === section;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+    }
+    sidebar.replaceChildren();
+    for (const label of sections[section]) {
+        const button = el("button", label, sidebar);
+        button.classList.toggle("selected", item === label);
+        button.setAttribute("aria-current", item === label ? "page" : "false");
+        button.onclick = () => { item = label; render(); };
+    }
+    content.replaceChildren();
+    el("div", `${titles[section]} / ${item}`, content, "settings-breadcrumb");
+    el("h3", item === "Chart" ? "Chart preferences" : item, content);
+    if (section === "general") {
+        toggle("Show stored signal panel", "flags");
+        toggle("Show BUY / SELL markers", "markers");
+        note("Chart preferences apply when you choose Apply and are saved in this browser.");
+    } else if (section === "candles") {
+        toggle("Show candles and current-price line", "candles");
+        note("Candles and features come from the combined bar stream.");
+    } else if (section === "features" && item === "EMA") {
+        toggle("Show EMA", "ema");
+        el("h4", "Display", content);
+        const group = el("div", "", content, "settings-periods");
+        for (const period of PERIODS) {
+            const label = el("label", "", group);
+            const input = el("input", "", label); input.type = "checkbox";
+            input.checked = draft.periods.includes(period);
+            input.onchange = () => { draft.periods = PERIODS.filter(p => p === period ? input.checked : draft.periods.includes(p)); };
+            el("span", `EMA ${period}`, label);
+        }
+        el("h4", "Style", content);
+        const colorRow = el("label", "Color", content, "settings-row");
+        const color = el("input", "", colorRow); color.type = "color"; color.value = draft.color;
+        color.oninput = () => { draft.color = color.value; };
+        for (const [label, key, options] of [
+            ["Line width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
+            ["Line style", "style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
+        ]) {
+            const row = el("label", label, content, "settings-row");
+            const select = el("select", "", row);
+            select.setAttribute("aria-label", label);
+            for (const [value, title] of options) { const option = el("option", title, select); option.value = value; }
+            select.value = draft[key]; select.onchange = () => { draft[key] = Number(select.value); };
+        }
+        note("Uses the stored EMA values for each bar. Display settings do not change feature calculations.");
+    } else if (section === "features") {
+        reserved(`Show ${item}`, "This feature has a place in settings. Its chart renderer and style controls will be connected next.");
+    } else if (section === "timeframes") {
+        note("Download switches will control the runner, independently of the chart timeframe selector. They are not connected yet.");
+        for (const tf of window.Composer.config.timeframes?.all || []) {
+            const row = el("label", tf, content, "settings-row");
+            const input = el("input", "", row); input.type = "checkbox"; input.disabled = true;
+            input.setAttribute("aria-label", `${tf} downloads — not connected`);
+        }
+    } else if (section === "coins") {
+        note("Registry entries are permanent. Future actions will move categories or delete stored candles, features and decisions separately.");
+        if (item === "Approved") note("Approved coins currently in the top 50.");
+        if (item === "Inactive") note("Still approved, but outside the current top 50. Core pauses processing these coins.");
+        if (item === "Ineligible") note("Rule-based exclusions from the existing registry, including memes and stablecoins.");
+        if (registryError) {
+            note(registryError);
+            const retry = el("button", "Retry loading registry", content); retry.onclick = loadRegistry;
+        } else if (!registry) note("Loading coin registry…");
+        else {
+            const rows = registry[item.toLowerCase()] || [];
+            el("p", `${rows.length} coins`, content, "settings-note");
+            const count = el("p", `${selectedCoins.size} selected`, content, "settings-note");
+            if (!rows.length) note("No coins in this category.");
+            for (const coin of rows) {
+                const row = el("label", "", content, "settings-coin");
+                const check = el("input", "", row); check.type = "checkbox";
+                check.setAttribute("aria-label", `Select ${coin.symbol}`);
+                check.checked = selectedCoins.has(coin.symbol);
+                check.onchange = () => {
+                    if (check.checked) selectedCoins.add(coin.symbol);
+                    else selectedCoins.delete(coin.symbol);
+                    count.textContent = `${selectedCoins.size} selected`;
+                };
+                el("strong", coin.symbol, row);
+                el("span", coin.reason || coin.note || (coin.rank ? `Rank ${coin.rank}` : ""), row);
+            }
+        }
+        reserved("Move selected coins", "Category changes must be connected to registry policy and the running downloader.");
+        reserved("Delete stored coin data", "Data deletion will be a separate action with an explicit confirmation. It will preserve the registry entry.");
+    } else {
+        reserved("Input parameters", "Calculation inputs will be connected to the existing input configuration, one group at a time.");
+    }
+}
+async function loadRegistry() {
+    registryError = ""; registry = null; if (section === "coins") render();
+    try {
+        const response = await fetch("/api/settings/coins", { cache: "no-store" });
+        if (!response.ok) throw new Error("Cannot load coin registry. Make sure the updated UI server is running.");
+        registry = await response.json();
+    } catch (error) { registryError = error.message; }
+    if (dialog.open && section === "coins") render();
+}
+
+export function mount() {
+    try {
+        const raw = localStorage.getItem(STORAGE);
+        // Preserve server display defaults until the user saves preferences.
+        saved = raw ? validated(JSON.parse(raw)) : validated({
+            ...defaults, candles: window.Composer.config.display?.candles !== false,
+            markers: window.Composer.config.display?.markers !== false,
+            ema: window.Composer.config.display?.ema50 !== false,
+        });
+    } catch { saved = { ...defaults }; }
+    apply();
+    const gear = el("button", "", document.getElementById("toolbar"));
+    gear.id = "settings-button"; gear.title = "Settings";
+    gear.setAttribute("aria-label", "Open settings");
+    gear.innerHTML = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9.5 3h5l.6 2.4 2 1.2 2.4-.7 2.5 4.2-1.8 1.8v2.3l1.8 1.7-2.5 4.2-2.4-.7-2 1.2-.6 2.4h-5l-.6-2.4-2-1.2-2.4.7L2 15.9l1.8-1.7v-2.3L2 10.1l2.5-4.2 2.4.7 2-1.2Z"/><circle cx="12" cy="13" r="3"/></svg>';
+    dialog = el("dialog", "", document.body); dialog.id = "settings-dialog";
+    dialog.setAttribute("aria-labelledby", "settings-title");
+    const header = el("header", "", dialog);
+    el("h2", "Settings", header).id = "settings-title";
+    const close = el("button", "×", header); close.setAttribute("aria-label", "Close settings"); close.onclick = () => dialog.close();
+    tabs = el("nav", "", dialog, "settings-tabs"); tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "Settings sections");
+    for (const key of Object.keys(sections)) {
+        const tab = el("button", titles[key], tabs); tab.dataset.section = key; tab.id = `settings-tab-${key}`;
+        tab.setAttribute("role", "tab"); tab.setAttribute("aria-controls", "settings-body");
+        tab.onclick = () => {
+            section = key; item = sections[key][0]; render();
+            if (key === "coins" && !registry) void loadRegistry();
+        };
+    }
+    tabs.onkeydown = event => {
+        const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const buttons = [...tabs.children], current = buttons.indexOf(document.activeElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+            : (current + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next].focus(); buttons[next].click();
+    };
+    const body = el("div", "", dialog, "settings-body"); body.id = "settings-body"; body.setAttribute("role", "tabpanel");
+    sidebar = el("nav", "", body, "settings-sidebar"); sidebar.setAttribute("aria-label", "Settings categories");
+    content = el("section", "", body, "settings-content"); content.setAttribute("aria-live", "polite");
+    const footer = el("footer", "", dialog);
+    const message = el("span", "", footer); message.setAttribute("role", "status");
+    const cancel = el("button", "Cancel", footer); cancel.onclick = () => dialog.close();
+    const save = el("button", "Apply", footer, "settings-apply");
+    save.onclick = () => {
+        const next = validated(draft);
+        try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
+        catch { message.textContent = "Could not save preferences in this browser."; return; }
+        saved = next; apply(); window.dispatchEvent(new Event("chart-settings-change")); dialog.close();
+    };
+    gear.onclick = () => {
+        draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
+        tabs.querySelector('[aria-selected="true"]').focus();
+        if (section === "coins") void loadRegistry();
+    };
+    dialog.addEventListener("close", () => gear.focus());
+}
