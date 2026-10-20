@@ -38,11 +38,15 @@ async function loadAll() {
     let renderGeneration = 0;
 
     function updateStatus() {
+        const bar=DataCache.latestBar, client=bar?.client;
+        const duration=client ? client.close_time-bar.open_time+1 : 0;
+        const behind=duration>0 && Date.now()-client.close_time>2*duration;
+        const historyNotice=behind ? ` | Historical data through ${new Date(client.close_time).toLocaleString()} — not current price` : '';
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
-              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "");
+              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice;
     }
 
     function checkBoundary() {

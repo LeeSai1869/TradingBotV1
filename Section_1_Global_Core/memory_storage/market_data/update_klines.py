@@ -69,6 +69,7 @@ PAGE_LIMIT = 1000
 
 
 _LAST_UPDATE_MS = {}
+LAST_AUDIT = None
 
 
 def _open_db():
@@ -197,6 +198,8 @@ def update_all():
     Safe to call every runner cycle. Interval-boundary tracking means
     each interval is queried at most once per bar period.
     """
+    global LAST_AUDIT
+    LAST_AUDIT = None
     if not DB_PATH.exists():
         return 0
 
@@ -212,8 +215,11 @@ def update_all():
     # Best-effort audit after every ingest pass. Does not block.
     if _audit_runner is not None and total > 0:
         try:
-            _audit_runner.run_fast(sample_rows_per_pair=10)
+            manifest = _audit_runner.run_fast(sample_rows_per_pair=10)
+            LAST_AUDIT = manifest.get('summary') or _audit_runner.summarize(manifest)
+            print('[audit] '+_json.dumps(LAST_AUDIT,sort_keys=True),flush=True)
         except Exception as e:
+            LAST_AUDIT = {"pass":None,"error":str(e)}
             print("[update_klines] audit warning:", e, flush=True)
 
     return total

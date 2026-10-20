@@ -172,6 +172,25 @@ def _should_run_a3() -> bool:
 # Main entry points
 # ------------------------------------------------------------------
 
+def summarize(manifest):
+    """Keep integrity, source verification and freshness distinct in reports."""
+    a3 = manifest.get('A3') or {}
+    source = ('failed' if a3.get('issues') else 'disabled' if a3.get('enabled') is False
+              else 'passed' if a3.get('samples_checked',0)>0 else 'not-verified') if a3.get('ran') else 'not-run'
+    result = {
+        'schema_pass': (manifest.get('A1') or {}).get('failed',0)==0,
+        'continuity_pass': not manifest.get('A2'),
+        'source_verification': source,
+        'consistency_pass': not any(pair.get('mismatch_count',0) for item in manifest.get('A4') or [] for pair in item.get('pairs',[])),
+        'stale_count': (manifest.get('A5') or {}).get('stale_count',0),
+        'missing_count': (manifest.get('A5') or {}).get('missing',0),
+    }
+    result['freshness_pass'] = result['stale_count']==0 and result['missing_count']==0
+    result['pass'] = (result['schema_pass'] and result['continuity_pass'] and source!='failed'
+                      and result['consistency_pass'] and result['freshness_pass'])
+    return result
+
+
 def run(*, sample_rows_per_pair: int = 200,
         continuity_refetch: bool | None = None,
         include_daily: bool | None = None) -> dict:
@@ -231,12 +250,14 @@ def run(*, sample_rows_per_pair: int = 200,
     do_a3 = include_daily if include_daily is not None else _should_run_a3()
     if do_a3:
         a3_results = []
+        samples_checked = 0
         for sym, iv in pairs:
             r = audit_cross_source.run(sym, iv)
+            samples_checked += r.get("sampled",0)
             if r.get("mismatch_count", 0) or r.get("error_count", 0):
                 a3_results.append(r)
         manifest["A3"] = {
-            "ran": True,
+            "ran": True, "enabled": cfg.A3_ENABLED, "samples_checked": samples_checked,
             "pairs_checked": len(pairs),
             "issues": a3_results,
         }
@@ -260,12 +281,9 @@ def run(*, sample_rows_per_pair: int = 200,
     manifest["finished_at"] = finished_iso
     manifest["duration_ms"] = duration_ms
 
-    passed = (
-        manifest["A1"]["failed"] == 0
-        and len(manifest["A2"]) == 0
-        and (manifest["A5"]["stale_count"] == 0)
-    )
-    manifest["pass"] = passed
+    manifest['summary'] = summarize(manifest)
+    passed = manifest['summary']['pass']
+    manifest['pass'] = passed
 
     # -------- Write manifest --------
     cfg.LOG_DIR.mkdir(parents=True, exist_ok=True)

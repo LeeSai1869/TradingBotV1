@@ -36,6 +36,7 @@ from Section_1_Global_Core.memory_storage.market_data.update_klines import (
     INTERVAL_MS as _KLINES_INTERVAL_MS,
     INTERVALS as _KLINES_INTERVALS,
 )
+from Section_1_Global_Core.memory_storage.market_data import update_klines as _ingest
 from Section_1_Global_Core.memory_storage.Storage import klines_store
 from Section_1_Global_Core.memory_storage.Audit import audit_runner
 from Section_1_Global_Core.Symbols import symbols as sym
@@ -172,8 +173,8 @@ class GlobalCoreOrchestrator:
             inserted = 0
 
         # 2) Audit is owned by update_all() after ingest.
-        #    Nothing to do here — the ingest already audited.
-        audit_pass = True
+        #    Report the actual result; not-run/error must never become True.
+        audit_pass = (_ingest.LAST_AUDIT or {}).get("pass")
 
         # 3) Process new bars
         #

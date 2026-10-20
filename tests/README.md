@@ -320,3 +320,31 @@ PYTHONPATH=. python3 tests/browser_alert_editor.py /path/to/lightweight-charts.s
 This browser regression creates three alerts successively while holding the runner
 lock and mocking audio resume to remain pending. It verifies separate list/editor,
 edit identity, deletion, and successful retry after an HTTP save failure.
+
+Historical backfill versus wrong prices
+--------------------------------------
+`check_coin.py ETHUSDT` now prints latest stored closes alongside their dates and
+flags history behind current time. A read-only exact-timestamp source comparison
+can be requested for selected intervals:
+
+```sh
+python3 check_coin.py ETHUSDT --verify 1m 5m 15m 1h 2h 4h
+```
+
+This compares one latest stored OHLCV sample per interval to a fresh Binance
+request for that same symbol, interval and timestamp. MATCH is sample evidence,
+not certification of all history; UNVERIFIED reports a failed/unavailable source
+check. It never changes candles or runtime state. The chart labels historical
+latest candles explicitly instead of implying their prices are current.
+
+The existing fast ingest audit excludes A3 cross-source verification. Freshness
+A5 is separate from historical row validity. Ingest now retains/logs actual audit
+summaries and the orchestrator no longer hardcodes audit_pass=True. Full audit
+aggregation now includes A3 issues, A4 consistency failures and missing freshness
+rows; skipped, disabled and empty source checks are labelled separately. Audit
+remains post-ingest/best-effort and does not stop a legitimate historical backfill.
+
+`test_coin_verification.py` checks request identity/time, mismatch detection and
+read-only operation. `test_audit_reporting.py` distinguishes stale history, missing
+rows, source failures and skipped source verification. The cloud cannot validate
+the Mac's saved prices; the command above must run against that local database.
