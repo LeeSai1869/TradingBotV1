@@ -15,6 +15,8 @@ FIELDS = {f'client.{key}': f'Candle {key}' for key in ('high','low','close')}
 FIELDS.update({f'features.{key}': key.replace('_',' ').upper() for key in features_store.COLUMNS if key not in {'symbol','interval','open_time'}})
 LIVE_FIELDS = {f'client.{key}' for key in ('high','low','close')} | {f'features.ema{p}' for p in (7,25,50,100,200,300)} | {'features.rsi','features.prev_rsi','features.rsi_change'}
 FIELDS.update({'features.di_plus':'+DI','features.di_minus':'−DI','features.di_direction':'DI direction (signed)','features.di_spread':'DI spread'})
+FIELDS.pop('features.formula_version', None)
+FIELDS['features.change_percent'] = 'Close change (fraction: 0.01 = 1%; formula v2)'
 OPERATORS = {'above','at_or_above','below','at_or_below','equals','crosses_above','crosses_below'}
 SOUNDS = {'chime','bell','alarm','none'}
 

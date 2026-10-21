@@ -79,15 +79,15 @@ def compute(df: pd.DataFrame) -> VWAPFeatures:
     up2 = vwap + VWAP_BAND_MULTIPLIER_2 * sd
     lo2 = vwap - VWAP_BAND_MULTIPLIER_2 * sd
 
-    dist = abs(vwap - c)
+    dist = c - vwap
     dist_pct = dist / c * 100 if c else None
 
     bands = [
-        ("vwap", vwap),
-        ("upper1", up1),
-        ("upper2", up2),
-        ("lower1", lo1),
-        ("lower2", lo2),
+        ("LOWER_2", lo2),
+        ("LOWER_1", lo1),
+        ("VWAP", vwap),
+        ("UPPER_1", up1),
+        ("UPPER_2", up2),
     ]
     nb = ns = None; nbd = nsd = None; nbp = nsp = None
     nbt = nst = ""

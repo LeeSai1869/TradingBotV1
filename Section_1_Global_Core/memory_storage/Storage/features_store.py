@@ -152,6 +152,14 @@ COLUMNS = [
     "asia_high", "asia_low",
 ]
 
+# Keep every pure feature output instead of silently discarding derived fields.
+# Legacy columns retain their order for existing callers.
+from Section_4_Features.features.registry import load as _pure_features
+for _declaration in _pure_features():
+    for _field in _declaration['output_fields']:
+        if _field not in COLUMNS:
+            COLUMNS.append(_field)
+COLUMNS.append('formula_version')
 _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))
 
 
@@ -159,6 +167,17 @@ def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.executescript(_SCHEMA)
+    existing = {row[1] for row in conn.execute('PRAGMA table_info(features)')}
+    for column in COLUMNS:
+        if column not in existing:
+            kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if column.endswith('_type') else 'REAL'
+            try:
+                conn.execute(f'ALTER TABLE features ADD COLUMN {column} {kind}')
+            except sqlite3.OperationalError:
+                # UI and runner may open the previous schema concurrently.
+                if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
+                    conn.close()
+                    raise
     conn.commit()
     return conn
 

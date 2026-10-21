@@ -76,6 +76,8 @@ def build_feature_packet(
         for arg in decl["inputs"]:
             if arg == "df":
                 kwargs["df"] = df
+            elif arg == "context":
+                kwargs["context"] = ctx_dict
             elif arg == "atr":
                 if _atr_value is None:
                     from Section_4_Features.features.atr import compute as _atr_compute
@@ -334,5 +336,6 @@ def build_feature_packet(
     features["l1"] = l1
     features["bar_index"] = bar_index
     features["bar_time"] = time_val
+    features["formula_version"] = 2
 
     return create_feature_packet(tf=tf, features=features, valid=True)

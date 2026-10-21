@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 import numpy as np
 import pandas as pd
+from .pine_math import rma, true_range
 
 
 ADX_LEN = 10
@@ -28,21 +29,20 @@ class DMIFeatures:
 
 
 def _atr(high, low, close, length):
-    pc = close.shift(1)
-    tr = pd.concat([high - low, (high - pc).abs(), (low - pc).abs()], axis=1).max(axis=1)
-    return tr.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
+    return rma(true_range(high, low, close, first_bar=False), length)
 
 
 def _dmi(high, low, close, length):
     up = high.diff()
     down = -low.diff()
-    plus_dm = np.where((up > down) & (up > 0), up, 0.0)
-    minus_dm = np.where((down > up) & (down > 0), down, 0.0)
+    plus_dm = pd.Series(np.where((up > down) & (up > 0), up, 0.0), index=high.index).where(up.notna())
+    minus_dm = pd.Series(np.where((down > up) & (down > 0), down, 0.0), index=high.index).where(down.notna())
     atr = _atr(high, low, close, length)
-    plus_di = 100 * pd.Series(plus_dm, index=high.index).ewm(alpha=1/length, adjust=False).mean() / atr
-    minus_di = 100 * pd.Series(minus_dm, index=high.index).ewm(alpha=1/length, adjust=False).mean() / atr
-    dx = (plus_di - minus_di).abs() / (plus_di + minus_di) * 100
-    adx = dx.ewm(alpha=1/length, adjust=False).mean()
+    plus_di = (100 * rma(plus_dm, length) / atr).ffill()
+    minus_di = (100 * rma(minus_dm, length) / atr).ffill()
+    total = plus_di + minus_di
+    dx = (plus_di - minus_di).abs() / total.where(total != 0, 1) * 100
+    adx = rma(dx, length)
     return plus_di, minus_di, adx
 
 

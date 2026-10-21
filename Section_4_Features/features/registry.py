@@ -9,7 +9,10 @@ import importlib
 
 
 MODULES = (
-    "ema",
+    "price",
+    "trend",
+    "ema_structure",
+    "price_location",
     "wma",
     "rsi",
     "di_adx",

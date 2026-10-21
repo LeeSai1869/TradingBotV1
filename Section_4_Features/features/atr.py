@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 import pandas as pd
+from .pine_math import rma, true_range
 
 
 ATR_LEN = 10
@@ -23,9 +24,7 @@ class ATRFeatures:
 
 
 def _atr(high, low, close, length):
-    pc = close.shift(1)
-    tr = pd.concat([high - low, (high - pc).abs(), (low - pc).abs()], axis=1).max(axis=1)
-    return tr.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
+    return rma(true_range(high, low, close), length)
 
 
 def compute(df: pd.DataFrame) -> ATRFeatures:
