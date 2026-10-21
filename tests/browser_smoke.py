@@ -167,9 +167,11 @@ window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
         print('PASS: one marker wrapper across navigation, config changes and redraws',flush=True)
 
         # Stale initial loads still cannot contaminate a new selection.
+        await page.get_by_role('button',name='Choose symbol',exact=True).click()
         await page.get_by_role('combobox',name='Search symbol',exact=True).fill('sui')
         await page.get_by_role('combobox',name='Search symbol',exact=True).press('Enter')
         await page.select_option('#interval','1m')
+        await page.get_by_role('button',name='Choose symbol',exact=True).click()
         await page.get_by_role('combobox',name='Search symbol',exact=True).fill('bitcoin')
         await page.get_by_role('combobox',name='Search symbol',exact=True).press('Enter')
         await page.wait_for_function('!DataCache.loading && DataCache.symbol === "BTCUSDT" && DataCache.timeframe === "1m" && DataCache.bars.length === 2000 && !DataCache._olderPromise')

@@ -30,6 +30,7 @@ async def exercise(base,library):
         assert await panel.get_by_role('heading',name='Best opportunity').is_visible()
         assert await panel.get_by_role('textbox',name='AI chat message').is_disabled()
         assert 'Stale' in await hud.locator('#comparison-hud').inner_text()
+        await page.get_by_role('button',name='Choose symbol',exact=True).click()
         await page.get_by_role('combobox',name='Search symbol',exact=True).fill('sui')
         await page.get_by_role('combobox',name='Search symbol',exact=True).press('Enter')
         await hud.get_by_role('table',name='SUIUSDT multi-timeframe comparison').wait_for()

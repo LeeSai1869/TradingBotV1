@@ -544,3 +544,16 @@ until the outermost scope exits, thread timeouts work, and exceptions release th
 lock. A real-storage runner cycle replays 205 candles across the maintenance/event
 boundary and commits without mocking the policy lock. The prior test fixtures'
 no-op locks could not expose this deadlock.
+
+
+Symbol dropdown picker
+----------------------
+`browser_symbol_picker.py` checks a 63-symbol list without truncation, a separate
+blank/focused search at the top on every open, ticker/name filtering, keyboard
+selection, cancel/outside dismissal, scrollable results with a fixed search field,
+and a narrow viewport. Existing history and HUD tests select symbols through the
+same dropdown. The underlying select/change event contract is retained.
+
+```sh
+PYTHONPATH=. python3 tests/browser_symbol_picker.py /path/to/lightweight-charts.standalone.production.js
+```
