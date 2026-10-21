@@ -62,13 +62,15 @@ class UiAvailabilityTests(unittest.TestCase):
         self.assertEqual(json.loads(self.get('/api/session'))['role'],'user')
 
     def test_real_data_lock_wait_is_bounded_and_can_recover(self):
-        with tempfile.TemporaryDirectory() as directory,patch.object(data_policy,'LOCK_FILE',Path(directory)/'lock'):
+        def competing_writer():
+            with data_policy.locked(timeout=.05):pass
+        with tempfile.TemporaryDirectory() as directory,patch.object(data_policy,'LOCK_FILE',Path(directory)/'lock'),ThreadPoolExecutor(1) as pool:
             with data_policy.locked():
                 start=time.monotonic()
                 with self.assertRaises(TimeoutError):
-                    with data_policy.locked(timeout=.05):pass
+                    pool.submit(competing_writer).result(timeout=1)
                 self.assertLess(time.monotonic()-start,.5)
-            with data_policy.locked(timeout=.05):pass
+            pool.submit(competing_writer).result(timeout=1)
 
     def test_chart_reads_while_runner_owns_writer_lock(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(data_policy,'LOCK_FILE',Path(directory)/'lock'):

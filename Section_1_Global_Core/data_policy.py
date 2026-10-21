@@ -5,10 +5,15 @@ import json
 from pathlib import Path
 import tempfile
 import time
+import threading
 
 ROOT = Path(__file__).resolve().parent
 POLICY_FILE = ROOT / 'runtime_policy.json'
 LOCK_FILE = ROOT / '.data-policy.lock'
+# Threads serialize here; nested writer scopes reuse the outer OS file lock.
+_WRITER_MUTEX = threading.RLock()
+_WRITER_LOCAL = threading.local()
+
 INTERVALS = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M']
 
 
@@ -35,8 +40,23 @@ def _file_lock(path, mode, timeout):
 
 @contextmanager
 def locked(*, timeout=None):
-    with _file_lock(LOCK_FILE, fcntl.LOCK_EX, timeout):
-        yield
+    started=time.monotonic()
+    acquired=(_WRITER_MUTEX.acquire() if timeout is None
+              else _WRITER_MUTEX.acquire(timeout=max(0,timeout)))
+    if not acquired:raise TimeoutError('Market data is busy. Retry shortly.')
+    try:
+        if getattr(_WRITER_LOCAL,'depth',0):
+            _WRITER_LOCAL.depth+=1
+            try:yield
+            finally:_WRITER_LOCAL.depth-=1
+        else:
+            remaining=None if timeout is None else max(0,timeout-(time.monotonic()-started))
+            with _file_lock(LOCK_FILE,fcntl.LOCK_EX,remaining):
+                _WRITER_LOCAL.depth=1
+                try:yield
+                finally:_WRITER_LOCAL.depth=0
+    finally:
+        _WRITER_MUTEX.release()
 
 
 @contextmanager

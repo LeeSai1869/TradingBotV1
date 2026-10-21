@@ -534,3 +534,13 @@ yielding after a slow download, and event timeouts that resume the next pair
 without skipping the interrupted pair's next candle. Diagnostics explicitly
 separate old feature row counts from missing new-formula checkpoints and label
 logs as cumulative across process starts. Backups announce when they begin.
+
+
+Nested policy writer locks
+--------------------------
+`test_policy_lock.py` uses actual `flock` calls in bounded subprocesses. It checks
+that nested orchestrator/processor locks finish, competing processes stay excluded
+until the outermost scope exits, thread timeouts work, and exceptions release the
+lock. A real-storage runner cycle replays 205 candles across the maintenance/event
+boundary and commits without mocking the policy lock. The prior test fixtures'
+no-op locks could not expose this deadlock.

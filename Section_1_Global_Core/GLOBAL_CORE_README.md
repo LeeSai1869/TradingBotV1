@@ -261,3 +261,13 @@ waits until the following turn. The updater still owns ingestion and its recent
 row audit. Feature checkpoints remain in features.db and events retain their
 chronological watermarks. Restarting resets scheduling positions, not committed
 calculation state. Leave the runner running to advance a full-history replay.
+
+
+### Nested writer coordination
+
+`data_policy.locked()` is reentrant within the owning thread. The orchestrator
+can hold the policy guard while a feature processor enters its commit guard:
+only the outermost scope acquires/releases the OS lock. A process-local RLock
+serializes other threads; the OS lock still excludes other processes. A timeout
+covers waiting for both guards. Opening the lock file a second time and calling
+`flock` previously allowed the runner to block itself at its first event commit.
