@@ -13,19 +13,32 @@ Every feature has Select all/Deselect all controls on its Display and Style tabs
 ADX and DI have independent panes/settings; ADX has a dashed 25 reference line.
 VWAP axis labels retain their numeric values/colors without band-name tags.
 
-The Drawing tool menu provides a two-point trend line, two-point rectangle,
-one-point full-width horizontal line, two-point Fib retracement and three-point
-trend-based Fib extension. Choose a tool and click points on the main price pane.
-Pointer mode selects drawings; drag the line/edge to move the shape or a visible
-anchor handle to edit it. Delete drawing removes the selection; Undo drawing
-reverses creation, movement or deletion. Escape cancels unfinished placement.
-Drawings are browser-local, scoped by signed-in account, symbol and timeframe,
-and anchored to candle time plus fractional bar offset and price. They do not
-modify stored candles, features or alerts.
+Compact drawing icons sit at the right of the regular top toolbar. Click a
+shape icon, then place anchors on the price chart. Clicking a saved drawing opens
+its small style popup: color, width, line style, rectangle fill, position lock and
+visible timeframes (or all). Drag unlocked shapes/handles to move/edit them.
+Undo reverses edits/deletions; Escape cancels unfinished placement.
 
-`drawings.test.mjs` checks Fibonacci direction/projection and saved-data validation.
-`browser_drawings.py` checks actual placement, dragging, undo/delete, panning,
-reload/timeframe isolation, compact header/footer and bulk feature selection:
+Drawings now belong to the authenticated account in
+`~/.tradingbot/drawings.sqlite3`, separate from market databases. The API ignores
+client-supplied usernames and uses the session identity. Each coin has a revision
+counter; concurrent saves from other devices return a conflict instead of
+silently overwriting their changes. The UI refreshes account drawings periodically.
+Devices must connect to the same backend to share the account memory; separate
+localhost installations do not share a database. This change does not expose the
+local server to the network. Existing browser drawings are imported on first load
+of their coin, then removed from browser storage after a successful server save.
+
+Drawings use absolute candle timestamps and price, allowing projection onto the
+chosen timeframes. Defaults restrict a new drawing to its creation timeframe.
+The duplicate symbol/timeframe row above candle details is removed. Lower-pane
+headers show enabled outputs in their own colors, with two-decimal values following
+the crosshair or latest candle.
+
+`test_drawings.py` covers persistence, ownership, revision conflicts, deletion,
+validation and access checks. `browser_drawings.py` checks icons, style/lock editing,
+timeframe visibility and persistence across clean browser contexts. Geometry
+vectors remain in `drawings.test.mjs`.
 
 ```sh
 PYTHONPATH=. python3 tests/browser_drawings.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js

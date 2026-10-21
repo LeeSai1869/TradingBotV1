@@ -30,6 +30,10 @@ async def exercise(base,library):
         for feature in ['RSI','ADX','DI','ATR','Volume']:
             await page.get_by_role('group',name=f'{feature} pane controls').wait_for()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').data().at(-1).value;})()") == 69
+        await page.mouse.move(1,1);await settle(page)
+        rsi_label=await page.locator('.indicator-values[aria-label="RSI values"]').inner_text()
+        assert rsi_label=='RSI 69.00',rsi_label
+        assert await page.locator('.indicator-values[aria-label="ADX values"]').inner_text()=='ADX 34.00'
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('vwap').getPane().paneIndex();})()") == 0
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('adx').getPane().paneIndex()!==x.getSeries('di_plus').getPane().paneIndex() && x.getSeries('adx').priceLines().some(line=>line.options().price===25) && x.getSeries('vwap_upper1').options().title==='';})()")
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','volume','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
@@ -47,7 +51,7 @@ async def exercise(base,library):
             const previous=DataCache.bars.at(-2);
             Canvas.chart.setCrosshairPosition(previous.client.close,previous.time,candle);
         }""")
-        assert 'Closed' in await page.locator('#candle-details strong').get_attribute('title')
+        assert 'Closed' in await page.locator('#candle-details').get_attribute('title')
         await page.get_by_role('button',name='Collapse RSI',exact=True).click();await settle(page)
         assert await page.evaluate('Canvas.chart.panes()[1].getHeight()')<=40
         await page.get_by_role('button',name='Expand RSI',exact=True).click()

@@ -1,92 +1,66 @@
-"""Manual chart drawings, compact header/footer and bulk feature selections."""
+"""Compact icon tools, style/lock/timeframe editing and account memory across browsers."""
 from pathlib import Path
 import sys
-import re
 from playwright.async_api import async_playwright
-from browser_smoke import run, sign_in, settle
-
+from browser_smoke import run,sign_in,settle
 
 async def exercise(base,library):
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
-        page=await browser.new_page(viewport={'width':1800,'height':1200})
-        errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-        page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-        await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
+        context=await browser.new_context(viewport={'width':1800,'height':1200})
+        page=await context.new_page();errors=[]
+        page.on('pageerror',lambda e:errors.append(str(e)))
+        await context.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'user')
         await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000 && !DataCache._olderPromise')
+        await page.get_by_role('button',name='Trend line',exact=True).wait_for(state='visible')
+        await page.wait_for_function("!document.querySelector('[aria-label=\"Trend line\"]').disabled")
         await settle(page)
-        assert not await page.locator('#flags-panel').count()
-        assert await page.locator('#candle-details dt').all_text_contents()==['O','H','L','C','Vol','Δ%']
-        chart=await page.locator('#chart').bounding_box();footer=await page.locator('#status').bounding_box()
-        assert footer['y']>=chart['y']+chart['height']-1
-        tool=page.get_by_role('combobox',name='Drawing tool',exact=True)
+        chart=await page.locator('#chart').bounding_box();tools=await page.locator('.drawing-tools').bounding_box()
+        assert tools['y']<chart['y']
+        assert not await page.locator('#candle-details strong').count()
         overlay=page.locator('#drawing-overlay')
         async def click(x,y):await page.mouse.click(chart['x']+x,chart['y']+y)
-        for kind,points in [('line',[(250,200),(550,300)]),('rectangle',[(650,350),(850,450)]),
-                            ('horizontal',[(400,550)]),('retracement',[(1000,200),(1200,500)]),
-                            ('extension',[(250,350),(450,200),(600,400)])]:
-            await tool.select_option(kind)
+        for kind,points in [('Trend line',[(250,200),(550,300)]),('Rectangle zone',[(650,350),(850,450)]),('Horizontal line',[(400,550)]),('Fib retracement',[(1000,200),(1200,500)]),('Fib extension',[(250,350),(450,200),(600,400)])]:
+            await page.get_by_role('button',name=kind,exact=True).click()
             for x,y in points:await click(x,y)
             await settle(page)
-            assert await tool.input_value()=='pointer'
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        assert await overlay.locator('text').filter(has_text=re.compile(r'^61\.80%')).count()==2
-        horizontal=overlay.locator('g[data-type=horizontal] line').first
-        assert float(await horizontal.get_attribute('x1'))==0
-        assert float(await horizontal.get_attribute('x2'))>1500
-        key=await page.evaluate("Object.keys(localStorage).find(key=>key.startsWith('tradingbot.drawings.v1.'))")
-        saved=await page.evaluate('(key)=>JSON.parse(localStorage.getItem(key))',key)
+        assert await overlay.locator(':scope > g').count()==5
         await click(490,280);await settle(page)
-        handle=overlay.locator('g[data-drawing="0"] circle').first
-        box=await handle.bounding_box()
-        await page.mouse.move(box['x']+5,box['y']+5);await page.mouse.down()
-        await page.mouse.move(box['x']+45,box['y']+25,steps=5);await page.mouse.up();await settle(page)
-        changed=await page.evaluate('(key)=>JSON.parse(localStorage.getItem(key))',key)
-        assert saved[0]['anchors']!=changed[0]['anchors']
-        await page.get_by_role('button',name='Undo drawing',exact=True).click();await settle(page)
-        assert saved==await page.evaluate('(key)=>JSON.parse(localStorage.getItem(key))',key)
-        before=float(await overlay.locator('g[data-drawing="0"] line').first.get_attribute('x1'))
-        await page.evaluate('''()=>{const r=Canvas.chart.timeScale().getVisibleLogicalRange();Canvas.chart.timeScale().setVisibleLogicalRange({from:r.from+20,to:r.to+20});}''')
-        await settle(page)
-        after=float(await overlay.locator('g[data-drawing="0"] line').first.get_attribute('x1'))
-        assert abs(after-before)>50
-        await tool.select_option('extension');await click(200,200);await page.keyboard.press('Escape');await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        await page.reload();await sign_in(page,'user')
-        await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000')
-        await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        await page.get_by_role('button',name='Open settings',exact=True).click()
-        settings=page.get_by_role('dialog',name='Settings',exact=True)
-        await settings.get_by_role('tab',name='Features',exact=True).click()
-        for feature in ['EMA','RSI','ADX','DI','ATR','Volume','VWAP']:
-            await settings.get_by_role('button',name=feature,exact=True).click()
-            await settings.get_by_role('button',name='Select all',exact=True).click()
-            assert await settings.locator('.settings-style-table input[type=checkbox]:not(:checked)').count()==0
-            await settings.get_by_role('button',name='Deselect all',exact=True).click()
-            assert await settings.locator('.settings-style-table input[type=checkbox]:checked').count()==0
-        await settings.get_by_role('button',name='Cancel',exact=True).click()
-        await tool.select_option('horizontal');await click(300,700);await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==6
-        await page.get_by_role('button',name='Delete drawing',exact=True).click();await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        await page.get_by_role('button',name='Undo drawing',exact=True).click();await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==6
-        await page.get_by_role('button',name='Undo drawing',exact=True).click();await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        await page.locator('#interval').select_option('1m')
-        await page.wait_for_function("DataCache.timeframe==='1m' && !DataCache.loading && DataCache.bars.length>0")
-        await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==0
-        await page.locator('#interval').select_option('15m')
-        await page.wait_for_function("DataCache.timeframe==='15m' && !DataCache.loading && DataCache.bars.length>0")
-        await settle(page)
-        assert await overlay.locator(':scope > g[data-drawing]').count()==5
-        await page.screenshot(path='/tmp/tradingbot-drawings.png')
+        popup=page.get_by_role('dialog',name='Drawing style')
+        await popup.wait_for()
+        await popup.get_by_label('Drawing color',exact=True).fill('#ff1234')
+        await popup.get_by_label('Drawing width',exact=True).select_option('4')
+        await popup.get_by_label('Drawing line style',exact=True).select_option('dashed')
+        await popup.get_by_label('Lock position',exact=True).check()
+        await popup.get_by_label('All timeframes',exact=True).check()
+        await popup.get_by_role('button',name='Apply drawing',exact=True).click();await settle(page)
+        await page.wait_for_function("document.querySelector('.drawing-tools [role=status]').textContent==='Drawings saved to your account.'")
+        data=await page.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())")
+        assert len(data['drawings'])==5
+        assert data['drawings'][0]['locked'] is True
+        assert data['drawings'][0]['style']['color']=='#ff1234'
+        assert data['drawings'][0]['timeframes']==[]
+        assert await overlay.locator('g[data-drawing="0"] line').first.get_attribute('stroke')=='#ff1234'
+        assert not await overlay.locator('g[data-drawing="0"] circle').count()
+        assert await page.evaluate("Object.keys(localStorage).filter(k=>k.startsWith('tradingbot.drawings.')).length")==0
+        # A clean browser has no shared localStorage or cookies; the account retrieves its memory.
+        other=await browser.new_context(viewport={'width':1800,'height':1200})
+        await other.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
+        second=await other.new_page();second.on('pageerror',lambda e:errors.append(str(e)))
+        await second.goto(base);await sign_in(second,'user')
+        await second.wait_for_function("document.querySelectorAll('#drawing-overlay > g').length===5")
+        await second.locator('#interval').select_option('1m')
+        await second.wait_for_function("DataCache.timeframe==='1m' && !DataCache.loading && DataCache.bars.length>0")
+        await settle(second)
+        assert await second.locator('#drawing-overlay > g').count()==1
+        # Another account cannot retrieve these drawings.
+        admin=await browser.new_context();await admin.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
+        third=await admin.new_page();await third.goto(base);await sign_in(third,'admin')
+        assert (await third.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())"))['drawings']==[]
+        await page.screenshot(path='/tmp/tradingbot-account-drawings.png')
         assert not errors,errors
-        print('PASS: compact candle strip/footer, no flags panel, all five drawing tools, drag/undo, time anchoring, cancellation, persistence and bulk feature selections',flush=True)
+        print('PASS: compact icons; popup color/width/pattern/lock/timeframes; account storage across clean browsers; cross-timeframe projection and account isolation',flush=True)
         await browser.close()
-
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

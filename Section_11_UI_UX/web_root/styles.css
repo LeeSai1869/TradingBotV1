@@ -261,3 +261,14 @@ button:hover { background: #333; }
 #drawing-overlay .drawing-hit {pointer-events:stroke;cursor:move;}
 #drawing-overlay .drawing-handle {pointer-events:all;cursor:grab;}
 .drawing-instructions {font-size:11px;color:#aaa;max-width:250px;}
+/* Compact drawing icons remain in the regular toolbar, aligned right. */
+.drawing-tools {flex:0 1 auto;margin-left:auto;gap:3px;max-width:100%;flex-wrap:nowrap;}
+.drawing-tools button {width:29px;height:29px;padding:0;font-size:18px;}
+.drawing-tools button[aria-pressed="true"] {color:#58b9ff;border-color:#58b9ff;background:#203347;}
+.drawing-popup {position:fixed;left:auto;right:12px;top:64px;margin:0;width:min(320px,calc(100vw - 24px));max-height:80vh;overflow:auto;z-index:70;background:#1b2029;color:#ddd;border:1px solid #52647d;border-radius:7px;padding:12px;box-shadow:0 6px 25px #0009;}
+.drawing-popup form {display:flex;flex-direction:column;gap:8px;}
+.drawing-popup form > label {display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+.drawing-timeframes {display:flex;flex-wrap:wrap;gap:6px;font-size:11px;}
+.drawing-actions {display:flex;gap:5px;flex-wrap:wrap;}
+.drawing-actions button {height:29px;font-size:11px;}
+.indicator-values {display:inline-flex;gap:9px;font-variant-numeric:tabular-nums;}

@@ -10,7 +10,7 @@ function render(){
     const candle=bar.client, previous=bars[index-1];
     const change=previous?.client.close?((candle.close-previous.client.close)/previous.client.close)*100:null;
     box.replaceChildren();
-    const title=document.createElement('strong');title.textContent=`${bar.symbol||cache.symbol} · ${bar.interval||cache.timeframe}`;title.title=`${bar.provisional?'Live':'Closed'} · ${new Date(bar.open_time).toLocaleString()}`;box.append(title);
+    box.title=`${bar.provisional?'Live':'Closed'} · ${new Date(bar.open_time).toLocaleString()}`;
     const list=document.createElement('dl');
     for(const [label,n] of [['Open',candle.open],['High',candle.high],['Low',candle.low],['Close',candle.close],['Volume',candle.volume],['Change %',change]]){
         const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=({Open:'O',High:'H',Low:'L',Close:'C',Volume:'Vol','Change %':'Δ%'})[label];term.title=label;value.textContent=formatValue(n,`client.${label.toLowerCase()}`)+(label==='Change %' && n!==null?'%':'');list.append(term,value);

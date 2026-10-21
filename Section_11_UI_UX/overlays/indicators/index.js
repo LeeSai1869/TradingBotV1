@@ -1,8 +1,17 @@
-import {featurePriceFormat} from '../../web_root/value_format.js';
+import {formatValue,featurePriceFormat} from '../../web_root/value_format.js';
 // Completed stored indicators use exactly the same canonical bars as candles.
 import {FEATURE_STYLES} from '../../controls/settings/feature_styles.js';
 export const name='indicators';
-const groups=new Map();let chart, controls, observer;
+const groups=new Map();let chart, controls, observer, latestBar, hoverTime=null, barsByTime=new Map();
+function values(){
+    const bar=barsByTime.get(hoverTime)||latestBar;
+    for(const state of groups.values())if(state.valueLabel){
+        state.valueLabel.replaceChildren();
+        for(const [key,label] of FEATURE_STYLES[state.feature].outputs)if(styles()[key]?.visible){
+            const text=document.createElement("span");text.textContent=`${label} ${formatValue(bar?value(bar,key):null)}`;text.style.color=styles()[key].color;state.valueLabel.append(text);
+        }
+    }
+}
 const LOWER=['RSI','ADX','DI','ATR','Volume'];
 function styles(){return window.Composer.config.featureStyles||{};}
 function value(bar,key){const n=key==='volume'?bar.client?.volume:bar.features?.[key];return Number.isFinite(n)?n:null;}
@@ -26,6 +35,7 @@ function create(feature){
             state.pane.setHeight(state.collapsed?34:150);requestAnimationFrame(positionHeaders);
         });collapse.setAttribute('aria-expanded','true');
         const title=document.createElement('strong');title.textContent=feature;header.append(title);
+        state.valueLabel=document.createElement("span");state.valueLabel.className="indicator-values";state.valueLabel.setAttribute("aria-label",`${feature} values`);header.append(state.valueLabel);
         button(`${feature} settings`,'⚙',header,()=>window.dispatchEvent(new CustomEvent('open-feature-settings',{detail:feature})));
         button(`Close ${feature}`,'×',header,()=>window.dispatchEvent(new CustomEvent('feature-visibility-change',{detail:{feature,visible:false}})));
     }
@@ -56,10 +66,11 @@ function levels(state){
     }});
 }
 export function mount(instance){
-    chart=instance;controls=document.createElement('div');controls.id='indicator-pane-controls';document.getElementById('chart').append(controls);
+    chart=instance;chart.subscribeCrosshairMove(event=>{hoverTime=typeof event.time==='number'?event.time:null;values();});controls=document.createElement('div');controls.id='indicator-pane-controls';document.getElementById('chart').append(controls);
     observer=new ResizeObserver(()=>requestAnimationFrame(positionHeaders));observer.observe(document.getElementById('chart'));
 }
 export function update(instance,data){
+    barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
     for(const feature of [...LOWER,'VWAP']){
         const enabled=FEATURE_STYLES[feature].outputs.some(([key])=>styles()[key]?.visible);
         let state=groups.get(feature);
@@ -79,10 +90,11 @@ export function update(instance,data){
         }
         levels(state);
     }
-    requestAnimationFrame(positionHeaders);
+    values();requestAnimationFrame(positionHeaders);
 }
 export function updateLive(instance,bar){
     if(!bar)return;
+    latestBar=bar;barsByTime.set(bar.time,bar);values();
     for(const state of groups.values())for(const [key,line] of state.lines){
         if(!styles()[key]?.visible)continue;
         const n=value(bar,key);const point=n===null?{time:bar.time}:{time:bar.time,value:n};
