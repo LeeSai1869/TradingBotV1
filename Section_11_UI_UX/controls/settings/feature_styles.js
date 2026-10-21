@@ -5,6 +5,7 @@ export const FEATURE_STYLES = {
         ["ema50", "EMA 50", "#ad83f5"], ["ema100", "EMA 100", "#60ab64"],
         ["ema200", "EMA 200", "#4b7bff"], ["ema300", "EMA 300", "#f18a35"],
     ] },
+    WMA: { connected: true, outputs: [["wma50", "WMA 50", "#38bdf8"]] },
     RSI: { connected: true, outputs: [["rsi", "RSI", "#ad83f5"]] },
     ADX: { connected: true, outputs: [
         ["adx", "ADX", "#f5c542"],

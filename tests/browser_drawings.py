@@ -9,6 +9,7 @@ async def exercise(base,library):
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         context=await browser.new_context(viewport={'width':1800,'height':1200})
         page=await context.new_page();errors=[]
+        await page.add_init_script('AbortSignal.timeout=undefined')
         page.on('pageerror',lambda e:errors.append(str(e)))
         await context.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'user')
@@ -21,10 +22,24 @@ async def exercise(base,library):
         assert not await page.locator('#candle-details strong').count()
         overlay=page.locator('#drawing-overlay')
         async def click(x,y):await page.mouse.click(chart['x']+x,chart['y']+y)
+        failed=[False]
+        async def transient_failure(route):
+            if route.request.method=='POST' and not failed[0]:
+                failed[0]=True
+                await route.fulfill(status=503,json={'error':'Temporary drawing storage failure'})
+            else:await route.continue_()
+        await page.route('**/api/drawings',transient_failure)
         for kind,points in [('Trend line',[(250,200),(550,300)]),('Rectangle zone',[(650,350),(850,450)]),('Horizontal line',[(400,550)]),('Fib retracement',[(1000,200),(1200,500)]),('Fib extension',[(250,350),(450,200),(600,400)])]:
             await page.get_by_role('button',name=kind,exact=True).click()
             for x,y in points:await click(x,y)
             await settle(page)
+            if kind=='Trend line':
+                notice=page.locator('.drawing-notice')
+                await notice.wait_for(state='visible')
+                assert 'unsaved' in await notice.inner_text()
+                assert (await page.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())"))['drawings']==[]
+                await page.get_by_role('button',name='Retry saving drawings',exact=True).click()
+                await page.wait_for_function("document.querySelector('.drawing-notice').textContent==='Drawings saved to your account.'")
         assert await overlay.locator(':scope > g').count()==5
         await click(490,280);await settle(page)
         popup=page.get_by_role('dialog',name='Drawing style')
@@ -35,7 +50,7 @@ async def exercise(base,library):
         await popup.get_by_label('Lock position',exact=True).check()
         await popup.get_by_label('All timeframes',exact=True).check()
         await popup.get_by_role('button',name='Apply drawing',exact=True).click();await settle(page)
-        await page.wait_for_function("document.querySelector('.drawing-tools [role=status]').textContent==='Drawings saved to your account.'")
+        await page.wait_for_function("document.querySelector('.drawing-notice').textContent==='Drawings saved to your account.'")
         data=await page.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())")
         assert len(data['drawings'])==5
         assert data['drawings'][0]['locked'] is True

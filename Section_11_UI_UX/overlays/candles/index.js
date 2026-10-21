@@ -37,7 +37,7 @@ class CurrentPriceRay {
             const visible = x >= 0 && x <= mediaSize.width;
             context.save();
             context.strokeStyle = this.bar.client.close >= this.bar.client.open
-                ? "#26a69a" : "#ef5350";
+                ? this.series.options().upColor : this.series.options().downColor;
             context.lineWidth = 1;
             context.setLineDash(visible ? [] : [2, 3]);
             context.beginPath();
@@ -89,7 +89,7 @@ function updateCurrentPrice(bar) {
     }
     const options = {
         price: bar.client.close,
-        color: bar.client.close >= bar.client.open ? "#26a69a" : "#ef5350",
+        color: bar.client.close >= bar.client.open ? series.options().upColor : series.options().downColor,
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
         lineVisible: false,
@@ -104,7 +104,7 @@ function updateCurrentPrice(bar) {
 export function update(chart, data, options = {}) {
     if (!series) return;
 
-    series.applyOptions({ visible: options.visible !== false });
+    series.applyOptions({ ...window.Composer?.config.candleStyle, visible: options.visible !== false });
     series.setData(_toPoints(data.bars));
     updateCurrentPrice(data.bars?.at(-1));
 

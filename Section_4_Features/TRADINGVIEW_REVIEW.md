@@ -4,6 +4,16 @@ Reference: `sections_4&5_Tradingview`, Git commit `e940218`.
 Previous Python engine: `backups/pre_tradingview_e940218.zip`.
 The backup contains source only, not databases or credentials.
 
+## Completion status
+
+**Section 4 is partially translated; Section 5 was not rewritten by this update.**
+The source was reviewed, but the existing Section 5 Python implementation has not
+been certified equivalent to this newer Pine reference. Core formula corrections
+and file separation below are completed work, not completion of the entire port.
+WMA 50 already existed in the calculator/registry; its missing chart display and
+settings are now connected. Remaining advanced feature displays and the stateful
+port/replay work below are still outstanding.
+
 ## Implemented and connected
 
 | Reference | Python owner | Status |

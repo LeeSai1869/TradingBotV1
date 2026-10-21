@@ -8,7 +8,7 @@ from browser_smoke import run, sign_in, settle, db
 async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',100)
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=row[2],ema50=row[6]-.5,
-        rsi=45+i%25,adx=25+i%10,di_plus=30,di_minus=15,di_direction=15,di_spread=15,
+        wma50=row[6]-.3,rsi=45+i%25,adx=25+i%10,di_plus=30,di_minus=15,di_direction=15,di_spread=15,
         atr=2.5,atr_ma=2.2,volume_ma=9,vwap=row[6]-.2,vwap_upper1=row[6]+1,vwap_lower1=row[6]-1) for i,row in enumerate(rows)])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -22,11 +22,20 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)
         await settings.get_by_role('tab',name='Features',exact=True).click()
-        for feature,fields in [('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
+        for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
             await settings.get_by_role('button',name=feature,exact=True).click()
             for field in fields:await settings.get_by_label(field,exact=True).check()
+        await settings.get_by_role('tab',name='Candles',exact=True).click()
+        await settings.get_by_role('button',name='Style',exact=True).click()
+        await settings.get_by_label('Bullish body',exact=True).fill('#123abc')
+        await settings.get_by_label('Bearish wick',exact=True).fill('#ff00ab')
+        await settings.get_by_label('Show borders',exact=True).check()
         await settings.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         await page.wait_for_function('Canvas.chart.panes().length===6')
+        assert await page.evaluate("Canvas.chart.panes()[0].getSeries()[0].options().upColor")=='#123abc'
+        assert await page.evaluate("Canvas.chart.panes()[0].getSeries()[0].options().wickDownColor")=='#ff00ab'
+        assert await page.evaluate("Canvas.chart.panes()[0].getSeries()[0].options().borderVisible") is True
+        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('wma50').options().visible && x.getSeries('wma50').getPane().paneIndex()===0 && x.getSeries('adx').options().title==='';})()")
         for feature in ['RSI','ADX','DI','ATR','Volume']:
             await page.get_by_role('group',name=f'{feature} pane controls').wait_for()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').data().at(-1).value;})()") == 69

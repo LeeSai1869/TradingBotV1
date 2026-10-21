@@ -7,6 +7,19 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 Completed indicator displays
 ---------------------------
+Symbol selection supports typing a ticker (or common coin name), keyboard arrows
+and Enter. The original selector remains hidden as the shared market identity;
+search never starts a load for unmatched free text. Candles have separate Display
+and Style tabs for bullish/bearish body, wick and border colors and visibility.
+WMA 50 uses its existing stored calculation and now has chart/style controls.
+Indicator axes show numbers without name tags; pane headers retain names/values.
+
+Drawing placement uses a transparent HTML input layer over the price pane so it
+does not depend on unpainted SVG hit areas. Requests use AbortController timeouts
+without requiring AbortSignal.timeout. Load/save failures are visible on the chart;
+a failed save retains the drawing in memory and exposes Retry saving drawings.
+The browser regression simulates a failed POST and verifies retry/persistence.
+
 The candle header is a compact `O H L C Vol Δ%` strip beneath the symbol.
 Chart loading/cache status sits below the chart; the stored-flags panel is removed.
 Every feature has Select all/Deselect all controls on its Display and Style tabs.

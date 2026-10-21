@@ -3,6 +3,7 @@ import { FEATURE_STYLES, migrateStyles } from "./feature_styles.js";
 import {normalizeHud} from "../workspace/preferences.js";
 import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
+import {normalizeCandleStyle} from './candle_style.js';
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
 const PERIODS = [7, 25, 50, 100, 200, 300];
@@ -13,7 +14,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -27,6 +28,7 @@ function validated(value) {
         if (typeof value[key] === "boolean") result[key] = value[key];
     }
     result.outputs = migrateStyles(value);
+    result.candleStyle=normalizeCandleStyle(value.candleStyle);
     result.hud = normalizeHud(value.hud);
     const lower=Number(value.rsiLevels?.lower??30), upper=Number(value.rsiLevels?.upper??70);
     result.rsiLevels = Number.isFinite(lower) && Number.isFinite(upper) && lower>=0 && upper<=100 && lower<upper?{lower,upper}:{lower:30,upper:70};
@@ -39,6 +41,7 @@ function apply() {
     config.rsiLevels = saved.rsiLevels;
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
     config.featureStyles = saved.outputs;
+    config.candleStyle=saved.candleStyle;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
 }
 
@@ -168,7 +171,15 @@ function render() {
         toggle("Show BUY / SELL markers", "markers");
         note("Chart preferences apply when you choose Apply and are saved in this browser.");
     } else if (section === "candles") {
-        toggle("Show candles and current-price line", "candles");
+        const nav=el('nav','',content,'settings-subtabs');
+        for(const title of ['Display','Style']){const b=el('button',title,nav);b.setAttribute('aria-pressed',String(featureTab===title));b.onclick=()=>{featureTab=title;render();};}
+        if(featureTab==='Display')toggle("Show candles and current-price line", "candles");
+        else for(const [key,label] of Object.entries({upColor:'Bullish body',downColor:'Bearish body',wickUpColor:'Bullish wick',wickDownColor:'Bearish wick',borderUpColor:'Bullish border',borderDownColor:'Bearish border',wickVisible:'Show wicks',borderVisible:'Show borders'})){
+            const row=el('label','',content,'settings-row');el('span',label,row);const input=el('input','',row);
+            const check=typeof draft.candleStyle[key]==='boolean';input.type=check?'checkbox':'color';input.setAttribute('aria-label',label);
+            if(check)input.checked=draft.candleStyle[key];else input.value=draft.candleStyle[key];
+            input.onchange=()=>{draft.candleStyle[key]=check?input.checked:input.value;};
+        }
         note("Candles and features come from the combined bar stream.");
     } else if (section === "features") {
         renderFeature();

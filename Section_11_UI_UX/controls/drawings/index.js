@@ -2,6 +2,7 @@ import {getSeries} from '../../overlays/candles/index.js';
 import {TOOLS,fibLevels,normalizeDrawings} from './geometry.js';
 export const name='drawings';
 const NS='http://www.w3.org/2000/svg';
+let capture;
 let chart,svg,select={value:'pointer'},hint,popup,buttons=[],drawings=[],draft=[],selected=-1,key='',drag=null,undo=[],frame=0,state,toolStatus;
 const collections=new Map();
 const INTERVALS=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'];
@@ -9,10 +10,15 @@ let width=0,height=0,paneNode,observer,lastTimeframe='';
 function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;render();});}
 function node(tag,attrs,parent=svg,text){const n=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(text)n.textContent=text;parent.append(n);return n;}
 async function request(symbol,data){
-    const response=await fetch('/api/drawings'+(data?'':'?symbol='+encodeURIComponent(symbol)),data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,symbol}),signal:AbortSignal.timeout(10000)}:{cache:'no-store',signal:AbortSignal.timeout(10000)});
-    const result=await response.json();if(!response.ok)throw Error(result.error||'Drawing memory unavailable');return result;
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+    try{
+        const response=await fetch('/api/drawings'+(data?'':'?symbol='+encodeURIComponent(symbol)),data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,symbol}),signal:controller.signal}:{cache:'no-store',signal:controller.signal});
+        if(response.status===404)throw Error('Drawing service missing. Restart the updated UI server.');
+        const result=await response.json();if(!response.ok){const error=Error(result.error||'Drawing memory unavailable');error.status=response.status;throw error;}return result;
+    }finally{clearTimeout(timeout);}
 }
-function feedback(text){hint.textContent=text;toolStatus.title=text;}
+let noticeTimer;
+function feedback(text){clearTimeout(noticeTimer);hint.textContent=text;toolStatus.title=text;hint.hidden=text==='Select a drawing to style it.';if(text==='Drawings saved to your account.')noticeTimer=setTimeout(()=>hint.hidden=true,2500);}
 async function load(current,quiet=false){
     if(current.loading)return;current.loading=true;
     try{
@@ -54,13 +60,13 @@ async function store(){
         while(current.pending){const snapshot=current.pending;current.pending=null;
             const result=await request(current.symbol,{revision:current.revision,drawings:snapshot});current.revision=result.revision;
         }
-        if(state===current)feedback('Drawings saved to your account.');
-    }catch(error){current.error=true;current.pending=null;if(state===current){buttons.forEach(b=>b.disabled=true);feedback(error.message+' Use Reload drawings to reconnect.');}}
+        if(state===current){toolStatus.setAttribute('aria-label','Reload drawings');buttons.forEach(b=>b.disabled=false);feedback('Drawings saved to your account.');}
+    }catch(error){current.error=true;current.conflict=error.status===409;current.pending=JSON.parse(JSON.stringify(current.drawings));if(state===current){mode();buttons.forEach(b=>b.disabled=true);toolStatus.setAttribute('aria-label',current.conflict?'Reload drawings':'Retry saving drawings');feedback(error.message+(current.conflict?' Reload drawings to use the server version.':' Drawing is unsaved. Use Retry saving drawings.'));}}
     finally{current.saving=false;}
 }
 function remember(){undo.push(JSON.stringify(drawings));if(undo.length>50)undo.shift();}
 function mode(value='pointer'){
-    select.value=value;draft=[];svg.dataset.active=String(value!=='pointer');
+    select.value=value;draft=[];svg.dataset.active=String(value!=='pointer');if(capture)capture.hidden=value==='pointer';
     buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===value)));
     chart.applyOptions({handleScroll:value==='pointer',handleScale:value==='pointer'});
     feedback(value==='pointer'?'Select a drawing to style it.':`Click ${TOOLS[value]} ${TOOLS[value]===1?'point':'points'} on the chart. Escape cancels.`);schedule();
@@ -71,7 +77,7 @@ function market(){
     if(cache.symbol===key)return;
     key=cache.symbol;popup?.close();state=collections.get(key);
     if(!state){state={symbol:key,drawings:[],revision:0,ready:false};collections.set(key,state);}
-    drawings=state.drawings;selected=-1;drag=null;undo=[];mode();buttons.forEach(b=>b.disabled=!state.ready||state.error);void load(state);
+    drawings=state.drawings;selected=-1;drag=null;undo=[];mode();buttons.forEach(b=>b.disabled=!state.ready||state.error);if(!state.ready)feedback('Loading account drawings…');void load(state);
 }
 function anchor(x,y){
     const bars=window.DataCache?.renderBars||[],logical=chart.timeScale().coordinateToLogical(x),price=getSeries()?.coordinateToPrice(y);
@@ -95,7 +101,7 @@ function render(){
     market();svg.replaceChildren();
     const pane=chart.panes()[0];if(!pane)return;
     if(pane.getHTMLElement()!==paneNode){if(paneNode)observer.unobserve(paneNode);paneNode=pane.getHTMLElement();if(paneNode)observer.observe(paneNode);}
-    width=chart.timeScale().width();height=pane.getHeight();svg.style.width=width+'px';svg.style.height=height+'px';svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    width=chart.timeScale().width();height=pane.getHeight();svg.style.width=width+'px';svg.style.height=height+'px';svg.setAttribute('viewBox',`0 0 ${width} ${height}`);if(capture){capture.style.width=width+'px';capture.style.height=height+'px';}
     function paint(d,index){
         if(d.timeframes?.length && !d.timeframes.includes(window.DataCache.timeframe))return;
         const style=d.style||{},color=style.color||"#58b9ff";
@@ -178,20 +184,21 @@ export function mount(instance){
     for(const [value,label,icon] of [['pointer','Select drawing','↖'],['line','Trend line','╱'],['rectangle','Rectangle zone','▭'],['horizontal','Horizontal line','―'],['retracement','Fib retracement','≋'],['extension','Fib extension','↗']]){
         const b=button(label,'',()=>{popup.close();mode(select.value===value?'pointer':value);});b.dataset.tool=value;buttons.push(b);
         const iconSvg=node('svg',{viewBox:'0 0 24 24',width:18,height:18,'aria-hidden':'true'},b);
-        const paths={pointer:'M5 3 L5 18 L10 13 L14 21 L17 19 L13 12 L20 12 Z',line:'M4 20 L20 4 M3 18 L6 21 M18 3 L21 6',rectangle:'M3 5 H21 V19 H3 Z',horizontal:'M2 12 H22',retracement:'M3 4 H21 M3 9 H17 M3 14 H21 M3 20 H14',extension:'M3 19 L9 10 L14 14 L21 3 M14 3 H21 V10'};
+        const paths={pointer:'M5 3 L5 18 L10 13 L14 21 L17 19 L13 12 L20 12 Z',line:'M4 20 L20 4 M3 18 L6 21 M18 3 L21 6',rectangle:'M3 5 H21 V19 H3 Z',horizontal:'M2 12 H22',retracement:'M3 4 H21 M3 9 H17 M3 14 H21 M3 20 H14',extension:'M3 20 L8 12 L12 16 L19 4 M12 4 H22 M12 9 H22 M12 14 H22'};
         node('path',{d:paths[value],fill:'none',stroke:'currentColor','stroke-width':1.5,'stroke-linecap':'round','stroke-linejoin':'round'},iconSvg);
     }
     button('Undo drawing','↶',()=>{if(!state?.ready||state.error||!undo.length)return;drawings=JSON.parse(undo.pop());selected=-1;popup.close();void store();schedule();});
-    toolStatus=button('Reload drawings','↻',()=>{if(!state?.saving){state.ready=false;buttons.forEach(b=>b.disabled=true);void load(state);}});
-    hint=document.createElement('span');hint.className='sr-only';hint.setAttribute('role','status');controls.append(hint);
+    toolStatus=button('Reload drawings','↻',()=>{if(!state||state.saving)return;if(state.error&&!state.conflict&&state.pending){state.error=false;void store();return;}state.pending=null;state.ready=false;buttons.forEach(b=>b.disabled=true);void load(state);});
+    hint=document.createElement('span');hint.className='drawing-notice';hint.setAttribute('role','status');document.getElementById('chart').append(hint);
     popup=document.createElement('dialog');popup.className='drawing-popup';popup.setAttribute('aria-label','Drawing style');document.body.append(popup);
     svg=node('svg',{'id':'drawing-overlay','aria-label':'Chart drawings'},document.getElementById('chart'));
-    svg.addEventListener('pointerdown',event=>{
+    capture=document.createElement('div');capture.id='drawing-input';capture.hidden=true;document.getElementById('chart').append(capture);
+    const down=event=>{
         if(event.button!==0 || !state?.ready || state.error)return;
         const p=local(event);if(p.y<0 || p.y>height)return;
         if(select.value!=='pointer'){
             event.preventDefault();event.stopPropagation();
-            const a=anchor(p.x,p.y);if(!a)return;draft.push(a);
+            const a=anchor(p.x,p.y);if(!a){feedback('No candle coordinates available yet. Wait for the chart to load.');return;}draft.push(a);
             if(draft.length===TOOLS[select.value]){remember();drawings.push({type:select.value,anchors:draft,style:{color:'#58b9ff',width:2,pattern:'solid',fillOpacity:.1},locked:false,timeframes:[window.DataCache.timeframe]});selected=drawings.length-1;store();mode();}
             schedule();return;
         }
@@ -200,7 +207,8 @@ export function mount(instance){
         if(drawings[selected].locked){edit();schedule();return;}
         drag={start:p,before:JSON.stringify(drawings),points:drawings[selected].anchors.map(point),handle:event.target.hasAttribute('data-anchor')?Number(event.target.dataset.anchor):null};
         svg.setPointerCapture(event.pointerId);schedule();
-    });
+    };
+    svg.addEventListener('pointerdown',down);capture.addEventListener('pointerdown',down);
     svg.addEventListener('pointermove',event=>{
         if(!drag)return;
         const p=local(event),updated=drawings[selected].anchors.map((a,i)=>{
