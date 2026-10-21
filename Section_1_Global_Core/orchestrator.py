@@ -190,7 +190,11 @@ class GlobalCoreOrchestrator:
                 continue  # Ad-hoc callable processors need no module maintenance.
             maintenance = getattr(module, 'maintenance', None)
             if maintenance:
-                maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                try:
+                    maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                except Exception as error:
+                    print(f'[orchestrator] maintenance failed {module_name}; continuing other processors and pairs: {error}',flush=True)
+                    traceback.print_exc()
 
         # 3) Process new bars
         #

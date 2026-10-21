@@ -28,8 +28,7 @@ def calculate(state,client,length):
 ''',
 'dmi': '''
 def calculate(state,client,length,smoothing):
-    from .atr import true_range
-    from .adx import calculate as adx_calculate
+    from .volatility import true_range
     length=int(length)
     high,low,close=(client[key] for key in ('high','low','close'))
     previous=state.get('previous')
@@ -42,7 +41,7 @@ def calculate(state,client,length,smoothing):
     if rt.is_na(dp):dp=state.get('dp',rt.NA)
     if rt.is_na(dm):dm=state.get('dm',rt.NA)
     state.update(dp=dp,dm=dm,previous=[high,low,close])
-    return dp,dm,adx_calculate(state,dp,dm,int(smoothing))
+    return dp,dm,calculate_adx(state,dp,dm,int(smoothing))
 ''',
 'adx': '''
 def calculate(state,plus,minus,length):

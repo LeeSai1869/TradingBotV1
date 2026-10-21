@@ -3,7 +3,6 @@ from unittest.mock import patch
 from dataclasses import asdict
 import pandas as pd
 from Section_11_UI_UX.server.live_features import calculate
-from Section_4_Features.features import ema, rsi
 from restart_runner import configuration, ROOT
 from pathlib import Path
 
@@ -12,8 +11,8 @@ class LiveFeaturesTests(unittest.TestCase):
     def setUp(self):
         import tempfile
         from Section_1_Global_Core.memory_storage.Storage import features_store
-        from Section_4_Features.individual.engine import Engine
-        from Section_4_Features.individual.checkpoint import dump
+        from Section_4_Features.execution.engine import Engine
+        from Section_4_Features.execution.checkpoint import dump
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name)/'features.db'
         self.patch=patch.object(features_store,'DB_PATH',self.path);self.patch.start();self.addCleanup(self.patch.stop)

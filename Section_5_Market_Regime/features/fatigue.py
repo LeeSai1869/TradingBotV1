@@ -1,5 +1,5 @@
 """Section 5: fatigue; Pine lines 5820–5833."""
-from Section_4_Features.individual import runtime as rt
+from Section_4_Features.execution import runtime as rt
 
 def update(e):
     # Pine 5830

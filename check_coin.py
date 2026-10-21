@@ -58,6 +58,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('symbol',nargs='?',default='ETHUSDT')
     parser.add_argument('--verify',nargs='+',choices=data_policy.INTERVALS,help='Read-only exchange comparison of the latest stored candle for each selected timeframe')
+    parser.add_argument('--logs',action='store_true',help='Include the recent local runner output and errors in this single diagnostic command')
     args=parser.parse_args(); symbol=args.symbol.upper()
     project=Path(__file__).resolve().parent
     print('Checked project:',project)
@@ -92,7 +93,7 @@ def main():
     if sys.platform=='darwin' and not rows:
         print('To install/re-enable the login runner: python3 restart_runner.py')
     print('Run again in 30–60 seconds; increasing 1m counts/timestamps confirm progress; current timestamps can mean already caught up.')
-    print('Timeframe   candles       latest candle UTC                 features      latest feature UTC')
+    print('Timeframe   candles       latest candle UTC                 features      latest feature UTC                  policy')
     errors=set()
     for iv in data_policy.INTERVALS:
         values=[]
@@ -104,7 +105,7 @@ def main():
                 values.append((0,None));errors.add(f'{Path(path).name}: {error}')
             finally: conn.close()
         (candles,t),(features,ft)=values
-        print(f'{iv:6} {candles:10}  {stamp(t):32} {features:10}  {stamp(ft)}')
+        print(f'{iv:6} {candles:10}  {stamp(t):32} {features:10}  {stamp(ft):32}  {"ACTIVE" if data_policy.enabled(symbol,iv) else "PAUSED"}')
     for error in sorted(errors): print('Storage warning:',error)
     print('Fresh pairs download one 1000-bar page per cycle; features and other pairs share the same runner.')
     if Path(features_store.DB_PATH).exists():
@@ -114,7 +115,14 @@ def main():
                 checkpoints=conn.execute('SELECT interval,last_open_time FROM feature_engine_state WHERE symbol=?',(symbol,)).fetchall()
                 if checkpoints:
                     print('Complete formula-v3 replay checkpoints (older rows can still use previous formulas):')
-                    for interval,timestamp in checkpoints:print(f'{interval:6} replayed through {stamp(timestamp)}')
+                    raw=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5) if Path(klines_store.DB_PATH).exists() else None
+                    try:
+                        for interval,timestamp in checkpoints:
+                            pending=raw.execute('SELECT COUNT(*) FROM klines WHERE symbol=? AND interval=? AND open_time>?',(symbol,interval,timestamp)).fetchone()[0] if raw else 'unknown'
+                            status='ACTIVE' if data_policy.enabled(symbol,interval) else 'PAUSED by policy'
+                            print(f'{interval:6} replayed through {stamp(timestamp)} | pending candles: {pending} | {status}')
+                    finally:
+                        if raw:raw.close()
                     print('Replay resumes automatically in batches after restart; live features wait for the closed checkpoint to catch up.')
         finally:conn.close()
     if Path(klines_store.DB_PATH).exists():
@@ -137,6 +145,16 @@ def main():
             except (OSError,ValueError,TypeError,KeyError,IndexError,sqlite3.Error) as error:
                 print(f'{iv:4} UNVERIFIED: {error}')
         print('MATCH verifies the displayed latest sample, not the entire historical dataset.')
+
+    if args.logs:
+        logs=Path.home()/'Library/Logs/TradingBotV1'
+        from collections import deque
+        for name,count in [('runner.log',80),('runner-error.log',60)]:
+            print(f'\nRecent {name}:')
+            try:
+                with (logs/name).open(errors='replace') as stream:
+                    for line in deque(stream,maxlen=count):print(line,end='')
+            except OSError as error:print(f'Cannot read {logs/name}: {error}')
 
 
 if __name__=='__main__': main()

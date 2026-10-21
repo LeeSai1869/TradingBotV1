@@ -21,3 +21,34 @@ class RunnerDiagnosticTests(unittest.TestCase):
             self.assertIn('Candle database:',text)
             self.assertIn('Runner working folder: /another/checkout',text)
             self.assertIn('DIFFERENT project folder',text)
+
+    def test_single_command_reports_paused_policy_pending_replay_and_logs(self):
+        import sqlite3
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory);raw=root/'klines.db';features=root/'features.db'
+            with sqlite3.connect(raw) as conn:
+                conn.execute('CREATE TABLE klines(symbol TEXT,interval TEXT,open_time INTEGER,close REAL,close_time INTEGER)')
+                conn.executemany('INSERT INTO klines VALUES (?,?,?,?,?)',[('ETHUSDT','1m',i*60000,100,(i+1)*60000-1) for i in range(3)])
+            with sqlite3.connect(features) as conn:
+                conn.execute('CREATE TABLE features(symbol TEXT,interval TEXT,open_time INTEGER)')
+                conn.execute('INSERT INTO features VALUES (?,?,?)',('ETHUSDT','1m',0))
+                conn.execute('CREATE TABLE feature_engine_state(symbol TEXT,interval TEXT,last_open_time INTEGER)')
+                conn.execute('INSERT INTO feature_engine_state VALUES (?,?,?)',('ETHUSDT','1m',0))
+            logs=root/'Library/Logs/TradingBotV1';logs.mkdir(parents=True)
+            (logs/'runner.log').write_text('download phase starting\n')
+            (logs/'runner-error.log').write_text('specific pair failure\n')
+            for obj,key,value in ((check_coin.sys,'argv',['check_coin.py','ETHUSDT','--logs']),
+                    (check_coin.sys,'platform','linux'),(Path,'home',lambda:root),
+                    (check_coin.klines_store,'DB_PATH',raw),(check_coin.features_store,'DB_PATH',features),
+                    (check_coin.data_policy,'INTERVALS',['1m','5m'])):
+                stack.enter_context(patch.object(obj,key,value))
+            stack.enter_context(patch.object(check_coin.data_admin,'catalog',return_value={'approved':[{'symbol':'ETHUSDT'}]}))
+            stack.enter_context(patch.object(check_coin.data_policy,'active_symbols',return_value=['ETHUSDT']))
+            stack.enter_context(patch.object(check_coin.data_policy,'enabled',side_effect=lambda symbol,interval:interval=='5m'))
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):check_coin.main()
+            text=output.getvalue()
+            self.assertIn('pending candles: 2 | PAUSED by policy',text)
+            self.assertIn('download phase starting',text)
+            self.assertIn('specific pair failure',text)

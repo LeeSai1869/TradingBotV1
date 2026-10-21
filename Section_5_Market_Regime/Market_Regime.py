@@ -1,8 +1,8 @@
 """Section 5: compose six individual regime features with pair-scoped memory."""
 from dataclasses import dataclass
 from Section_1_Global_Core.Data_Contracts_Legacy import market_definitions as definitions
-from Section_4_Features.individual.context import Context,MANIFEST
-from Section_4_Features.individual.contract import snake,REGIMES
+from Section_4_Features.execution.context import Context,MANIFEST
+from Section_4_Features.execution.contract import snake,REGIMES
 from .features import control,energy,regime,fatigue,trend_state,transition
 
 

@@ -5,7 +5,7 @@ history prefix to reproduce recursive indicators and stateful zone lifecycles.
 There is no rolling-window approximation in the runner.
 """
 from Section_4_Features.feature_packet import create_feature_packet
-from Section_4_Features.individual.engine import Engine
+from Section_4_Features.execution.engine import Engine
 
 
 def build_feature_packet(*,tf,symbol,df=None,client=None,engine=None,bar_index=None,is_confirmed=True,

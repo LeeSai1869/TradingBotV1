@@ -223,3 +223,14 @@ class DataAdminTests(unittest.TestCase):
         with patch.object(orchestrator,'update_klines_all',return_value=0),patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']):
             orch.cycle()
         self.assertEqual(orch._state['BTCUSDT|1m'],0)
+
+    def test_maintenance_error_does_not_abort_healthy_event_processing(self):
+        from Section_4_Features import processor
+        orch=orchestrator.GlobalCoreOrchestrator()
+        orch._state={'BTCUSDT|1m':0}
+        received=[]
+        orch._processors=[('Section_4_Features.processor.process_bar',lambda ev:received.append(ev.open_time))]
+        with patch.object(orchestrator,'update_klines_all',return_value=0),patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(processor,'maintenance',side_effect=RuntimeError('injected maintenance error')):
+            orch.cycle()
+        self.assertTrue(received)
+        self.assertEqual(orch._state['BTCUSDT|1m'],received[-1])

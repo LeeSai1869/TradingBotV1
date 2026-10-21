@@ -1,5 +1,5 @@
 """Section 5: trend_state; Pine lines 5834–5870."""
-from Section_4_Features.individual import runtime as rt
+from Section_4_Features.execution import runtime as rt
 
 def update(e):
     # Pine 5848

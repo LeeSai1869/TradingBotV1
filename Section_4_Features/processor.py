@@ -7,11 +7,12 @@ Market downloads remain owned by the existing orchestrator.
 from pathlib import Path
 import threading
 import time
+import traceback
 from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,features_store,klines_store
 from Section_4_Features.feature_builder import build_feature_packet
-from Section_4_Features.individual.engine import Engine
-from Section_4_Features.individual import checkpoint
+from Section_4_Features.execution.engine import Engine
+from Section_4_Features.execution import checkpoint
 
 WRITE_BATCH=200
 _ENGINES={}
@@ -108,9 +109,17 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
         for _ in range(len(pairs)):
             symbol,interval=pairs[_cursor%len(pairs)];_cursor+=1
             try:count+=_advance(symbol,interval,max_bars-count,deadline)
-            except Exception:
-                reset_pair(symbol,interval);raise
-            if time.monotonic()<deadline:_repair_daily(symbol,interval,deadline)
+            except Exception as error:
+                reset_pair(symbol,interval)
+                print(f'[processor] replay failed {symbol} {interval}; checkpoint retained, other pairs continue: {error}',flush=True)
+                traceback.print_exc()
+                if time.monotonic()>=deadline:break
+                continue
+            if time.monotonic()<deadline:
+                try:_repair_daily(symbol,interval,deadline)
+                except Exception as error:
+                    print(f'[processor] daily repair failed {symbol} {interval}: {error}',flush=True)
+                    traceback.print_exc()
             if count>=max_bars or time.monotonic()>=deadline:break
     return count
 

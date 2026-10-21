@@ -1,25 +1,20 @@
 # Full Section 4 / Section 5 conversion
 
 The executable calculations in `sections_4&5_Tradingview` are translated into
-**29 Section 4 main-feature modules and six Section 5 modules**. The complete
+**22 numbered Section 4 calculation modules and six Section 5 modules**. The complete
 537-field MarketFeatures contract and six regime outputs are calculated and
 persisted, with compatible aliases for existing clients. This replaces the earlier
 partial translation. It does not add renderers for every advanced feature.
 
 ## Files and ownership
 
-- Active individual features: [`individual/`](individual/README.md).
+- Active calculations: [`features/`](features/README.md), one file per numbered 4.2 section.
 - Section 5: [`../Section_5_Market_Regime/features/`](../Section_5_Market_Regime/features/).
 - Composition: `feature_builder.py`; bounded runner integration: `processor.py`.
-- Shared execution state: `individual/context.py`; scalar/array primitives:
-  `individual/runtime.py`; versioned JSON checkpoints: `individual/checkpoint.py`.
-- The EMA, RSI, ATR, ADX/DI, WMA, VWAP and volume files contain their native
-  calculation kernels as well as their source-referenced update functions.
-- `features/registry.py` indexes the active individual modules. Small older pure
-  APIs remain for import compatibility; they are not the runner's calculation path.
-- Broad `market_location`, `market_liquidity`, `market_imbalance`, `bos_structure`
-  implementations are removed from the legacy source. The converted
-  `individual/support_resistance.py` owns the complete support/resistance lifecycle.
+- Shared execution helpers: `execution/`; source metadata: `conversion/manifest.json`.
+- Native indicator kernels live in their numbered owners: trend, momentum,
+  volatility, VWAP and volume. There is one calculation path.
+- Old pure implementations and the superseded `individual/` tree are removed.
 
 The previous Section 4/5 Python source is preserved in
 `backups/pre_full_conversion_b5a67d7.zip`. Raw candles are not deleted or downloaded
@@ -129,18 +124,29 @@ from an export that omits the initialization history.
 source-referenced update functions and field manifest. This is a build-time tool;
 the app runs ordinary Python functions, never Pine parsing or `eval`. Unsupported
 source syntax/dependencies fail explicitly. The source checksum, feature spans,
-extra source lines and written outputs are in `individual/manifest.json`.
+numbered section boundaries and written outputs are in `conversion/manifest.json`.
 
 When changing formulas or state semantics, increment the checkpoint version and
 replay the raw history. Do not resume an old checkpoint under new formulas.
 
-## Main-feature consolidation
+## Numbered-section ownership and replay isolation
 
-The regrouping preserves formulas, source-call IDs, calculation order, persistent
-array names and all exported fields. Checkpoint version 3 remains compatible;
-existing memory resumes without a replay caused solely by moving files. Liquidity,
-support/resistance, sessions, order blocks with breakers, EMA metrics and ADX/DI
-each have one owner. The manifest keeps their dependency stages explicit. The
-converter emits these owners directly and removes superseded generated files.
-Existing UI renderers/styles and HUD/alert field names remain available; this
-refactor does not introduce new chart renderers for advanced zone features.
+File ownership follows the actual 4.2.x source headers, not inferred categories.
+The complete 4.2.12 candle section includes engulfing, rejection, pivots and
+break/retest. Range and swing location have their own numbered source sections.
+Shared execution helpers and the source manifest live outside the feature folder.
+Formulas, source-call IDs, exported fields and checkpoint version 3 are preserved;
+existing memory resumes without recalculation solely because files moved.
+
+A replay error previously escaped maintenance and aborted the rest of its pass.
+Maintenance now reports the failing symbol/timeframe, retains its committed
+checkpoint, and continues other pairs within the global budget. Orchestrator
+maintenance failures also no longer prevent the event pass. Failed candles are
+not skipped. Disabled timeframes remain paused. `check_coin.py SYMBOL --logs`
+shows policy, pending raw candles after each checkpoint, and recent runner logs.
+This fixes a demonstrated failure-isolation path; it does not establish why an
+individual Mac stalled without that machine's diagnostic output.
+
+The already-calculated `prevCandleRange` local was missing from the exported
+legacy `prev_candle_range` field. That field is now included in new packets;
+existing historical rows are not rewritten solely for this output addition.

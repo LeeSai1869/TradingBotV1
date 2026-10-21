@@ -33,6 +33,8 @@ FIELDS['daily_source_ready']='bool'
 
 def canonical(values,context):
     result={snake(name):value for name,value in values.items()}
+    # Calculated in 4.2.12 but omitted from the Pine constructor's type fields.
+    result['prev_candle_range']=context['prevCandleRange']
     for key,source in ALIASES.items():
         if source in result:result[key]=result[source]
     for name in ['atr',*[f'ema{p}' for p in (7,25,50,100,200,300)]]:

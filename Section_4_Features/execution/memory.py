@@ -1,4 +1,4 @@
-"""Persistent zone arrays/constants, scoped by pair, never global across markets."""
+"""Per-pair persistent arrays and constants from Pine 4.1.22."""
 from . import runtime as rt
 
 def update(e):

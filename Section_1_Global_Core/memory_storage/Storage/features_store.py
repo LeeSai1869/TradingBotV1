@@ -154,11 +154,11 @@ COLUMNS = [
 
 # Keep every pure feature output instead of silently discarding derived fields.
 # Legacy columns retain their order for existing callers.
-from Section_4_Features.individual.contract import LEGACY_FIELDS
+from Section_4_Features.execution.contract import LEGACY_FIELDS
 for _field in LEGACY_FIELDS:
     if _field not in COLUMNS:COLUMNS.append(_field)
 COLUMNS.append('formula_version')
-from Section_4_Features.individual.contract import FIELDS as _translated_fields
+from Section_4_Features.execution.contract import FIELDS as _translated_fields
 for _field in _translated_fields:
     if _field not in COLUMNS:COLUMNS.append(_field)
 _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))

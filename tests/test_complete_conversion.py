@@ -7,10 +7,10 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from Section_4_Features.individual.engine import Engine
-from Section_4_Features.individual import checkpoint
-from Section_4_Features.individual.context import MANIFEST
-from Section_4_Features.individual.contract import snake
+from Section_4_Features.execution.engine import Engine
+from Section_4_Features.execution import checkpoint
+from Section_4_Features.execution.context import MANIFEST
+from Section_4_Features.execution.contract import snake
 from Section_4_Features import processor
 from Section_1_Global_Core.memory_storage.Storage import features_store,klines_store,db
 
@@ -30,9 +30,9 @@ class CompleteConversionTests(unittest.TestCase):
             covered.update(range(entry['start'],entry['end']+1));covered.update(entry.get('extra_lines',[]))
         expected={line for _,_,line in statements(lines,793,5112)}|{line for _,_,line in statements(lines,5741,5893)}
         self.assertEqual(expected-covered,set())
-        self.assertEqual(len(MANIFEST['modules']),35)
+        self.assertEqual(len(MANIFEST['modules']),28)
         for name in MANIFEST['modules']:
-            module=importlib.import_module(name if '.' in name else 'Section_4_Features.individual.'+name)
+            module=importlib.import_module(name if '.' in name else 'Section_4_Features.features.'+name)
             self.assertTrue(callable(module.update))
 
     def test_main_feature_consolidation_preserves_all_packets(self):
@@ -44,21 +44,39 @@ class CompleteConversionTests(unittest.TestCase):
             client=dict(symbol='ETHUSDT',interval='15m',open_time=1700000000000+i*900000,
                         close_time=1700000000000+(i+1)*900000-1,open=c-.5,high=c+2,
                         low=c-3,close=c,volume=10+i%17)
-            digest.update(json.dumps(engine.step(client),sort_keys=True,separators=(',',':')).encode())
+            packet=engine.step(client)
+            # Newly exported legacy candle field was absent from the old packet.
+            packet.pop('prev_candle_range')
+            digest.update(json.dumps(packet,sort_keys=True,separators=(',',':')).encode())
         self.assertEqual(digest.hexdigest(),'9a8ab1dafc558a35c3a01123eeac30022599e0fc885e569d8bf18b5336c210c7')
         from Section_4_Features.features.registry import load
         owners={row['name']:row for row in load()}
-        for name in ('liquidity','support_resistance','sessions','order_blocks','ema','adx'):
+        for name in ('liquidity','support_resistance','sessions','order_blocks','trend','momentum','candle','market_structure'):
             self.assertIn(name,owners)
-        self.assertEqual(len(owners),29)
+        self.assertEqual(len(owners),22)
         from Section_11_UI_UX.server.hud import FIELDS
         for field in ('di_dominance','rsi','adx','ema50','vwap'):
             self.assertIn('features.'+field,FIELDS)
         for step in MANIFEST['steps']:
             import importlib
             name=step['module']
-            module=importlib.import_module(name if '.' in name else 'Section_4_Features.individual.'+name)
+            module=importlib.import_module(name if '.' in name else 'Section_4_Features.features.'+name)
             self.assertTrue(callable(getattr(module,step['function'])))
+
+    def test_files_follow_numbered_source_sections(self):
+        from Section_4_Features.conversion.compile_reference import section_spans,SOURCE
+        entries={row['section']:row for row in MANIFEST['manifest'] if isinstance(row['section'],str)}
+        for section,name,start,end,title in section_spans(SOURCE.read_text().splitlines()):
+            self.assertEqual((entries[section]['feature'],entries[section]['start'],entries[section]['end']),(name,start,end))
+        candle=entries['4.2.12']['outputs']
+        for field in ('bullEngulfing','bearRejection','bullBreakRetest','pivotHigh','prevPivotLow'):
+            self.assertIn(field,candle)
+        structure=entries['4.2.10']['outputs']
+        self.assertIn('latestConfirmedPivotHigh',structure)
+        from pathlib import Path
+        folder=Path(__file__).parents[1]/'Section_4_Features'
+        self.assertFalse((folder/'individual').exists())
+        self.assertEqual({p.stem for p in (folder/'features').glob('*.py')}-{'__init__','registry'},set(entries[row]['feature'] for row in entries))
 
     def test_all_contract_fields_and_hand_calculated_wilder_seed(self):
         engine=Engine('ETHUSDT','1m',{'rsiLen':3,'atrLen':2,'adxLen':2})
@@ -196,6 +214,29 @@ class ReplayStorageTests(unittest.TestCase):
         conn.execute('DROP TRIGGER reject_feature');conn.commit();conn.close()
         self.assertEqual(processor.catch_up('ETHUSDT','1m'),1)
         self.assertEqual(db.read_features('ETHUSDT','1m',205*60000)['ema300'],reference.step(bar(205,140))['ema300'])
+
+    def test_failed_pair_does_not_starve_healthy_pairs_or_skip_failed_candle(self):
+        db.write_klines([bar(i,100+i%9,symbol=symbol) for symbol in ('ETHUSDT','BTCUSDT') for i in range(3)])
+        original=processor.build_feature_packet
+        def fail(**kwargs):
+            if kwargs['symbol']=='ETHUSDT':raise RuntimeError('injected candle calculation failure')
+            return original(**kwargs)
+        processor._cursor=0
+        with patch.object(processor,'build_feature_packet',side_effect=fail):
+            self.assertEqual(processor.maintenance(['ETHUSDT','BTCUSDT'],['1m'],time_budget=5),3)
+        self.assertEqual(db.count_features('ETHUSDT','1m'),0)
+        self.assertEqual(db.count_features('BTCUSDT','1m'),3)
+        processor._ENGINES.clear()
+        self.assertEqual(processor.maintenance(['ETHUSDT','BTCUSDT'],['1m'],time_budget=5),3)
+        self.assertEqual(db.count_features('ETHUSDT','1m'),3)
+
+    def test_disabled_interval_does_not_block_enabled_interval(self):
+        db.write_klines([bar(i,100+i%9,interval=iv,step=60000 if iv=='1m' else 300000) for iv in ('1m','5m') for i in range(3)])
+        processor._cursor=0
+        with patch.object(processor.data_policy,'enabled',side_effect=lambda symbol,interval:interval=='5m'):
+            self.assertEqual(processor.maintenance(['ETHUSDT'],['1m','5m'],time_budget=5),3)
+        self.assertEqual(db.count_features('ETHUSDT','1m'),0)
+        self.assertEqual(db.count_features('ETHUSDT','5m'),3)
 
     def test_old_feature_memory_is_backed_up_before_replacement(self):
         db.write_klines([bar(0,100)])

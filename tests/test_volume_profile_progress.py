@@ -3,37 +3,46 @@ import json
 import subprocess
 import sys
 import unittest
-import numpy as np
-from Section_4_Features.features.volume_profile import _calculate_volume_profile
+from Section_4_Features.execution.engine import Engine
+
+
+def profile(highs,lows,volumes,bins):
+    engine=Engine('ETHUSDT','1m',{'vpLookback':len(highs),'vpBins':bins,'vpValueAreaPct':70})
+    for i,(high,low,volume) in enumerate(zip(highs,lows,volumes)):
+        close=(high+low)/2
+        result=engine.step(dict(symbol='ETHUSDT',interval='1m',open_time=i*60000,
+                               close_time=(i+1)*60000-1,open=close,close=close,
+                               high=high,low=low,volume=volume))
+    return result['vp_poc'],result['vp_vah'],result['vp_val']
 
 
 class VolumeProfileProgressTests(unittest.TestCase):
     def test_left_edge_poc_with_empty_neighbors_finishes(self):
         # Run in a child with a deadline: the original bug loops forever.
-        code='''
+        code="""
 import json
-import numpy as np
-from Section_4_Features.features.volume_profile import _calculate_volume_profile
-result=_calculate_volume_profile(np.array([.1,3.1]),np.array([0.,3.]),np.array([60.,40.]),2,4,70.)
-print(json.dumps(result))
-'''
+import sys
+sys.path.insert(0,"tests")
+from test_volume_profile_progress import profile
+print(json.dumps(profile([.1,3.1],[0.,3.],[60.,40.],4)))
+"""
         result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,timeout=10,check=True)
-        profile=json.loads(result.stdout)
-        self.assertAlmostEqual(profile[2],0.)
-        self.assertAlmostEqual(profile[1],3.1)
-        self.assertGreater(profile[0],0.)
+        result=json.loads(result.stdout)
+        self.assertAlmostEqual(result[2],0.)
+        self.assertAlmostEqual(result[1],3.1)
+        self.assertGreater(result[0],0.)
 
     def test_right_edge_and_single_bin_stay_inside_price_range(self):
         for volumes,bins in (([40.,60.],4),([60.,40.],1)):
-            profile=_calculate_volume_profile(np.array([.1,3.1]),np.array([0.,3.]),np.array(volumes),2,bins,70.)
-            self.assertGreaterEqual(profile[2],0.)
-            self.assertLessEqual(profile[1],3.1+1e-12)
-            self.assertLessEqual(profile[2],profile[1])
+            result=profile([.1,3.1],[0.,3.],volumes,bins)
+            self.assertGreaterEqual(result[2],0.)
+            self.assertLessEqual(result[1],3.1+1e-12)
+            self.assertLessEqual(result[2],result[1])
 
     def test_dense_histogram_retains_expected_value_area(self):
-        profile=_calculate_volume_profile(np.array([.1,1.1,2.1,3.1]),np.array([0.,1.,2.,3.]),np.array([10.,40.,30.,20.]),4,4,70.)
-        self.assertAlmostEqual(profile[2],.775)
-        self.assertAlmostEqual(profile[1],2.325)
+        result=profile([.1,1.1,2.1,3.1],[0.,1.,2.,3.],[10.,40.,30.,20.],4)
+        self.assertAlmostEqual(result[2],.775)
+        self.assertAlmostEqual(result[1],2.325)
 
     def test_full_feature_builder_finishes_with_sparse_volume_profile(self):
         code="""

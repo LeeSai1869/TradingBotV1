@@ -6,7 +6,7 @@ from pathlib import Path
 import math
 from . import runtime as rt
 
-MANIFEST=json.loads(Path(__file__).with_name('manifest.json').read_text())
+MANIFEST=json.loads((Path(__file__).parents[1]/'conversion/manifest.json').read_text())
 HISTORY=set(MANIFEST['history']) | {'ema7','ema25','ema50','ema100','ema200','ema300','atr'}
 
 class Context:
@@ -57,8 +57,8 @@ class Context:
             self.daily_bars=self.daily_bars[-3:]
         daily=self.daily_bars[-1];daily['high']=max(daily['high'],client['high']);daily['low']=min(daily['low'],client['low']);daily['close']=client['close']
         typical=(client['high']+client['low']+client['close'])/3
-        from .vwap import session_value
-        from .volume import moving_average
+        from ..features.vwap import session_value
+        from ..features.volume import moving_average
         vwap=session_value(self,client,self.new_day);volume_ma=moving_average(self,client['volume'])
         prev=self.last_client
         for field in ('open','high','low','close','volume'):
@@ -98,7 +98,7 @@ class Context:
         if site in self.calls:return self.calls[site]
         state=self.technical.setdefault(site,{})
         if name=='ema':
-            from .ema import calculate
+            from ..features.trend import calculate_ema as calculate
             result=calculate(state,*args)
         elif name in ('sma','wma','highest','lowest'):
             value,length=args;length=int(length);queue=state.setdefault('queue',[])
@@ -108,16 +108,16 @@ class Context:
             elif len(valid)<length:result=rt.NA
             elif name=='sma':result=math.fsum(valid)/length
             else:
-                from .wma import calculate
+                from ..features.ema_structure import calculate_wma as calculate
                 result=calculate(valid)
         elif name=='rsi':
-            from .rsi import calculate
+            from ..features.momentum import calculate_rsi as calculate
             result=calculate(state,*args)
         elif name=='atr':
-            from .atr import calculate
+            from ..features.volatility import calculate
             result=calculate(state,self.current_client,*args)
         elif name=='dmi':
-            from .adx import calculate_dmi
+            from ..features.momentum import calculate_dmi
             result=calculate_dmi(state,self.current_client,*args)
         elif name in ('pivothigh','pivotlow'):
             value,left,right=args;left,right=int(left),int(right);queue=state.setdefault('queue',[]);queue.append(value);state['queue']=queue=queue[-(left+right+1):]

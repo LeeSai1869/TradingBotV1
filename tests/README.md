@@ -488,9 +488,9 @@ restart the runner to resume catch-up from its last committed feature rows.
 
 Complete feature conversion and replay
 --------------------------------------
-The supplied Section 4/5 reference is now covered by 35 main-feature modules (29 Section 4 and six Section 5),
+The supplied Section 4/5 reference is now covered by 28 modules (22 numbered Section 4 sections and six Section 5 modules),
 not broad location/momentum implementations. See
-`Section_4_Features/TRADINGVIEW_REVIEW.md` and `individual/README.md` for the source
+`Section_4_Features/TRADINGVIEW_REVIEW.md` and `features/README.md` for the source
 map, external parameter defaults, explicit source corrections and parity limits.
 
 `test_complete_conversion.py` checks source statement coverage, all 537 contract
@@ -508,3 +508,13 @@ python3 -m Section_4_Features.conversion.validate_export export.csv --symbol ETH
 This read-only comparator requires the same Pine inputs/history and an actual
 export fixture. Passing synthetic regression vectors is not TradingView export
 certification. No such export was provided with the reference source.
+
+
+Numbered-section layout and replay isolation
+--------------------------------------------
+`test_complete_conversion.py` verifies exact 4.2 source boundaries, candle ownership,
+the absence of the duplicate individual tree, a pre-refactor packet digest,
+healthy-pair progress after an injected calculation error, retry without skipping
+failed candles, and intentional disabled-timeframe behavior. The source manifest
+is in `Section_4_Features/conversion/`; execution helpers are in `execution/`.
+Use `python3 check_coin.py ETHUSDT --logs` as a single read-only diagnostic command.

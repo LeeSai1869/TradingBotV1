@@ -1,5 +1,5 @@
 """Section 5: regime; Pine lines 5779–5819."""
-from Section_4_Features.individual import runtime as rt
+from Section_4_Features.execution import runtime as rt
 
 def update(e):
     # Pine 5799
