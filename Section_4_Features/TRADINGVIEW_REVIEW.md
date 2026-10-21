@@ -1,7 +1,7 @@
 # Full Section 4 / Section 5 conversion
 
 The executable calculations in `sections_4&5_Tradingview` are translated into
-**52 individual Section 4 feature modules and six Section 5 modules**. The complete
+**29 Section 4 main-feature modules and six Section 5 modules**. The complete
 537-field MarketFeatures contract and six regime outputs are calculated and
 persisted, with compatible aliases for existing clients. This replaces the earlier
 partial translation. It does not add renderers for every advanced feature.
@@ -13,12 +13,13 @@ partial translation. It does not add renderers for every advanced feature.
 - Composition: `feature_builder.py`; bounded runner integration: `processor.py`.
 - Shared execution state: `individual/context.py`; scalar/array primitives:
   `individual/runtime.py`; versioned JSON checkpoints: `individual/checkpoint.py`.
-- The EMA, RSI, ATR, DMI, ADX, WMA, VWAP and volume files contain their native
+- The EMA, RSI, ATR, ADX/DI, WMA, VWAP and volume files contain their native
   calculation kernels as well as their source-referenced update functions.
 - `features/registry.py` indexes the active individual modules. Small older pure
   APIs remain for import compatibility; they are not the runner's calculation path.
 - Broad `market_location`, `market_liquidity`, `market_imbalance`, `bos_structure`
-  and `support_resistance` implementations are removed from the active source.
+  implementations are removed from the legacy source. The converted
+  `individual/support_resistance.py` owns the complete support/resistance lifecycle.
 
 The previous Section 4/5 Python source is preserved in
 `backups/pre_full_conversion_b5a67d7.zip`. Raw candles are not deleted or downloaded
@@ -132,3 +133,14 @@ extra source lines and written outputs are in `individual/manifest.json`.
 
 When changing formulas or state semantics, increment the checkpoint version and
 replay the raw history. Do not resume an old checkpoint under new formulas.
+
+## Main-feature consolidation
+
+The regrouping preserves formulas, source-call IDs, calculation order, persistent
+array names and all exported fields. Checkpoint version 3 remains compatible;
+existing memory resumes without a replay caused solely by moving files. Liquidity,
+support/resistance, sessions, order blocks with breakers, EMA metrics and ADX/DI
+each have one owner. The manifest keeps their dependency stages explicit. The
+converter emits these owners directly and removes superseded generated files.
+Existing UI renderers/styles and HUD/alert field names remain available; this
+refactor does not introduce new chart renderers for advanced zone features.

@@ -30,10 +30,35 @@ class CompleteConversionTests(unittest.TestCase):
             covered.update(range(entry['start'],entry['end']+1));covered.update(entry.get('extra_lines',[]))
         expected={line for _,_,line in statements(lines,793,5112)}|{line for _,_,line in statements(lines,5741,5893)}
         self.assertEqual(expected-covered,set())
-        self.assertEqual(len(MANIFEST['modules']),58)
+        self.assertEqual(len(MANIFEST['modules']),35)
         for name in MANIFEST['modules']:
             module=importlib.import_module(name if '.' in name else 'Section_4_Features.individual.'+name)
             self.assertTrue(callable(module.update))
+
+    def test_main_feature_consolidation_preserves_all_packets(self):
+        # Captured from the pre-consolidation engine (4267c45), before moving code.
+        import hashlib
+        digest=hashlib.sha256();engine=Engine('ETHUSDT','15m')
+        for i in range(700):
+            c=100+math.sin(i/9)*14+i*.01
+            client=dict(symbol='ETHUSDT',interval='15m',open_time=1700000000000+i*900000,
+                        close_time=1700000000000+(i+1)*900000-1,open=c-.5,high=c+2,
+                        low=c-3,close=c,volume=10+i%17)
+            digest.update(json.dumps(engine.step(client),sort_keys=True,separators=(',',':')).encode())
+        self.assertEqual(digest.hexdigest(),'9a8ab1dafc558a35c3a01123eeac30022599e0fc885e569d8bf18b5336c210c7')
+        from Section_4_Features.features.registry import load
+        owners={row['name']:row for row in load()}
+        for name in ('liquidity','support_resistance','sessions','order_blocks','ema','adx'):
+            self.assertIn(name,owners)
+        self.assertEqual(len(owners),29)
+        from Section_11_UI_UX.server.hud import FIELDS
+        for field in ('di_dominance','rsi','adx','ema50','vwap'):
+            self.assertIn('features.'+field,FIELDS)
+        for step in MANIFEST['steps']:
+            import importlib
+            name=step['module']
+            module=importlib.import_module(name if '.' in name else 'Section_4_Features.individual.'+name)
+            self.assertTrue(callable(getattr(module,step['function'])))
 
     def test_all_contract_fields_and_hand_calculated_wilder_seed(self):
         engine=Engine('ETHUSDT','1m',{'rsiLen':3,'atrLen':2,'adxLen':2})

@@ -3,23 +3,15 @@
   "modules": [
     "price",
     "ema",
-    "ema_structure",
     "wma",
     "vwap",
-    "ema_position",
     "rsi",
-    "dmi",
     "adx",
-    "di_metrics",
     "momentum_weakening",
     "momentum_divergence",
     "atr",
     "volume",
-    "zone_geometry",
-    "support_zones",
-    "institutional_support",
-    "resistance_zones",
-    "institutional_resistance",
+    "support_resistance",
     "swing_pivots",
     "structure",
     "break_of_structure",
@@ -31,27 +23,12 @@
     "break_retest",
     "price_change",
     "fibonacci",
-    "liquidity_pools",
-    "liquidity_sweeps",
-    "absorption",
-    "liquidity_type",
-    "external_liquidity",
-    "internal_liquidity",
-    "liquidity_clusters",
-    "liquidity_age",
-    "liquidity_importance",
-    "nearest_liquidity",
+    "liquidity",
     "order_blocks",
-    "breaker_blocks",
     "volume_profile",
     "range",
     "swing_levels",
-    "session_clock",
-    "asia_session",
-    "london_session",
-    "newyork_session",
-    "nearest_session_levels",
-    "ema_extension",
+    "sessions",
     "daily_levels",
     "Section_5_Market_Regime.features.control",
     "Section_5_Market_Regime.features.energy",
@@ -60,9 +37,245 @@
     "Section_5_Market_Regime.features.trend_state",
     "Section_5_Market_Regime.features.transition"
   ],
+  "steps": [
+    {
+      "module": "price",
+      "function": "update"
+    },
+    {
+      "module": "ema",
+      "function": "update_ema"
+    },
+    {
+      "module": "ema",
+      "function": "update_ema_structure"
+    },
+    {
+      "module": "wma",
+      "function": "update"
+    },
+    {
+      "module": "vwap",
+      "function": "update"
+    },
+    {
+      "module": "ema",
+      "function": "update_ema_position"
+    },
+    {
+      "module": "rsi",
+      "function": "update"
+    },
+    {
+      "module": "adx",
+      "function": "update_dmi"
+    },
+    {
+      "module": "adx",
+      "function": "update_adx"
+    },
+    {
+      "module": "adx",
+      "function": "update_di_metrics"
+    },
+    {
+      "module": "momentum_weakening",
+      "function": "update"
+    },
+    {
+      "module": "momentum_divergence",
+      "function": "update"
+    },
+    {
+      "module": "atr",
+      "function": "update"
+    },
+    {
+      "module": "volume",
+      "function": "update"
+    },
+    {
+      "module": "support_resistance",
+      "function": "update_zone_geometry"
+    },
+    {
+      "module": "support_resistance",
+      "function": "update_support_zones"
+    },
+    {
+      "module": "support_resistance",
+      "function": "update_institutional_support"
+    },
+    {
+      "module": "support_resistance",
+      "function": "update_resistance_zones"
+    },
+    {
+      "module": "support_resistance",
+      "function": "update_institutional_resistance"
+    },
+    {
+      "module": "swing_pivots",
+      "function": "update"
+    },
+    {
+      "module": "structure",
+      "function": "update"
+    },
+    {
+      "module": "break_of_structure",
+      "function": "update"
+    },
+    {
+      "module": "fair_value_gaps",
+      "function": "update"
+    },
+    {
+      "module": "candle",
+      "function": "update"
+    },
+    {
+      "module": "fractal_pivots",
+      "function": "update"
+    },
+    {
+      "module": "engulfing",
+      "function": "update"
+    },
+    {
+      "module": "rejection",
+      "function": "update"
+    },
+    {
+      "module": "break_retest",
+      "function": "update"
+    },
+    {
+      "module": "price_change",
+      "function": "update"
+    },
+    {
+      "module": "fibonacci",
+      "function": "update"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_pools"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_sweeps"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_absorption"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_type"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_external_liquidity"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_internal_liquidity"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_clusters"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_age"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_liquidity_importance"
+    },
+    {
+      "module": "liquidity",
+      "function": "update_nearest_liquidity"
+    },
+    {
+      "module": "order_blocks",
+      "function": "update_order_blocks"
+    },
+    {
+      "module": "order_blocks",
+      "function": "update_breaker_blocks"
+    },
+    {
+      "module": "volume_profile",
+      "function": "update"
+    },
+    {
+      "module": "range",
+      "function": "update"
+    },
+    {
+      "module": "swing_levels",
+      "function": "update"
+    },
+    {
+      "module": "sessions",
+      "function": "update_session_clock"
+    },
+    {
+      "module": "sessions",
+      "function": "update_asia_session"
+    },
+    {
+      "module": "sessions",
+      "function": "update_london_session"
+    },
+    {
+      "module": "sessions",
+      "function": "update_newyork_session"
+    },
+    {
+      "module": "sessions",
+      "function": "update_nearest_session_levels"
+    },
+    {
+      "module": "ema",
+      "function": "update_ema_extension"
+    },
+    {
+      "module": "daily_levels",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.control",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.energy",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.regime",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.fatigue",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.trend_state",
+      "function": "update"
+    },
+    {
+      "module": "Section_5_Market_Regime.features.transition",
+      "function": "update"
+    }
+  ],
   "manifest": [
     {
       "feature": "price",
+      "stage": "price",
+      "function": "update",
       "start": 793,
       "end": 806,
       "extra_lines": [],
@@ -80,6 +293,8 @@
     },
     {
       "feature": "ema",
+      "stage": "ema",
+      "function": "update_ema",
       "start": 807,
       "end": 823,
       "extra_lines": [],
@@ -100,7 +315,9 @@
       ]
     },
     {
-      "feature": "ema_structure",
+      "feature": "ema",
+      "stage": "ema_structure",
+      "function": "update_ema_structure",
       "start": 824,
       "end": 872,
       "extra_lines": [],
@@ -128,6 +345,8 @@
     },
     {
       "feature": "wma",
+      "stage": "wma",
+      "function": "update",
       "start": 873,
       "end": 878,
       "extra_lines": [],
@@ -139,6 +358,8 @@
     },
     {
       "feature": "vwap",
+      "stage": "vwap",
+      "function": "update",
       "start": 879,
       "end": 959,
       "extra_lines": [],
@@ -171,7 +392,9 @@
       ]
     },
     {
-      "feature": "ema_position",
+      "feature": "ema",
+      "stage": "ema_position",
+      "function": "update_ema_position",
       "start": 960,
       "end": 971,
       "extra_lines": [],
@@ -188,6 +411,8 @@
     },
     {
       "feature": "rsi",
+      "stage": "rsi",
+      "function": "update",
       "start": 972,
       "end": 976,
       "extra_lines": [],
@@ -198,7 +423,9 @@
       ]
     },
     {
-      "feature": "dmi",
+      "feature": "adx",
+      "stage": "dmi",
+      "function": "update_dmi",
       "start": 977,
       "end": 978,
       "extra_lines": [],
@@ -210,6 +437,8 @@
     },
     {
       "feature": "adx",
+      "stage": "adx",
+      "function": "update_adx",
       "start": 979,
       "end": 979,
       "extra_lines": [],
@@ -218,7 +447,9 @@
       ]
     },
     {
-      "feature": "di_metrics",
+      "feature": "adx",
+      "stage": "di_metrics",
+      "function": "update_di_metrics",
       "start": 980,
       "end": 984,
       "extra_lines": [],
@@ -232,6 +463,8 @@
     },
     {
       "feature": "momentum_weakening",
+      "stage": "momentum_weakening",
+      "function": "update",
       "start": 985,
       "end": 987,
       "extra_lines": [],
@@ -242,6 +475,8 @@
     },
     {
       "feature": "momentum_divergence",
+      "stage": "momentum_divergence",
+      "function": "update",
       "start": 988,
       "end": 993,
       "extra_lines": [],
@@ -253,6 +488,8 @@
     },
     {
       "feature": "atr",
+      "stage": "atr",
+      "function": "update",
       "start": 994,
       "end": 1003,
       "extra_lines": [],
@@ -267,6 +504,8 @@
     },
     {
       "feature": "volume",
+      "stage": "volume",
+      "function": "update",
       "start": 1004,
       "end": 1012,
       "extra_lines": [],
@@ -279,7 +518,9 @@
       ]
     },
     {
-      "feature": "zone_geometry",
+      "feature": "support_resistance",
+      "stage": "zone_geometry",
+      "function": "update_zone_geometry",
       "start": 1013,
       "end": 1215,
       "extra_lines": [],
@@ -398,7 +639,9 @@
       ]
     },
     {
-      "feature": "support_zones",
+      "feature": "support_resistance",
+      "stage": "support_zones",
+      "function": "update_support_zones",
       "start": 1216,
       "end": 1631,
       "extra_lines": [],
@@ -520,7 +763,9 @@
       ]
     },
     {
-      "feature": "institutional_support",
+      "feature": "support_resistance",
+      "stage": "institutional_support",
+      "function": "update_institutional_support",
       "start": 1632,
       "end": 1990,
       "extra_lines": [],
@@ -638,7 +883,9 @@
       ]
     },
     {
-      "feature": "resistance_zones",
+      "feature": "support_resistance",
+      "stage": "resistance_zones",
+      "function": "update_resistance_zones",
       "start": 1991,
       "end": 2406,
       "extra_lines": [],
@@ -760,7 +1007,9 @@
       ]
     },
     {
-      "feature": "institutional_resistance",
+      "feature": "support_resistance",
+      "stage": "institutional_resistance",
+      "function": "update_institutional_resistance",
       "start": 2407,
       "end": 2762,
       "extra_lines": [],
@@ -879,6 +1128,8 @@
     },
     {
       "feature": "swing_pivots",
+      "stage": "swing_pivots",
+      "function": "update",
       "start": 2763,
       "end": 2908,
       "extra_lines": [],
@@ -925,6 +1176,8 @@
     },
     {
       "feature": "structure",
+      "stage": "structure",
+      "function": "update",
       "start": 2909,
       "end": 3252,
       "extra_lines": [],
@@ -1025,6 +1278,8 @@
     },
     {
       "feature": "break_of_structure",
+      "stage": "break_of_structure",
+      "function": "update",
       "start": 3253,
       "end": 3451,
       "extra_lines": [],
@@ -1106,6 +1361,8 @@
     },
     {
       "feature": "fair_value_gaps",
+      "stage": "fair_value_gaps",
+      "function": "update",
       "start": 3452,
       "end": 3877,
       "extra_lines": [],
@@ -1218,6 +1475,8 @@
     },
     {
       "feature": "candle",
+      "stage": "candle",
+      "function": "update",
       "start": 3878,
       "end": 3895,
       "extra_lines": [
@@ -1255,6 +1514,8 @@
     },
     {
       "feature": "fractal_pivots",
+      "stage": "fractal_pivots",
+      "function": "update",
       "start": 3896,
       "end": 3900,
       "extra_lines": [],
@@ -1267,6 +1528,8 @@
     },
     {
       "feature": "engulfing",
+      "stage": "engulfing",
+      "function": "update",
       "start": 3910,
       "end": 3923,
       "extra_lines": [],
@@ -1277,6 +1540,8 @@
     },
     {
       "feature": "rejection",
+      "stage": "rejection",
+      "function": "update",
       "start": 3924,
       "end": 3934,
       "extra_lines": [],
@@ -1289,6 +1554,8 @@
     },
     {
       "feature": "break_retest",
+      "stage": "break_retest",
+      "function": "update",
       "start": 3935,
       "end": 3948,
       "extra_lines": [],
@@ -1301,6 +1568,8 @@
     },
     {
       "feature": "price_change",
+      "stage": "price_change",
+      "function": "update",
       "start": 3949,
       "end": 3954,
       "extra_lines": [],
@@ -1311,6 +1580,8 @@
     },
     {
       "feature": "fibonacci",
+      "stage": "fibonacci",
+      "function": "update",
       "start": 3955,
       "end": 4099,
       "extra_lines": [],
@@ -1348,7 +1619,9 @@
       ]
     },
     {
-      "feature": "liquidity_pools",
+      "feature": "liquidity",
+      "stage": "liquidity_pools",
+      "function": "update_liquidity_pools",
       "start": 4100,
       "end": 4146,
       "extra_lines": [],
@@ -1372,7 +1645,9 @@
       ]
     },
     {
-      "feature": "liquidity_sweeps",
+      "feature": "liquidity",
+      "stage": "liquidity_sweeps",
+      "function": "update_liquidity_sweeps",
       "start": 4147,
       "end": 4162,
       "extra_lines": [],
@@ -1386,7 +1661,9 @@
       ]
     },
     {
-      "feature": "absorption",
+      "feature": "liquidity",
+      "stage": "absorption",
+      "function": "update_absorption",
       "start": 4163,
       "end": 4199,
       "extra_lines": [],
@@ -1403,7 +1680,9 @@
       ]
     },
     {
-      "feature": "liquidity_type",
+      "feature": "liquidity",
+      "stage": "liquidity_type",
+      "function": "update_liquidity_type",
       "start": 4200,
       "end": 4208,
       "extra_lines": [],
@@ -1412,7 +1691,9 @@
       ]
     },
     {
-      "feature": "external_liquidity",
+      "feature": "liquidity",
+      "stage": "external_liquidity",
+      "function": "update_external_liquidity",
       "start": 4209,
       "end": 4237,
       "extra_lines": [],
@@ -1429,7 +1710,9 @@
       ]
     },
     {
-      "feature": "internal_liquidity",
+      "feature": "liquidity",
+      "stage": "internal_liquidity",
+      "function": "update_internal_liquidity",
       "start": 4238,
       "end": 4245,
       "extra_lines": [],
@@ -1442,7 +1725,9 @@
       ]
     },
     {
-      "feature": "liquidity_clusters",
+      "feature": "liquidity",
+      "stage": "liquidity_clusters",
+      "function": "update_liquidity_clusters",
       "start": 4246,
       "end": 4267,
       "extra_lines": [],
@@ -1456,7 +1741,9 @@
       ]
     },
     {
-      "feature": "liquidity_age",
+      "feature": "liquidity",
+      "stage": "liquidity_age",
+      "function": "update_liquidity_age",
       "start": 4268,
       "end": 4283,
       "extra_lines": [],
@@ -1466,7 +1753,9 @@
       ]
     },
     {
-      "feature": "liquidity_importance",
+      "feature": "liquidity",
+      "stage": "liquidity_importance",
+      "function": "update_liquidity_importance",
       "start": 4284,
       "end": 4332,
       "extra_lines": [],
@@ -1480,7 +1769,9 @@
       ]
     },
     {
-      "feature": "nearest_liquidity",
+      "feature": "liquidity",
+      "stage": "nearest_liquidity",
+      "function": "update_nearest_liquidity",
       "start": 4333,
       "end": 4365,
       "extra_lines": [],
@@ -1497,6 +1788,8 @@
     },
     {
       "feature": "order_blocks",
+      "stage": "order_blocks",
+      "function": "update_order_blocks",
       "start": 4366,
       "end": 4610,
       "extra_lines": [],
@@ -1582,7 +1875,9 @@
       ]
     },
     {
-      "feature": "breaker_blocks",
+      "feature": "order_blocks",
+      "stage": "breaker_blocks",
+      "function": "update_breaker_blocks",
       "start": 4611,
       "end": 4736,
       "extra_lines": [],
@@ -1653,6 +1948,8 @@
     },
     {
       "feature": "volume_profile",
+      "stage": "volume_profile",
+      "function": "update",
       "start": 4737,
       "end": 4901,
       "extra_lines": [],
@@ -1708,6 +2005,8 @@
     },
     {
       "feature": "range",
+      "stage": "range",
+      "function": "update",
       "start": 4902,
       "end": 4914,
       "extra_lines": [],
@@ -1720,6 +2019,8 @@
     },
     {
       "feature": "swing_levels",
+      "stage": "swing_levels",
+      "function": "update",
       "start": 4915,
       "end": 4922,
       "extra_lines": [],
@@ -1731,7 +2032,9 @@
       ]
     },
     {
-      "feature": "session_clock",
+      "feature": "sessions",
+      "stage": "session_clock",
+      "function": "update_session_clock",
       "start": 4923,
       "end": 4962,
       "extra_lines": [],
@@ -1774,7 +2077,9 @@
       ]
     },
     {
-      "feature": "asia_session",
+      "feature": "sessions",
+      "stage": "asia_session",
+      "function": "update_asia_session",
       "start": 4963,
       "end": 4984,
       "extra_lines": [
@@ -1796,7 +2101,9 @@
       ]
     },
     {
-      "feature": "london_session",
+      "feature": "sessions",
+      "stage": "london_session",
+      "function": "update_london_session",
       "start": 4985,
       "end": 5006,
       "extra_lines": [
@@ -1818,7 +2125,9 @@
       ]
     },
     {
-      "feature": "newyork_session",
+      "feature": "sessions",
+      "stage": "newyork_session",
+      "function": "update_newyork_session",
       "start": 5007,
       "end": 5028,
       "extra_lines": [
@@ -1840,7 +2149,9 @@
       ]
     },
     {
-      "feature": "nearest_session_levels",
+      "feature": "sessions",
+      "stage": "nearest_session_levels",
+      "function": "update_nearest_session_levels",
       "start": 5037,
       "end": 5098,
       "extra_lines": [],
@@ -1857,7 +2168,9 @@
       ]
     },
     {
-      "feature": "ema_extension",
+      "feature": "ema",
+      "stage": "ema_extension",
+      "function": "update_ema_extension",
       "start": 5099,
       "end": 5104,
       "extra_lines": [],
@@ -1868,6 +2181,8 @@
     },
     {
       "feature": "daily_levels",
+      "stage": "daily_levels",
+      "function": "update",
       "start": 5105,
       "end": 5112,
       "extra_lines": [],

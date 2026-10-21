@@ -488,7 +488,7 @@ restart the runner to resume catch-up from its last committed feature rows.
 
 Complete feature conversion and replay
 --------------------------------------
-The supplied Section 4/5 reference is now covered by 58 individual feature modules,
+The supplied Section 4/5 reference is now covered by 35 main-feature modules (29 Section 4 and six Section 5),
 not broad location/momentum implementations. See
 `Section_4_Features/TRADINGVIEW_REVIEW.md` and `individual/README.md` for the source
 map, external parameter defaults, explicit source corrections and parity limits.

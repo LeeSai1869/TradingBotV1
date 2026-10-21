@@ -117,8 +117,8 @@ class Context:
             from .atr import calculate
             result=calculate(state,self.current_client,*args)
         elif name=='dmi':
-            from .dmi import calculate
-            result=calculate(state,self.current_client,*args)
+            from .adx import calculate_dmi
+            result=calculate_dmi(state,self.current_client,*args)
         elif name in ('pivothigh','pivotlow'):
             value,left,right=args;left,right=int(left),int(right);queue=state.setdefault('queue',[]);queue.append(value);state['queue']=queue=queue[-(left+right+1):]
             result=rt.NA
