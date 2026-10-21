@@ -1,4 +1,4 @@
-import {getSeries as candleSeries} from "../candles/index.js";
+import {featurePriceFormat} from '../../web_root/value_format.js';
 // Completed stored indicators use exactly the same canonical bars as candles.
 import {FEATURE_STYLES} from '../../controls/settings/feature_styles.js';
 export const name='indicators';
@@ -32,7 +32,7 @@ function create(feature){
     for(const [key,label,,presentation='line'] of FEATURE_STYLES[feature].outputs){
         const line=chart.addSeries(presentation==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,
             {visible:false,title:label,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true,
-             priceFormat:feature==='Volume'?{type:'volume'}:{type:'price',precision:2,minMove:.01}},state.pane?.paneIndex()??0);
+             priceFormat:featurePriceFormat},state.pane?.paneIndex()??0);
         state.lines.set(key,line);
     }
     groups.set(feature,state);
@@ -63,7 +63,7 @@ export function update(instance,data){
         if(!state)state=create(feature);
         for(const [key,line] of state.lines){
             const style=styles()[key];line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
-                priceFormat:feature==='VWAP'||feature==='ATR'?candleSeries()?.options().priceFormat:feature==='Volume'?{type:'volume'}:{type:'price',precision:2,minMove:.01},
+                priceFormat:featurePriceFormat,
                 lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:!!style?.visible && !state.collapsed});
             if(!style?.visible)continue;
             line.setData((data.bars||[]).map(bar=>{

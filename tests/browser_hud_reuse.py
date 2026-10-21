@@ -31,7 +31,7 @@ async def exercise(base,library):
             }''')
             await settle(page)
             assert await table.locator('tbody tr').filter(has_text='Close').locator('td').inner_text()=='444'
-            assert await table.locator('tbody tr').filter(has_text='EMA50').locator('td').inner_text()=='444.5'
+            assert await table.locator('tbody tr').filter(has_text='EMA50').locator('td').inner_text()=='444.50'
             assert 'Live' in await table.inner_text()
             await page.wait_for_timeout(5200)
             assert not any('/api/hud?' in url for url in requests),requests

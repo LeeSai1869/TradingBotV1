@@ -1,4 +1,5 @@
 // Alert configuration is per account; evaluation happens in the local backend.
+import {formatValue} from '../../web_root/value_format.js';
 export const name = 'alerts';
 let dialog, editor, editorTitle, editorStatus, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
 let polling=false, timer, editing=null, refreshId=0, saving=false;
@@ -86,7 +87,7 @@ async function refresh() {
     if(!packet.rules.length)el('p','No saved alerts. Use + to create your first alert.',rules,'settings-note');
     for(const rule of packet.rules) {
         const row=el('div','',rules,'alert-rule');
-        el('strong',rule.name,row);el('p',`${rule.symbol} ${rule.interval} · ${rule.field} ${rule.operator.replaceAll('_',' ')} ${rule.target_field||rule.value} · ${rule.status}`,row,'settings-note');
+        el('strong',rule.name,row);el('p',`${rule.symbol} ${rule.interval} · ${rule.field} ${rule.operator.replaceAll('_',' ')} ${rule.target_field||formatValue(rule.value,rule.field)} · ${rule.status}`,row,'settings-note');
         const buttons=el('div','',row,'settings-coin-actions');
         const edit=el('button','Edit',buttons);edit.onclick=()=>{if(saving)return;fill(rule);editorTitle.textContent='Edit alert';editorStatus.textContent='';editor.showModal();};
         const toggle=el('button',rule.enabled?'Pause':'Re-arm',buttons);

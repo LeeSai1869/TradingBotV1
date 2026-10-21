@@ -1,6 +1,6 @@
+import {formatValue} from '../../web_root/value_format.js';
 export const name='candle_details';
 let box, cache, hoverTime=null, positions=new Map();
-const format=n=>Number.isFinite(n)?new Intl.NumberFormat(undefined,{maximumSignificantDigits:9}).format(n):'—';
 function render(){
     if(!box || !cache)return;
     const bars=cache.renderBars||cache.bars||[];
@@ -14,7 +14,7 @@ function render(){
     const time=document.createElement('div');time.textContent=new Date(bar.open_time).toLocaleString();box.append(time);
     const list=document.createElement('dl');
     for(const [label,n] of [['Open',candle.open],['High',candle.high],['Low',candle.low],['Close',candle.close],['Volume',candle.volume],['Change %',change]]){
-        const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=label;value.textContent=format(n)+(label==='Change %' && n!==null?'%':'');list.append(term,value);
+        const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=label;value.textContent=formatValue(n,`client.${label.toLowerCase()}`)+(label==='Change %' && n!==null?'%':'');list.append(term,value);
     }box.append(list);
 }
 export function mount(chart){

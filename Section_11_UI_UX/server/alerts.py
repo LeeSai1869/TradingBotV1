@@ -21,6 +21,13 @@ OPERATORS = {'above','at_or_above','below','at_or_below','equals','crosses_above
 SOUNDS = {'chime','bell','alarm','none'}
 
 
+def display_value(value, field):
+    """Round presentation only; rule evaluation keeps the original number."""
+    raw = {'client.high','client.low','client.close'} | {
+        f'features.{key}' for key in ('c','o','h','l','c1','o1','h1','l1','current_price','prev_close')}
+    return str(value) if field in raw else f'{value:.2f}'
+
+
 def open_db():
     path = auth.USERS_FILE.with_name('alerts.sqlite3')
     path.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -166,7 +173,7 @@ def evaluate_live(rule,spec):
                     conn.execute('INSERT OR REPLACE INTO live_state VALUES (?,?,?,?)',(rule['id'],value,target,rule['revision']))
                     status='Watching live price'
                     if fired:
-                        message=f"{spec['name']}: {symbol} {iv} live — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {target:g} (value {value:g})"
+                        message=f"{spec['name']}: {symbol} {iv} live — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {display_value(target, spec.get('target_field') or spec['field'])} (value {display_value(value, spec['field'])})"
                         event={'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'live'}
                         inserted=conn.execute('INSERT OR IGNORE INTO events(owner,rule_id,epoch,bar_time,created,packet) VALUES(?,?,?,?,?,?)',(rule['owner'],rule['id'],version,bar['open_time'],event['created'],json.dumps(event))).rowcount
                         status='Triggered' if inserted else 'Already triggered on this candle'
@@ -214,7 +221,7 @@ def evaluate_rule(rule):
                 cursor=bar['open_time']; previous=bar
                 status='Watching new closed candles' if value is not None and target is not None else 'Field has no numeric value on last candle'
                 if fired:
-                    message=f"{spec['name']}: {symbol} {iv} — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {target:g} (value {value:g})"
+                    message=f"{spec['name']}: {symbol} {iv} — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {display_value(target, spec.get('target_field') or spec['field'])} (value {display_value(value, spec['field'])})"
                     updates.append({'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'closed'})
                     status='Triggered'
                     if spec['repeat']=='once': spec['enabled']=False; break

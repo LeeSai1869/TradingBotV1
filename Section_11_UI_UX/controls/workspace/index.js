@@ -2,6 +2,7 @@ import {mountResize} from './resize.js';
 import {chartColumn} from './chart_column.js';
 import {hudRequest} from './requests.js';
 import {normalizeHud} from './preferences.js';
+import {formatValue} from '../../web_root/value_format.js';
 export const name = 'workspace';
 let panel, hud, hudToggle, table, heading, status, toggle, timer, request, generation = 0, pending = false;
 let catalogPromise, lastPacket, lastChoices;
@@ -17,11 +18,6 @@ function el(tag, text, parent, className) {
 }
 function preferences() {return normalizeHud(window.Composer.config.hud);}
 function selectedSymbol(config) {return config.symbol || document.getElementById('symbol').value;}
-function format(value) {
-    if(value==null)return '—';
-    if(typeof value==='number')return new Intl.NumberFormat(undefined,{maximumSignificantDigits:7}).format(value);
-    return String(value);
-}
 function invalidate() {
     generation++; request?.abort();pending=false;
     table?.replaceChildren();lastPacket=null;
@@ -79,8 +75,8 @@ function renderPacket(packet,choices,config,symbol) {
         for(const field of config.fields) {
             const row=el('tr','',body);el('th',choices.fields[field] || field,row).scope='row';
             for(const column of packet.columns) {
-                const value=column.values[field];const cell=el('td',format(value),row);
-                cell.title=value==null?'Not calculated or downloaded yet':`${symbol} ${column.interval} · ${choices.fields[field] || field}: ${value}`;
+                const value=column.values[field], formatted=formatValue(value,field);const cell=el('td',formatted,row);
+                cell.title=value==null?'Not calculated or downloaded yet':`${symbol} ${column.interval} · ${choices.fields[field] || field}: ${formatted}`;
             }
         }
         status.textContent='Latest candle values · refreshed '+new Date(packet.as_of).toLocaleTimeString()+'. Missing values appear as —.';

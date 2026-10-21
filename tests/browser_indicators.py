@@ -31,8 +31,11 @@ async def exercise(base,library):
             await page.get_by_role('group',name=f'{feature} pane controls').wait_for()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').data().at(-1).value;})()") == 69
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('vwap').getPane().paneIndex();})()") == 0
-        assert await page.evaluate("Canvas.chart.panes()[0].getSeries().filter(s=>s.options().title==='EMA 50' || s.options().color===Composer.config.featureStyles.ema50.color).some(s=>s.options().lastValueVisible)")
+        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','volume','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
+        assert await page.evaluate("Canvas.chart.panes()[0].getSeries().filter(s=>s.options().title==='EMA 50' || s.options().color===Composer.config.featureStyles.ema50.color).some(s=>s.options().lastValueVisible && s.priceFormatter().format(34.40199)==='34.40')")
         assert 'Open' in await page.get_by_role('region',name='Candle details').inner_text()
+        details=page.get_by_role('region',name='Candle details')
+        assert await details.locator('dt').filter(has_text='Volume').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
         await page.evaluate("""async()=>{
             const indicators=await import('/overlays/indicators/index.js');
             const bar=DataCache.bars.at(-1);

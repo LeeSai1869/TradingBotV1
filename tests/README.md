@@ -7,6 +7,12 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 Completed indicator displays
 ---------------------------
+Feature displays use exactly two decimal places in the HUD (including tooltips),
+indicator price labels, candle volume/change details and new alert messages.
+Raw OHLC prices retain their numeric precision. This is presentation formatting;
+stored values and alert comparisons retain full precision. `value_format.test.mjs`
+checks that distinction; browser indicator/HUD checks exercise the rendered values.
+
 RSI, ADX/DMI, ATR, Volume and VWAP can be enabled in Features settings.
 RSI, ADX, ATR and Volume use synchronized lower chart panes with collapse,
 close and direct settings buttons. Per-output colors, widths and line styles
