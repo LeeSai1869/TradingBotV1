@@ -107,6 +107,16 @@ def main():
         print(f'{iv:6} {candles:10}  {stamp(t):32} {features:10}  {stamp(ft)}')
     for error in sorted(errors): print('Storage warning:',error)
     print('Fresh pairs download one 1000-bar page per cycle; features and other pairs share the same runner.')
+    if Path(features_store.DB_PATH).exists():
+        conn=sqlite3.connect(Path(features_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
+        try:
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
+                checkpoints=conn.execute('SELECT interval,last_open_time FROM feature_engine_state WHERE symbol=?',(symbol,)).fetchall()
+                if checkpoints:
+                    print('Complete formula-v3 replay checkpoints (older rows can still use previous formulas):')
+                    for interval,timestamp in checkpoints:print(f'{interval:6} replayed through {stamp(timestamp)}')
+                    print('Replay resumes automatically in batches after restart; live features wait for the closed checkpoint to catch up.')
+        finally:conn.close()
     if Path(klines_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
         try:

@@ -102,7 +102,7 @@ Edit processors.json:
     {
       "schema_version": 1,
       "processors": [
-        {"module": "Section_4_Features.feature_builder", "function": "process_bar"}
+        {"module": "Section_4_Features.processor", "function": "process_bar"}
       ]
     }
 

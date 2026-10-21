@@ -139,7 +139,7 @@ class DataAdminTests(unittest.TestCase):
         orch._processors=[('Section_4_Features.processor.process_bar',processor.process_bar)]
         def cycle():
             order.append('cycle');orch.stop()
-        with patch.object(orchestrator,'update_klines_all',side_effect=lambda:order.append('download')), patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']), patch.object(data_policy,'active_intervals',return_value=['1m']), patch.object(processor,'catch_up',side_effect=lambda *args:order.append('features')), patch.object(orch,'cycle',side_effect=cycle), patch.object(orchestrator._signal,'signal'):
+        with patch.object(orchestrator,'update_klines_all',side_effect=lambda:order.append('download')), patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']), patch.object(data_policy,'active_intervals',return_value=['1m']), patch.object(processor,'maintenance',side_effect=lambda *args:order.append('features')), patch.object(orch,'cycle',side_effect=cycle), patch.object(orchestrator._signal,'signal'):
             orch.run_forever()
         self.assertEqual(order,['download','features','cycle'])
 

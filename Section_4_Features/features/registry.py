@@ -1,43 +1,16 @@
-# ======================================================
-# FEATURE REGISTRY
-# Lists every pure feature module. feature_builder loops this.
-# Adding a feature = create the module + add one entry here.
-# ======================================================
-
-from __future__ import annotations
+"""Registry of individual converted features; legacy pure APIs remain importable."""
 import importlib
+from Section_4_Features.individual.context import MANIFEST
+from Section_4_Features.individual.contract import FIELDS,snake
 
-
-MODULES = (
-    "price",
-    "trend",
-    "ema_structure",
-    "price_location",
-    "wma",
-    "rsi",
-    "di_adx",
-    "atr",
-    "volume",
-    "candle",
-    "vwap",
-)
+MODULES=tuple(name for name in MANIFEST['modules'] if '.' not in name)
 
 
 def load():
-    """Return a list of (module_name, module_object, declaration_dict)."""
-    out = []
-    for name in MODULES:
-        mod = importlib.import_module(
-            f"Section_4_Features.features.{name}"
-        )
-        decl = {
-            "name": getattr(mod, "NAME", name),
-            "inputs": getattr(mod, "INPUTS", ("df",)),
-            "output_fields": getattr(mod, "OUTPUT_FIELDS", ()),
-            "module": mod,
-        }
-        out.append(decl)
-    return out
-
-
-__all__ = ["MODULES", "load"]
+    result=[]
+    for name,entry in zip(MANIFEST['modules'],MANIFEST['manifest']):
+        if '.' in name:continue
+        module=importlib.import_module('Section_4_Features.individual.'+name)
+        result.append({'name':name,'inputs':('context',),'module':module,
+                       'output_fields':tuple(snake(field) for field in entry['outputs'] if snake(field) in FIELDS)})
+    return result

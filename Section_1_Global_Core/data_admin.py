@@ -89,6 +89,7 @@ def delete_data(*, interval=None, symbol=None):
             with conn:
                 for name, table in [('candles','main.klines'),('features','features_memory.features'),('decisions','decisions_memory.decisions')]:
                     counts[name] = conn.execute(f'DELETE FROM {table} WHERE {column}=?', (value,)).rowcount
+                conn.execute(f'DELETE FROM features_memory.feature_engine_state WHERE {column}=?', (value,))
             return counts
         finally:
             conn.close()

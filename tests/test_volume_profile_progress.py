@@ -4,7 +4,7 @@ import subprocess
 import sys
 import unittest
 import numpy as np
-from Section_4_Features.features.market_location import _calculate_volume_profile
+from Section_4_Features.features.volume_profile import _calculate_volume_profile
 
 
 class VolumeProfileProgressTests(unittest.TestCase):
@@ -13,7 +13,7 @@ class VolumeProfileProgressTests(unittest.TestCase):
         code='''
 import json
 import numpy as np
-from Section_4_Features.features.market_location import _calculate_volume_profile
+from Section_4_Features.features.volume_profile import _calculate_volume_profile
 result=_calculate_volume_profile(np.array([.1,3.1]),np.array([0.,3.]),np.array([60.,40.]),2,4,70.)
 print(json.dumps(result))
 '''

@@ -102,7 +102,8 @@ class FormingCandleCache:
             if bar is not None:
                 try:
                     from .live_features import calculate
-                    bar['features'] = calculate(symbol, interval, bar['client'])
+                    first_tick=entry['bar'] is None or entry['bar']['open_time']!=open_time
+                    bar['features'] = calculate(symbol, interval, bar['client'],is_new=first_tick)
                     bar['features_status'] = 'provisional' if bar['features'] else 'waiting for stored history'
                 except Exception as feature_error:
                     # Missing dependencies/history must not interrupt the price feed.

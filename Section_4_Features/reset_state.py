@@ -1,30 +1,6 @@
-# ======================================================
-# SECTION 4 — STATE RESET
-# ======================================================
-# Clears every per-(symbol, tf) state store in Section 4.
-# Call this before starting a fresh backfill pass, or when
-# you want a clean slate for debugging.
-# ======================================================
+"""Reset transient feature caches. Permanent replay checkpoints remain intact."""
 
-from __future__ import annotations
-
-
-def reset_all_state() -> None:
-    from Section_4_Features.features.support_resistance import _sr_memory_store
-    from Section_4_Features.features.bos_structure import (
-        _structure_memory_store,
-        _SWING_PIVOT_STATES,
-        _FLIP_CANDIDATE_STATES,
-    )
-    from Section_4_Features.features.market_imbalance import _imbalance_memory_store
-    from Section_4_Features.features.market_location import _location_memory_store
-
-    _sr_memory_store.clear()
-    _structure_memory_store.clear()
-    _SWING_PIVOT_STATES.clear()
-    _FLIP_CANDIDATE_STATES.clear()
-    _imbalance_memory_store.clear()
-    _location_memory_store.clear()
-
-
-__all__ = ["reset_all_state"]
+def reset_all_state():
+    from . import processor
+    from Section_5_Market_Regime.Market_Regime import _LAST
+    processor._PREVIEWS.clear();processor._ENGINES.clear();processor._BACKUP_CHECKED.clear();_LAST.clear()

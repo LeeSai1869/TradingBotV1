@@ -176,6 +176,21 @@ class GlobalCoreOrchestrator:
         # 2) Audit is owned by update_all() after ingest.
         #    Report the actual result; not-run/error must never become True.
         audit_pass = (_ingest.LAST_AUDIT or {}).get("pass")
+        # Feature replay progresses even when this interval has no new candles.
+        # Each processor owns a bounded budget; downloads stay in this runner.
+        maintained = set()
+        for name, fn in self._processors:
+            module_name = name.rsplit('.', 1)[0]
+            if module_name in maintained:
+                continue
+            maintained.add(module_name)
+            try:
+                module = importlib.import_module(module_name)
+            except ModuleNotFoundError:
+                continue  # Ad-hoc callable processors need no module maintenance.
+            maintenance = getattr(module, 'maintenance', None)
+            if maintenance:
+                maintenance(data_policy.active_symbols(), data_policy.active_intervals())
 
         # 3) Process new bars
         #
@@ -213,7 +228,7 @@ class GlobalCoreOrchestrator:
                         for name, fn in self._processors:
                             module = importlib.import_module(name.rsplit('.', 1)[0])
                             catch = getattr(module, 'catch_up', None)
-                            if catch:
+                            if catch and not getattr(module, "maintenance", None):
                                 catch(s, iv)
                         latest_ot = bars[-1][0]
                         self._state[key] = latest_ot
@@ -242,7 +257,9 @@ class GlobalCoreOrchestrator:
                             break
                         for name, fn in self._processors:
                             try:
-                                fn(ev)
+                                if fn(ev) is False:
+                                    success = False
+                                    break  # A bounded replay has not reached this candle yet.
                             except Exception as e:
                                 print(f"[orchestrator] {name} failed on {s} {iv} {ot}: {e}", flush=True)
                                 traceback.print_exc()
@@ -288,29 +305,23 @@ class GlobalCoreOrchestrator:
         except Exception:
             traceback.print_exc()
         print("[orchestrator] startup catch-up...", flush=True)
-        for s in data_policy.active_symbols():
-            for iv in data_policy.active_intervals():
-                for name, fn in self._processors:
-                    catch_fn = None
-                    try:
-                        mod = __import__(name.rsplit(".", 1)[0],
-                                         fromlist=["catch_up"])
-                        catch_fn = getattr(mod, "catch_up", None)
-                    except Exception:
-                        catch_fn = None
-                    if catch_fn is None:
-                        continue
-                    try:
-                        if not data_policy.enabled(s, iv):
-                            continue
-                        print(f"[orchestrator] catching up {name} {s} {iv}", flush=True)
-                        n = catch_fn(s, iv)
-                        if n:
-                            print(f"[orchestrator]   {name} {s} {iv}: +{n}",
-                                  flush=True)
-                    except Exception as e:
-                        print(f"[orchestrator]   {name} catch_up {s} {iv} "
-                              f"failed: {e}", flush=True)
+        for name, fn in self._processors:
+            try:
+                mod = importlib.import_module(name.rsplit(".", 1)[0])
+                maintenance = getattr(mod, "maintenance", None)
+                if maintenance:
+                    # One global budget, regardless of the number of approved pairs.
+                    maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                    continue
+                catch_fn = getattr(mod, "catch_up", None)
+                if catch_fn:
+                    for s in data_policy.active_symbols():
+                        for iv in data_policy.active_intervals():
+                            if data_policy.enabled(s, iv):
+                                catch_fn(s, iv)
+            except Exception as e:
+                print(f"[orchestrator] {name} startup catch-up failed: {e}", flush=True)
+                traceback.print_exc()
         print("[orchestrator] catch-up done", flush=True)
         print(flush=True)
 

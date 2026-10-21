@@ -171,6 +171,7 @@ The desktop chart server needs access to api.binance.com for live preview.
 
 
 The uploaded live configuration registers only `Section_4_Features.processor`.
+That processor also calculates the six Section 5 regime states.
 No application caller persists decisions with `db.write_adcn()`. Existing stored
 decisions render, but this change does not implement a new decision writer or
 change strategy formulas. The tests' decisions are disposable fixtures.
@@ -240,13 +241,14 @@ not establish Binance connectivity or native Mac notification support.
 
 Live EMA/RSI and runner recovery
 -------------------------------
-The shared forming-candle worker calculates provisional EMA and RSI using the
-same pure Section 4 formulas and 500-bar window as permanent processing. It
-requires contiguous stored history through the prior candle. Each tick replaces
-the forming input, without mutating processor state or writing features. The
-runner still calculates and stores final features after downloading the closed
-candle. Other indicators remain closed-candle only. Live alerts support EMA and
-RSI as well as price. New alert forms take the current chart symbol/timeframe
+The shared forming-candle worker now forks the runner's committed full-history
+formula-v3 checkpoint and calculates the complete provisional feature packet.
+It requires the checkpoint to be adjacent to the forming candle; while historical
+replay is behind, provisional features remain unavailable. Each tick uses a fresh
+fork, without advancing permanent state or writing feature rows. Final closed
+packets and checkpoints are stored together by the existing runner. Live alert
+field eligibility remains price, EMA and RSI; other alert conditions remain
+closed-feature rules. New alert forms take the current chart symbol/timeframe
 on every opening.
 
 On macOS, from the checkout, using the Python environment with pipeline dependencies:
@@ -482,3 +484,27 @@ each iteration adds one valid bin, so expansion is bounded by the histogram size
 subprocess with a deadline, and checks right-edge, single-bin and dense profiles.
 The correction does not alter stored candles or require clearing feature memory;
 restart the runner to resume catch-up from its last committed feature rows.
+
+
+Complete feature conversion and replay
+--------------------------------------
+The supplied Section 4/5 reference is now covered by 58 individual feature modules,
+not broad location/momentum implementations. See
+`Section_4_Features/TRADINGVIEW_REVIEW.md` and `individual/README.md` for the source
+map, external parameter defaults, explicit source corrections and parity limits.
+
+`test_complete_conversion.py` checks source statement coverage, all 537 contract
+fields, independent EMA/Wilder vectors, checkpoint equivalence, pair isolation,
+FVG failure memory, institutional references, live rollback, daily security timing,
+daily dependency repair, empty profile bins, all six regimes, bounded replay,
+backup and export mismatch detection. Previous source is archived. Migration to
+formula version 3 is automatic and bounded; `check_coin.py` distinguishes its
+cursor from old feature row counts. The raw candles and downloader are unchanged.
+
+```sh
+python3 -m Section_4_Features.conversion.validate_export export.csv --symbol ETHUSDT --interval 15m --fields ema50 rsi adx
+```
+
+This read-only comparator requires the same Pine inputs/history and an actual
+export fixture. Passing synthetic regression vectors is not TradingView export
+certification. No such export was provided with the reference source.

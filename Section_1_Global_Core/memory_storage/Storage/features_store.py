@@ -154,12 +154,13 @@ COLUMNS = [
 
 # Keep every pure feature output instead of silently discarding derived fields.
 # Legacy columns retain their order for existing callers.
-from Section_4_Features.features.registry import load as _pure_features
-for _declaration in _pure_features():
-    for _field in _declaration['output_fields']:
-        if _field not in COLUMNS:
-            COLUMNS.append(_field)
+from Section_4_Features.individual.contract import LEGACY_FIELDS
+for _field in LEGACY_FIELDS:
+    if _field not in COLUMNS:COLUMNS.append(_field)
 COLUMNS.append('formula_version')
+from Section_4_Features.individual.contract import FIELDS as _translated_fields
+for _field in _translated_fields:
+    if _field not in COLUMNS:COLUMNS.append(_field)
 _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))
 
 
@@ -170,7 +171,7 @@ def open_db() -> sqlite3.Connection:
     existing = {row[1] for row in conn.execute('PRAGMA table_info(features)')}
     for column in COLUMNS:
         if column not in existing:
-            kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if column.endswith('_type') else 'REAL'
+            kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if _translated_fields.get(column)=='string' or column.endswith('_type') else 'REAL'
             try:
                 conn.execute(f'ALTER TABLE features ADD COLUMN {column} {kind}')
             except sqlite3.OperationalError:
@@ -178,6 +179,7 @@ def open_db() -> sqlite3.Connection:
                 if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
                     conn.close()
                     raise
+    conn.execute('CREATE TABLE IF NOT EXISTS feature_engine_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))')
     conn.commit()
     return conn
 
@@ -207,9 +209,11 @@ def has_row(conn, symbol, interval, open_time) -> bool:
 
 
 def read_row(conn, symbol, interval, open_time):
+    columns = _read_columns(conn)
+    if not columns:return None
     cur = conn.execute(
         f"""
-        SELECT {",".join(COLUMNS)} FROM features
+        SELECT {",".join(columns)} FROM features
         WHERE symbol=? AND interval=? AND open_time=?
         """,
         (symbol, interval, open_time),
@@ -217,7 +221,20 @@ def read_row(conn, symbol, interval, open_time):
     row = cur.fetchone()
     if row is None:
         return None
-    return dict(zip(COLUMNS, row))
+    return _decode(columns, row)
+
+
+def _read_columns(conn):
+    existing={row[1] for row in conn.execute('PRAGMA table_info(features)')}
+    return [column for column in COLUMNS if column in existing]
+
+
+def _decode(columns,row):
+    result=dict.fromkeys(COLUMNS)
+    result.update(zip(columns,row))
+    for key,value in result.items():
+        if value is not None and _translated_fields.get(key)=='bool':result[key]=bool(value)
+    return result
 
 
 def read_range(conn, symbol, interval, start_ms, end_ms):
@@ -226,16 +243,18 @@ def read_range(conn, symbol, interval, start_ms, end_ms):
 
     Returns dictionaries keyed by COLUMNS.
     """
+    columns=_read_columns(conn)
+    if not columns:return []
     cur = conn.execute(
         f"""
-        SELECT {",".join(COLUMNS)} FROM features
+        SELECT {",".join(columns)} FROM features
         WHERE symbol=? AND interval=?
           AND open_time>=? AND open_time<?
         ORDER BY open_time
         """,
         (symbol, interval, start_ms, end_ms),
     )
-    return [dict(zip(COLUMNS, row)) for row in cur.fetchall()]
+    return [_decode(columns,row) for row in cur.fetchall()]
 
 
 def count_rows(conn, symbol=None, interval=None) -> int:

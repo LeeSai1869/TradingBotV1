@@ -10,29 +10,39 @@ from pathlib import Path
 
 class LiveFeaturesTests(unittest.TestCase):
     def setUp(self):
-        self.rows = [('ETHUSDT','1m',i*60000,100,110,90,100+i%13,5,(i+1)*60000-1) for i in range(499)]
-        self.client = dict(symbol='ETHUSDT',interval='1m',open_time=499*60000,
-                           open=100,high=120,low=90,close=112,volume=8,close_time=500*60000-1)
+        import tempfile
+        from Section_1_Global_Core.memory_storage.Storage import features_store
+        from Section_4_Features.individual.engine import Engine
+        from Section_4_Features.individual.checkpoint import dump
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.path=Path(self.temp.name)/'features.db'
+        self.patch=patch.object(features_store,'DB_PATH',self.path);self.patch.start();self.addCleanup(self.patch.stop)
+        self.epochs=patch('Section_4_Features.processor._epoch',return_value=(0,0));self.epochs.start();self.addCleanup(self.epochs.stop)
+        self.engine=Engine('ETHUSDT','1m')
+        for i in range(60):
+            self.engine.step(dict(symbol='ETHUSDT',interval='1m',open_time=i*60000,close_time=(i+1)*60000-1,open=100,high=120,low=90,close=100+i%13,volume=5))
+        self.client=dict(symbol='ETHUSDT',interval='1m',open_time=60*60000,close_time=61*60000-1,open=100,high=120,low=90,close=112,volume=8)
+        self.saved=dump(self.engine,(0,0))
+        conn=features_store.open_db()
+        conn.execute('INSERT INTO feature_engine_state VALUES (?,?,?,?)',('ETHUSDT','1m',59*60000,self.saved));conn.commit();conn.close()
 
-    def test_tick_replaces_last_close_and_matches_permanent_formula(self):
-        with patch('Section_11_UI_UX.server.live_features.db.read_klines_tail',return_value=self.rows) as read:
-            first=calculate('ETHUSDT','1m',self.client)
-            self.client['close']=117
-            second=calculate('ETHUSDT','1m',self.client)
-            again=calculate('ETHUSDT','1m',self.client)
-        read.assert_called_with('ETHUSDT','1m',499*60000,499)
-        frame=pd.DataFrame({'close':[r[6] for r in self.rows]+[117]})
-        expected={**asdict(ema.compute(frame)),**asdict(rsi.compute(frame))}
-        self.assertEqual(second,expected)
-        self.assertEqual(second,again)
-        self.assertNotEqual(first['ema50'],second['ema50'])
-        self.assertNotEqual(first['rsi'],second['rsi'])
-        self.assertEqual(len(self.rows),499)
+    def test_tick_uses_full_closed_state_without_mutation_or_writes(self):
+        import copy
+        from Section_1_Global_Core.memory_storage.Storage import features_store
+        first=calculate('ETHUSDT','1m',self.client)
+        self.client['close']=117
+        second=calculate('ETHUSDT','1m',self.client)
+        self.assertEqual(second,copy.deepcopy(self.engine).step(self.client,is_confirmed=False,is_realtime=True))
+        self.assertEqual(second,calculate('ETHUSDT','1m',self.client))
+        self.assertNotEqual(first['ema50'],second['ema50']);self.assertNotEqual(first['rsi'],second['rsi'])
+        conn=features_store.open_db()
+        self.assertEqual(conn.execute('SELECT state FROM feature_engine_state').fetchone()[0],self.saved)
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM features').fetchone()[0],0);conn.close()
 
-    def test_missing_or_gapped_history_waits(self):
-        for rows in ([], self.rows[:-1], self.rows[:100]+self.rows[101:]):
-            with patch('Section_11_UI_UX.server.live_features.db.read_klines_tail',return_value=rows):
-                self.assertIsNone(calculate('ETHUSDT','1m',self.client))
+    def test_missing_checkpoint_or_nonadjacent_candle_waits(self):
+        self.assertIsNone(calculate('BTCUSDT','1m',self.client))
+        for delta in (-60000,60000):
+            self.assertIsNone(calculate('ETHUSDT','1m',{**self.client,'open_time':self.client['open_time']+delta}))
 
     def test_launchd_uses_checkout_and_selected_interpreter(self):
         config=configuration(Path('/custom/python'),Path('/tmp/logs'))
