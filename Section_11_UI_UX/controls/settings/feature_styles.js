@@ -5,15 +5,15 @@ export const FEATURE_STYLES = {
         ["ema50", "EMA 50", "#ad83f5"], ["ema100", "EMA 100", "#60ab64"],
         ["ema200", "EMA 200", "#4b7bff"], ["ema300", "EMA 300", "#f18a35"],
     ] },
-    RSI: { outputs: [["rsi", "RSI", "#ad83f5"]] },
-    ADX: { outputs: [
+    RSI: { connected: true, outputs: [["rsi", "RSI", "#ad83f5"]] },
+    ADX: { connected: true, outputs: [
         ["adx", "ADX", "#f5c542"], ["di_plus", "+DI", "#26a69a"],
         ["di_minus", "−DI", "#ef5350"], ["di_spread", "DI spread", "#4b7bff"],
         ["di_direction", "DI direction", "#ad83f5"],
     ] },
-    ATR: { outputs: [["atr", "ATR", "#f18a35"], ["atr_ma", "ATR average", "#4b7bff"]] },
-    Volume: { outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"]] },
-    VWAP: { outputs: [
+    ATR: { connected: true, outputs: [["atr", "ATR", "#f18a35"], ["atr_ma", "ATR average", "#4b7bff"]] },
+    Volume: { connected: true, outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"]] },
+    VWAP: { connected: true, outputs: [
         ["vwap", "VWAP", "#f5c542"], ["vwap_upper1", "Upper band 1", "#26a69a"],
         ["vwap_upper2", "Upper band 2", "#60ab64"], ["vwap_lower1", "Lower band 1", "#ef5350"],
         ["vwap_lower2", "Lower band 2", "#e747ae"],

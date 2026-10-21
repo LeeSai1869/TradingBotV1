@@ -28,12 +28,15 @@ function validated(value) {
     }
     result.outputs = migrateStyles(value);
     result.hud = normalizeHud(value.hud);
+    const lower=Number(value.rsiLevels?.lower??30), upper=Number(value.rsiLevels?.upper??70);
+    result.rsiLevels = Number.isFinite(lower) && Number.isFinite(upper) && lower>=0 && upper<=100 && lower<upper?{lower,upper}:{lower:30,upper:70};
     return result;
 }
 
 function apply() {
     const config = window.Composer.config;
     config.hud = saved.hud;
+    config.rsiLevels = saved.rsiLevels;
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
     config.featureStyles = saved.outputs;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
@@ -75,7 +78,15 @@ function renderFeature() {
         };
     }
     if (item === "EMA") toggle("Show EMA", "ema");
-    else note("Style preferences can be saved now. This feature’s chart renderer is not connected yet.");
+    else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    if(item==='RSI') {
+        const row=el('div','',content,'settings-row');
+        for(const key of ['lower','upper']) {
+            const label=el('label',`${key==='lower'?'Lower':'Upper'} reference level `,row), input=el('input','',label);
+            input.type='number';input.min=0;input.max=100;input.value=draft.rsiLevels[key];
+            input.setAttribute('aria-label',`RSI ${key} reference level`);input.onchange=()=>{draft.rsiLevels[key]=Number(input.value);};
+        }
+    }
     if (featureTab === "Display") {
         for (const [key, label] of feature.outputs) {
             const row = el("label", "", content, "settings-row");
@@ -262,6 +273,9 @@ export async function mount() {
     const cancel = el("button", "Cancel", footer); cancel.onclick = () => dialog.close();
     const save = el("button", "Apply", footer, "settings-apply");
     save.onclick = () => {
+        if (!(draft.rsiLevels.lower>=0 && draft.rsiLevels.upper<=100 && draft.rsiLevels.lower<draft.rsiLevels.upper)) {
+            message.textContent='RSI levels must be between 0 and 100, with lower below upper.';return;
+        }
         const next = validated(draft);
         try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
         catch { message.textContent = "Could not save preferences in this browser."; return; }
@@ -275,6 +289,16 @@ export async function mount() {
             if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});
     };
+    window.addEventListener('open-feature-settings', event=>{
+        if(!FEATURE_STYLES[event.detail])return;
+        section='features';item=event.detail;featureTab='Style';gear.click();
+    });
+    window.addEventListener('feature-visibility-change',event=>{
+        const feature=FEATURE_STYLES[event.detail.feature];if(!feature)return;
+        for(const [key] of feature.outputs)saved.outputs[key].visible=event.detail.visible===true;
+        try{localStorage.setItem(STORAGE,JSON.stringify(saved));}catch{}
+        apply();window.dispatchEvent(new Event('chart-settings-change'));
+    });
     window.addEventListener("hud-size-change", event => {
         saved.hud = normalizeHud({...saved.hud,size:event.detail});
         try {localStorage.setItem(STORAGE,JSON.stringify(saved));} catch {}

@@ -5,6 +5,29 @@ node --test tests/ui_lifecycle.test.mjs
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
+Completed indicator displays
+---------------------------
+RSI, ADX/DMI, ATR, Volume and VWAP can be enabled in Features settings.
+RSI, ADX, ATR and Volume use synchronized lower chart panes with collapse,
+close and direct settings buttons. Per-output colors, widths and line styles
+persist in browser preferences; RSI also has editable reference levels.
+EMA and VWAP display matching colored price-axis labels. The candle-details
+table follows the crosshair and otherwise shows the latest loaded candle.
+All these displays consume the existing combined bar stream without separate
+indicator requests. Missing feature values remain blank; live values are shown
+only when supplied by the existing provisional feature calculation.
+
+```sh
+PYTHONPATH=. python3 tests/browser_indicators.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+This browser regression uses disposable data and checks pane controls, styles,
+RSI levels, live RSI updates, persistence, candle details and request reuse.
+It verifies rendering, not numerical parity with TradingView.
+
+The supplied `sections_4&5_Tradingview` reference was populated at commit
+`e940218`. Numerical translation is tracked separately from these rendering tests.
+
 The cloud Python environment is `/workspace/.venvs/tradingbot/bin/python`.
 These tests use disposable SQLite databases and never fetch market data.
 They cover count-based paging over gaps/month boundaries, cursor exhaustion,

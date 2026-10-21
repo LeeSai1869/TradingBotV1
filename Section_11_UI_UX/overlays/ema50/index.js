@@ -1,3 +1,4 @@
+import {getSeries as candleSeries} from "../candles/index.js";
 // EMA overlays read the same combined stored bars as candles.
 // Keep the legacy name so existing display.ema50 configuration stays valid.
 export const name = "ema50";
@@ -9,7 +10,7 @@ export function mount(chart) {
         series.set(period, chart.addSeries(LightweightCharts.LineSeries, {
             color: "#f5c542", lineWidth: 2,
             visible: period === 50,
-            priceLineVisible: false, lastValueVisible: false,
+            priceLineVisible: false, lastValueVisible: true,
             crosshairMarkerVisible: false,
         }));
     }
@@ -21,7 +22,7 @@ export function update(chart, data, options = {}) {
     for (const [period, line] of series) {
         const style = window.Composer?.config.featureStyles?.[`ema${period}`];
         const visible = options.visible !== false && (style ? style.visible : periods.includes(period));
-        line.applyOptions({ visible, color: style?.color || config.color || "#f5c542",
+        line.applyOptions({ priceFormat:candleSeries()?.options().priceFormat, visible, lastValueVisible: visible, color: style?.color || config.color || "#f5c542",
             lineWidth: style?.width || config.lineWidth || 2, lineStyle: style?.style ?? config.lineStyle ?? 0 });
         if (!visible) continue;
         const points = [];
