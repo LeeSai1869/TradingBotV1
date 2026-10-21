@@ -7,7 +7,10 @@ export const FEATURE_STYLES = {
     ] },
     RSI: { connected: true, outputs: [["rsi", "RSI", "#ad83f5"]] },
     ADX: { connected: true, outputs: [
-        ["adx", "ADX", "#f5c542"], ["di_plus", "+DI", "#26a69a"],
+        ["adx", "ADX", "#f5c542"],
+    ] },
+    DI: { connected: true, outputs: [
+        ["di_plus", "+DI", "#26a69a"],
         ["di_minus", "−DI", "#ef5350"], ["di_spread", "DI spread", "#4b7bff"],
         ["di_direction", "DI direction", "#ad83f5"],
     ] },

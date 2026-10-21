@@ -9,7 +9,7 @@ import * as indicators from "../overlays/indicators/index.js";
 import * as candleDetails from "../panels/candle_details/index.js";
 import * as ema50 from "../overlays/ema50/index.js";
 
-import * as flagsPanel from "../panels/flags/index.js";
+import * as drawingsControl from "../controls/drawings/index.js";
 
 import * as symbolControl from "../controls/symbol/index.js";
 import * as timeframeControl from "../controls/timeframe/index.js";
@@ -21,7 +21,7 @@ import * as workspaceControl from "../controls/workspace/index.js";
 import * as settingsControl from "../controls/settings/index.js";
 
 const VISUALS = [candles, markers, ema50, indicators, candleDetails];
-const PANELS = [flagsPanel];
+const PANELS = [];
 
 const Composer = {
     mounted: false,
@@ -39,6 +39,7 @@ const Composer = {
         settings: settingsControl,
         alerts: alertsControl,
         workspace: workspaceControl,
+        drawings: drawingsControl,
     },
 
     async mountAll(chart) {

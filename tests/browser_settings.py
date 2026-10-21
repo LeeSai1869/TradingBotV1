@@ -54,7 +54,6 @@ Canvas.init = (...args) => {
         await dialog.get_by_role('button', name='Cancel', exact=True).click()
         assert await page.evaluate('Composer.config.display.markers') is True
         await page.get_by_role('button', name='Open settings').click()
-        await dialog.get_by_role('switch', name='Show stored signal panel').uncheck()
         await dialog.get_by_role('tab', name='Features', exact=True).click()
         await dialog.get_by_label('EMA 25', exact=True).check()
         await dialog.get_by_label('EMA 25 width', exact=True).select_option('3')
@@ -64,7 +63,8 @@ Canvas.init = (...args) => {
         await dialog.get_by_label('RSI width', exact=True).select_option('4')
         await dialog.get_by_label('RSI color', exact=True).fill('#1234ff')
         await dialog.get_by_role('button', name='ADX', exact=True).click()
-        assert await dialog.get_by_role('combobox').count() == 10
+        assert await dialog.get_by_role('combobox').count() == 2
+        await dialog.get_by_role('button', name='DI', exact=True).click()
         await dialog.get_by_label('+DI color', exact=True).fill('#abcdef')
         await dialog.get_by_role('button', name='EMA', exact=True).click()
         await dialog.get_by_role('button', name='Display', exact=True).click()

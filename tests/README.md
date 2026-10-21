@@ -7,6 +7,30 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 Completed indicator displays
 ---------------------------
+The candle header is a compact `O H L C Vol Δ%` strip beneath the symbol.
+Chart loading/cache status sits below the chart; the stored-flags panel is removed.
+Every feature has Select all/Deselect all controls on its Display and Style tabs.
+ADX and DI have independent panes/settings; ADX has a dashed 25 reference line.
+VWAP axis labels retain their numeric values/colors without band-name tags.
+
+The Drawing tool menu provides a two-point trend line, two-point rectangle,
+one-point full-width horizontal line, two-point Fib retracement and three-point
+trend-based Fib extension. Choose a tool and click points on the main price pane.
+Pointer mode selects drawings; drag the line/edge to move the shape or a visible
+anchor handle to edit it. Delete drawing removes the selection; Undo drawing
+reverses creation, movement or deletion. Escape cancels unfinished placement.
+Drawings are browser-local, scoped by signed-in account, symbol and timeframe,
+and anchored to candle time plus fractional bar offset and price. They do not
+modify stored candles, features or alerts.
+
+`drawings.test.mjs` checks Fibonacci direction/projection and saved-data validation.
+`browser_drawings.py` checks actual placement, dragging, undo/delete, panning,
+reload/timeframe isolation, compact header/footer and bulk feature selection:
+
+```sh
+PYTHONPATH=. python3 tests/browser_drawings.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
 Feature displays use exactly two decimal places in the HUD (including tooltips),
 indicator price labels, candle volume/change details and new alert messages.
 Raw OHLC prices retain their numeric precision. This is presentation formatting;

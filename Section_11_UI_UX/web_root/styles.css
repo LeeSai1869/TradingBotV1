@@ -24,19 +24,7 @@ button { cursor: pointer; }
 button:hover { background: #333; }
 #status { margin-left: auto; font-size: 12px; color: #aaa; }
 #chart { flex: 1 1 auto; min-height: 0; width: 100%; position: relative; }
-#flags-panel {
-    position: fixed; top: 70px; right: 12px;
-    background: rgba(17,17,17,0.92);
-    border: 1px solid #333; border-radius: 6px;
-    padding: 10px 14px;
-    font-family: 'SF Mono', Menlo, monospace;
-    font-size: 12px; line-height: 1.6;
-    color: #ddd; z-index: 9999;
-    min-width: 260px;
-    pointer-events: none;
-}
-.flags-title { color: #888; margin-bottom: 4px; }
-.flags-row { color: #666; }
+
 
 #latest-candle-button {
     position: absolute;
@@ -85,7 +73,6 @@ button:hover { background: #333; }
 }
 
 #settings-button { flex-shrink: 0; width: 36px; padding: 6px; display: grid; place-items: center; }
-#flags-panel[hidden] { display: none; }
 #settings-dialog {
     width: min(900px, calc(100vw - 32px)); max-width: none;
     height: min(650px, calc(100dvh - 32px)); max-height: none;
@@ -221,14 +208,11 @@ button:hover { background: #333; }
 .settings-content fieldset {border:1px solid #465267; margin-top:18px; border-radius:5px;}
 .settings-content h4 {margin-bottom:8px;}
 .sr-only {position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
-#flags-panel {position:absolute; top:15px; right:85px; z-index:20;}
 #toolbar {overflow-x:auto;}
 #toolbar > * {flex-shrink:0;}
 @media(max-width:760px) {
     #analysis-panel {position:absolute; top:0; bottom:0; right:0; width:min(480px,95vw); z-index:40; box-shadow:-8px 0 20px #0008;}
 }
-/* Keep the existing stored-signal box clear of a HUD in the same corner. */
-#chart:has(.chart-hud[data-position="top-right"]:not([hidden])) #flags-panel {top:auto; bottom:45px;}
 
 /* Wrap controls into available space instead of clipping the toolbar. */
 #toolbar {height:auto; min-height:55px; flex-wrap:wrap; overflow-x:auto; overflow-y:visible; scrollbar-width:thin;}
@@ -262,7 +246,18 @@ button:hover { background: #333; }
 #indicator-pane-controls {position:absolute; inset:0; pointer-events:none; z-index:28;}
 .indicator-pane-header {position:absolute; left:12px; display:flex; gap:7px; align-items:center; font-size:12px; padding:3px 5px; background:#171c24d9; border-radius:4px; pointer-events:auto;}
 .indicator-pane-header button {height:23px; min-width:24px; padding:0 5px; background:transparent;}
-#candle-details {position:absolute; left:12px; top:12px; z-index:23; padding:8px 10px; background:#10151bd9; border:1px solid #445166; border-radius:5px; font-size:11px; pointer-events:none; max-width:260px;}
-#candle-details dl {display:grid; grid-template-columns:auto auto; gap:3px 16px; margin:7px 0 0;}
-#candle-details dt {color:#a7b3c5;} #candle-details dd {margin:0; text-align:right; font-variant-numeric:tabular-nums;}
-#chart:has(.chart-hud[data-position="top-left"]:not([hidden])) #candle-details {top:auto;bottom:42px;}
+#candle-details {position:absolute;left:12px;top:10px;right:75px;z-index:23;font-size:12px;pointer-events:none;background:transparent;}
+#candle-details strong {display:block;margin-bottom:5px;color:#ddd;}
+#candle-details dl {display:flex;flex-wrap:wrap;gap:4px 8px;margin:0;align-items:baseline;}
+#candle-details dt {color:#94a3b8;}
+#candle-details dd {margin:0 10px 0 0;font-variant-numeric:tabular-nums;}
+#status {margin:0;padding:5px 12px;flex:0 0 auto;font-size:11px;color:#999;border-top:1px solid #333;background:#181818;}
+.chart-hud[data-position="top-left"] {top:76px;}
+.settings-selection {display:flex;gap:8px;margin:10px 0;}
+.drawing-tools {display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex:1 1 100%;min-width:0;max-width:100%;}
+.drawing-tools button {padding:0 8px;}
+#drawing-overlay {position:absolute;left:0;top:0;z-index:24;overflow:hidden;pointer-events:none;}
+#drawing-overlay[data-active="true"] {pointer-events:auto;cursor:crosshair;}
+#drawing-overlay .drawing-hit {pointer-events:stroke;cursor:move;}
+#drawing-overlay .drawing-handle {pointer-events:all;cursor:grab;}
+.drawing-instructions {font-size:11px;color:#aaa;max-width:250px;}

@@ -22,20 +22,21 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)
         await settings.get_by_role('tab',name='Features',exact=True).click()
-        for feature,fields in [('RSI',['RSI']),('ADX',['ADX','+DI','−DI']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
+        for feature,fields in [('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
             await settings.get_by_role('button',name=feature,exact=True).click()
             for field in fields:await settings.get_by_label(field,exact=True).check()
         await settings.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        await page.wait_for_function('Canvas.chart.panes().length===5')
-        for feature in ['RSI','ADX','ATR','Volume']:
+        await page.wait_for_function('Canvas.chart.panes().length===6')
+        for feature in ['RSI','ADX','DI','ATR','Volume']:
             await page.get_by_role('group',name=f'{feature} pane controls').wait_for()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').data().at(-1).value;})()") == 69
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('vwap').getPane().paneIndex();})()") == 0
+        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('adx').getPane().paneIndex()!==x.getSeries('di_plus').getPane().paneIndex() && x.getSeries('adx').priceLines().some(line=>line.options().price===25) && x.getSeries('vwap_upper1').options().title==='';})()")
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','volume','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
         assert await page.evaluate("Canvas.chart.panes()[0].getSeries().filter(s=>s.options().title==='EMA 50' || s.options().color===Composer.config.featureStyles.ema50.color).some(s=>s.options().lastValueVisible && s.priceFormatter().format(34.40199)==='34.40')")
-        assert 'Open' in await page.get_by_role('region',name='Candle details').inner_text()
+        assert 'O' in await page.get_by_role('region',name='Candle details').inner_text()
         details=page.get_by_role('region',name='Candle details')
-        assert await details.locator('dt').filter(has_text='Volume').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
+        assert await details.locator('dt').filter(has_text='Vol').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
         await page.evaluate("""async()=>{
             const indicators=await import('/overlays/indicators/index.js');
             const bar=DataCache.bars.at(-1);
@@ -46,7 +47,7 @@ async def exercise(base,library):
             const previous=DataCache.bars.at(-2);
             Canvas.chart.setCrosshairPosition(previous.client.close,previous.time,candle);
         }""")
-        assert 'Closed' in await page.get_by_role('region',name='Candle details').inner_text()
+        assert 'Closed' in await page.locator('#candle-details strong').get_attribute('title')
         await page.get_by_role('button',name='Collapse RSI',exact=True).click();await settle(page)
         assert await page.evaluate('Canvas.chart.panes()[1].getHeight()')<=40
         await page.get_by_role('button',name='Expand RSI',exact=True).click()
@@ -58,12 +59,12 @@ async def exercise(base,library):
         assert await page.evaluate('Composer.config.rsiLevels.lower')==25
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').options().color;})()")=='#12abef'
         await page.get_by_role('button',name='Close RSI',exact=True).click();await settle(page)
-        assert await page.evaluate('Canvas.chart.panes().length')==4
+        assert await page.evaluate('Canvas.chart.panes().length')==5
         assert not await page.get_by_role('group',name='RSI pane controls').count()
         await page.reload();await sign_in(page,'user')
         await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000')
         await settle(page)
-        assert await page.evaluate('Canvas.chart.panes().length')==4
+        assert await page.evaluate('Canvas.chart.panes().length')==5
         assert await page.evaluate('Composer.config.featureStyles.rsi.visible') is False
         assert not errors,errors
         forbidden=['/api/chart_window','/api/flags_current','/api/live_candle']

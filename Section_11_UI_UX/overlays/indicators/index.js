@@ -3,7 +3,7 @@ import {featurePriceFormat} from '../../web_root/value_format.js';
 import {FEATURE_STYLES} from '../../controls/settings/feature_styles.js';
 export const name='indicators';
 const groups=new Map();let chart, controls, observer;
-const LOWER=['RSI','ADX','ATR','Volume'];
+const LOWER=['RSI','ADX','DI','ATR','Volume'];
 function styles(){return window.Composer.config.featureStyles||{};}
 function value(bar,key){const n=key==='volume'?bar.client?.volume:bar.features?.[key];return Number.isFinite(n)?n:null;}
 function button(label,text,parent,action){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.onclick=action;parent.append(b);return b;}
@@ -31,7 +31,7 @@ function create(feature){
     }
     for(const [key,label,,presentation='line'] of FEATURE_STYLES[feature].outputs){
         const line=chart.addSeries(presentation==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,
-            {visible:false,title:label,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true,
+            {visible:false,title:feature==='VWAP'?'':label,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true,
              priceFormat:featurePriceFormat},state.pane?.paneIndex()??0);
         state.lines.set(key,line);
     }
@@ -45,11 +45,15 @@ function remove(state){
     groups.delete(state.feature);
 }
 function levels(state){
-    if(state.feature!=='RSI')return;
-    const line=state.lines.get('rsi');for(const level of state.levels)line.removePriceLine(level);
+    if(!['RSI','ADX'].includes(state.feature))return;
+    const line=state.lines.get(state.feature==='ADX'?'adx':'rsi');for(const level of state.levels)line.removePriceLine(level);
     const config=window.Composer.config.rsiLevels||{lower:30,upper:70};
-    state.levels=[config.lower,config.upper].map(price=>line.createPriceLine({price,color:'#748298',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
-    line.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
+    state.levels=(state.feature==='ADX'?[25]:[config.lower,config.upper]).map(price=>line.createPriceLine({price,color:'#748298',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:''}));
+    if(state.feature==='RSI')line.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
+    else line.applyOptions({autoscaleInfoProvider:original=>{
+        const info=original();
+        return info?{...info,priceRange:{minValue:Math.min(0,info.priceRange.minValue),maxValue:Math.max(30,info.priceRange.maxValue)}}:null;
+    }});
 }
 export function mount(instance){
     chart=instance;controls=document.createElement('div');controls.id='indicator-pane-controls';document.getElementById('chart').append(controls);

@@ -6,14 +6,14 @@ import * as admin from "./admin_controls.js";
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
 const PERIODS = [7, 25, 50, 100, 200, 300];
-const defaults = { candles: true, markers: true, flags: true, ema: true };
+const defaults = { candles: true, markers: true, ema: true };
 let saved = { ...defaults }, draft, dialog, content, sidebar, tabs;
 let featureTab = "Style";
 let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "RSI", "ADX", "ATR", "Volume", "VWAP"],
+    features: ["EMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -23,7 +23,7 @@ const titles = { general: "General", inputs: "Inputs", features: "Features",
 function validated(value) {
     const result = { ...defaults };
     if (!value || typeof value !== "object") value = {};
-    for (const key of ["candles", "markers", "flags", "ema"]) {
+    for (const key of ["candles", "markers", "ema"]) {
         if (typeof value[key] === "boolean") result[key] = value[key];
     }
     result.outputs = migrateStyles(value);
@@ -40,7 +40,6 @@ function apply() {
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
     config.featureStyles = saved.outputs;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
-    document.getElementById("flags-panel").hidden = !saved.flags;
 }
 
 function el(tag, text, parent, className) {
@@ -79,6 +78,15 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    const selection=el('div','',content,'settings-selection');
+    for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
+        const button=el('button',label,selection);
+        button.onclick=()=>{
+            for(const [key] of feature.outputs)draft.outputs[key].visible=visible;
+            if(item==='EMA' && visible)draft.ema=true;
+            render();
+        };
+    }
     if(item==='RSI') {
         const row=el('div','',content,'settings-row');
         for(const key of ['lower','upper']) {
@@ -157,7 +165,6 @@ function render() {
     if (section === "general" && item === "Account") {
         admin.account(content, render);
     } else if (section === "general") {
-        toggle("Show stored signal panel", "flags");
         toggle("Show BUY / SELL markers", "markers");
         note("Chart preferences apply when you choose Apply and are saved in this browser.");
     } else if (section === "candles") {

@@ -83,7 +83,6 @@ function renderPacket(packet,choices,config,symbol) {
 }
 export function mount() {
     panel=document.getElementById('analysis-panel');
-    document.getElementById('chart').append(document.getElementById('flags-panel'));
     toggle=el('button','Analysis',document.getElementById('toolbar'));
     toggle.id='workspace-button';toggle.setAttribute('aria-controls','analysis-panel');toggle.setAttribute('aria-expanded','false');
     const header=el('header','',panel);el('h2','Analysis workspace',header);

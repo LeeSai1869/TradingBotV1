@@ -189,7 +189,8 @@ window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
         await settle(page)
         assert await page.evaluate('DataCache.latestBar.time') == 1781654400
         assert await page.evaluate('Canvas.chart.timeScale().getVisibleRange().to') == 1781654400
-        assert 'SELL' in await page.locator('#flags-signal').text_content()
+        assert await page.evaluate('DataCache.latestBar.adcn.signal_type') == 'SELL'
+        assert not await page.locator('#flags-panel').count()
         await page.evaluate('Canvas.chart.timeScale().setVisibleLogicalRange({from:700,to:1699})')
         await settle(page)
         historical=await page.evaluate('Canvas.chart.timeScale().getVisibleRange()')
