@@ -14,6 +14,7 @@ export const FEATURE_STYLES = {
         ["di_plus", "+DI", "#26a69a"],
         ["di_minus", "−DI", "#ef5350"], ["di_spread", "DI spread", "#4b7bff"],
         ["di_direction", "DI direction", "#ad83f5"],
+        ["di_dominance", "DI dominance", "#f59e0b"],
     ] },
     ATR: { connected: true, outputs: [["atr", "ATR", "#f18a35"], ["atr_ma", "ATR average", "#4b7bff"]] },
     Volume: { connected: true, outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"]] },

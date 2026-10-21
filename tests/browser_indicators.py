@@ -8,7 +8,7 @@ from browser_smoke import run, sign_in, settle, db
 async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',100)
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=row[2],ema50=row[6]-.5,
-        wma50=row[6]-.3,rsi=45+i%25,adx=25+i%10,di_plus=30,di_minus=15,di_direction=15,di_spread=15,
+        wma50=row[6]-.3,rsi=45+i%25,adx=25+i%10,di_plus=30,di_minus=15,di_direction=15,di_spread=15,di_dominance=1/3,
         atr=2.5,atr_ma=2.2,volume_ma=9,vwap=row[6]-.2,vwap_upper1=row[6]+1,vwap_lower1=row[6]-1) for i,row in enumerate(rows)])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -22,7 +22,7 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)
         await settings.get_by_role('tab',name='Features',exact=True).click()
-        for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
+        for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI','DI dominance']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
             await settings.get_by_role('button',name=feature,exact=True).click()
             for field in fields:await settings.get_by_label(field,exact=True).check()
         await settings.get_by_role('tab',name='Candles',exact=True).click()
@@ -43,6 +43,7 @@ async def exercise(base,library):
         rsi_label=await page.locator('.indicator-values[aria-label="RSI values"]').inner_text()
         assert rsi_label=='RSI 69.00',rsi_label
         assert await page.locator('.indicator-values[aria-label="ADX values"]').inner_text()=='ADX 34.00'
+        assert 'DI dominance 0.33' in await page.locator('.indicator-values[aria-label="DI values"]').inner_text()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('vwap').getPane().paneIndex();})()") == 0
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('adx').getPane().paneIndex()!==x.getSeries('di_plus').getPane().paneIndex() && x.getSeries('adx').priceLines().some(line=>line.options().price===25) && x.getSeries('vwap_upper1').options().title==='';})()")
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','volume','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
