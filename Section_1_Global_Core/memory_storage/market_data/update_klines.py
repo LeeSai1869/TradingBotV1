@@ -70,6 +70,7 @@ PAGE_LIMIT = 1000
 
 _LAST_UPDATE_MS = {}
 LAST_AUDIT = None
+_DOWNLOAD_CURSOR = 0
 
 
 def _open_db():
@@ -191,14 +192,16 @@ def update_one(symbol, interval, conn):
     return n
 
 
-def update_all():
+def update_all(*, max_pairs=12, time_budget=2.0):
     """
-    Update every (symbol, interval). Returns total bars inserted.
+    Update a bounded round-robin slice of pairs. Returns total bars inserted.
+
+    Time is checked between requests; one request retains its network timeout.
 
     Safe to call every runner cycle. Interval-boundary tracking means
     each interval is queried at most once per bar period.
     """
-    global LAST_AUDIT
+    global LAST_AUDIT, _DOWNLOAD_CURSOR
     LAST_AUDIT = None
     if not DB_PATH.exists():
         return 0
@@ -206,9 +209,18 @@ def update_all():
     conn = _open_db()
     total = 0
     try:
-        for symbol in data_policy.active_symbols():
-            for interval in data_policy.active_intervals():
-                total += update_one(symbol, interval, conn)
+        pairs=[(symbol,interval) for symbol in data_policy.active_symbols()
+               for interval in data_policy.active_intervals()]
+        deadline=time.monotonic()+time_budget
+        visited=0
+        for _ in range(min(max_pairs,len(pairs))):
+            symbol,interval=pairs[_DOWNLOAD_CURSOR%len(pairs)]
+            _DOWNLOAD_CURSOR+=1;visited+=1
+            total += update_one(symbol, interval, conn)
+            # A request may finish after the soft deadline; never start the next
+            # one until features have had their turn in the existing runner.
+            if time.monotonic()>=deadline:break
+        print(f'[update_klines] download slice: {visited}/{len(pairs)} pairs; cursor={_DOWNLOAD_CURSOR}; yielding to features',flush=True)
     finally:
         conn.close()
 

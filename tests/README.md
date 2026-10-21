@@ -518,3 +518,19 @@ healthy-pair progress after an injected calculation error, retry without skippin
 failed candles, and intentional disabled-timeframe behavior. The source manifest
 is in `Section_4_Features/conversion/`; execution helpers are in `execution/`.
 Use `python3 check_coin.py ETHUSDT --logs` as a single read-only diagnostic command.
+
+
+Large-universe runner scheduling
+--------------------------------
+The existing runner now rotates through bounded download and event slices rather
+than visiting every approved coin/timeframe before yielding. Downloads visit up
+to 12 pairs or a two-second soft budget; a running network call retains its timeout.
+Events have a separate 12-pair/two-second soft budget, checked between bars, with
+chronological watermarks retained across slices. Feature maintenance remains a
+separate bounded round-robin pass. No extra downloader or writer is introduced.
+
+`test_runner_scheduling.py` covers rotation across more pairs than one slice,
+yielding after a slow download, and event timeouts that resume the next pair
+without skipping the interrupted pair's next candle. Diagnostics explicitly
+separate old feature row counts from missing new-formula checkpoints and label
+logs as cumulative across process starts. Backups announce when they begin.

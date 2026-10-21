@@ -107,7 +107,7 @@ def main():
         (candles,t),(features,ft)=values
         print(f'{iv:6} {candles:10}  {stamp(t):32} {features:10}  {stamp(ft):32}  {"ACTIVE" if data_policy.enabled(symbol,iv) else "PAUSED"}')
     for error in sorted(errors): print('Storage warning:',error)
-    print('Fresh pairs download one 1000-bar page per cycle; features and other pairs share the same runner.')
+    print('Fresh pairs download one 1000-bar page per scheduled visit; bounded download and feature passes share the same runner.')
     if Path(features_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(features_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
         try:
@@ -124,6 +124,10 @@ def main():
                     finally:
                         if raw:raw.close()
                     print('Replay resumes automatically in batches after restart; live features wait for the closed checkpoint to catch up.')
+                else:
+                    print(f'No formula-v3 checkpoint committed for {symbol} yet. Existing feature counts describe older rows; this symbol is waiting for its first replay batch.')
+            else:
+                print('No formula-v3 checkpoint table yet. The runner has not initialized the new feature replay memory.')
         finally:conn.close()
     if Path(klines_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
@@ -150,7 +154,7 @@ def main():
         logs=Path.home()/'Library/Logs/TradingBotV1'
         from collections import deque
         for name,count in [('runner.log',80),('runner-error.log',60)]:
-            print(f'\nRecent {name}:')
+            print(f'\nRecent {name} (appended across runner starts):')
             try:
                 with (logs/name).open(errors='replace') as stream:
                     for line in deque(stream,maxlen=count):print(line,end='')

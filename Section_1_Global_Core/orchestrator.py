@@ -156,6 +156,9 @@ class GlobalCoreOrchestrator:
         self._stop = False
         self._processors = _load_processors()
         self._state = _load_state()
+        self._event_cursor = 0
+        self.event_pair_limit = 12
+        self.event_time_budget = 2.0
 
     def stop(self):
         self._stop = True
@@ -207,72 +210,78 @@ class GlobalCoreOrchestrator:
         #    bar as baseline and fire nothing. Processors start
         #    receiving events from the NEXT bar forward.
         events_fired = 0
-        for s in data_policy.active_symbols():
-            for iv in data_policy.active_intervals():
-                key = f"{s}|{iv}"
-                epochs = data_policy.read()['epochs']
-                epoch = [epochs.get(f'symbol:{s}', 0), epochs.get(f'interval:{iv}', 0)]
-                seen = self._state.setdefault('__epochs__', {})
-                if seen.get(key, [0, 0]) != epoch:
-                    self._state.pop(key, None)
+        event_pairs=[(symbol,interval) for symbol in data_policy.active_symbols()
+                     for interval in data_policy.active_intervals()]
+        event_deadline=time.monotonic()+self.event_time_budget
+        for visited in range(min(self.event_pair_limit,len(event_pairs))):
+            if visited and time.monotonic()>=event_deadline:break
+            s,iv=event_pairs[self._event_cursor%len(event_pairs)]
+            self._event_cursor+=1
+            key = f"{s}|{iv}"
+            epochs = data_policy.read()['epochs']
+            epoch = [epochs.get(f'symbol:{s}', 0), epochs.get(f'interval:{iv}', 0)]
+            seen = self._state.setdefault('__epochs__', {})
+            if seen.get(key, [0, 0]) != epoch:
+                self._state.pop(key, None)
+                for name, fn in self._processors:
+                    module = importlib.import_module(name.rsplit('.', 1)[0])
+                    reset = getattr(module, 'reset_pair', None)
+                    if reset:
+                        reset(s, iv)
+            seen[key] = epoch
+            since = self._state.get(key)
+            bars = _fetch_bars_since(s, iv, since if since is not None else -1)
+
+            if since is None:
+                # First sight: seed baseline, do NOT fire events.
+                if bars:
+                    if not data_policy.enabled(s, iv):
+                        continue
                     for name, fn in self._processors:
                         module = importlib.import_module(name.rsplit('.', 1)[0])
-                        reset = getattr(module, 'reset_pair', None)
-                        if reset:
-                            reset(s, iv)
-                seen[key] = epoch
-                since = self._state.get(key)
-                bars = _fetch_bars_since(s, iv, since if since is not None else -1)
-
-                if since is None:
-                    # First sight: seed baseline, do NOT fire events.
-                    if bars:
-                        if not data_policy.enabled(s, iv):
-                            continue
-                        for name, fn in self._processors:
-                            module = importlib.import_module(name.rsplit('.', 1)[0])
-                            catch = getattr(module, 'catch_up', None)
-                            if catch and not getattr(module, "maintenance", None):
-                                catch(s, iv)
-                        latest_ot = bars[-1][0]
-                        self._state[key] = latest_ot
-                        print(
-                            f"[orchestrator] seeded baseline {s} {iv} "
-                            f"at open_time={latest_ot}",
-                            flush=True,
-                        )
-                    continue
-
-                if bars:
-                    print(f"[orchestrator] feature batch {s} {iv}: {len(bars)} bars after {since}",flush=True)
-                for row in bars:
-                    (ot, ct, o, h, l, c, v) = row
-                    ev = BarEvent(
-                        symbol=s, timeframe=iv,
-                        open_time=ot, close_time=ct,
-                        open=float(o), high=float(h),
-                        low=float(l), close=float(c),
-                        volume=float(v),
+                        catch = getattr(module, 'catch_up', None)
+                        if catch and not getattr(module, "maintenance", None):
+                            catch(s, iv)
+                    latest_ot = bars[-1][0]
+                    self._state[key] = latest_ot
+                    print(
+                        f"[orchestrator] seeded baseline {s} {iv} "
+                        f"at open_time={latest_ot}",
+                        flush=True,
                     )
-                    success = True
-                    with data_policy.locked():
-                        current = data_policy.read()['epochs']
-                        if not data_policy.enabled(s, iv) or epoch != [current.get(f'symbol:{s}', 0), current.get(f'interval:{iv}', 0)]:
-                            break
-                        for name, fn in self._processors:
-                            try:
-                                if fn(ev) is False:
-                                    success = False
-                                    break  # A bounded replay has not reached this candle yet.
-                            except Exception as e:
-                                print(f"[orchestrator] {name} failed on {s} {iv} {ot}: {e}", flush=True)
-                                traceback.print_exc()
+                continue
+
+            if bars:
+                print(f"[orchestrator] feature batch {s} {iv}: {len(bars)} bars after {since}",flush=True)
+            for row in bars:
+                if time.monotonic()>=event_deadline:break
+                (ot, ct, o, h, l, c, v) = row
+                ev = BarEvent(
+                    symbol=s, timeframe=iv,
+                    open_time=ot, close_time=ct,
+                    open=float(o), high=float(h),
+                    low=float(l), close=float(c),
+                    volume=float(v),
+                )
+                success = True
+                with data_policy.locked():
+                    current = data_policy.read()['epochs']
+                    if not data_policy.enabled(s, iv) or epoch != [current.get(f'symbol:{s}', 0), current.get(f'interval:{iv}', 0)]:
+                        break
+                    for name, fn in self._processors:
+                        try:
+                            if fn(ev) is False:
                                 success = False
-                                break
-                    if not success:
-                        break  # Retry this bar next cycle; do not advance past failure.
-                    self._state[key] = ot
-                    events_fired += 1
+                                break  # A bounded replay has not reached this candle yet.
+                        except Exception as e:
+                            print(f"[orchestrator] {name} failed on {s} {iv} {ot}: {e}", flush=True)
+                            traceback.print_exc()
+                            success = False
+                            break
+                if not success:
+                    break  # Retry this bar next cycle; do not advance past failure.
+                self._state[key] = ot
+                events_fired += 1
 
         _save_state(self._state)
 

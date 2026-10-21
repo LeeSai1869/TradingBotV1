@@ -52,3 +52,26 @@ class RunnerDiagnosticTests(unittest.TestCase):
             self.assertIn('pending candles: 2 | PAUSED by policy',text)
             self.assertIn('download phase starting',text)
             self.assertIn('specific pair failure',text)
+
+    def test_missing_symbol_checkpoint_is_explicit(self):
+        import sqlite3
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory);features=root/'features.db'
+            with sqlite3.connect(features) as conn:
+                conn.execute('CREATE TABLE features(symbol TEXT,interval TEXT,open_time INTEGER)')
+                conn.execute('CREATE TABLE feature_engine_state(symbol TEXT,interval TEXT,last_open_time INTEGER)')
+            stack.enter_context(patch.object(check_coin.sys,'argv',['check_coin.py','ETHUSDT']))
+            stack.enter_context(patch.object(check_coin.sys,'platform','linux'))
+            stack.enter_context(patch.object(check_coin.features_store,'DB_PATH',features))
+            stack.enter_context(patch.object(check_coin.klines_store,'DB_PATH',root/'klines.db'))
+            stack.enter_context(patch.object(check_coin.data_admin,'catalog',return_value={}))
+            stack.enter_context(patch.object(check_coin.data_policy,'active_symbols',return_value=['ETHUSDT']))
+            stack.enter_context(patch.object(check_coin.data_policy,'enabled',return_value=True))
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):check_coin.main()
+            self.assertIn('No formula-v3 checkpoint committed for ETHUSDT yet',output.getvalue())
+            with sqlite3.connect(features) as conn:conn.execute('DROP TABLE feature_engine_state')
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):check_coin.main()
+            self.assertIn('No formula-v3 checkpoint table yet',output.getvalue())

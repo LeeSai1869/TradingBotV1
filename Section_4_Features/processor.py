@@ -45,6 +45,7 @@ def _backup_legacy():
         if not conn.execute('SELECT 1 FROM features WHERE COALESCE(formula_version,1)<3 LIMIT 1').fetchone():
             _BACKUP_CHECKED.add(str(path));return
         import sqlite3
+        print(f'[processor] preserving previous feature database before replay: {backup}',flush=True)
         target=sqlite3.connect(backup)
         try:conn.backup(target)
         finally:target.close()

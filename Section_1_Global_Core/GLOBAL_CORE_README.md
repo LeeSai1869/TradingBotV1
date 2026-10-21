@@ -249,3 +249,15 @@ exercise real feature computation. Actual Ethereum download progress must be
 checked on the user's machine with `python3 check_coin.py ETHUSDT`; this cloud
 checkout does not contain their current registry or historical data. Restart the
 runner after pulling so its in-memory code adopts the bounded reads.
+
+
+### Scheduling with many approved coins
+
+The existing loop alternates bounded download slices, feature maintenance, and
+bounded event slices. Each download/event slice has a rotating cursor and visits
+at most 12 pairs with a two-second soft budget between requests/events. One
+network request or calculation can exceed the soft budget; the next operation
+waits until the following turn. The updater still owns ingestion and its recent
+row audit. Feature checkpoints remain in features.db and events retain their
+chronological watermarks. Restarting resets scheduling positions, not committed
+calculation state. Leave the runner running to advance a full-history replay.
