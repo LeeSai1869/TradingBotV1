@@ -1,8 +1,10 @@
 """Canonical storage names and explicit legacy aliases for the Pine contract."""
 import re
+from functools import lru_cache
 from .context import MANIFEST
 
 
+@lru_cache(maxsize=4096)
 def snake(name):
     name=re.sub(r'([A-Z]+)([A-Z][a-z])',r'\1_\2',name)
     name=re.sub(r'([a-z0-9])([A-Z])',r'\1_\2',name)
@@ -29,10 +31,19 @@ for key,source in ALIASES.items():FIELDS[key]=FIELDS.get(source,'float')
 for p in (7,25,50,100,200,300):FIELDS[f'prev_ema{p}']='float'
 FIELDS['prev_atr']='float'
 FIELDS['daily_source_ready']='bool'
+for side in ('support','resistance','inst_support','inst_resistance'):
+    for edge in ('low','high'):FIELDS[f'{side}_zone_{edge}']='float'
 
 
 def canonical(values,context):
     result={snake(name):value for name,value in values.items()}
+    for side,prefix,identifier in [('support','support','nearestSupportZoneID'),('resistance','resistance','nearestResistanceZoneID'),('inst_support','instSupport','nearestInstSupportZoneID'),('inst_resistance','instResistance','nearestInstResistanceZoneID')]:
+        ids=context.persistent.get(prefix+'ZoneIDArray',[])
+        identity=context.values.get(identifier)
+        index=ids.index(identity) if identity in ids else None
+        for edge in ('low','high'):
+            levels=context.persistent.get(prefix+edge.title()+'Array',[])
+            result[f'{side}_zone_{edge}']=levels[index] if index is not None and index<len(levels) else None
     # Calculated in 4.2.12 but omitted from the Pine constructor's type fields.
     result['prev_candle_range']=context['prevCandleRange']
     for key,source in ALIASES.items():

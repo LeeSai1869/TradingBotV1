@@ -14,7 +14,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP", "Support / Resistance", "FVG"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -133,7 +133,7 @@ function renderFeature() {
             for (const [value, text] of options) { const option = el("option", text, select); option.value = value; }
             select.value = state[field];
             select.onchange = () => { state[field] = Number(select.value); };
-            if (presentation !== "line") {
+            if (presentation === "histogram") {
                 select.disabled = true;
                 select.title = "Histogram output uses bar color; line controls do not apply.";
             }

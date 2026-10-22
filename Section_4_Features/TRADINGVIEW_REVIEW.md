@@ -150,3 +150,17 @@ individual Mac stalled without that machine's diagnostic output.
 The already-calculated `prevCandleRange` local was missing from the exported
 legacy `prev_candle_range` field. That field is now included in new packets;
 existing historical rows are not rewritten solely for this output addition.
+
+
+## Runtime performance and display additions
+
+The volume-profile histogram's inner loop now uses native arithmetic with the same
+per-candle/per-bin addition order. The source converter emits this reviewed kernel;
+all other VP outputs remain source-derived, and packet regression vectors remain
+unchanged. Canonical field-name conversion is memoized. Checkpoint/formula version
+3 remains compatible; no full replay is triggered by this optimization.
+
+Eight additional display fields expose the selected dynamic/institutional S/R
+zone's actual low/high from its persistent arrays. These do not change scoring or
+existing output values. New rows include them, while old rows remain readable.
+FVG rendering uses the existing nearest bull/bear FVG bounds and creation identity.

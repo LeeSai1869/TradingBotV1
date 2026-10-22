@@ -108,6 +108,13 @@ def main():
         print(f'{iv:6} {candles:10}  {stamp(t):32} {features:10}  {stamp(ft):32}  {"ACTIVE" if data_policy.enabled(symbol,iv) else "PAUSED"}')
     for error in sorted(errors): print('Storage warning:',error)
     print('Fresh pairs download one 1000-bar page per scheduled visit; bounded download and feature passes share the same runner.')
+    if Path(klines_store.DB_PATH).exists():
+        raw=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
+        try:
+            if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():
+                for interval,cursor in raw.execute('SELECT interval,next_open_time FROM history_progress WHERE symbol=?',(symbol,)):
+                    print(f'{interval:6} historical download cursor: {stamp(cursor)} | recent candles refreshed separately; features do not skip this gap')
+        finally:raw.close()
     if Path(features_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(features_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
         try:

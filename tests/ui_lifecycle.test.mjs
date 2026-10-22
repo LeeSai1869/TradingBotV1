@@ -203,3 +203,27 @@ test('a busy stored-bar response is retried without losing the initial chart loa
     await c.loadInitial('BTCUSDT','1m');
     assert.equal(calls,2);assert.equal(c.bars.length,2);assert.equal(c.loading,false);assert.equal(c.error,null);
 });
+
+
+test('ordinary refresh polls two bars and periodically reconciles replayed window',async()=>{
+    const c=cache();const calls=[];
+    c._fetchPage=(symbol,tf,limit)=>{calls.push(limit);return Promise.resolve(page([100,101]));};
+    await c.loadInitial('BTCUSDT','1m');
+    for(let i=0;i<12;i++)await c.refreshStored();
+    assert.equal(calls[0],1000);
+    assert.deepEqual(calls.slice(1,12),Array(11).fill(2));
+    assert.equal(calls[12],1000);
+    assert.equal(c.bars.length,2);
+});
+
+
+test('finishing historical catch-up reloads the cached window to remove old gaps',async()=>{
+    const c=cache();let calls=0;
+    c._fetchPage=()=>Promise.resolve(++calls===1?{...page([1,2]),history_pending:true}:
+        calls===2?{...page([10,11]),history_pending:false}:{...page([3,4,5,6,7,8,9,10,11]),history_pending:false});
+    await c.loadInitial('BTCUSDT','1m');
+    assert.equal(c.historyPending,true);
+    await c.refreshStored();
+    assert.equal(calls,3);assert.equal(c.historyPending,false);
+    assert.deepEqual(Array.from(c.bars,b=>b.time),[3,4,5,6,7,8,9,10,11]);
+});

@@ -248,6 +248,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
     conn = _read_connection(klines_store.DB_PATH)
     try:
         rows = klines_store.read_page(conn, symbol, interval, limit + 1, before=before)
+        cursor=klines_store.history_cursor(conn,symbol,interval)
     finally:
         conn.close()
     has_more = len(rows) > limit
@@ -270,7 +271,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
             "features": features_by_time.get(open_time),
             "adcn": decisions_by_time.get(open_time),
         })
-    return {"bars": bars, "next_before": start_ms if has_more else None}
+    return {"bars": bars, "next_before": start_ms if has_more else None, "history_pending":cursor is not None}
 
 
 # ==============================================================================

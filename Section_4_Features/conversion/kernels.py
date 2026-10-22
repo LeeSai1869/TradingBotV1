@@ -69,3 +69,29 @@ def moving_average(context,volume):
     return sum(context.volumes)/length if len(context.volumes)==length else rt.NA
 ''',
 }
+
+
+VOLUME_PROFILE_HISTOGRAM = r"""
+def accumulate_histogram(e):
+    import math
+    lookback=int(e['vpLookback']);count=int(e['vpBins'])
+    high=[e['h'],*reversed(e.histories.get('h',()))]
+    low=[e['l'],*reversed(e.histories.get('l',()))]
+    volume=[e['volume'],*reversed(e.histories.get('volume',()))]
+    bins=e['vpVolumeBins'];base=e['vpLow'];size=e['vpBinSize']
+    for i in range(lookback):
+        h=high[i] if i<len(high) else rt.NA
+        l=low[i] if i<len(low) else rt.NA
+        v=volume[i] if i<len(volume) else rt.NA
+        if rt.is_na(h) or rt.is_na(l):
+            lo=hi=touched=amount=rt.NA
+        else:
+            lo=max(0,min(count-1,math.floor((l-base)/size)))
+            hi=max(0,min(count-1,math.floor((h-base)/size)))
+            touched=hi-lo+1;amount=v/touched if touched else rt.NA
+            for b in range(lo,hi+1):
+                bins[b]+=amount
+                e.values['b']=b
+        e.values.update(i=i,candleHigh=h,candleLow=l,candleVolume=v,
+                        lowBin=lo,highBin=hi,touchedBins=touched,volumePerBin=amount)
+"""

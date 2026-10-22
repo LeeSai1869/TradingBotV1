@@ -524,7 +524,7 @@ Large-universe runner scheduling
 --------------------------------
 The existing runner now rotates through bounded download and event slices rather
 than visiting every approved coin/timeframe before yielding. Downloads visit up
-to 12 pairs or a two-second soft budget; a running network call retains its timeout.
+to 512 pairs or a two-second soft budget; a running network call retains its timeout.
 Events have a separate 12-pair/two-second soft budget, checked between bars, with
 chronological watermarks retained across slices. Feature maintenance remains a
 separate bounded round-robin pass. No extra downloader or writer is introduced.
@@ -557,3 +557,31 @@ same dropdown. The underlying select/change event contract is retained.
 ```sh
 PYTHONPATH=. python3 tests/browser_symbol_picker.py /path/to/lightweight-charts.standalone.production.js
 ```
+
+
+Zone displays and catch-up performance
+-------------------------------------
+Settings → Features now includes Support / Resistance (dynamic and institutional)
+and FVG (bull/bear). `browser_zones.py` covers combined-stream zone rendering,
+style persistence and visibility without extra feature requests. Zone primitives
+stay in the price pane behind candles and only draw visible segments. The stored
+zone bounds are the selected zone's actual array entries, not an ATR approximation.
+Older dynamic S/R rows lacking new bounds can show their stored level as a line.
+New bounds populate as chronological replay reaches each bar; no reset is needed.
+
+Profiling identified the VP histogram loop and repeated field-name regex work.
+The native histogram retains ordered per-bin additions and the golden reference
+packet digest; field names are memoized. A local 1,800-bar engine benchmark measured
+192→416 bars/s with the old/new histogram, both using cached field names. This
+excludes SQLite/network work and is not a promise about the user's Mac.
+
+Normal chart polling reads two newest closed bars instead of 1,000; each twelfth
+poll reconciles the full window for historical feature replay. A discontinuous
+new edge reloads its initial window rather than skipping cache rows silently.
+The updater scans more eligible pairs per soft time budget and fetches a recent
+closed page while history fills. Its persistent `history_progress` cursor is in
+klines.db, is deleted with the relevant coin/timeframe, and caps feature replay
+so a fresh tail can never make recursive calculations jump an unfinished gap.
+Audit summaries keep `pass=false` while active history backfills remain.
+`test_complete_conversion.py` exercises fresh-tail insertion, gap exclusion,
+forward cursor completion, and continued full feature replay on actual stores.

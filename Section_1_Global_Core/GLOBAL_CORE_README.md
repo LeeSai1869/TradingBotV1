@@ -254,8 +254,8 @@ runner after pulling so its in-memory code adopts the bounded reads.
 ### Scheduling with many approved coins
 
 The existing loop alternates bounded download slices, feature maintenance, and
-bounded event slices. Each download/event slice has a rotating cursor and visits
-at most 12 pairs with a two-second soft budget between requests/events. One
+bounded event slices. Download and event slices have rotating cursors, with limits of 512 and 12
+pairs respectively and two-second soft budgets between requests/events. One
 network request or calculation can exceed the soft budget; the next operation
 waits until the following turn. The updater still owns ingestion and its recent
 row audit. Feature checkpoints remain in features.db and events retain their
@@ -271,3 +271,16 @@ only the outermost scope acquires/releases the OS lock. A process-local RLock
 serializes other threads; the OS lock still excludes other processes. A timeout
 covers waiting for both guards. Opening the lock file a second time and calling
 `flock` previously allowed the runner to block itself at its first event commit.
+
+
+### Recent candles during historical catch-up
+
+The same updater now keeps a `history_progress` table in klines.db when it adds a
+recent closed-candle page ahead of unfinished history. MAX(open_time) is no longer
+used as that historical cursor. The feature processor stops at the completed
+historical prefix until the gap is filled; it does not initialize indicators from
+the recent page or silently bridge missing history. Coin/timeframe deletion clears
+its progress entry. The existing ingest audit reports remaining backfill pairs.
+The download pass can visit up to 512 pairs within its two-second soft budget,
+allowing already-current pairs to be checked without consuming separate cycles.
+Event slices retain their separate limit. Network calls can exceed soft deadlines.

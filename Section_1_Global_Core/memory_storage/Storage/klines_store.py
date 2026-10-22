@@ -169,3 +169,14 @@ __all__ = [
     "count_rows",
     "insert_rows",
 ]
+
+
+def ensure_history_progress(conn):
+    conn.execute('CREATE TABLE IF NOT EXISTS history_progress (symbol TEXT, interval TEXT, next_open_time INTEGER NOT NULL, PRIMARY KEY(symbol,interval))')
+    conn.commit()
+
+
+def history_cursor(conn,symbol,interval):
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():return None
+    row=conn.execute('SELECT next_open_time FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+    return row[0] if row else None

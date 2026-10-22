@@ -5,8 +5,8 @@ MARKET DATA — Incremental Kline Updater
 
 Keeps market_data/klines.db fresh. Called from the live runner each cycle.
 
-Only fetches new bars. Respects interval boundaries: a 1h interval is
-queried at most once per hour, a 1w interval at most once per week, etc.
+Caught-up pairs respect interval boundaries. Historical pages keep progressing
+between interval boundaries; recent snapshots are refreshed once per bucket.
 
 INVARIANT:
     Every stored candle has close_time < now_ms, where now_ms is
@@ -17,6 +17,7 @@ INVARIANT:
 from __future__ import annotations
 
 from Section_1_Global_Core import data_policy
+from Section_1_Global_Core.memory_storage.Storage import klines_store
 
 import sqlite3
 import time
@@ -71,6 +72,7 @@ PAGE_LIMIT = 1000
 _LAST_UPDATE_MS = {}
 LAST_AUDIT = None
 _DOWNLOAD_CURSOR = 0
+_LATEST_UPDATE_MS = {}
 
 
 def _open_db():
@@ -90,9 +92,9 @@ def _fetch(symbol, interval, start_ms):
     params = {
         "symbol": symbol,
         "interval": interval,
-        "startTime": int(start_ms),
         "limit": PAGE_LIMIT,
     }
+    if start_ms is not None:params["startTime"]=int(start_ms)
     url = BINANCE_KLINES_URL + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"User-Agent": "ScalpV1-UP/1.0"})
     with urllib.request.urlopen(req, timeout=15) as resp:
@@ -137,6 +139,11 @@ def _insert(conn, symbol, interval, page, now_ms):
     return cur.rowcount
 
 
+def _pair_epoch(symbol,interval):
+    epochs=data_policy.read()['epochs']
+    return epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)
+
+
 def update_one(symbol, interval, conn):
     """
     Update one (symbol, interval). Returns rows inserted.
@@ -150,37 +157,65 @@ def update_one(symbol, interval, conn):
     """
     now_ms = int(time.time() * 1000)
     key = (symbol, interval)
+    epoch=_pair_epoch(symbol,interval)
     step = INTERVAL_MS[interval]
 
     if not data_policy.enabled(symbol, interval):
         return 0
+    klines_store.ensure_history_progress(conn)
     stored = _last_stored_open_time(conn, symbol, interval)
+    if stored is None:_LATEST_UPDATE_MS.pop(key,None)
+    cursor=klines_store.history_cursor(conn,symbol,interval)
     last_ms = _LAST_UPDATE_MS.get(key) if stored is not None else None
-    if last_ms is not None:
-        # Same interval bucket as the last fetch — the bar we would
-        # fetch hasn't closed yet. Nothing new to do.
-        if (last_ms // step) == (now_ms // step):
-            return 0
-
-    # Missing/deleted pairs bootstrap from exchange history, one page per cycle.
+    if cursor is None and last_ms is not None and last_ms//step==now_ms//step:return 0
     from .download_binance_history import FALLBACK_START_MS
-    start_ms = stored + 1 if stored is not None else FALLBACK_START_MS
+    start_ms=cursor if cursor is not None else stored+1 if stored is not None else FALLBACK_START_MS
+    total=0
+    # Keep the historical cursor separate from MAX(open_time) before adding a
+    # current page. Otherwise a recent page would permanently skip older history.
+    behind=stored is None or now_ms-stored>2*step
+    if cursor is None and behind:
+        with data_policy.locked():
+            if not data_policy.enabled(symbol,interval) or epoch!=_pair_epoch(symbol,interval):return 0
+            conn.execute('INSERT OR IGNORE INTO history_progress VALUES (?,?,?)',(symbol,interval,start_ms));conn.commit()
+        cursor=start_ms
+    if cursor is not None and _LATEST_UPDATE_MS.get(key,-1)//step!=now_ms//step:
+        try:
+            latest=_fetch(symbol,interval,None)
+            with data_policy.locked():
+                if not data_policy.enabled(symbol,interval) or epoch!=_pair_epoch(symbol,interval):return 0
+                total+=_insert(conn,symbol,interval,latest,now_ms)
+            _LATEST_UPDATE_MS[key]=now_ms
+            if latest:print(f'[update_klines] {symbol} {interval}: recent closed candles refreshed; history cursor retained',flush=True)
+        except Exception as error:
+            print(f'[update_klines] {symbol} {interval}: latest refresh error: {error}',flush=True)
 
     try:
         page = _fetch(symbol, interval, start_ms)
     except Exception as e:
         print("[update_klines] " + symbol + " " + interval + ": fetch error: " + str(e), flush=True)
-        return 0
+        return total
 
     if not page:
         _LAST_UPDATE_MS[key] = now_ms
-        return 0
+        return total
 
     now_ms = int(time.time() * 1000)
     with data_policy.locked():
-        if not data_policy.enabled(symbol, interval):
-            return 0
+        if not data_policy.enabled(symbol, interval) or epoch!=_pair_epoch(symbol,interval):
+            return total
         n = _insert(conn, symbol, interval, page, now_ms)
+        closed=[row for row in page if int(row[6])<now_ms]
+        if cursor is not None and not closed and page and int(page[0][6])>=now_ms:
+            with conn:conn.execute('DELETE FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval))
+        if cursor is not None and closed:
+            next_time=int(closed[-1][0])+1
+            with conn:
+                conn.execute('UPDATE history_progress SET next_open_time=? WHERE symbol=? AND interval=?',(next_time,symbol,interval))
+                # Short pages finish historical catch-up only when they approach
+                # the current exchange boundary (not on a transient old page).
+                if (len(page)<PAGE_LIMIT or int(page[-1][6])>=now_ms) and now_ms-int(closed[-1][6])<2*step:
+                    conn.execute('DELETE FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval))
     # A full page can mean backlog; continue next cycle rather than waiting
     # an entire 1w/1M interval. Throttle only when caught up.
     if len(page) < PAGE_LIMIT or int(page[-1][6]) >= now_ms:
@@ -189,17 +224,17 @@ def update_one(symbol, interval, conn):
         _LAST_UPDATE_MS.pop(key, None)
     if n > 0:
         print("[update_klines] " + symbol + " " + interval + ": +" + str(n) + " bars", flush=True)
-    return n
+    return total+n
 
 
-def update_all(*, max_pairs=12, time_budget=2.0):
+def update_all(*, max_pairs=512, time_budget=2.0):
     """
     Update a bounded round-robin slice of pairs. Returns total bars inserted.
 
     Time is checked between requests; one request retains its network timeout.
 
     Safe to call every runner cycle. Interval-boundary tracking means
-    each interval is queried at most once per bar period.
+    caught-up pairs are queried at most once per bar period; history keeps paging.
     """
     global LAST_AUDIT, _DOWNLOAD_CURSOR
     LAST_AUDIT = None
@@ -230,6 +265,13 @@ def update_all(*, max_pairs=12, time_budget=2.0):
             print("[audit] recent-row audit starting",flush=True)
             manifest = _audit_runner.run_fast(sample_rows_per_pair=10)
             LAST_AUDIT = manifest.get('summary') or _audit_runner.summarize(manifest)
+            audit_conn=_open_db()
+            try:
+                pending=audit_conn.execute('SELECT symbol,interval FROM history_progress').fetchall() if audit_conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else []
+                active=set(pairs)
+                LAST_AUDIT['history_backfill_pairs']=sum(tuple(pair) in active for pair in pending)
+                if LAST_AUDIT['history_backfill_pairs']:LAST_AUDIT['pass']=False
+            finally:audit_conn.close()
             print('[audit] '+_json.dumps(LAST_AUDIT,sort_keys=True),flush=True)
         except Exception as e:
             LAST_AUDIT = {"pass":None,"error":str(e)}

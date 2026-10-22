@@ -55,30 +55,8 @@ def update(e):
             for e['i'] in rt.inclusive(0, rt.binary('-', e['vpBins'], 1)):
                 # Pine 4773
                 rt.arr_set(e['vpVolumeBins'], e['i'], 0.0)
-        # Pine 4775
-        for e['i'] in rt.inclusive(0, rt.binary('-', e['vpLookback'], 1)):
-            # Pine 4776
-            e['candleHigh'] = e.previous('h', e['i'])
-            # Pine 4777
-            e['candleLow'] = e.previous('l', e['i'])
-            # Pine 4778
-            e['candleVolume'] = e.previous('volume', e['i'])
-            # Pine 4780
-            e['lowBin'] = rt.math_floor(rt.binary('/', rt.binary('-', e['candleLow'], e['vpLow']), e['vpBinSize']))
-            # Pine 4781
-            e['highBin'] = rt.math_floor(rt.binary('/', rt.binary('-', e['candleHigh'], e['vpLow']), e['vpBinSize']))
-            # Pine 4782
-            e['lowBin'] = rt.math_max(0, rt.math_min(rt.binary('-', e['vpBins'], 1), e['lowBin']))
-            # Pine 4783
-            e['highBin'] = rt.math_max(0, rt.math_min(rt.binary('-', e['vpBins'], 1), e['highBin']))
-            # Pine 4785
-            e['touchedBins'] = rt.binary('+', rt.binary('-', e['highBin'], e['lowBin']), 1)
-            # Pine 4786
-            e['volumePerBin'] = rt.binary('/', e['candleVolume'], e['touchedBins'])
-            # Pine 4787
-            for e['b'] in rt.inclusive(e['lowBin'], e['highBin']):
-                # Pine 4788
-                rt.arr_set(e['vpVolumeBins'], e['b'], rt.binary('+', rt.arr_get(e['vpVolumeBins'], e['b']), e['volumePerBin']))
+        # Pine 4775–4788: native histogram, identical ordered additions.
+        accumulate_histogram(e)
         # Pine 4790
         e['maxVolume'] = 0.0
         # Pine 4791
@@ -195,3 +173,26 @@ def update(e):
     if rt.truth((rt.truth((not rt.truth(rt.is_na(e['vpVALow'])))) and rt.truth(rt.binary('<', e['vpVALow'], e['c'])))):
         # Pine 4899
         e['distanceToVAL'] = (rt.binary('-', e['c'], e['vpVALow']) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['vpVALow'])))) and rt.truth(rt.binary('!=', e['c'], 0)))) else rt.NA)
+
+def accumulate_histogram(e):
+    import math
+    lookback=int(e['vpLookback']);count=int(e['vpBins'])
+    high=[e['h'],*reversed(e.histories.get('h',()))]
+    low=[e['l'],*reversed(e.histories.get('l',()))]
+    volume=[e['volume'],*reversed(e.histories.get('volume',()))]
+    bins=e['vpVolumeBins'];base=e['vpLow'];size=e['vpBinSize']
+    for i in range(lookback):
+        h=high[i] if i<len(high) else rt.NA
+        l=low[i] if i<len(low) else rt.NA
+        v=volume[i] if i<len(volume) else rt.NA
+        if rt.is_na(h) or rt.is_na(l):
+            lo=hi=touched=amount=rt.NA
+        else:
+            lo=max(0,min(count-1,math.floor((l-base)/size)))
+            hi=max(0,min(count-1,math.floor((h-base)/size)))
+            touched=hi-lo+1;amount=v/touched if touched else rt.NA
+            for b in range(lo,hi+1):
+                bins[b]+=amount
+                e.values['b']=b
+        e.values.update(i=i,candleHigh=h,candleLow=l,candleVolume=v,
+                        lowBin=lo,highBin=hi,touchedBins=touched,volumePerBin=amount)

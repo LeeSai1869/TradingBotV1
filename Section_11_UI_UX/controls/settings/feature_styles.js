@@ -1,5 +1,12 @@
 // Each output owns its presentation. This catalog also drives the settings rows.
 export const FEATURE_STYLES = {
+    'Support / Resistance': { connected: true, outputs: [
+        ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
+        ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
+    ] },
+    FVG: { connected: true, outputs: [
+        ['bull_fvg_zones','Bullish FVG','#26a69a','zone'],['bear_fvg_zones','Bearish FVG','#ef5350','zone'],
+    ] },
     EMA: { connected: true, outputs: [
         ["ema7", "EMA 7", "#f5c542"], ["ema25", "EMA 25", "#e747ae"],
         ["ema50", "EMA 50", "#ad83f5"], ["ema100", "EMA 100", "#60ab64"],

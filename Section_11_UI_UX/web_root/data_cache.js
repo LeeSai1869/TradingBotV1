@@ -8,6 +8,7 @@ const DataCache = {
     timeframe: null,
     bars: [],
     liveEnabled: true,
+    historyPending: false,
     formingBar: null,
     liveStatus: "loading",
     activeBars: [],
@@ -20,6 +21,7 @@ const DataCache = {
     _olderPromise: null,
     _refreshPromise: null,
     _latestSignature: null,
+    _refreshCount: 0,
     _storageEpoch: "0:0",
     listeners: [],
 
@@ -101,12 +103,13 @@ const DataCache = {
         const generation = ++this._reloadGeneration;
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
-            _olderPromise: null, _refreshPromise: null, _latestSignature: null,
-            formingBar: null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
+            historyPending: false, formingBar: null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
+            this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
             this.bars = packet.bars;
             this.activeBars = this.bars;
@@ -157,14 +160,24 @@ const DataCache = {
         if (this.loading || !this.atLiveEdge) return Promise.resolve(false);
         if (this._refreshPromise) return this._refreshPromise;
         const generation = this._reloadGeneration;
-        const request = this._fetchPage(this.symbol, this.timeframe, WINDOW_BARS);
+        // Poll only the closed edge; occasionally refresh the full window for replayed features.
+        const limit=++this._refreshCount%12===0?WINDOW_BARS:2;
+        const request = this._fetchPage(this.symbol, this.timeframe, limit);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
             if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
                 return this.loadInitial(this.symbol, this.timeframe);
             }
+            const wasHistoryPending=this.historyPending;
+            const historyChanged=this.historyPending!==!!packet.history_pending;
+            this.historyPending=!!packet.history_pending;
+            if(wasHistoryPending&&!this.historyPending)return this.loadInitial(this.symbol,this.timeframe);
+            const prior=this.latestBar;
+            if(prior?.client?.close_time && packet.bars.length && packet.bars[0].open_time>prior.client.close_time+1){
+                return this.loadInitial(this.symbol,this.timeframe);
+            }
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature;
+            const changed = signature !== this._latestSignature || historyChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

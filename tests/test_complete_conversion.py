@@ -47,6 +47,8 @@ class CompleteConversionTests(unittest.TestCase):
             packet=engine.step(client)
             # Newly exported legacy candle field was absent from the old packet.
             packet.pop('prev_candle_range')
+            for side in ('support','resistance','inst_support','inst_resistance'):
+                for edge in ('low','high'):packet.pop(f'{side}_zone_{edge}')
             digest.update(json.dumps(packet,sort_keys=True,separators=(',',':')).encode())
         self.assertEqual(digest.hexdigest(),'9a8ab1dafc558a35c3a01123eeac30022599e0fc885e569d8bf18b5336c210c7')
         from Section_4_Features.features.registry import load
@@ -122,6 +124,20 @@ class CompleteConversionTests(unittest.TestCase):
         engine.step(bar(45,close,interval='4h',step=14400000))
         self.assertTrue(memory['instSupportZoneIDArray'])
         self.assertTrue(set(memory['instSupportZoneIDArray']).issubset(memory['supportZoneIDArray']))
+
+    def test_support_zone_edges_export_the_selected_zone_without_approximation(self):
+        engine=Engine('ETHUSDT','4h',{'atrLen':2,'S/R Pivot Lookback':1,'S/R Reaction ATR':0})
+        found=0
+        for i in range(65):
+            packet=engine.step(bar(i,100+math.sin(i/2)*5,interval='4h',step=14400000))
+            for side,prefix in [('support','support'),('resistance','resistance')]:
+                identity=packet[f'nearest_{side}_zone_id']
+                if identity is None:continue
+                index=engine.context.persistent[prefix+'ZoneIDArray'].index(identity)
+                self.assertEqual(packet[f'{side}_zone_low'],engine.context.persistent[prefix+'LowArray'][index])
+                self.assertEqual(packet[f'{side}_zone_high'],engine.context.persistent[prefix+'HighArray'][index])
+                found+=1
+        self.assertGreater(found,0)
 
     def test_daily_security_historical_timing_and_explicit_daily_inputs(self):
         engine=Engine('ETHUSDT','1h',{'vpLookback':3})
@@ -237,6 +253,46 @@ class ReplayStorageTests(unittest.TestCase):
             self.assertEqual(processor.maintenance(['ETHUSDT'],['1m','5m'],time_budget=5),3)
         self.assertEqual(db.count_features('ETHUSDT','1m'),0)
         self.assertEqual(db.count_features('ETHUSDT','5m'),3)
+
+    def test_recent_candles_do_not_make_replay_jump_unfinished_history(self):
+        from Section_1_Global_Core.memory_storage.market_data import update_klines as updater
+        def page(indices):return [[i*60000,'100','102','98','101','5',(i+1)*60000-1] for i in indices]
+        db.write_klines([bar(i,100) for i in range(3)])
+        phase=[0]
+        def fetch(symbol,interval,start):
+            if start is None:return page(range(10,13))
+            self.assertEqual(start,120001 if phase[0]==0 else 300001)
+            return page(range(3,6) if phase[0]==0 else range(6,13))
+        with patch.object(updater,'_LATEST_UPDATE_MS',{}),patch.object(updater,'_LAST_UPDATE_MS',{}),patch.object(updater,'_fetch',side_effect=fetch),patch.object(updater.time,'time',return_value=780.1):
+            conn=klines_store.open_db()
+            try:
+                self.assertEqual(updater.update_one('ETHUSDT','1m',conn),6)
+                self.assertEqual(klines_store.history_cursor(conn,'ETHUSDT','1m'),300001)
+                self.assertEqual(db.last_kline_time('ETHUSDT','1m'),720000)
+                self.assertTrue(db.read_state_page('ETHUSDT','1m')['history_pending'])
+                processor.catch_up('ETHUSDT','1m')
+                self.assertIsNone(db.read_features('ETHUSDT','1m',600000))
+                self.assertEqual(processor._load('ETHUSDT','1m',(0,0)).context.last_time,300000)
+                phase[0]=1
+                self.assertEqual(updater.update_one('ETHUSDT','1m',conn),4)
+                self.assertIsNone(klines_store.history_cursor(conn,'ETHUSDT','1m'))
+                self.assertFalse(db.read_state_page('ETHUSDT','1m')['history_pending'])
+                processor.catch_up('ETHUSDT','1m')
+                self.assertEqual(db.count_features('ETHUSDT','1m'),13)
+            finally:conn.close()
+
+    def test_recent_download_cannot_commit_after_policy_epoch_changes(self):
+        from Section_1_Global_Core.memory_storage.market_data import update_klines as updater
+        db.write_klines([bar(0,100)])
+        epoch=[0]
+        def fetch(*args):
+            epoch[0]+=1
+            return [[600000,'100','102','98','101','5',659999]]
+        with patch.object(updater,'_pair_epoch',side_effect=lambda *args:(epoch[0],0)),patch.object(updater,'_LATEST_UPDATE_MS',{}),patch.object(updater,'_LAST_UPDATE_MS',{}),patch.object(updater,'_fetch',side_effect=fetch),patch.object(updater.time,'time',return_value=780.):
+            conn=klines_store.open_db()
+            try:self.assertEqual(updater.update_one('ETHUSDT','1m',conn),0)
+            finally:conn.close()
+        self.assertEqual(db.count_klines('ETHUSDT','1m'),1)
 
     def test_old_feature_memory_is_backed_up_before_replacement(self):
         db.write_klines([bar(0,100)])

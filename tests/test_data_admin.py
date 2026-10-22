@@ -234,3 +234,14 @@ class DataAdminTests(unittest.TestCase):
             orch.cycle()
         self.assertTrue(received)
         self.assertEqual(orch._state['BTCUSDT|1m'],received[-1])
+
+    def test_deletion_removes_only_scoped_history_cursor(self):
+        conn=klines_store.open_db()
+        klines_store.ensure_history_progress(conn)
+        conn.executemany('INSERT INTO history_progress VALUES (?,?,?)',[('BTCUSDT','1m',123),('SUIUSDT','1m',456)])
+        conn.commit();conn.close()
+        data_admin.delete_data(symbol='BTCUSDT')
+        conn=klines_store.open_db()
+        self.assertIsNone(klines_store.history_cursor(conn,'BTCUSDT','1m'))
+        self.assertEqual(klines_store.history_cursor(conn,'SUIUSDT','1m'),456)
+        conn.close()
