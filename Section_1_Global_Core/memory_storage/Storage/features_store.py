@@ -282,3 +282,16 @@ __all__ = [
     "insert_rows", "has_row", "read_row", "read_range",
     "count_rows", "last_open_time",
 ]
+
+
+def read_di_inputs(conn,symbol,interval,start,end):
+    columns={row[1] for row in conn.execute('PRAGMA table_info(features)')}
+    if not {'di_plus','di_minus','di_spread','formula_version'}.issubset(columns):return {}
+    rows=conn.execute('SELECT open_time,di_plus,di_minus,di_spread FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND formula_version=3 ORDER BY open_time',(symbol,interval,start,end)).fetchall()
+    return {row[0]:dict(zip(('di_plus','di_minus','di_spread'),row[1:])) for row in rows}
+
+
+def replay_through(conn,symbol,interval):
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():return None
+    row=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+    return row[0] if row else None

@@ -245,3 +245,11 @@ class DataAdminTests(unittest.TestCase):
         self.assertIsNone(klines_store.history_cursor(conn,'BTCUSDT','1m'))
         self.assertEqual(klines_store.history_cursor(conn,'SUIUSDT','1m'),456)
         conn.close()
+
+    def test_deletion_clears_only_the_matching_decision_rule_state(self):
+        conn=adcn_store.open_db()
+        conn.executemany('INSERT INTO decision_rule_state VALUES (?,?,?,?)',[('BTCUSDT','1m',0,'{}'),('SUIUSDT','1m',0,'{}')]);conn.commit();conn.close()
+        data_admin.delete_data(symbol='BTCUSDT')
+        conn=adcn_store.open_db()
+        self.assertIsNone(adcn_store.read_rule_state(conn,'BTCUSDT','1m'))
+        self.assertEqual(adcn_store.read_rule_state(conn,'SUIUSDT','1m'),'{}');conn.close()

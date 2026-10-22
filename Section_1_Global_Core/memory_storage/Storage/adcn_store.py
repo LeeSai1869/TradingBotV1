@@ -94,6 +94,7 @@ def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.executescript(_SCHEMA)
+    conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
     conn.commit()
     return conn
 
@@ -244,3 +245,15 @@ __all__ = [
     "read_previous_state", "last_open_time",
     "last_signal_for", "count_rows",
 ]
+
+def read_rule_state(conn,symbol,interval):
+    row=conn.execute('SELECT state FROM decision_rule_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+    return row[0] if row else None
+
+
+def commit_rule_rows(conn,symbol,interval,rows,last_open_time,state):
+    """Update this rule's decision fields without erasing unrelated score columns."""
+    with conn:
+        conn.executemany('INSERT INTO decisions(symbol,interval,open_time,signal_type,decision_state,trigger,final_score) VALUES (?,?,?,?,?,?,NULL) ON CONFLICT(symbol,interval,open_time) DO UPDATE SET signal_type=excluded.signal_type,decision_state=excluded.decision_state,trigger=excluded.trigger,final_score=NULL',
+                         [(symbol,interval,row['open_time'],row['signal_type'],row['decision_state'],row['trigger']) for row in rows])
+        conn.execute('INSERT OR REPLACE INTO decision_rule_state VALUES (?,?,?,?)',(symbol,interval,last_open_time,state))

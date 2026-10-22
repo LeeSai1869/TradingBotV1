@@ -102,7 +102,8 @@ Edit processors.json:
     {
       "schema_version": 1,
       "processors": [
-        {"module": "Section_4_Features.processor", "function": "process_bar"}
+        {"module": "Section_4_Features.processor", "function": "process_bar"},
+        {"module": "Section_8_Decision_Engine.processor", "function": "process_bar"}
       ]
     }
 
@@ -116,7 +117,8 @@ Each processor exposes a function accepting a BarEvent:
 Global Core loads processors by string. It never imports them directly.
 Adding or removing a processor does not modify Global Core.
 
-If a processor raises, Global Core logs and continues with the next bar.
+If a processor raises or returns False, Global Core retains that pair’s
+watermark for retry and continues other pairs.
 The loop never crashes from a processor error.
 
 ---
@@ -284,3 +286,14 @@ its progress entry. The existing ingest audit reports remaining backfill pairs.
 The download pass can visit up to 512 pairs within its two-second soft budget,
 allowing already-current pairs to be checked without consuming separate cycles.
 Event slices retain their separate limit. Network calls can exceed soft deadlines.
+
+
+### Closed-candle decisions
+
+Section 8 follows Section 4 in processors.json. It reads only a small projection
+of committed formula-v3 DI values and closed raw-bar identities, capped by the
+feature replay checkpoint. A finite two-bar rule starts from the latest calculated
+three-candle window, without introducing a full historical strategy replay. It
+then advances in bounded batches as closed features become ready. Decision rows
+and `decision_rule_state` commit together in ADCN.db. Policy deletion removes
+matching rule checkpoints and epoch changes invalidate transient state.

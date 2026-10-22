@@ -354,3 +354,38 @@ __all__ = [
     "read_state_range",
     "read_state_page", "read_state_after",
 ]
+
+
+def read_decision_inputs(symbol,interval,after,limit=200):
+    """Small closed-bar/DI projection, capped by committed feature replay state."""
+    if not features_store.DB_PATH.exists() or not klines_store.DB_PATH.exists():return []
+    from Section_1_Global_Core import data_policy
+    with data_policy.snapshot_guard():
+        features=_read_connection(features_store.DB_PATH)
+        raw=_read_connection(klines_store.DB_PATH)
+        try:
+            features.execute('BEGIN')
+            through=features_store.replay_through(features,symbol,interval)
+            if through is None:return []
+            rows=[row for row in klines_store.read_after_page(raw,symbol,interval,after,limit) if row[2]<=through]
+            if not rows:return []
+            values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
+            return [dict(open_time=row[2],close_time=row[8],features=values.get(row[2])) for row in rows]
+        finally:features.close();raw.close()
+
+
+def read_decision_seed(symbol,interval):
+    """Latest three raw candles at the committed feature prefix; never a live tail."""
+    if not features_store.DB_PATH.exists() or not klines_store.DB_PATH.exists():return []
+    from Section_1_Global_Core import data_policy
+    with data_policy.snapshot_guard():
+        features=_read_connection(features_store.DB_PATH);raw=_read_connection(klines_store.DB_PATH)
+        try:
+            features.execute('BEGIN')
+            through=features_store.replay_through(features,symbol,interval)
+            if through is None:return []
+            rows=klines_store.read_page(raw,symbol,interval,3,before=through+1)
+            if not rows:return []
+            values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
+            return [dict(open_time=row[2],close_time=row[8],features=values.get(row[2])) for row in rows]
+        finally:features.close();raw.close()

@@ -19,7 +19,7 @@ export function update(chart, data, options = {}) {
             position: isBuy ? "belowBar" : "aboveBar",
             color: isBuy ? "#4caf50" : "#f44336",
             shape: "circle",
-            text: `${isBuy ? "B" : "S"} | ${Math.round(row.final_score || 0)}`,
+            text: `${isBuy ? "B" : "S"}${Number.isFinite(row.final_score) ? ` | ${Math.round(row.final_score)}` : ""}`,
             size: 1.7,
         });
     }

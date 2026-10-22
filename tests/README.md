@@ -170,11 +170,10 @@ on verification; source connectivity is not claimed from these simulated tests.
 The desktop chart server needs access to api.binance.com for live preview.
 
 
-The uploaded live configuration registers only `Section_4_Features.processor`.
-That processor also calculates the six Section 5 regime states.
-No application caller persists decisions with `db.write_adcn()`. Existing stored
-decisions render, but this change does not implement a new decision writer or
-change strategy formulas. The tests' decisions are disposable fixtures.
+The live configuration registers `Section_4_Features.processor` followed by
+`Section_8_Decision_Engine.processor`. Features include the six Section 5 regime
+states; Section 8 persists the closed-candle DI recovery rule in ADCN with its
+restart checkpoint in the same transaction. Test decisions use disposable stores.
 
 The existing architecture check (`python -m Section_1_Global_Core.tools.check_imports`)
 rejects the storage gateway imports already used by the UI and feature processor;
@@ -585,3 +584,15 @@ so a fresh tail can never make recursive calculations jump an unfinished gap.
 Audit summaries keep `pass=false` while active history backfills remain.
 `test_complete_conversion.py` exercises fresh-tail insertion, gap exclusion,
 forward cursor completion, and continued full feature replay on actual stores.
+
+
+Closed DI-spread decision rule
+-----------------------------
+`test_di_decisions.py` covers both strictly qualifying setup candles, the inclusive
++DI/spread crossing, strict +DI rise and −DI decline, invalid inputs, no immediate
+repeat, closed-feature checkpoint gating, raw time gaps, initial latest-window
+seeding, restart/idempotence, symbol/timeframe isolation, policy epochs, and
+atomic row/checkpoint rollback. ADCN's unrelated score fields remain intact.
+`test_policy_lock.py` exercises both real processors beneath the real runner lock.
+`browser_di_decisions.py` generates a decision from stored DI values and verifies
+its score-free BUY marker through the existing combined bar endpoint.
