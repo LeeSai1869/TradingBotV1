@@ -35,6 +35,23 @@ class ProfileSnapshotTests(unittest.TestCase):
         with patch.object(volume_profile.json,'loads',side_effect=AssertionError('unchanged state should be cached')):
             self.assertEqual(volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0'),result)
 
+    def test_each_closed_candle_keeps_its_own_rolling_profile_levels(self):
+        old=self.result
+        new=self.engine.step(dict(symbol='ETHUSDT',interval='1m',open_time=240000,close_time=299999,
+                                  open=10.05,close=10.05,high=10.1,low=10.,volume=100.))
+        conn=features_store.open_db()
+        try:
+            features_store.insert_rows(conn,[old,new])
+            rows=features_store.read_range(conn,'ETHUSDT','1m',0,300000)
+        finally:conn.close()
+        self.assertEqual([r['open_time'] for r in rows],[180000,240000])
+        self.assertAlmostEqual(rows[0]['vp_poc'],1.1625)
+        self.assertAlmostEqual(rows[0]['vp_va_low'],.775)
+        self.assertAlmostEqual(rows[0]['vp_va_high'],2.325)
+        self.assertAlmostEqual(rows[1]['vp_poc'],8.9625)
+        self.assertAlmostEqual(rows[1]['vp_va_low'],1.)
+        self.assertAlmostEqual(rows[1]['vp_va_high'],10.1)
+
     def test_wrong_candle_epoch_or_inconsistent_levels_withholds_histogram(self):
         for latest,epoch in [({'open_time':240000,'features':self.result},'0:0'),(self.latest,'1:0'),({'open_time':180000,'features':{**self.result,'vp_poc':99}},'0:0')]:
             self.assertNotEqual(volume_profile.snapshot('ETHUSDT','1m',latest,epoch)['status'],'ready')

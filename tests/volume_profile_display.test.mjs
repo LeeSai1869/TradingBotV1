@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {FEATURE_STYLES,normalizeStyles} from '../Section_11_UI_UX/controls/settings/feature_styles.js';
-import {histogramRows,barGeometry,referenceLevels} from '../Section_11_UI_UX/overlays/volume_profile/index.js';
+import {histogramRows,barGeometry} from '../Section_11_UI_UX/overlays/volume_profile/index.js';
 import {segments} from '../Section_11_UI_UX/overlays/zones/index.js';
 
 test('Volume Profile offers independent lines and histogram controls',()=>{
@@ -38,14 +38,12 @@ test('histogram widths reflect actual volume and node toggles retain separate bi
     assert.deepEqual(histogramRows({status:'waiting',bins:[]},styles),[]);
 });
 
-test('POC VAH and VAL remain reference lines and never enable histogram rows',()=>{
+test('POC VAH and VAL never enable histogram rows',()=>{
     const styles=normalizeStyles({vp_poc:{visible:true},vp_va_high:{visible:true},vp_va_low:{visible:true}});
     const profile={status:'ready',levels:{vp_poc:100,vp_va_high:110,vp_va_low:90},bins:[{low:90,high:110,volume:100,node:'high'}]};
-    assert.deepEqual(referenceLevels(profile,null,styles).map(l=>l.price),[100,110,90]);
     assert.deepEqual(histogramRows(profile,styles),[]);
     styles.vp_histogram.visible=true;
     styles.vp_poc.visible=styles.vp_va_high.visible=styles.vp_va_low.visible=false;
-    assert.deepEqual(referenceLevels(profile,null,styles),[]);
     assert.equal(histogramRows(profile,styles).length,1);
 });
 test('bars are thin and extend into chart without changing volume proportions',()=>{

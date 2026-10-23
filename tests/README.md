@@ -657,7 +657,8 @@ All displays consume the existing combined bars; the optional histogram snapshot
 travels in the same `/api/bars` response. No separate market-data requests or
 feature recalculation are introduced. Missing S/R boundaries are hidden rather
 than rendered as zero-width zones at a fallback price. The profile displays the latest committed rolling histogram as horizontal bars,
-with independent HVN/LVN colors and current horizontal POC/VAH/VAL projections.
+with independent HVN/LVN colors. POC/VAH/VAL plot their stored values per candle,
+using the same historical/live line-series path as VWAP.
 `test_profile_snapshot.py` checks a known bin/POC/value-area vector, cache reuse,
 checkpoint/candle/epoch consistency, and withholding stale bins during repair.
 Bins are read from the runner checkpoint, never inferred from price levels.
@@ -667,10 +668,18 @@ takes priority over the existing Symbols `.env` file; missing/empty configuratio
 uses public requests without an authentication header. Incomplete results retain
 the previous registry, and failed refreshes retain the existing hourly retry.
 
-VP reference lines and histogram bars have independent visibility: selecting POC,
+VP per-candle lines and histogram bars have independent visibility: selecting POC,
 VAH and VAL must not enable any bars. The tests check this migration regression,
 volume-proportional lengths, configurable chart length/pixel thickness and zoom
 spacing without changing price-bin resolution. The extra VP value-area rectangle
 was removed. Calculations retain the Pine rolling OHLCV allocation and custom
 HVN/LVN thresholds; these UI tests do not establish equivalence to a lower-timeframe
 or exchange-trade volume profile.
+
+Per-candle VP coverage: the browser compares all 150 plotted POC/VAH/VAL points
+against their corresponding feature rows and confirms the series vary over time.
+Node-bar opacity is edited independently for high/low nodes and survives reload.
+A rolling-window calculation/storage vector verifies changed levels on a new
+closed candle without overwriting the previous candle's profile values. The
+latest closed histogram remains on the side; it is not substituted for the
+historical line series. No feature formula or replay version changes are needed.

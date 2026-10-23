@@ -102,7 +102,7 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
-    if(item==='Volume Profile')note('POC, VAH and VAL are horizontal reference lines. Volume and node bars have separate controls below.');
+    if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Node bars stay on the side and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
         const button=el('button',label,selection);
@@ -123,7 +123,7 @@ function renderFeature() {
     }
     if (featureTab === "Display") {
         for (const [key, label,,presentation] of feature.outputs) {
-            if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Reference lines',content);
+            if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Per-candle lines',content);
             const row = el("label", "", content, "settings-row");
             el("span", label, row);
             const check = el("input", "", row); check.type = "checkbox";
@@ -185,9 +185,10 @@ function renderFeature() {
         }
     }
     for(const [key,label,,presentation] of feature.outputs)if(['zone','profile'].includes(presentation)) {
-        const row=el('label',`${label} fill opacity (%) `,content,'settings-row');
+        const caption=presentation==='profile'?`${label} bar opacity`:`${label} fill opacity`;
+        const row=el('label',`${caption} (%) `,content,'settings-row');
         const input=el('input','',row);input.type='number';input.min=0;input.max=100;input.step=1;
-        input.value=draft.outputs[key].opacity;input.setAttribute('aria-label',`${label} fill opacity`);
+        input.value=draft.outputs[key].opacity;input.setAttribute('aria-label',caption);
         input.onchange=()=>{draft.outputs[key].opacity=Math.max(0,Math.min(100,Number(input.value)||0));};
     }
     note("Each output keeps its own style. Unchecking an output preserves its color, width and line style.");

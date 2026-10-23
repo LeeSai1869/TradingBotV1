@@ -22,7 +22,7 @@ function positionHeaders(){
     for(const state of groups.values())if(state.header){const row=state.pane.getHTMLElement();if(row)state.header.style.top=(row.getBoundingClientRect().top-outer.top+5)+'px';}
 }
 function create(feature){
-    const state={feature,lines:new Map(),pane:['VWAP','WMA'].includes(feature)?null:chart.addPane(true),header:null,collapsed:false,levels:[]};
+    const state={feature,lines:new Map(),pane:['VWAP','WMA','Volume Profile'].includes(feature)?null:chart.addPane(true),header:null,collapsed:false,levels:[]};
     if(state.pane){
         state.pane.setStretchFactor(.5);
         const header=document.createElement('div');header.className='indicator-pane-header';header.dataset.feature=feature;
@@ -40,7 +40,7 @@ function create(feature){
         button(`Close ${feature}`,'×',header,()=>window.dispatchEvent(new CustomEvent('feature-visibility-change',{detail:{feature,visible:false}})));
     }
     for(const [key,label,,presentation='line'] of FEATURE_STYLES[feature].outputs){
-        if(presentation==='zone')continue;
+        if(['zone','profile'].includes(presentation))continue;
         const line=chart.addSeries(presentation==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,
             {visible:false,title:'',priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true,
              priceFormat:featurePriceFormat},state.pane?.paneIndex()??0);
@@ -72,8 +72,8 @@ export function mount(instance){
 }
 export function update(instance,data){
     barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
-    for(const feature of [...LOWER,'VWAP','WMA']){
-        const enabled=FEATURE_STYLES[feature].outputs.some(([key])=>styles()[key]?.visible);
+    for(const feature of [...LOWER,'VWAP','WMA','Volume Profile']){
+        const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&styles()[key]?.visible);
         let state=groups.get(feature);
         if(!enabled){if(state)remove(state);continue;}
         if(!state)state=create(feature);

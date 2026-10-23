@@ -41,6 +41,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Point of control (POC) line style',exact=True).select_option('1')
         await dialog.get_by_label('Profile bar length (% of chart)',exact=True).fill('55')
         await dialog.get_by_label('Profile bar thickness (px)',exact=True).fill('2')
+        await dialog.get_by_label('High-volume nodes bar opacity',exact=True).fill('25')
+        await dialog.get_by_label('Low-volume nodes bar opacity',exact=True).fill('75')
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
         await dialog.get_by_role('button',name='FVG',exact=True).click()
@@ -57,6 +59,14 @@ async def exercise(base,library):
             print(requests[-10:],flush=True)
             raise
         assert await page.evaluate('Composer.config.featureStyles.vp_poc.color')=='#fedcba'
+        assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
+        assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
+        for key in ('vp_poc','vp_va_high','vp_va_low'):
+            plotted=await page.evaluate("key=>import('/overlays/indicators/index.js').then(x=>x.getSeries(key).data().filter(p=>p.value!=null))",key)
+            expected=[{'time':r[2]//1000,'value':profiles[r[2]][key]} for r in rows]
+            assert plotted==expected,(key,len(plotted))
+            assert len({p['value'] for p in plotted})>1,key
+
         assert await page.evaluate('Composer.config.featureStyles.vp_histogram.lengthPercent')==55
         assert await page.evaluate('Composer.config.featureStyles.vp_histogram.thickness')==2
         assert await page.evaluate("import('/overlays/volume_profile/index.js').then(x=>x.getProfile().levels.vp_poc)")==profiles[rows[-1][2]]['vp_poc']
@@ -66,6 +76,8 @@ async def exercise(base,library):
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
         assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==6
+        assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
+        assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
         await page.get_by_role('button',name='Open settings',exact=True).click()
         await dialog.get_by_role('tab',name='Features',exact=True).click()
         await dialog.get_by_role('button',name='FVG',exact=True).click()
@@ -74,7 +86,7 @@ async def exercise(base,library):
         assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==4
         assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
-        print('PASS: S/R bands, separate VP lines and thin horizontal bins, saved length/thickness/styles and combined-stream reuse',flush=True)
+        print('PASS: S/R bands, per-candle VP plots and side nodes, saved length/thickness/styles and combined-stream reuse',flush=True)
         await browser.close()
 
 

@@ -1,7 +1,7 @@
 // One current closed-candle profile, projected from the runner's stored bins.
 import {getSeries} from '../candles/index.js';
 export const name='volumeProfile';
-let primitive,axis=[],status,profile=null;
+let primitive,status,profile=null;
 const styles=()=>window.Composer.config.featureStyles||{};
 export function histogramRows(snapshot,config){
     if(snapshot?.status!=='ready')return [];
@@ -22,10 +22,6 @@ export function barGeometry(row,coordinate,paneWidth,config){
     const height=Math.min(available*.8,config.vp_histogram?.thickness??3);
     const width=paneWidth*(config.vp_histogram?.lengthPercent??45)/100*row.fraction;
     return {left:paneWidth-5-width,top:(a+b)/2-height/2,width,height};
-}
-export function referenceLevels(profile,latest,config){
-    const levels=profile?.levels||latest?.features||{};
-    return ['vp_poc','vp_va_high','vp_va_low'].filter(key=>config[key]?.visible&&Number.isFinite(levels[key])).map(key=>({key,price:levels[key],...config[key]}));
 }
 class Profile {
     attached({series,requestUpdate}){this.series=series;this.requestUpdate=requestUpdate;}
@@ -52,15 +48,9 @@ export function mount(){
     document.getElementById('chart').append(status);
 }
 export function update(chart,data){
-    const config=styles(),enabled=Object.entries(config).some(([k,v])=>k.startsWith('vp_')&&v.visible);
+    const config=styles(),enabled=['vp_histogram','vp_hvn_nodes','vp_lvn_nodes'].some(key=>config[key]?.visible);
     const latest=(data.bars||[]).findLast(b=>!b.provisional),candidate=data.volumeProfile;
     profile=enabled&&candidate?.status==='ready'&&candidate.as_of===latest?.open_time?candidate:null;
-    for(const line of axis)getSeries().removePriceLine(line);axis=[];
-    if(enabled){
-        for(const line of referenceLevels(profile,latest,config)){
-            axis.push(getSeries().createPriceLine({price:line.price,color:line.color,lineWidth:line.width,lineStyle:line.style,lineVisible:true,axisLabelVisible:true,title:''}));
-        }
-    }
     status.hidden=!enabled;
     status.textContent=profile?`Volume profile · ${profile.lookback} closed candles`:'Waiting for closed-candle volume profile';
     primitive.requestUpdate?.();
