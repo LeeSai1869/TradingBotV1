@@ -5,7 +5,7 @@ import threading
 import time
 import traceback
 from Section_1_Global_Core import data_policy
-from Section_1_Global_Core.memory_storage.Storage import db,adcn_store
+from Section_1_Global_Core.memory_storage.Storage import db,adcn_store,features_store
 from .rules import di_turning_point as rule
 from .sequence import alternate
 
@@ -17,7 +17,9 @@ BATCH=200
 
 def _epoch(symbol,interval):
     epochs=data_policy.read()['epochs']
-    return [epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]
+    epoch=[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]
+    generation=features_store.decision_generation(symbol,interval)
+    return epoch+[generation] if generation else epoch
 
 
 def _load(symbol,interval):
@@ -33,7 +35,7 @@ def _load(symbol,interval):
             state={**state,'version':rule.VERSION,
                    'last_signal':db.read_previous_decision_candidate(symbol,interval,state['last']+1)}
         if not state or state.get('version')!=rule.VERSION or state.get('epoch')!=epoch:
-            state={'version':rule.VERSION,'epoch':epoch,'last':-1,'previous':[],'seeded':False,'last_signal':None}
+            state={'version':rule.VERSION,'epoch':epoch,'last':-1,'previous':[],'seeded':bool(len(epoch)>2 and epoch[-1]),'last_signal':None}
         _CACHE[key]=state
     return _CACHE[key]
 

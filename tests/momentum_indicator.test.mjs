@@ -35,4 +35,5 @@ test('suppressed candidates and obsolete v2 rows cannot create markers or sounds
     const bars=[{...signal(1000),momentum:{signal_type:null,decision_state:'SUPPRESSED'},adcn:{signal_type:'BUY',trigger:'DI_TURNING_POINT_V3'}},
         {adcn:{signal_type:'BUY',trigger:'DI_TURNING_POINT_V2'}}];
     assert.deepEqual(closedSignals(bars),[]);
+    assert.deepEqual(closedSignals([{momentum:null,adcn:{signal_type:'BUY',trigger:'DI_TURNING_POINT_V3'}}]),[]);
 });

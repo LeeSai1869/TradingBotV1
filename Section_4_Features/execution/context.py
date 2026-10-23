@@ -46,7 +46,7 @@ class Context:
         series=self.histories.get(key,[])
         return series[-int(index)] if len(series)>=index else rt.NA
     def input(self,title,default):return self.parameters.get(title,default)
-    def begin(self,client,is_confirmed=True,is_realtime=False,is_new=True):
+    def begin(self,client,is_confirmed=True,is_realtime=False,is_new=True,*,stored=None,helpers=None):
         timestamp=int(client['open_time'])
         if self.last_time is not None and timestamp<=self.last_time:raise ValueError('Feature bars must be strictly chronological; preview a clone for live ticks')
         self.index+=1;self.values={};self.calls={};self.is_realtime=is_realtime
@@ -59,7 +59,8 @@ class Context:
         typical=(client['high']+client['low']+client['close'])/3
         from ..features.vwap import session_value
         from ..features.volume import moving_average
-        vwap=session_value(self,client,self.new_day);volume_ma=moving_average(self,client['volume'])
+        vwap=session_value(self,client,self.new_day) if helpers is None or 'context:vwap' in helpers else (stored or {}).get('vwap',rt.NA)
+        volume_ma=moving_average(self,client['volume']) if helpers is None or 'context:volume' in helpers else (stored or {}).get('volume_ma',rt.NA)
         prev=self.last_client
         for field in ('open','high','low','close','volume'):
             self.values[field]=client[field];self.values['mtfData.'+field]=client[field]
@@ -71,8 +72,8 @@ class Context:
             'tf':self.timeframe,'executionEngine':self.parameters.get('executionEngine','SCALP'),'bar_index':self.index,'time':timestamp,'hlc3':typical,
             'barstate.isconfirmed':is_confirmed,'barstate.isnew':is_new,'timeframe.period':pine_tf,'syminfo.tickerid':self.symbol,'lastRegime':self.last_regime})
         self.current_client=dict(client)
-    def finish(self):
-        for key in HISTORY:
+    def finish(self,*,history_keys=None):
+        for key in HISTORY if history_keys is None else history_keys:
             self.histories.setdefault(key,deque(maxlen=self.capacity)).append(self.values.get(key,self.persistent.get(key,rt.NA)))
         self.last_time=self.current_client['open_time'];self.last_client=self.current_client;self.last_regime=self.values['regimeState']
     def session(self,spec):

@@ -8,7 +8,10 @@ from .contract import canonical
 STEPS=tuple((importlib.import_module(step['module'] if '.' in step['module'] else 'Section_4_Features.features.'+step['module'],__package__),step['function']) for step in MANIFEST['steps'])
 
 class Engine:
-    def __init__(self,symbol,timeframe,parameters=None):self.context=Context(symbol,timeframe,parameters)
+    def __init__(self,symbol,timeframe,parameters=None):
+        self.context=Context(symbol,timeframe,parameters)
+        from .components import catalog
+        self.component_sources=catalog().source
     def step(self,client,*,is_confirmed=True,is_realtime=False,daily_bars=None,is_new=True):
         e=self.context;e.begin(client,is_confirmed,is_realtime,is_new);e.external_daily=daily_bars;memory.update(e)
         for module,function in STEPS:

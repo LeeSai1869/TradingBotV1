@@ -179,6 +179,10 @@ def open_db() -> sqlite3.Connection:
                 if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
                     conn.close()
                     raise
+    conn.execute('CREATE TABLE IF NOT EXISTS feature_replay_jobs (symbol TEXT, interval TEXT, signature TEXT, target INTEGER, last_time INTEGER, changed TEXT, state TEXT, columns TEXT, PRIMARY KEY(symbol,interval))')
+    conn.execute("CREATE TABLE IF NOT EXISTS feature_calculation_versions (symbol TEXT, interval TEXT, signature TEXT, generation INTEGER NOT NULL DEFAULT 0, invalidated_columns TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(symbol,interval))")
+    if 'invalidated_columns' not in {row[1] for row in conn.execute('PRAGMA table_info(feature_calculation_versions)')}:
+        conn.execute("ALTER TABLE feature_calculation_versions ADD COLUMN invalidated_columns TEXT NOT NULL DEFAULT '[]'")
     conn.execute('CREATE TABLE IF NOT EXISTS feature_engine_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))')
     conn.commit()
     return conn
@@ -221,7 +225,9 @@ def read_row(conn, symbol, interval, open_time):
     row = cur.fetchone()
     if row is None:
         return None
-    return _decode(columns, row)
+    result=_decode(columns,row)
+    mask_replays(conn,symbol,interval,[result])
+    return result
 
 
 def _read_columns(conn):
@@ -237,7 +243,7 @@ def _decode(columns,row):
     return result
 
 
-def read_range(conn, symbol, interval, start_ms, end_ms):
+def read_range(conn, symbol, interval, start_ms, end_ms, *, mask_pending=True):
     """
     Read permanent feature rows in [start_ms, end_ms), oldest first.
 
@@ -254,7 +260,9 @@ def read_range(conn, symbol, interval, start_ms, end_ms):
         """,
         (symbol, interval, start_ms, end_ms),
     )
-    return [_decode(columns,row) for row in cur.fetchall()]
+    result=[_decode(columns,row) for row in cur.fetchall()]
+    if mask_pending:mask_replays(conn,symbol,interval,result)
+    return result
 
 
 def count_rows(conn, symbol=None, interval=None) -> int:
@@ -286,12 +294,70 @@ __all__ = [
 
 def read_di_inputs(conn,symbol,interval,start,end):
     columns={row[1] for row in conn.execute('PRAGMA table_info(features)')}
-    if not {'di_plus','di_minus','di_spread','adx','formula_version'}.issubset(columns):return {}
-    rows=conn.execute('SELECT open_time,di_plus,di_minus,di_spread,adx FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND formula_version=3 ORDER BY open_time',(symbol,interval,start,end)).fetchall()
-    return {row[0]:dict(zip(('di_plus','di_minus','di_spread','adx'),row[1:])) for row in rows}
+    fields=decision_fields()
+    if not set(fields+['formula_version']).issubset(columns):return {}
+    cap=replay_through(conn,symbol,interval)
+    if cap is not None:end=min(end,cap+1)
+    rows=conn.execute('SELECT open_time,'+','.join(fields)+' FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND formula_version=3 ORDER BY open_time',(symbol,interval,start,end)).fetchall()
+    return {row[0]:dict(zip(fields,row[1:])) for row in rows}
 
 
 def replay_through(conn,symbol,interval):
     if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():return None
     row=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
-    return row[0] if row else None
+    through=row[0] if row else None
+    task=pending_replay(conn,symbol,interval)
+    if task and set(task[2])&set(decision_fields()+['c','close']):
+        through=min(through,task[0]) if through is not None else task[0]
+    return through
+
+
+def pending_replay(conn,symbol,interval):
+    import json
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_replay_jobs'").fetchone():return None
+    row=conn.execute('SELECT last_time,target,columns FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+    return (row[0],row[1],json.loads(row[2])) if row else None
+
+
+def decision_generation(symbol,interval):
+    if not DB_PATH.exists():return 0
+    conn=sqlite3.connect(DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():return 0
+        row=conn.execute('SELECT generation FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+        return row[0] if row else 0
+    finally:conn.close()
+
+
+def decision_fields():
+    from Section_8_Decision_Engine.rules import di_turning_point as rule
+    return [field for field in rule.FIELDS if field!='close']
+
+
+
+def read_replay_inputs(conn,symbol,interval,start,end,columns):
+    """Small prerequisite projection for targeted replay; no presentation masking."""
+    columns=sorted((set(columns)&set(COLUMNS))|{'open_time','formula_version'})
+    rows=conn.execute('SELECT '+','.join(columns)+' FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? ORDER BY open_time',(symbol,interval,start,end)).fetchall()
+    result=[]
+    for row in rows:
+        value=dict(zip(columns,row))
+        for key,item in value.items():
+            if item is not None and _translated_fields.get(key)=='bool':value[key]=bool(item)
+        result.append(value)
+    return result
+
+
+
+def mask_replays(conn,symbol,interval,rows):
+    import json
+    task=pending_replay(conn,symbol,interval)
+    legacy=None
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():
+        legacy=conn.execute('SELECT v.invalidated_columns,s.last_open_time FROM feature_calculation_versions v LEFT JOIN feature_engine_state s ON v.symbol=s.symbol AND v.interval=s.interval WHERE v.symbol=? AND v.interval=?',(symbol,interval)).fetchone()
+    invalidated=json.loads(legacy[0]) if legacy else []
+    for row in rows:
+        if task and task[0]<row['open_time']<=task[1]:
+            for field in task[2]:row[field]=None
+        if legacy and legacy[1] is not None and row['open_time']>legacy[1]:
+            for field in invalidated:row[field]=None

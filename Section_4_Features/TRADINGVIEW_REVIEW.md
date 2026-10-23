@@ -1,5 +1,10 @@
 # Full Section 4 / Section 5 conversion
 
+Formula/input edits now use [selective historical replay](execution/SELECTIVE_REPLAY.md).
+Matching existing formula-v3 checkpoints retain their progress; future edits
+update only affected columns and dependents. Strategy and display edits do not
+restart feature history.
+
 The executable calculations in `sections_4&5_Tradingview` are translated into
 **22 numbered Section 4 calculation modules and six Section 5 modules**. The complete
 537-field MarketFeatures contract and six regime outputs are calculated and

@@ -343,3 +343,13 @@ frequent scheduler path exhausted the runner's descriptor limit and caused both
 `Too many open files` and `unable to open database file` errors. The fix uses
 `contextlib.closing`, preserves scheduling order and replay checkpoints, and
 requires a runner restart to release handles held by the old process.
+
+### Selective calculation repair
+
+The existing runner detects feature formula/input revisions and repairs only their
+outputs and dependents. Unchanged feature columns stay intact; strategy/style edits
+do not reset Section 4. Repair checkpoints resume after restart, and the initial
+formula-v3 migration retains its progress. See
+[`SELECTIVE_REPLAY.md`](../Section_4_Features/execution/SELECTIVE_REPLAY.md) for
+dependency, visibility and state-merging behavior. `check_coin.py SYMBOL --logs`
+lists affected columns and repair progress separately from feature row counts.

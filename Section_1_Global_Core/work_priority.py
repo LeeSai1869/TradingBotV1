@@ -21,14 +21,19 @@ def work_symbol(symbols,intervals):
     if not klines_store.DB_PATH.exists():return symbols[0]
     with closing(sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
-        checkpoints={}
+        checkpoints={};versions=None;jobs=set()
         if features_store.DB_PATH.exists():
             with closing(sqlite3.connect(f'file:{features_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as features:
                 if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
                     checkpoints={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,last_open_time FROM feature_engine_state')}
+                if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():
+                    from Section_4_Features.execution.components import current_signature
+                    signature=current_signature()
+                    versions={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,signature FROM feature_calculation_versions')}
+                    jobs=set(features.execute('SELECT symbol,interval FROM feature_replay_jobs'))
         def pending(s):
             for t in intervals:
-                if (s,t) in history:return True
+                if (s,t) in history or (s,t) in jobs or versions is not None and versions.get((s,t))!=signature:return True
                 # Indexed point lookup; never scan millions of candles per cycle.
                 latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(s,t)).fetchone()[0]
                 if latest is None or checkpoints.get((s,t),-1)<latest:return True

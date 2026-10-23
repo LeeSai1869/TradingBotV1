@@ -89,6 +89,8 @@ def delete_data(*, interval=None, symbol=None):
             with conn:
                 for name, table in [('candles','main.klines'),('features','features_memory.features'),('decisions','decisions_memory.decisions')]:
                     counts[name] = conn.execute(f'DELETE FROM {table} WHERE {column}=?', (value,)).rowcount
+                for table in ('feature_replay_jobs','feature_calculation_versions'):
+                    conn.execute(f'DELETE FROM features_memory.{table} WHERE {column}=?',(value,))
                 conn.execute(f'DELETE FROM features_memory.feature_engine_state WHERE {column}=?', (value,))
                 conn.execute(f'DELETE FROM decisions_memory.decision_rule_state WHERE {column}=?',(value,))
                 if conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():

@@ -10,7 +10,7 @@ export function closedSignals(bars,styles={},visible=true) {
     if(!visible)return [];
     return bars.flatMap(bar=>{
         if(bar.provisional)return [];
-        const row=bar.momentum??(bar.adcn?.trigger==='DI_TURNING_POINT_V3'?bar.adcn:null);
+        const row=Object.hasOwn(bar,'momentum')?bar.momentum:(bar.adcn?.trigger==='DI_TURNING_POINT_V3'?bar.adcn:null);
         const side=row?.signal_type?.toLowerCase();
         if(!['buy','sell'].includes(side)||styles[`momentum_${side}`]?.visible===false)return [];
         return [{bar,side}];

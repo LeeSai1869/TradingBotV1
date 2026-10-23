@@ -12,7 +12,8 @@ from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,features_store,klines_store
 from Section_4_Features.feature_builder import build_feature_packet
 from Section_4_Features.execution.engine import Engine
-from Section_4_Features.execution import checkpoint
+from Section_4_Features.execution import checkpoint,selective
+from Section_4_Features.execution.components import current_signature,catalog
 
 WRITE_BATCH=200
 _ENGINES={}
@@ -58,6 +59,8 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
     epoch=_epoch(symbol,interval)
     if not data_policy.enabled(symbol,interval):return 0
     engine=_load(symbol,interval,epoch)
+    _prepare_engine(symbol,interval,engine,epoch)
+    if getattr(engine,'_repair_pending',False):return _advance_targeted(symbol,interval,engine,epoch,max_bars,deadline)
     conn=klines_store.open_db()
     try:
         rows=klines_store.read_after_page(conn,symbol,interval,engine.context.last_time if engine.context.last_time is not None else -1,max_bars)
@@ -89,6 +92,7 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
                 columns=features_store.COLUMNS
                 conn.executemany(f'INSERT OR REPLACE INTO features ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})',[[r.get(c) for c in columns] for r in output])
                 conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,engine.context.last_time,checkpoint.dump(engine,epoch)))
+                conn.execute('INSERT INTO feature_calculation_versions(symbol,interval,signature,generation) VALUES (?,?,?,0) ON CONFLICT(symbol,interval) DO UPDATE SET signature=excluded.signature',(symbol,interval,current_signature()))
         except Exception:
             reset_pair(symbol,interval);raise
         finally:conn.close()
@@ -165,13 +169,17 @@ def _repair_daily(symbol,interval,deadline):
 
 def process_bar(ev, *, historical_replay=True):
     with _LOCK:
-        engine=_load(ev.symbol,ev.timeframe,_epoch(ev.symbol,ev.timeframe))
+        epoch=_epoch(ev.symbol,ev.timeframe)
+        engine=_load(ev.symbol,ev.timeframe,epoch)
+        _prepare_engine(ev.symbol,ev.timeframe,engine,epoch)
+        if getattr(engine,'_repair_pending',False):
+            if not historical_replay:return False
+            _advance(ev.symbol,ev.timeframe,WRITE_BATCH,time.monotonic()+.25)
+            return False
         if engine.context.last_time is None or engine.context.last_time<ev.open_time:
             if not historical_replay:
                 previous=engine.context.last_client
                 if not previous or previous['close_time']+1!=ev.open_time:return False
-            # One bounded page also makes the public processor useful outside the
-            # orchestrator. False means replay is still behind; never skip bars.
             try:_advance(ev.symbol,ev.timeframe,WRITE_BATCH,time.monotonic()+.25)
             except Exception:
                 reset_pair(ev.symbol,ev.timeframe);raise
@@ -195,14 +203,19 @@ def preview(symbol,interval,client,*,is_new=True):
     try:
         row=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
         if not row:return None
+        revision=None
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():
+            revision=conn.execute('SELECT signature FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+        stamp=(row[0],revision)
+        repair=features_store.pending_replay(conn,symbol,interval)
         key=(str(path),symbol,interval,_epoch(symbol,interval))
         with _LOCK:
             cached=_PREVIEWS.get(key)
-            if not cached or cached[0]!=row[0]:
+            if not cached or cached[0]!=stamp:
                 state=conn.execute('SELECT state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
                 engine=checkpoint.restore(symbol,interval,state[0],_epoch(symbol,interval)) if state else None
                 if engine is None:return None
-                _PREVIEWS[key]=(row[0],engine)
+                _PREVIEWS[key]=(stamp,engine)
                 if len(_PREVIEWS)>64:_PREVIEWS.pop(next(iter(_PREVIEWS)))
             else:engine=cached[1]
             if not engine.context.last_client or engine.context.last_client['close_time']+1!=client['open_time']:return None
@@ -225,7 +238,10 @@ def preview(symbol,interval,client,*,is_new=True):
             # Only current-day open is used; high/low references point to the
             # previous actual daily candle, never to a fabricated weekly range.
             daily.append({'open':opening})
-    return fork.step(client,is_confirmed=False,is_realtime=True,daily_bars=daily,is_new=is_new)
+    result=fork.step(client,is_confirmed=False,is_realtime=True,daily_bars=daily,is_new=is_new)
+    if repair:
+        for column in repair[2]:result[column]=None
+    return result
 
 
 def _compute_and_write_one(symbol,interval,bar_open_ms):
@@ -235,3 +251,78 @@ def _compute_and_write_one(symbol,interval,bar_open_ms):
         while engine.context.last_time is None or engine.context.last_time<bar_open_ms:
             if not _advance(symbol,interval):return 0
         return 1
+
+
+
+def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
+    """Patch affected columns and partial state atomically; never replace rows."""
+    import json
+    conn=features_store.open_db()
+    try:job=selective.read_job(conn,symbol,interval)
+    finally:conn.close()
+    if not job:base._repair_pending=False;return 0
+    plan=catalog().plan(set(json.loads(job['changed'])))
+    restored=checkpoint.restore(symbol,interval,job['state'],epoch) if job['state'] else None
+    if job['state'] and restored is None:raise RuntimeError('Invalid selective replay checkpoint; stored features retained')
+    partial=selective.PartialEngine(symbol,interval,plan,selective.desired_parameters(),restored.context if restored else None)
+    raw=klines_store.open_db()
+    try:rows=[r for r in klines_store.read_after_page(raw,symbol,interval,job['last_time'],min(1000,max_bars*5)) if r[2]<=job['target']]
+    finally:raw.close()
+    if not rows:raise RuntimeError('Missing raw history for selective replay; checkpoint retained')
+    conn=features_store.open_db()
+    required={catalog().export[field] for field in plan.reads|plan.history_keys|{'regimeState'} if field in catalog().export and field not in plan.state_writes}
+    required.update(catalog().export[field] for field in plan.shadowed)
+    if 'mtfData.vwapValue' in plan.reads:required.add('vwap')
+    if 'mtfData.volumeMA' in plan.reads:required.add('volume_ma')
+    try:stored={r['open_time']:r for r in features_store.read_replay_inputs(conn,symbol,interval,rows[0][2],rows[-1][2]+1,required)}
+    finally:conn.close()
+    output=[]
+    for row in rows:
+        if output and deadline is not None and time.monotonic()>=deadline:break
+        old=stored.get(row[2])
+        if not old or old.get('formula_version')!=3:raise RuntimeError('Selective replay requires the committed full feature prefix')
+        client=dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),row))
+        daily=None;ready=True
+        if interval in ('3d','1w','1M') and 'daily_source_ready' in plan.columns:
+            daily_rows=db.read_klines_tail(symbol,'1d',client['close_time']+1,3)
+            ready=bool(daily_rows and daily_rows[-1][8]==(client['close_time']+1)//86400000*86400000-1)
+            daily=[dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),r)) for r in daily_rows] if ready else []
+        result=partial.step(client,old,daily_bars=daily);result['daily_source_ready']=ready
+        output.append(result)
+    last=partial.context.last_time;complete=last>=job['target']
+    columns=sorted(set(plan.columns)&set(features_store.COLUMNS)-{'symbol','interval','open_time','formula_version'})
+    merged=selective.merge(base,partial) if complete else None
+    with data_policy.locked():
+        if epoch!=_epoch(symbol,interval) or not data_policy.enabled(symbol,interval):
+            reset_pair(symbol,interval);return 0
+        conn=features_store.open_db()
+        try:
+            with conn:
+                if columns:
+                    conn.executemany('UPDATE features SET '+','.join(f'{c}=?' for c in columns)+' WHERE symbol=? AND interval=? AND open_time=?',
+                                     [[r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output])
+                if complete:
+                    conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(checkpoint.dump(merged,epoch),symbol,interval))
+                    conn.execute('DELETE FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval))
+                    conn.execute('UPDATE feature_calculation_versions SET signature=? WHERE symbol=? AND interval=?',(current_signature(),symbol,interval))
+                else:
+                    conn.execute('UPDATE feature_replay_jobs SET last_time=?,state=? WHERE symbol=? AND interval=?',(last,checkpoint.dump(partial,epoch),symbol,interval))
+        finally:conn.close()
+    if complete:
+        key=(str(features_store.DB_PATH),symbol,interval,epoch)
+        merged._repair_pending=False;merged._prepared_signature=current_signature();_ENGINES[key]=merged
+    print(f'[processor] {symbol} {interval}: targeted +{len(output)} rows, {len(columns)} columns; through={last}; complete={complete}',flush=True)
+    return len(output)
+
+
+
+def _prepare_engine(symbol,interval,engine,epoch):
+    signature=current_signature()
+    if getattr(engine,'_prepared_signature',None)==signature:return
+    with data_policy.locked():
+        if epoch!=_epoch(symbol,interval) or not data_policy.enabled(symbol,interval):return
+        conn=features_store.open_db()
+        try:
+            with conn:job=selective.prepare(conn,engine,epoch)
+        finally:conn.close()
+    engine._repair_pending=bool(job);engine._prepared_signature=signature

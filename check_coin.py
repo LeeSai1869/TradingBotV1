@@ -121,6 +121,7 @@ def main():
             if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
                 checkpoints=conn.execute('SELECT interval,last_open_time FROM feature_engine_state WHERE symbol=?',(symbol,)).fetchall()
                 if checkpoints:
+                    print('Feature counts/latest timestamps can include older formulas; the following checkpoints show actual full replay progress.')
                     print('Complete formula-v3 replay checkpoints (older rows can still use previous formulas):')
                     raw=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5) if Path(klines_store.DB_PATH).exists() else None
                     try:
@@ -135,6 +136,13 @@ def main():
                     print(f'No formula-v3 checkpoint committed for {symbol} yet. Existing feature counts describe older rows; this symbol is waiting for its first replay batch.')
             else:
                 print('No formula-v3 checkpoint table yet. The runner has not initialized the new feature replay memory.')
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_replay_jobs'").fetchone():
+                tasks=conn.execute('SELECT interval,last_time,target,columns FROM feature_replay_jobs WHERE symbol=?',(symbol,)).fetchall()
+                if tasks:
+                    print('Targeted feature recalculation (unrelated columns preserved):')
+                    for interval,last,target,columns in tasks:
+                        print(f'{interval:6} through {stamp(last) if last>=0 else "not started"}; target {stamp(target)}; columns: {columns}')
+
         finally:conn.close()
     if Path(klines_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)

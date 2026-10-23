@@ -630,3 +630,14 @@ suppression, WAIT/gap handling, and agreement between chart and event study.
 page-size invariance, backward lookup across page boundaries, and avoiding
 historical scans for windows without candidates. Marker tests exclude suppressed
 signals and obsolete V2 records from marker/sound delivery.
+
+Selective calculation repair: `test_selective_features.py` compares repaired
+historical columns and the next new candle against full-engine references for
+RSI, EMA, ADX/DI, ATR, volume, volume profile, S/R, VWAP and pivot inputs. It checks
+every unrelated column remains unchanged, blocks unrelated EMA/ADX computation
+during RSI repair, verifies source-change detection, checkpoint adoption without
+replay, restart/resume, input reversal, transaction rollback, masked dirty values,
+dependent decision invalidation and strategy edits leaving Section 4 untouched.
+Live-preview coverage verifies that dirty values are withheld and repaired state
+refreshes even when the main candle cursor stays unchanged. Fixtures use isolated
+databases and synthetic candles, not production history.

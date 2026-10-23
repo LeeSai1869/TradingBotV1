@@ -416,6 +416,11 @@ def iter_decision_history(symbols=None,intervals=None):
         if not raw.execute("SELECT 1 FROM f.sqlite_master WHERE name='feature_engine_state'").fetchone():return
         pairs=raw.execute('SELECT symbol,interval,last_open_time FROM f.feature_engine_state ORDER BY symbol,interval').fetchall()
         for symbol,interval,cap in pairs:
+            if raw.execute("SELECT 1 FROM f.sqlite_master WHERE name='feature_replay_jobs'").fetchone():
+                task=raw.execute('SELECT last_time,columns FROM f.feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                if task:
+                    import json
+                    if set(json.loads(task[1]))&set(features_store.decision_fields()+['c','close']):cap=min(cap,task[0])
             if (symbols and symbol not in symbols) or (intervals and interval not in intervals):continue
             columns=('open_time','close_time','open','close','di_plus','di_minus','di_spread','adx')
             cursor=raw.execute('''SELECT k.open_time,k.close_time,k.open,k.close,f.di_plus,f.di_minus,f.di_spread,f.adx
