@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 import re
 import subprocess
 import sys
@@ -72,18 +73,21 @@ def _write(data):
 
 
 def _key():
-    for line in _ENV.read_text(encoding="utf-8").splitlines():
+    configured=os.environ.get('COINGECKO_API_KEY','').strip()
+    if configured:return configured
+    try:lines=_ENV.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:return None
+    for line in lines:
         line = line.strip()
         if line.startswith("COINGECKO_API_KEY="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise RuntimeError("COINGECKO_API_KEY not in .env")
+            return line.split("=", 1)[1].strip().strip('"').strip("'") or None
+    return None
 
 
 def _fetch_cg_page(api_key, page):
-    req = urllib.request.Request(_CG_BASE + str(page), headers={
-        "x-cg-demo-api-key": api_key,
-        "User-Agent": "ScalpV1-Proposer/5.0",
-    })
+    headers={"User-Agent": "ScalpV1-Proposer/5.0"}
+    if api_key:headers['x-cg-demo-api-key']=api_key
+    req = urllib.request.Request(_CG_BASE + str(page), headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
 

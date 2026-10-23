@@ -318,6 +318,12 @@ existing current candles continue to receive refresh opportunities.
 
 ### Daily eligible top-50 refresh
 
+`COINGECKO_API_KEY` is optional. The proposer checks the process environment, then
+`Symbols/.env`, and otherwise uses the public CoinGecko endpoint. Public requests
+can be rate-limited; failed/incomplete refreshes preserve the existing registry
+and retry after an hour. The runner's environment can differ from a terminal's
+environment when launched by macOS launchd.
+
 Previously the proposer was a manual command; the runner did not schedule it.
 The existing runner now calls a nonblocking daily scheduler for the existing
 `Symbols.symbol_proposer`. A successful refresh is persisted and repeated after

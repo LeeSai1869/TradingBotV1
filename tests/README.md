@@ -658,3 +658,8 @@ or feature recalculation are introduced. Missing S/R boundaries are hidden rathe
 than rendered as zero-width zones at a fallback price. This displays stored volume
 profile levels and value area; it does not invent a volume-by-price histogram from
 the price levels alone.
+
+Daily registry refresh tests cover the optional CoinGecko key: process environment
+takes priority over the existing Symbols `.env` file; missing/empty configuration
+uses public requests without an authentication header. Incomplete results retain
+the previous registry, and failed refreshes retain the existing hourly retry.
