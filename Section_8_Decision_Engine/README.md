@@ -1,45 +1,62 @@
-# Active DI-spread buy decision
+# Closed-candle DI turning-point decisions
 
-The active gate is [`rules/di_spread_recovery.py`](rules/di_spread_recovery.py).
-The previous scalp scoring-based implementation remains available for future
-strategy composition; it is not invoked by this rule.
+The single active strategy is [rules/di_turning_point.py](rules/di_turning_point.py).
+It applies to every enabled timeframe. Sections 6 and 7 and the old Section 8
+scoring engine have been removed. Sections 9 and 10 are retained; their existing
+score packet import now points at `contracts.py`. They are not newly activated,
+and this strategy does not invent confidence scores or execute exchange orders.
 
-On **each of the preceding two closed candles**, require:
+The rule is a direct translation of the supplied Pine function. Write a, b, c for
+three successive closed candles (oldest first), and spread = abs(+DI − −DI).
 
-- −DI > +DI.
-- −DI > DI spread.
-- +DI < DI spread.
+BUY outer gate:
+- a.−DI < b.−DI > c.−DI;
+- a.spread < b.spread > c.spread;
+- c.close > b.close;
+- c.ADX > b.ADX.
 
-On the current **closed candle**, require:
+Then either:
+- −DI < +DI on a and b, and −DI > +DI on c; or
+- b.spread > b.+DI, and −DI > +DI on all three candles.
 
-- +DI ≥ DI spread (equality qualifies).
-- +DI > its immediately preceding value.
-- −DI < its immediately preceding value.
+SELL mirrors these conditions using a peak in +DI, a falling close, rising ADX,
+and either a transition from +DI < −DI to +DI > −DI, or +DI dominance throughout
+with b.spread > b.−DI. Every comparison is strict. BUY and SELL are evaluated as
+independent `if` statements in Pine order. No regime/config filter is added because
+the supplied function does not use those arguments. Unavailable required values
+produce WARMUP, not a signal. The older candle's ADX/close are not required.
 
-All values must be finite, nonnegative and available. The existing momentum
-feature owns DI spread: `abs(+DI − −DI)`. No ADX threshold or additional filter
-is introduced. No SELL/exit condition is inferred. This is a decision signal;
-no exchange-order API is called.
+The existing runner invokes Section 8 after Section 4. Inputs come from the same
+stored raw bars and committed formula-v3 features used by the chart. Feature
+checkpoint caps, gaps, close times, atomic decision/checkpoint commits, and policy
+epoch checks prevent use of provisional or skipped data. Signals appear through
+the combined chart stream as BUY/SELL markers. Rule version 2 invalidates the old
+rule's transient/checkpoint state and seeds the latest calculated three-bar window.
+Older stored decisions remain historical records, not re-evaluated v2 results.
 
-| Closed candle | +DI | −DI | Spread | Result |
-|---|---:|---:|---:|---|
-| t−2 | 10 | 30 | 20 | Setup |
-| t−1 | 11 | 30 | 19 | Setup |
-| t | 15 | 27 | 12 | BUY |
+## Historical evaluation
 
-The first activation seeds its two-bar memory from the latest committed feature
-window and evaluates that window's latest closed bar. It does not replay every
-older decision from exchange listing. Subsequent closed feature bars are evaluated
-in order. Missing raw candles clear setup memory; provisional features and unclosed
-candles cannot trigger a decision. If feature replay is behind current time, the
-decision processor also waits for calculated values rather than fabricating DI.
+Run from the project folder:
 
-The existing runner invokes `processor.py` after Section 4. It writes the signal
-and its bounded restart state to ADCN.db atomically. Other score columns remain
-intact; this rule supplies no confidence score. The chart reads `adcn.signal_type`
-through the existing combined stream and draws a `B` marker on the trigger candle.
-A following candle cannot repeat the signal unless a fresh two-candle setup forms.
+```bash
+python3 evaluate_strategy.py --symbols ETHUSDT --intervals 5m 15m 1h 4h --output strategy_report.json
+```
 
-Rule version 1 and policy epochs are recorded in the checkpoint. Future changes
-to its conditions require a version bump. Earlier stored decisions are historical
-records; re-evaluating a whole earlier date range is a separate strategy replay.
+Omit symbol/timeframe filters to evaluate all available committed pairs. Only
+formula-v3 data through the feature replay checkpoint is included. Re-run after
+replay completes for coverage of the latest regimes. The command opens databases
+read-only and never changes runner state or stored decisions.
+
+This is an independent signal event study: signal on the closed bar, entry at
+the **next candle's open**, and returns at 1, 3, 6 and 12 candles from entry.
+SELL returns use the short direction. Overlapping signals are separate events,
+not a portfolio. Gaps discard unfinished observations; incomplete tails do not
+create returns. Default results are gross: pass `--cost-bps 10`, for example,
+for a total 0.10% round-trip fee/slippage assumption. No exits, stops, sizing,
+funding, or fill model were supplied, so this cannot establish strategy P&L.
+
+Validation in this cloud checkout: 10,000 generated windows matched a separate
+Pine-condition translation; both BUY and SELL branches and closed-memory commits
+were tested. The available cloud candle/feature tables are empty, so a historical
+market performance result cannot be reported here. Use the command above on the
+Mac containing the downloaded history.

@@ -122,7 +122,7 @@ def _classify(raw, bsym, bn_pairs):
     return "eligible", None
 
 
-def propose():
+def propose(*, notify=True):
     api_key = _key()
     bn_pairs = _fetch_binance_usdt_pairs()
 
@@ -156,6 +156,8 @@ def propose():
             break
 
     eligible = eligible[:TARGET_ELIGIBLE]
+    if len(eligible)<TARGET_ELIGIBLE:
+        raise RuntimeError("Incomplete eligible market list; previous top-50 registry retained")
 
     data = _read()
     approved = {e["symbol"] for e in data["approved"]}
@@ -229,7 +231,7 @@ def propose():
     print("  reactivation pending     :", react_n)
     print("  total pending now        :", len(data["pending"]))
 
-    if new_n + react_n > 0:
+    if notify and new_n + react_n > 0:
         _notify(
             "Global Core — symbol approval needed",
             str(new_n + react_n) + " pending. Run: "

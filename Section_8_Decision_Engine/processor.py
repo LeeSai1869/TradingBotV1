@@ -6,7 +6,7 @@ import time
 import traceback
 from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,adcn_store
-from .rules import di_spread_recovery as rule
+from .rules import di_turning_point as rule
 
 _LOCK=threading.RLock()
 _CACHE={}
@@ -40,7 +40,7 @@ def reset_pair(symbol,interval):
 def _record(item):
     fields=item['features'] or {}
     result={key:fields.get(key) for key in rule.FIELDS}
-    result.update(open_time=item['open_time'],close_time=item['close_time'])
+    result.update(close=item.get('close'),open_time=item['open_time'],close_time=item['close_time'])
     return {key:(value if not isinstance(value,float) or math.isfinite(value) else None) for key,value in result.items()}
 
 
@@ -79,7 +79,7 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
         finally:conn.close()
     state.update(new_state)
     buys=sum(row['signal_type']=='BUY' for row in rows)
-    print(f'[decision] {symbol} {interval}: +{len(rows)} closed DI decisions, buys={buys}, through={last}',flush=True)
+    print(f'[decision] {symbol} {interval}: +{len(rows)} closed DI decisions, buys={buys}, sells={sum(row['signal_type']=='SELL' for row in rows)}, through={last}',flush=True)
     return len(rows)
 
 

@@ -246,6 +246,18 @@ class ReplayStorageTests(unittest.TestCase):
         self.assertEqual(processor.maintenance(['ETHUSDT','BTCUSDT'],['1m'],time_budget=5),3)
         self.assertEqual(db.count_features('ETHUSDT','1m'),3)
 
+    def test_non_owner_event_waits_for_replay_but_accepts_adjacent_live_bar(self):
+        from types import SimpleNamespace
+        db.write_klines([bar(i,100+i) for i in range(3)])
+        event=SimpleNamespace(symbol='ETHUSDT',timeframe='1m',open_time=120000)
+        self.assertFalse(processor.process_bar(event,historical_replay=False))
+        self.assertEqual(db.count_features('ETHUSDT','1m'),0)
+        processor.catch_up('ETHUSDT','1m')
+        db.write_klines([bar(3,103)])
+        event.open_time=180000
+        self.assertTrue(processor.process_bar(event,historical_replay=False))
+        self.assertEqual(db.count_features('ETHUSDT','1m'),4)
+
     def test_disabled_interval_does_not_block_enabled_interval(self):
         db.write_klines([bar(i,100+i%9,interval=iv,step=60000 if iv=='1m' else 300000) for iv in ('1m','5m') for i in range(3)])
         processor._cursor=0

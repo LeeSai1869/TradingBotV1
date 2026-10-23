@@ -7,44 +7,64 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-from Section_8_Decision_Engine.rules import di_spread_recovery as rule
+from Section_8_Decision_Engine.rules import di_turning_point as rule
 from Section_8_Decision_Engine import processor
 from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,klines_store,features_store,adcn_store
 from Section_1_Global_Core.memory_storage.market_data import download_binance_history as downloader
 
 
-def di(plus,minus,spread=None):
-    return dict(di_plus=plus,di_minus=minus,di_spread=abs(plus-minus) if spread is None else spread)
+def di(plus,minus,spread=None,*,adx=22,close=101):
+    return dict(di_plus=plus,di_minus=minus,di_spread=abs(plus-minus) if spread is None else spread,adx=adx,close=close)
 
-SETUP=[di(10,30),di(11,30)]
+SETUP=[di(10,30,adx=20,close=99),di(11,35,adx=21,close=100)]
 
 
 class DiRuleTests(unittest.TestCase):
-    def test_two_setup_bars_and_closed_rise_fall_give_buy(self):
+    def test_buy_continuation_branch(self):
         self.assertEqual(rule.evaluate(SETUP,di(15,27))['signal_type'],'BUY')
-        self.assertEqual(rule.evaluate(SETUP,di(14,28))['signal_type'],'BUY')  # +DI == spread
 
-    def test_both_preceding_candles_must_qualify_strictly(self):
-        for prior in ([di(15,30),SETUP[1]],[SETUP[0],di(16,30)],[di(0,30),SETUP[1]],[di(31,30),SETUP[1]]):
-            self.assertIsNone(rule.evaluate(prior,di(15,27))['signal_type'])
+    def test_buy_cross_branch(self):
+        prior=[di(30,10,adx=20,close=99),di(40,15,adx=21,close=100)]
+        self.assertEqual(rule.evaluate(prior,di(8,12))['signal_type'],'BUY')
 
-    def test_spread_shrink_without_positive_di_rise_does_not_buy(self):
-        self.assertIsNone(rule.evaluate(SETUP,di(11,20))['signal_type'])
-        self.assertIsNone(rule.evaluate(SETUP,di(10,19))['signal_type'])
+    def test_sell_both_branches(self):
+        prior=[di(30,10,adx=20,close=103),di(35,11,adx=21,close=102)]
+        self.assertEqual(rule.evaluate(prior,di(27,15))['signal_type'],'SELL')
+        prior=[di(10,30,adx=20,close=103),di(15,40,adx=21,close=102)]
+        self.assertEqual(rule.evaluate(prior,di(12,8))['signal_type'],'SELL')
 
-    def test_negative_di_must_fall_and_positive_di_must_cross_spread(self):
-        for current in (di(16,30),di(17,31),di(12,29)):
-            self.assertIsNone(rule.evaluate(SETUP,current)['signal_type'])
+    def test_every_outer_comparison_is_strict(self):
+        from copy import deepcopy
+        for target,key,value in ((0,'di_minus',35),(1,'di_minus',27),(0,'di_spread',24),(1,'di_spread',12),
+                                 (2,'close',100),(2,'adx',21)):
+            rows=deepcopy([*SETUP,di(15,27)]);rows[target][key]=value
+            self.assertIsNone(rule.evaluate(rows[:2],rows[2])['signal_type'],(target,key))
 
-    def test_missing_invalid_or_short_history_is_warmup(self):
-        for prior,current in ((SETUP[:1],di(15,27)),(SETUP,di(None,27,12)),
-                              (SETUP,di(float('nan'),27,12)),(SETUP,di(15,float('inf'),12)),
-                              ([di(-1,30),SETUP[1]],di(15,27))):
-            self.assertEqual(rule.evaluate(prior,current)['decision_state'],'WARMUP')
+    def test_invalid_values_are_warmup(self):
+        for key in rule.FIELDS:
+            for value in (None,float('nan'),float('inf'),True,-1):
+                current=di(15,27);current[key]=value
+                self.assertEqual(rule.evaluate(SETUP,current)['decision_state'],'WARMUP')
+        self.assertEqual(rule.evaluate(SETUP[:1],di(15,27))['decision_state'],'WARMUP')
 
-    def test_buy_does_not_repeat_without_new_two_bar_setup(self):
-        self.assertIsNone(rule.evaluate([SETUP[1],di(15,27)],di(16,26))['signal_type'])
+    def test_no_old_spread_cross_or_positive_rise_requirement(self):
+        # Faithful Pine continuation: +DI can stay below spread and decline.
+        self.assertEqual(rule.evaluate(SETUP,di(9,28))['signal_type'],'BUY')
+
+    def test_matches_independent_pine_translation_on_random_windows(self):
+        import random
+        rng=random.Random(817)
+        for _ in range(10000):
+            a,b,c=[di(rng.randrange(1,50),rng.randrange(1,50),adx=rng.randrange(1,50),close=rng.randrange(90,110)) for _ in range(3)]
+            out=None
+            if a['di_minus']<b['di_minus']>c['di_minus'] and a['di_spread']<b['di_spread']>c['di_spread'] and c['close']>b['close'] and b['adx']<c['adx']:
+                if a['di_minus']<a['di_plus'] and b['di_minus']<b['di_plus'] and c['di_minus']>c['di_plus']:out='BUY'
+                elif b['di_spread']>b['di_plus'] and a['di_minus']>a['di_plus'] and b['di_minus']>b['di_plus'] and c['di_minus']>c['di_plus']:out='BUY'
+            if a['di_plus']<b['di_plus']>c['di_plus'] and a['di_spread']<b['di_spread']>c['di_spread'] and c['close']<b['close'] and b['adx']<c['adx']:
+                if a['di_plus']<a['di_minus'] and b['di_plus']<b['di_minus'] and c['di_plus']>c['di_minus']:out='SELL'
+                elif b['di_spread']>b['di_minus'] and a['di_plus']>a['di_minus'] and b['di_plus']>b['di_minus'] and c['di_plus']>c['di_minus']:out='SELL'
+            self.assertEqual(rule.evaluate([a,b],c)['signal_type'],out)
 
 
 class DiMemoryTests(unittest.TestCase):
@@ -59,7 +79,7 @@ class DiMemoryTests(unittest.TestCase):
 
     def seed(self,values=(*SETUP,di(15,27)),symbol='ETHUSDT',interval='1m',times=None,cap=None):
         times=times or [i*60000 for i in range(len(values))]
-        db.write_klines([dict(symbol=symbol,interval=interval,open_time=t,close_time=t+59999,open=100.,high=102.,low=98.,close=101.,volume=5.) for t in times])
+        db.write_klines([dict(symbol=symbol,interval=interval,open_time=t,close_time=t+59999,open=100.,high=102.,low=98.,close=value.get("close",101.),volume=5.) for t,value in zip(times,values)])
         db.write_features([dict(symbol=symbol,interval=interval,open_time=t,formula_version=3,**value) for t,value in zip(times,values)])
         conn=features_store.open_db()
         conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,times[-1] if cap is None else cap,'{}'));conn.commit();conn.close()
@@ -80,6 +100,33 @@ class DiMemoryTests(unittest.TestCase):
         self.assertTrue(processor.process_bar(SimpleNamespace(symbol='ETHUSDT',timeframe='1m',open_time=180000)))
         self.assertIsNone(db.read_adcn('ETHUSDT','1m',180000)['signal_type'])
 
+    def test_historical_study_reads_canonical_prefix_without_writing_decisions(self):
+        from evaluate_strategy import evaluate
+        self.seed(cap=60000)
+        report=evaluate(['ETHUSDT'],['1m'],(1,))
+        self.assertEqual(report['pairs'][0]['bars'],2)
+        self.assertEqual(report['pairs'][0]['buy_signals'],0)
+        self.seed()
+        report=evaluate(['ETHUSDT'],['1m'],(1,))
+        self.assertEqual(report['pairs'][0]['bars'],3)
+        self.assertEqual(report['pairs'][0]['buy_signals'],1)
+        self.assertFalse(adcn_store.DB_PATH.exists())
+
+    def test_sell_uses_same_closed_memory_pipeline(self):
+        self.seed([di(30,10,adx=20,close=103),di(35,11,adx=21,close=102),di(27,15)])
+        processor.catch_up('ETHUSDT','1m')
+        self.assertEqual(db.read_adcn('ETHUSDT','1m',120000)['signal_type'],'SELL')
+
+    def test_old_rule_checkpoint_is_reseeded_with_new_version(self):
+        self.seed()
+        conn=adcn_store.open_db()
+        old={'version':1,'epoch':[0,0],'last':999999,'previous':[],'seeded':True}
+        adcn_store.commit_rule_rows(conn,'ETHUSDT','1m',[],999999,json.dumps(old));conn.close()
+        processor._CACHE.clear()
+        self.assertEqual(processor.catch_up('ETHUSDT','1m'),1)
+        self.assertEqual(db.read_adcn('ETHUSDT','1m',120000)['signal_type'],'BUY')
+        self.assertEqual(processor._load('ETHUSDT','1m')['version'],2)
+
     def test_waits_for_feature_checkpoint_and_forming_candle_close(self):
         self.seed(cap=60000)
         processor.catch_up('ETHUSDT','1m')
@@ -97,7 +144,7 @@ class DiMemoryTests(unittest.TestCase):
         self.assertEqual(db.read_adcn('ETHUSDT','1m',180000)['decision_state'],'WARMUP')
         self.seed([*SETUP,di(15,27)],symbol='BTCUSDT')
         processor.catch_up('BTCUSDT','1m')
-        self.seed([di(10,30),di(11,30),di(15,27)],symbol='BTCUSDT',times=[300000,360000,420000])
+        self.seed([*SETUP,di(15,27)],symbol='BTCUSDT',times=[300000,360000,420000])
         processor.catch_up('BTCUSDT','1m')
         self.assertEqual(db.read_adcn('BTCUSDT','1m',300000)['decision_state'],'WARMUP')
         self.assertEqual(db.read_adcn('BTCUSDT','1m',420000)['signal_type'],'BUY')

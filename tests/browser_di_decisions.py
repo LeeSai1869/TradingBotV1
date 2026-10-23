@@ -9,10 +9,11 @@ from Section_8_Decision_Engine import processor
 
 async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',3)
-    values=[(10,30),(11,30),(15,27)]
+    values=[(10,30),(11,35),(15,27)]
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
-                            di_plus=plus,di_minus=minus,di_spread=abs(plus-minus),ema50=r[6])
-                       for r,(plus,minus) in zip(rows,values)])
+                            di_plus=plus,di_minus=minus,di_spread=abs(plus-minus),adx=20+i,ema50=r[6])
+                       for i,(r,(plus,minus)) in enumerate(zip(rows,values))])
+    db.write_klines([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],open=100+i,high=103+i,low=99+i,close=101+i,volume=5,close_time=r[8]) for i,r in enumerate(rows)])
     conn=features_store.open_db()
     conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',('BTCUSDT','15m',rows[-1][2],'{}'));conn.commit();conn.close()
     with patch.object(processor.data_policy,'enabled',return_value=True):

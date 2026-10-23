@@ -545,4 +545,10 @@ __all__ = [
     # Packet
     "GlobalCorePacket",
     "create_global_core_packet",
+    "read_decision_history",
 ]
+
+def read_decision_history(symbols=None,intervals=None):
+    """Stream committed closed-bar strategy inputs through the public gateway."""
+    from .memory_storage.Storage.db import iter_decision_history
+    return iter_decision_history(symbols,intervals)

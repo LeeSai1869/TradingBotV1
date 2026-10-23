@@ -370,7 +370,7 @@ def read_decision_inputs(symbol,interval,after,limit=200):
             rows=[row for row in klines_store.read_after_page(raw,symbol,interval,after,limit) if row[2]<=through]
             if not rows:return []
             values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
-            return [dict(open_time=row[2],close_time=row[8],features=values.get(row[2])) for row in rows]
+            return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
         finally:features.close();raw.close()
 
 
@@ -387,5 +387,30 @@ def read_decision_seed(symbol,interval):
             rows=klines_store.read_page(raw,symbol,interval,3,before=through+1)
             if not rows:return []
             values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
-            return [dict(open_time=row[2],close_time=row[8],features=values.get(row[2])) for row in rows]
+            return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
         finally:features.close();raw.close()
+
+
+def iter_decision_history(symbols=None,intervals=None):
+    """Read-only, streaming canonical closed history for strategy evaluation.
+
+    Each yielded cursor is consumed before requesting the next pair. A feature
+    snapshot caps the stream at its committed replay prefix.
+    """
+    import time
+    if not klines_store.DB_PATH.exists() or not features_store.DB_PATH.exists():return
+    raw=_read_connection(klines_store.DB_PATH)
+    try:
+        raw.execute('ATTACH DATABASE ? AS f',(f'file:{features_store.DB_PATH}?mode=ro',))
+        raw.execute('BEGIN')
+        if not raw.execute("SELECT 1 FROM f.sqlite_master WHERE name='feature_engine_state'").fetchone():return
+        pairs=raw.execute('SELECT symbol,interval,last_open_time FROM f.feature_engine_state ORDER BY symbol,interval').fetchall()
+        for symbol,interval,cap in pairs:
+            if (symbols and symbol not in symbols) or (intervals and interval not in intervals):continue
+            columns=('open_time','close_time','open','close','di_plus','di_minus','di_spread','adx')
+            cursor=raw.execute('''SELECT k.open_time,k.close_time,k.open,k.close,f.di_plus,f.di_minus,f.di_spread,f.adx
+                FROM klines k JOIN f.features f ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time
+                WHERE k.symbol=? AND k.interval=? AND k.open_time<=? AND k.close_time<? AND f.formula_version=3 ORDER BY k.open_time''',
+                (symbol,interval,cap,int(time.time()*1000)))
+            yield symbol,interval,cap,(dict(zip(columns,r)) for r in cursor)
+    finally:raw.close()

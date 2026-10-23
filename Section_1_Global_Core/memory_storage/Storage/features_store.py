@@ -286,9 +286,9 @@ __all__ = [
 
 def read_di_inputs(conn,symbol,interval,start,end):
     columns={row[1] for row in conn.execute('PRAGMA table_info(features)')}
-    if not {'di_plus','di_minus','di_spread','formula_version'}.issubset(columns):return {}
-    rows=conn.execute('SELECT open_time,di_plus,di_minus,di_spread FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND formula_version=3 ORDER BY open_time',(symbol,interval,start,end)).fetchall()
-    return {row[0]:dict(zip(('di_plus','di_minus','di_spread'),row[1:])) for row in rows}
+    if not {'di_plus','di_minus','di_spread','adx','formula_version'}.issubset(columns):return {}
+    rows=conn.execute('SELECT open_time,di_plus,di_minus,di_spread,adx FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND formula_version=3 ORDER BY open_time',(symbol,interval,start,end)).fetchall()
+    return {row[0]:dict(zip(('di_plus','di_minus','di_spread','adx'),row[1:])) for row in rows}
 
 
 def replay_through(conn,symbol,interval):

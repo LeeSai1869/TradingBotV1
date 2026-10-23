@@ -59,10 +59,6 @@
       "module": "Section_1_Global_Core.memory_storage.Execution.ADCN_execution_writer"
     },
     {
-      "file": "Section_6_Base_Scoring_Engines/6.2 Swing Scalping Engine.py",
-      "module": "Section_1_Global_Core"
-    },
-    {
       "file": "Section_11_UI_UX/Imports/import_memory_packet.py",
       "module": "Section_1_Global_Core.memory_storage.Execution.ADCN_execution_memory"
     }

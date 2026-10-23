@@ -229,7 +229,7 @@ class DataAdminTests(unittest.TestCase):
         orch=orchestrator.GlobalCoreOrchestrator()
         orch._state={'BTCUSDT|1m':0}
         received=[]
-        orch._processors=[('Section_4_Features.processor.process_bar',lambda ev:received.append(ev.open_time))]
+        orch._processors=[('Section_4_Features.processor.process_bar',lambda ev,**options:received.append(ev.open_time))]
         with patch.object(orchestrator,'update_klines_all',return_value=0),patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(processor,'maintenance',side_effect=RuntimeError('injected maintenance error')):
             orch.cycle()
         self.assertTrue(received)

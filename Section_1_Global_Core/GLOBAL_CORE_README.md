@@ -297,3 +297,39 @@ three-candle window, without introducing a full historical strategy replay. It
 then advances in bounded batches as closed features become ready. Decision rows
 and `decision_rule_state` commit together in ADCN.db. Policy deletion removes
 matching rule checkpoints and epoch changes invalidate transient state.
+
+### Symbol-priority downloads and replay — 2026-10-23
+
+This supersedes the round-robin historical scheduling described above. Each
+bounded download slice first refreshes existing symbols' current closed bars,
+using a separate rotating live-refresh cursor. Historical work then belongs to
+one symbol across its enabled timeframes until both raw history and committed
+feature replay finish. Existing stored symbols precede empty new symbols.
+Frames rotate within the owner so daily dependencies and slower frames progress.
+Pausing/removing the owner releases it. Current events for other already-ready
+symbols remain eligible; their historical replay does not steal ownership.
+Calculation failures retain the checkpoint and allow a healthy symbol to proceed.
+Network timeouts remain soft-budget exceptions; no second downloader is started.
+
+`work_priority.py` uses indexed latest-bar lookups and small checkpoint/progress
+tables, not full candle scans. Restarting retains database progress and chooses an
+owner again. A large existing replay can therefore delay a new symbol's history;
+existing current candles continue to receive refresh opportunities.
+
+### Daily eligible top-50 refresh
+
+Previously the proposer was a manual command; the runner did not schedule it.
+The existing runner now calls a nonblocking daily scheduler for the existing
+`Symbols.symbol_proposer`. A successful refresh is persisted and repeated after
+24 hours. Failures log an explanation and retry after one hour. Downloads do not
+wait for CoinGecko/Binance universe requests. Configure the existing
+`COINGECKO_API_KEY` in `Section_1_Global_Core/Symbols/.env`; missing credentials
+produce a logged failure, not a false success. This is the **filtered eligible**
+top 50 defined by the existing eligibility logic, not the unfiltered market list.
+New entries still require approval. Incomplete universe responses retain the
+previous registry, and concurrent administrator changes cancel the write.
+
+Section 8 now uses strict three-closed-candle DI/price/ADX BUY/SELL conditions,
+version 2. See its README for exact conditions and the read-only event study.
+Sections 6 and 7 are removed. Existing stored score columns remain readable;
+Sections 9 and 10 retain their original implementations and are not auto-enabled.

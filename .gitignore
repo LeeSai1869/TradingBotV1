@@ -31,3 +31,8 @@ Section_1_Global_Core/runtime_policy.json
 Section_1_Global_Core/.data-policy.lock
 
 Section_1_Global_Core/.data-policy.lock.snapshot
+
+# Daily market-universe scheduler runtime state
+Section_1_Global_Core/Symbols/daily_refresh_state.json
+Section_1_Global_Core/Symbols/daily_refresh_state.tmp
+/strategy_report.json

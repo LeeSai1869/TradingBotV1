@@ -72,6 +72,7 @@ PAGE_LIMIT = 1000
 _LAST_UPDATE_MS = {}
 LAST_AUDIT = None
 _DOWNLOAD_CURSOR = 0
+_HISTORY_CURSORS = {}
 _LATEST_UPDATE_MS = {}
 
 
@@ -144,7 +145,7 @@ def _pair_epoch(symbol,interval):
     return epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)
 
 
-def update_one(symbol, interval, conn):
+def update_one(symbol, interval, conn, *, latest_only=False):
     """
     Update one (symbol, interval). Returns rows inserted.
 
@@ -171,6 +172,7 @@ def update_one(symbol, interval, conn):
     from .download_binance_history import FALLBACK_START_MS
     start_ms=cursor if cursor is not None else stored+1 if stored is not None else FALLBACK_START_MS
     total=0
+    if latest_only and stored is None:return 0
     # Keep the historical cursor separate from MAX(open_time) before adding a
     # current page. Otherwise a recent page would permanently skip older history.
     behind=stored is None or now_ms-stored>2*step
@@ -189,6 +191,8 @@ def update_one(symbol, interval, conn):
             if latest:print(f'[update_klines] {symbol} {interval}: recent closed candles refreshed; history cursor retained',flush=True)
         except Exception as error:
             print(f'[update_klines] {symbol} {interval}: latest refresh error: {error}',flush=True)
+
+    if latest_only and cursor is not None:return total
 
     try:
         page = _fetch(symbol, interval, start_ms)
@@ -244,18 +248,30 @@ def update_all(*, max_pairs=512, time_budget=2.0):
     conn = _open_db()
     total = 0
     try:
-        pairs=[(symbol,interval) for symbol in data_policy.active_symbols()
-               for interval in data_policy.active_intervals()]
+        from Section_1_Global_Core import work_priority
+        symbols=data_policy.active_symbols();intervals=data_policy.active_intervals()
+        pairs=[(symbol,interval) for symbol in symbols for interval in intervals]
         deadline=time.monotonic()+time_budget
         visited=0
+        # Current candles for every existing symbol take priority. A separate cursor
+        # prevents a large history owner from delaying their interval-boundary refresh.
+        refresh_deadline=time.monotonic()+time_budget/2
         for _ in range(min(max_pairs,len(pairs))):
             symbol,interval=pairs[_DOWNLOAD_CURSOR%len(pairs)]
             _DOWNLOAD_CURSOR+=1;visited+=1
-            total += update_one(symbol, interval, conn)
-            # A request may finish after the soft deadline; never start the next
-            # one until features have had their turn in the existing runner.
-            if time.monotonic()>=deadline:break
-        print(f'[update_klines] download slice: {visited}/{len(pairs)} pairs; cursor={_DOWNLOAD_CURSOR}; yielding to features',flush=True)
+            total+=update_one(symbol,interval,conn,latest_only=True)
+            if time.monotonic()>=refresh_deadline:break
+        owner=work_priority.work_symbol(symbols,intervals)
+        if owner is not None and time.monotonic()<deadline:
+            # Rotate frames within this symbol, retaining ownership across cycles
+            # until both its downloads and feature replay have completed.
+            cursor=_HISTORY_CURSORS.get(owner,0)
+            for _ in range(min(max_pairs,len(intervals))):
+                interval=intervals[cursor%len(intervals)];cursor+=1
+                total+=update_one(owner,interval,conn)
+                if time.monotonic()>=deadline:break
+            _HISTORY_CURSORS[owner]=cursor
+        print(f'[update_klines] current refresh: {visited}/{len(pairs)} pairs; history symbol={owner}; yielding to features',flush=True)
     finally:
         conn.close()
 

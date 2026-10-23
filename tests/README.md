@@ -596,3 +596,17 @@ atomic row/checkpoint rollback. ADCN's unrelated score fields remain intact.
 `test_policy_lock.py` exercises both real processors beneath the real runner lock.
 `browser_di_decisions.py` generates a decision from stored DI values and verifies
 its score-free BUY marker through the existing combined bar endpoint.
+
+### DI turning-point strategy and symbol priority
+
+`test_di_decisions.py` covers both branches in each direction, strict comparisons,
+10,000 generated comparisons against the supplied Pine conditions, closed-candle
+memory, gaps, policy cancellation, and transactional restart behavior.
+`test_work_priority.py` checks existing-before-new ordering, sticky ownership until
+raw and feature work finish, and release after pausing/removal. Scheduling tests
+cover current refreshes preceding historical work and yielding after slow requests.
+`test_daily_refresh.py` checks persisted daily success and failure retry behavior.
+`test_strategy_evaluation.py` verifies next-bar-open entry, explicit costs, horizons,
+and exclusion of gaps/unfinished tails. These are correctness tests, not evidence
+of profitable historical performance. Run `python3 evaluate_strategy.py` on the
+machine holding actual formula-v3 market history for a read-only forward study.

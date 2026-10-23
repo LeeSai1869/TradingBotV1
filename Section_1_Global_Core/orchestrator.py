@@ -165,6 +165,8 @@ class GlobalCoreOrchestrator:
 
     # -- one cycle --
     def cycle(self):
+        from Section_1_Global_Core.Symbols import daily_refresh
+        daily_refresh.tick()
         t0 = time.time()
 
         # 1) Ingest
@@ -270,7 +272,11 @@ class GlobalCoreOrchestrator:
                         break
                     for name, fn in self._processors:
                         try:
-                            if fn(ev) is False:
+                            if name=='Section_4_Features.processor.process_bar':
+                                from Section_1_Global_Core import work_priority
+                                result=fn(ev,historical_replay=work_priority.owns_history(s))
+                            else:result=fn(ev)
+                            if result is False:
                                 success = False
                                 break  # A bounded replay has not reached this candle yet.
                         except Exception as e:

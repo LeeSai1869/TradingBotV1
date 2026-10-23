@@ -104,21 +104,32 @@ def catch_up(symbol,interval):
 
 
 def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
-    """Round-robin replay in the existing runner, including pairs without new bars."""
+    """Finish the selected symbol in bounded batches, without blocking live refresh."""
     global _cursor
-    pairs=[(symbol,interval) for symbol in symbols for interval in intervals]
+    from Section_1_Global_Core import work_priority
+    owner=work_priority.work_symbol(symbols,intervals)
+    ordered=([owner]+[s for s in symbols if s!=owner]) if owner else list(symbols)
+    pairs=[(symbol,interval) for symbol in ordered for interval in intervals]
     if not pairs:return 0
     start=time.monotonic();deadline=start+time_budget;count=0
     with _LOCK:
-        for _ in range(len(pairs)):
-            symbol,interval=pairs[_cursor%len(pairs)];_cursor+=1
+        for _ in range(len(intervals)):
+            # Cursor rotates frames of the owner, not the entire coin universe.
+            symbol,interval=pairs[_cursor%len(intervals)];_cursor+=1
             try:count+=_advance(symbol,interval,max_bars-count,deadline)
             except Exception as error:
                 reset_pair(symbol,interval)
                 print(f'[processor] replay failed {symbol} {interval}; checkpoint retained, other pairs continue: {error}',flush=True)
                 traceback.print_exc()
-                if time.monotonic()>=deadline:break
-                continue
+                # A corrupt symbol must not stop healthy symbols. Its committed
+                # checkpoint remains unchanged and it is retried next cycle.
+                for other in ordered[1:]:
+                    for other_interval in intervals:
+                        if count>=max_bars or time.monotonic()>=deadline:break
+                        try:count+=_advance(other,other_interval,max_bars-count,deadline)
+                        except Exception:
+                            reset_pair(other,other_interval);traceback.print_exc()
+                break
             if time.monotonic()<deadline:
                 try:_repair_daily(symbol,interval,deadline)
                 except Exception as error:
@@ -152,10 +163,13 @@ def _repair_daily(symbol,interval,deadline):
             finally:conn.close()
 
 
-def process_bar(ev):
+def process_bar(ev, *, historical_replay=True):
     with _LOCK:
         engine=_load(ev.symbol,ev.timeframe,_epoch(ev.symbol,ev.timeframe))
         if engine.context.last_time is None or engine.context.last_time<ev.open_time:
+            if not historical_replay:
+                previous=engine.context.last_client
+                if not previous or previous['close_time']+1!=ev.open_time:return False
             # One bounded page also makes the public processor useful outside the
             # orchestrator. False means replay is still behind; never skip bars.
             try:_advance(ev.symbol,ev.timeframe,WRITE_BATCH,time.monotonic()+.25)
