@@ -13,6 +13,20 @@ export function histogramRows(snapshot,config){
         return key?{...b,key,fraction:b.volume/maximum}:null;
     }).filter(Boolean);
 }
+// Pixel presentation does not subdivide or otherwise change the stored bins.
+export function barGeometry(row,coordinate,paneWidth,config){
+    const a=coordinate(row.high),b=coordinate(row.low);
+    if(a===null||b===null)return null;
+    const available=Math.abs(b-a);
+    if(!available)return null;
+    const height=Math.min(available*.8,config.vp_histogram?.thickness??3);
+    const width=paneWidth*(config.vp_histogram?.lengthPercent??45)/100*row.fraction;
+    return {left:paneWidth-5-width,top:(a+b)/2-height/2,width,height};
+}
+export function referenceLevels(profile,latest,config){
+    const levels=profile?.levels||latest?.features||{};
+    return ['vp_poc','vp_va_high','vp_va_low'].filter(key=>config[key]?.visible&&Number.isFinite(levels[key])).map(key=>({key,price:levels[key],...config[key]}));
+}
 class Profile {
     attached({series,requestUpdate}){this.series=series;this.requestUpdate=requestUpdate;}
     detached(){this.series=null;this.requestUpdate=null;}
@@ -20,19 +34,13 @@ class Profile {
     draw(target){
         if(!this.series||!profile)return;
         target.useMediaCoordinateSpace(({context,mediaSize})=>{
-            const config=styles(),width=mediaSize.width*.1*(config.vp_histogram?.width||2),right=mediaSize.width-5;
-            const area=config.vp_value_area;
-            if(area?.visible){
-                const y1=this.series.priceToCoordinate(profile.levels.vp_va_high),y2=this.series.priceToCoordinate(profile.levels.vp_va_low);
-                if(y1!==null&&y2!==null){context.save();context.fillStyle=area.color;context.globalAlpha=area.opacity/100;context.fillRect(right-width,y1,width,y2-y1);
-                    context.globalAlpha=1;context.strokeStyle=area.color;context.lineWidth=area.width;context.setLineDash(area.style===1?[2,3]:area.style===2?[6,4]:[]);context.strokeRect(right-width,y1,width,y2-y1);context.restore();}
-            }
+            const config=styles();
             for(const row of histogramRows(profile,config)){
-                const y1=this.series.priceToCoordinate(row.high),y2=this.series.priceToCoordinate(row.low);
-                if(y1===null||y2===null||y2<0||y1>mediaSize.height)continue;
-                const style=config[row.key],length=width*row.fraction;
+                const box=barGeometry(row,value=>this.series.priceToCoordinate(value),mediaSize.width,config);
+                if(!box||box.top+box.height<0||box.top>mediaSize.height)continue;
+                const style=config[row.key];
                 context.save();context.fillStyle=style.color;context.globalAlpha=style.opacity/100;
-                context.fillRect(right-length,y1,length,Math.max(1,y2-y1-1));context.restore();
+                context.fillRect(box.left,box.top,box.width,box.height);context.restore();
             }
         });
     }
@@ -49,9 +57,8 @@ export function update(chart,data){
     profile=enabled&&candidate?.status==='ready'&&candidate.as_of===latest?.open_time?candidate:null;
     for(const line of axis)getSeries().removePriceLine(line);axis=[];
     if(enabled){
-        const levels=profile?.levels||latest?.features||{};
-        for(const key of ['vp_poc','vp_va_high','vp_va_low'])if(config[key]?.visible&&Number.isFinite(levels[key])){
-            const s=config[key];axis.push(getSeries().createPriceLine({price:levels[key],color:s.color,lineWidth:s.width,lineStyle:s.style,lineVisible:true,axisLabelVisible:true,title:''}));
+        for(const line of referenceLevels(profile,latest,config)){
+            axis.push(getSeries().createPriceLine({price:line.price,color:line.color,lineWidth:line.width,lineStyle:line.style,lineVisible:true,axisLabelVisible:true,title:''}));
         }
     }
     status.hidden=!enabled;

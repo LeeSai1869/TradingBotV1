@@ -102,6 +102,7 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    if(item==='Volume Profile')note('POC, VAH and VAL are horizontal reference lines. Volume and node bars have separate controls below.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
         const button=el('button',label,selection);
@@ -121,7 +122,8 @@ function renderFeature() {
         }
     }
     if (featureTab === "Display") {
-        for (const [key, label] of feature.outputs) {
+        for (const [key, label,,presentation] of feature.outputs) {
+            if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Reference lines',content);
             const row = el("label", "", content, "settings-row");
             el("span", label, row);
             const check = el("input", "", row); check.type = "checkbox";
@@ -131,6 +133,13 @@ function renderFeature() {
         }
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
+    }
+    if(item==='Volume Profile'){
+        for(const [key,label,min,max] of [['lengthPercent','Profile bar length (% of chart)',10,80],['thickness','Profile bar thickness (px)',1,12]]){
+            const row=el('label',label+' ',content,'settings-row'),input=el('input','',row);
+            input.type='number';input.min=min;input.max=max;input.step=1;input.value=draft.outputs.vp_histogram[key];input.setAttribute('aria-label',label);
+            input.onchange=()=>{draft.outputs.vp_histogram[key]=Math.max(min,Math.min(max,Number(input.value)||min));};
+        }
     }
     const table = el("div", "", content, "settings-style-table");
     const heading = el("div", "", table, "settings-style-row settings-style-heading");
@@ -157,19 +166,21 @@ function renderFeature() {
             input.type='checkbox';input.checked=state.label;input.setAttribute('aria-label',`${label} label`);input.onchange=()=>{state.label=input.checked;};
             continue;
         }
+        if(presentation==='profile'){
+            el('span','Profile layout',row);el('span','—',row);continue;
+        }
         for (const [field, title, options] of [
             ["width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
             ["style", "line style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
         ]) {
             const select = el("select", "", row);
             select.setAttribute("aria-label", `${label} ${title}`);
-            const choices=presentation==='profile'&&field==='width'?[[1,'10% chart'],[2,'20% chart'],[3,'30% chart'],[4,'40% chart']]:options;
-            for (const [value, text] of choices) { const option = el("option", text, select); option.value = value; }
+            for (const [value, text] of options) { const option = el("option", text, select); option.value = value; }
             select.value = state[field];
             select.onchange = () => { state[field] = Number(select.value); };
-            if (presentation === "histogram" || presentation==='profile'&&(field==='style'||key!=='vp_histogram')) {
+            if (presentation === "histogram") {
                 select.disabled = true;
-                select.title = "Bars use color and opacity. Volume by price controls the shared profile width.";
+                select.title = "Bars use color and opacity. The profile bar length and thickness controls apply to all bins.";
             }
         }
     }

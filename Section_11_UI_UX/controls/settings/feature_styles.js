@@ -34,7 +34,6 @@ export const FEATURE_STYLES = {
         ['vp_histogram','Volume by price','#748298','profile'],
         ['vp_hvn_nodes','High-volume nodes','#26a69a','profile'],
         ['vp_lvn_nodes','Low-volume nodes','#ef5350','profile'],
-        ['vp_value_area','Value area band','#38bdf8','zone'],
     ] },
     VWAP: { connected: true, outputs: [
         ["vwap", "VWAP", "#f5c542"], ["vwap_upper1", "Upper band 1", "#26a69a"],
@@ -47,7 +46,7 @@ export function normalizeStyles(value = {}) {
     const result = {};
     for (const feature of Object.values(FEATURE_STYLES)) {
         for (const [key, , color, presentation] of feature.outputs) {
-            const legacy=key==='vp_hvn_nodes'?(value?.vp_hvn_high?.visible?value.vp_hvn_high:value?.vp_hvn_low||value?.vp_hvn_high):key==='vp_lvn_nodes'?(value?.vp_lvn_high?.visible?value.vp_lvn_high:value?.vp_lvn_low||value?.vp_lvn_high):key==='vp_histogram'?value?.vp_poc:null;
+            const legacy=key==='vp_hvn_nodes'?(value?.vp_hvn_high?.visible?value.vp_hvn_high:value?.vp_hvn_low||value?.vp_hvn_high):key==='vp_lvn_nodes'?(value?.vp_lvn_high?.visible?value.vp_lvn_high:value?.vp_lvn_low||value?.vp_lvn_high):null;
             const input = value?.[key] || legacy || {};
             result[key] = {
                 visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
@@ -56,6 +55,10 @@ export function normalizeStyles(value = {}) {
                 style: [0,1,2].includes(input.style) ? input.style : 0,
             };
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
+            if(key==='vp_histogram'){
+                result[key].lengthPercent=Number.isFinite(input.lengthPercent)?Math.max(10,Math.min(80,input.lengthPercent)):45;
+                result[key].thickness=Number.isFinite(input.thickness)?Math.max(1,Math.min(12,input.thickness)):3;
+            }
             if(key.startsWith('momentum_')) {
                 result[key].shape=['arrowUp','arrowDown','circle','square'].includes(input.shape)?input.shape:(key==='momentum_buy'?'arrowUp':'arrowDown');
                 result[key].label=typeof input.label==='boolean'?input.label:true;

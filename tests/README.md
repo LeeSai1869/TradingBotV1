@@ -650,7 +650,7 @@ jobs without waiting for the selected history owner. Run this suite on Python
 3.14 as well as the main interpreter; native AST defaults differ between them.
 
 Volume Profile presentation: `volume_profile_display.test.mjs` covers independent
-POC/VAH/VAL/HVN/LVN visibility/styles, value-area fill, opacity validation, missing
+POC/VAH/VAL line visibility/styles, histogram/node controls, opacity validation, missing
 boundaries and gaps. `browser_zones.py` verifies these levels and shaded bands in
 the main price pane, saved colors/width/dashes/opacity, and S/R/FVG visibility.
 All displays consume the existing combined bars; the optional histogram snapshot
@@ -666,3 +666,11 @@ Daily registry refresh tests cover the optional CoinGecko key: process environme
 takes priority over the existing Symbols `.env` file; missing/empty configuration
 uses public requests without an authentication header. Incomplete results retain
 the previous registry, and failed refreshes retain the existing hourly retry.
+
+VP reference lines and histogram bars have independent visibility: selecting POC,
+VAH and VAL must not enable any bars. The tests check this migration regression,
+volume-proportional lengths, configurable chart length/pixel thickness and zoom
+spacing without changing price-bin resolution. The extra VP value-area rectangle
+was removed. Calculations retain the Pine rolling OHLCV allocation and custom
+HVN/LVN thresholds; these UI tests do not establish equivalence to a lower-timeframe
+or exchange-trade volume profile.

@@ -39,7 +39,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Point of control (POC) color',exact=True).fill('#fedcba')
         await dialog.get_by_label('Point of control (POC) width',exact=True).select_option('4')
         await dialog.get_by_label('Point of control (POC) line style',exact=True).select_option('1')
-        await dialog.get_by_label('Value area band fill opacity',exact=True).fill('35')
+        await dialog.get_by_label('Profile bar length (% of chart)',exact=True).fill('55')
+        await dialog.get_by_label('Profile bar thickness (px)',exact=True).fill('2')
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
         await dialog.get_by_role('button',name='FVG',exact=True).click()
@@ -56,6 +57,8 @@ async def exercise(base,library):
             print(requests[-10:],flush=True)
             raise
         assert await page.evaluate('Composer.config.featureStyles.vp_poc.color')=='#fedcba'
+        assert await page.evaluate('Composer.config.featureStyles.vp_histogram.lengthPercent')==55
+        assert await page.evaluate('Composer.config.featureStyles.vp_histogram.thickness')==2
         assert await page.evaluate("import('/overlays/volume_profile/index.js').then(x=>x.getProfile().levels.vp_poc)")==profiles[rows[-1][2]]['vp_poc']
         assert await page.evaluate('Composer.config.featureStyles.support_zones.opacity')==45
         assert await page.evaluate('Composer.config.featureStyles.bull_fvg_zones.color')=='#abcdef'
@@ -71,7 +74,7 @@ async def exercise(base,library):
         assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==4
         assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
-        print('PASS: S/R and FVG bands, Volume Profile levels/value-area fill, style/opacity persistence, display toggles and combined-stream reuse',flush=True)
+        print('PASS: S/R bands, separate VP lines and thin horizontal bins, saved length/thickness/styles and combined-stream reuse',flush=True)
         await browser.close()
 
 
