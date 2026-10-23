@@ -7,6 +7,7 @@ import traceback
 from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,adcn_store
 from .rules import di_turning_point as rule
+from .sequence import alternate
 
 _LOCK=threading.RLock()
 _CACHE={}
@@ -26,8 +27,13 @@ def _load(symbol,interval):
         try:text=adcn_store.read_rule_state(conn,symbol,interval)
         finally:conn.close()
         state=json.loads(text) if text else None
+        if state and state.get('version')==2 and state.get('epoch')==epoch:
+            # Preserve closed-bar progress; seed direction from the same historical
+            # gate used by chart pages, rather than resetting to an empty state.
+            state={**state,'version':rule.VERSION,
+                   'last_signal':db.read_previous_decision_candidate(symbol,interval,state['last']+1)}
         if not state or state.get('version')!=rule.VERSION or state.get('epoch')!=epoch:
-            state={'version':rule.VERSION,'epoch':epoch,'last':-1,'previous':[],'seeded':False}
+            state={'version':rule.VERSION,'epoch':epoch,'last':-1,'previous':[],'seeded':False,'last_signal':None}
         _CACHE[key]=state
     return _CACHE[key]
 
@@ -49,9 +55,11 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
     state=_load(symbol,interval);epoch=state['epoch']
     # Work on a copy. A failed transaction must never move the cached cursor.
     previous=list(state['previous']);rows=[];last=state['last'];now=int(time.time()*1000)
+    last_signal=state.get('last_signal')
     if not state.get('seeded'):
         seed=db.read_decision_seed(symbol,interval)
         if not seed:return 0
+        last_signal=db.read_previous_decision_candidate(symbol,interval,seed[-1]['open_time'])
         previous=[]
         for item in seed[:-1]:
             record=_record(item)
@@ -64,13 +72,13 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
         if item['close_time']>=now or item['features'] is None:break
         current=_record(item)
         if previous and previous[-1]['close_time']+1!=current['open_time']:previous=[]
-        decision=rule.evaluate(previous,current)
+        decision,last_signal=alternate(rule.evaluate(previous,current),last_signal)
         rows.append({'open_time':item['open_time'],**decision});last=item['open_time']
         # JSON memory stores unavailable inputs as null, never NaN/Infinity.
         previous.append(current)
         previous=previous[-rule.LOOKBACK:]
     if not rows:return 0
-    new_state={'version':rule.VERSION,'epoch':epoch,'last':last,'previous':previous,'seeded':True}
+    new_state={'version':rule.VERSION,'epoch':epoch,'last':last,'previous':previous,'seeded':True,'last_signal':last_signal}
     with data_policy.locked():
         if not data_policy.enabled(symbol,interval) or _epoch(symbol,interval)!=epoch:
             reset_pair(symbol,interval);return 0

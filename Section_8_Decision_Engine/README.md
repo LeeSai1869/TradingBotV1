@@ -30,9 +30,10 @@ The existing runner invokes Section 8 after Section 4. Inputs come from the same
 stored raw bars and committed formula-v3 features used by the chart. Feature
 checkpoint caps, gaps, close times, atomic decision/checkpoint commits, and policy
 epoch checks prevent use of provisional or skipped data. Signals appear through
-the combined chart stream as BUY/SELL markers. Rule version 2 invalidates the old
-rule's transient/checkpoint state and seeds the latest calculated three-bar window.
-Older stored decisions remain historical records, not re-evaluated v2 results.
+the combined chart stream as BUY/SELL markers. Rule version 3 adds strict signal alternation. Version-2 checkpoints retain their
+closed-bar progress and seed the preceding direction from calculated history.
+New pairs seed the latest calculated three-bar window.
+Older stored decisions remain legacy records, not re-evaluated v3 results.
 
 ## Historical evaluation
 
@@ -81,3 +82,26 @@ ignores candles closed before entering that chart. Historical loads, settings
 redraws and switching charts do not replay old sounds. Hiding the indicator or a
 direction mutes its sound. Defaults are silent until configured. This uses the
 existing alert audio system and does not create account-wide alert rules.
+
+## Mandatory alternation (rule version 3)
+
+The shared `sequence.alternate` guard runs after candidate evaluation everywhere:
+stored Section 8 decisions, read-only chart projection and historical studies.
+For each symbol/timeframe, BUY can only follow SELL, and SELL can only follow BUY.
+Either direction may be first. Repeated same-side candidates are SUPPRESSED with
+no signal or marker; no opposite signal is fabricated. WAIT, warmup and raw data
+gaps never clear the last accepted direction. The runner checkpoints `last_signal`
+atomically with decision rows and its existing two-candle memory. A version-2
+checkpoint is upgraded without rewinding its decision cursor or Section 4 replay.
+
+Chart pages seed direction from the nearest earlier raw candidate using a small
+DI/ADX/close projection in backward pages. Under this policy the most recent raw
+candidate and most recent accepted signal always have the same direction. Thus
+page size, panning and restarting cannot restart the visible sequence. Windows
+without candidates do not trigger an older-history search. All lookup connections
+close explicitly. V2 ADCN records are retained as legacy data and no longer used
+as fallback Momentum markers. Current markers use the V3 projection.
+
+Historical reports generated before this change counted repeated raw candidates.
+Re-run `evaluate_strategy.py` to evaluate the accepted alternating sequence. This
+remains a forward-return study; alternation does not add exits or position sizing.

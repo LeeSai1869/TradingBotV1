@@ -623,3 +623,10 @@ connection references, early returns, SQL errors, and failure opening the second
 database. Its isolated subprocess performs 1,000 scheduler checks with garbage
 collection disabled and a 64-descriptor soft limit. This reproduces the resource
 constraint without touching production databases or the parent process limits.
+
+Strict alternation: `test_signal_alternation.py` covers BUY/BUY and SELL/SELL
+suppression, WAIT/gap handling, and agreement between chart and event study.
+`test_di_decisions.py` verifies restart persistence, v2 checkpoint migration,
+page-size invariance, backward lookup across page boundaries, and avoiding
+historical scans for windows without candidates. Marker tests exclude suppressed
+signals and obsolete V2 records from marker/sound delivery.

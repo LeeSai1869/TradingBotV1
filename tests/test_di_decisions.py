@@ -125,6 +125,61 @@ class DiMemoryTests(unittest.TestCase):
         page=db.read_state_page('BTCUSDT','1m',1)
         self.assertEqual(page['bars'][0]['momentum']['decision_state'],'WARMUP')
 
+    def test_alternation_persists_across_restart_and_opposite_unlocks_next_buy(self):
+        buy=[*SETUP,di(15,27)]
+        sell=[di(30,10,adx=20,close=103),di(35,11,adx=21,close=102),di(27,15)]
+        self.seed(buy);processor.catch_up('ETHUSDT','1m')
+        processor._CACHE.clear()
+        self.seed(buy+buy+sell+buy)
+        processor.catch_up('ETHUSDT','1m')
+        with sqlite3.connect(adcn_store.DB_PATH) as conn:
+            signals=[row[0] for row in conn.execute("SELECT signal_type FROM decisions WHERE signal_type IS NOT NULL ORDER BY open_time")]
+        self.assertEqual(signals,['BUY','SELL','BUY'])
+        self.assertEqual(db.read_adcn('ETHUSDT','1m',300000)['decision_state'],'SUPPRESSED')
+        processor._CACHE.clear()
+        self.assertEqual(processor._load('ETHUSDT','1m')['last_signal'],'BUY')
+
+    def test_chart_anchor_search_crosses_backward_page_boundary(self):
+        self.seed([*SETUP,di(15,27),*([di(15,27)]*520),*SETUP,di(15,27)])
+        page=db.read_state_page('ETHUSDT','1m',1)
+        self.assertEqual(page['bars'][0]['momentum']['decision_state'],'SUPPRESSED')
+        self.assertEqual(db.read_previous_decision_candidate('ETHUSDT','1m',page['bars'][0]['open_time']),'BUY')
+        processor.catch_up('ETHUSDT','1m')
+        self.assertIsNone(db.read_adcn('ETHUSDT','1m',page['bars'][0]['open_time'])['signal_type'])
+
+    def test_signal_sequence_is_independent_of_chart_page_size(self):
+        buy=[*SETUP,di(15,27)]
+        sell=[di(30,10,adx=20,close=103),di(35,11,adx=21,close=102),di(27,15)]
+        self.seed(buy+buy+sell+sell+buy)
+        for size in (1,2,4,7,1000):
+            before=None;received=[]
+            while True:
+                page=db.read_state_page('ETHUSDT','1m',size,before=before)
+                received.extend(page['bars'])
+                before=page['next_before']
+                if before is None:break
+            received.sort(key=lambda bar:bar['open_time'])
+            self.assertEqual([bar['momentum']['signal_type'] for bar in received if bar['momentum']['signal_type']],['BUY','SELL','BUY'],size)
+
+    def test_signal_free_chart_does_not_search_older_history(self):
+        self.seed([di(10,30),di(11,30),di(12,29)])
+        with patch.object(db,'read_previous_decision_candidate',side_effect=AssertionError('unnecessary history search')):
+            page=db.read_state_page('ETHUSDT','1m',3)
+        self.assertTrue(all(not b['momentum']['signal_type'] for b in page['bars']))
+
+    def test_v2_migration_keeps_checkpoint_and_seeds_last_direction(self):
+        self.seed()
+        conn=adcn_store.open_db()
+        previous=[processor._record(item) for item in db.read_decision_seed('ETHUSDT','1m')][-2:]
+        old={'version':2,'epoch':[0,0],'last':120000,'previous':previous,'seeded':True}
+        adcn_store.commit_rule_rows(conn,'ETHUSDT','1m',[],120000,json.dumps(old));conn.close()
+        processor._CACHE.clear()
+        loaded=processor._load('ETHUSDT','1m')
+        self.assertEqual(loaded['last'],120000);self.assertEqual(loaded['last_signal'],'BUY')
+        self.seed([*SETUP,di(15,27),*SETUP,di(15,27)])
+        processor.catch_up('ETHUSDT','1m')
+        self.assertIsNone(db.read_adcn('ETHUSDT','1m',300000)['signal_type'])
+
     def test_sell_uses_same_closed_memory_pipeline(self):
         self.seed([di(30,10,adx=20,close=103),di(35,11,adx=21,close=102),di(27,15)])
         processor.catch_up('ETHUSDT','1m')
@@ -138,7 +193,7 @@ class DiMemoryTests(unittest.TestCase):
         processor._CACHE.clear()
         self.assertEqual(processor.catch_up('ETHUSDT','1m'),1)
         self.assertEqual(db.read_adcn('ETHUSDT','1m',120000)['signal_type'],'BUY')
-        self.assertEqual(processor._load('ETHUSDT','1m')['version'],2)
+        self.assertEqual(processor._load('ETHUSDT','1m')['version'],3)
 
     def test_waits_for_feature_checkpoint_and_forming_candle_close(self):
         self.seed(cap=60000)
@@ -160,7 +215,8 @@ class DiMemoryTests(unittest.TestCase):
         self.seed([*SETUP,di(15,27)],symbol='BTCUSDT',times=[300000,360000,420000])
         processor.catch_up('BTCUSDT','1m')
         self.assertEqual(db.read_adcn('BTCUSDT','1m',300000)['decision_state'],'WARMUP')
-        self.assertEqual(db.read_adcn('BTCUSDT','1m',420000)['signal_type'],'BUY')
+        self.assertIsNone(db.read_adcn('BTCUSDT','1m',420000)['signal_type'])
+        self.assertEqual(db.read_adcn('BTCUSDT','1m',420000)['decision_state'],'SUPPRESSED')
 
     def test_failed_commit_does_not_advance_checkpoint_or_cached_history(self):
         self.seed()

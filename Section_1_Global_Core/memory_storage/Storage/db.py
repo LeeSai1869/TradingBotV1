@@ -273,7 +273,14 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
     # Two predecessor rows seed the same Section 8 gate at page boundaries.
     # This is a bounded read-only projection; it does not backfill ADCN memory.
     from Section_8_Decision_Engine.presentation import annotate
-    bars=annotate(bars)[-limit:]
+    bars=annotate(bars)
+    # Most recent windows can still lack replayed features. Never search their
+    # entire older history when there is no candidate to display in this page.
+    if any(bar.get('momentum',{}).get('signal_type') for bar in bars[-limit:] if bar.get('momentum')):
+        first_evaluated=bars[2]['open_time'] if len(bars)>2 else bars[0]['open_time']
+        last_signal=read_previous_decision_candidate(symbol,interval,first_evaluated)
+        bars=annotate(bars,last_signal)
+    bars=bars[-limit:]
     return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
 
 
@@ -417,3 +424,39 @@ def iter_decision_history(symbols=None,intervals=None):
                 (symbol,interval,cap,int(time.time()*1000)))
             yield symbol,interval,cap,(dict(zip(columns,r)) for r in cursor)
     finally:raw.close()
+
+
+def read_previous_decision_candidate(symbol,interval,before):
+    """Nearest raw gate direction before a candle, using small backward pages.
+
+    Last accepted direction equals last raw candidate direction under strict
+    alternation. This seeds chart pages without restarting alternation at each
+    viewport boundary, and avoids replaying every older decision into memory.
+    Only the small DI/ADX projection is read; connections always close explicitly.
+    """
+    from contextlib import ExitStack,closing
+    from Section_8_Decision_Engine.rules import di_turning_point as rule
+    import time
+    if not klines_store.DB_PATH.exists() or not features_store.DB_PATH.exists():return None
+    now=int(time.time()*1000)
+    with ExitStack() as stack:
+        raw=stack.enter_context(closing(_read_connection(klines_store.DB_PATH)))
+        features=stack.enter_context(closing(_read_connection(features_store.DB_PATH)))
+        features.execute('BEGIN')
+        while True:
+            rows=klines_store.read_page(raw,symbol,interval,514,before=before)
+            if len(rows)<3:return None
+            values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
+            records=[];previous=[];last_close=None
+            for row in rows:
+                if last_close is not None and last_close+1!=row[2]:previous=[]
+                last_close=row[8]
+                if row[8]>=now or row[2] not in values:
+                    previous=[];records.append(None);continue
+                current={**values[row[2]],'close':row[6]}
+                records.append(rule.evaluate(previous,current)['signal_type'])
+                previous.append(current);previous=previous[-2:]
+            for signal in reversed(records[2:]):
+                if signal:return signal
+            if len(rows)<514:return None
+            before=rows[2][2]

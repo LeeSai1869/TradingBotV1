@@ -1,8 +1,8 @@
 """Faithful three-closed-candle translation of the supplied TradingView rule."""
 import math
 
-RULE_ID='DI_TURNING_POINT_V2'
-VERSION=2
+RULE_ID='DI_TURNING_POINT_V3'
+VERSION=3
 LOOKBACK=2
 FIELDS=('di_plus','di_minus','di_spread','adx','close')
 

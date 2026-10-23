@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from Section_1_Global_Core.global_packet import read_decision_history
 from Section_8_Decision_Engine.rules import di_turning_point as rule
+from Section_8_Decision_Engine.sequence import alternate
 
 
 def study(rows,horizons=(1,3,6,12),cost_bps=0):
@@ -13,7 +14,7 @@ def study(rows,horizons=(1,3,6,12),cost_bps=0):
     All horizons count from entry. Gaps discard unfinished observations. Each
     signal is an independent event, so overlapping signals are not a portfolio.
     """
-    previous=deque(maxlen=2);pending=[];last_close=None
+    previous=deque(maxlen=2);pending=[];last_close=None;last_signal=None
     stats={str(h):{'observations':0,'wins':0,'sum_return_pct':0.0} for h in horizons}
     result={'bars':0,'buy_signals':0,'sell_signals':0,'horizons':stats}
     for row in rows:
@@ -29,7 +30,8 @@ def study(rows,horizons=(1,3,6,12),cost_bps=0):
                 stat=stats[str(event['age'])];stat['observations']+=1;stat['wins']+=change>0;stat['sum_return_pct']+=change
             if event['age']<max(horizons):remaining.append(event)
         pending=remaining
-        signal=rule.evaluate(list(previous),row)['signal_type']
+        decision,last_signal=alternate(rule.evaluate(list(previous),row),last_signal)
+        signal=decision['signal_type']
         if signal:
             result['buy_signals' if signal=='BUY' else 'sell_signals']+=1
             pending.append({'entry':None,'age':0,'sign':1 if signal=='BUY' else -1})

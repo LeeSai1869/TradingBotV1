@@ -29,3 +29,10 @@ test('sound preferences validate options and volume',()=>{
     assert.deepEqual(normalizeMomentum(),{buy:'none',sell:'none',volume:.35});
     assert.deepEqual(normalizeMomentum({buy:'bell',sell:'invalid',volume:9}),{buy:'bell',sell:'none',volume:1});
 });
+
+
+test('suppressed candidates and obsolete v2 rows cannot create markers or sounds',()=>{
+    const bars=[{...signal(1000),momentum:{signal_type:null,decision_state:'SUPPRESSED'},adcn:{signal_type:'BUY',trigger:'DI_TURNING_POINT_V3'}},
+        {adcn:{signal_type:'BUY',trigger:'DI_TURNING_POINT_V2'}}];
+    assert.deepEqual(closedSignals(bars),[]);
+});
