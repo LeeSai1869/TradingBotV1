@@ -13,7 +13,9 @@ async def exercise(base,library):
         inst_support_zone_low=price-6,inst_support_zone_high=price-5,nearest_inst_support_zone_id='is1',
         inst_resistance_zone_low=price+5,inst_resistance_zone_high=price+6,nearest_inst_resistance_zone_id='ir1',
         nearest_bull_fvg_low=price-2,nearest_bull_fvg_high=price-1,nearest_bull_fvg_created_bar=10,
-        nearest_bear_fvg_low=price+1,nearest_bear_fvg_high=price+2,nearest_bear_fvg_created_bar=20) for r in rows])
+        nearest_bear_fvg_low=price+1,nearest_bear_fvg_high=price+2,nearest_bear_fvg_created_bar=20,
+        vp_poc=price,vp_va_low=price-2,vp_va_high=price+2,vp_hvn_high=price+1,vp_hvn_low=price-1,
+        vp_lvn_high=price+4,vp_lvn_low=price-4) for r in rows])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000});errors=[];requests=[]
@@ -24,29 +26,39 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         dialog=page.get_by_role('dialog',name='Settings',exact=True)
         await dialog.get_by_role('tab',name='Features',exact=True).click()
-        for name in ('Support / Resistance','FVG'):
+        for name in ('Support / Resistance','FVG','Volume Profile'):
             await dialog.get_by_role('button',name=name,exact=True).click()
             await dialog.get_by_role('button',name='Select all',exact=True).click()
+        await dialog.get_by_label('Point of control (POC) color',exact=True).fill('#fedcba')
+        await dialog.get_by_label('Point of control (POC) width',exact=True).select_option('4')
+        await dialog.get_by_label('Point of control (POC) line style',exact=True).select_option('1')
+        await dialog.get_by_label('Value area band fill opacity',exact=True).fill('35')
+        await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
+        await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
+        await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_label('Bullish FVG color',exact=True).fill('#abcdef')
         await dialog.get_by_label('Bullish FVG width',exact=True).select_option('3')
         await dialog.get_by_label('Bullish FVG line style',exact=True).select_option('2')
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
-        assert count==6,count
+        assert count==7,count
+        assert await page.evaluate("import('/overlays/indicators/index.js').then(x=>x.getSeries('vp_poc').options().color)")=='#fedcba'
+        assert await page.evaluate("import('/overlays/indicators/index.js').then(x=>x.getSeries('vp_poc').data().filter(p=>p.value!=null).length)")==150
+        assert await page.evaluate('Composer.config.featureStyles.support_zones.opacity')==45
         assert await page.evaluate('Composer.config.featureStyles.bull_fvg_zones.color')=='#abcdef'
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==6
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==7
         await page.get_by_role('button',name='Open settings',exact=True).click()
         await dialog.get_by_role('tab',name='Features',exact=True).click()
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_role('button',name='Deselect all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==4
-        assert not any('/api/fvg' in url or '/api/support' in url for url in requests)
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==5
+        assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
-        print('PASS: six stored S/R and FVG zones, style persistence, display toggles, single chart pane and combined-stream reuse',flush=True)
+        print('PASS: S/R and FVG bands, Volume Profile levels/value-area fill, style/opacity persistence, display toggles and combined-stream reuse',flush=True)
         await browser.close()
 
 

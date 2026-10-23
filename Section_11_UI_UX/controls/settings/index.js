@@ -16,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP", "Support / Resistance", "FVG", "Momentum Indicator"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Support / Resistance", "FVG", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -171,6 +171,12 @@ function renderFeature() {
                 select.title = "Histogram output uses bar color; line controls do not apply.";
             }
         }
+    }
+    for(const [key,label,,presentation] of feature.outputs)if(presentation==='zone') {
+        const row=el('label',`${label} fill opacity (%) `,content,'settings-row');
+        const input=el('input','',row);input.type='number';input.min=0;input.max=100;input.step=1;
+        input.value=draft.outputs[key].opacity;input.setAttribute('aria-label',`${label} fill opacity`);
+        input.onchange=()=>{draft.outputs[key].opacity=Math.max(0,Math.min(100,Number(input.value)||0));};
     }
     note("Each output keeps its own style. Unchecking an output preserves its color, width and line style.");
 }

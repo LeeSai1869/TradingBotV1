@@ -648,3 +648,13 @@ pending and completed Python 3.13/3.14-format jobs without replay or cursor rese
 preserves genuine input edits during recovery, and retires other symbols' false
 jobs without waiting for the selected history owner. Run this suite on Python
 3.14 as well as the main interpreter; native AST defaults differ between them.
+
+Volume Profile presentation: `volume_profile_display.test.mjs` covers independent
+POC/VAH/VAL/HVN/LVN visibility/styles, value-area fill, opacity validation, missing
+boundaries and gaps. `browser_zones.py` verifies these levels and shaded bands in
+the main price pane, saved colors/width/dashes/opacity, and S/R/FVG visibility.
+All displays consume the existing combined bars; no separate market-data requests
+or feature recalculation are introduced. Missing S/R boundaries are hidden rather
+than rendered as zero-width zones at a fallback price. This displays stored volume
+profile levels and value area; it does not invent a volume-by-price histogram from
+the price levels alone.

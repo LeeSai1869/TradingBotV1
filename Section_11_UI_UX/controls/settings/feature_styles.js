@@ -28,6 +28,13 @@ export const FEATURE_STYLES = {
     ] },
     ATR: { connected: true, outputs: [["atr", "ATR", "#f18a35"], ["atr_ma", "ATR average", "#4b7bff"]] },
     Volume: { connected: true, outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"]] },
+    'Volume Profile': { connected: true, outputs: [
+        ['vp_poc','Point of control (POC)','#f5c542'],
+        ['vp_va_high','Value area high (VAH)','#38bdf8'],['vp_va_low','Value area low (VAL)','#38bdf8'],
+        ['vp_hvn_high','High-volume node high','#26a69a'],['vp_hvn_low','High-volume node low','#60ab64'],
+        ['vp_lvn_high','Low-volume node high','#ef5350'],['vp_lvn_low','Low-volume node low','#e747ae'],
+        ['vp_value_area','Value area band','#38bdf8','zone'],
+    ] },
     VWAP: { connected: true, outputs: [
         ["vwap", "VWAP", "#f5c542"], ["vwap_upper1", "Upper band 1", "#26a69a"],
         ["vwap_upper2", "Upper band 2", "#60ab64"], ["vwap_lower1", "Lower band 1", "#ef5350"],
@@ -38,7 +45,7 @@ export const FEATURE_STYLES = {
 export function normalizeStyles(value = {}) {
     const result = {};
     for (const feature of Object.values(FEATURE_STYLES)) {
-        for (const [key, , color] of feature.outputs) {
+        for (const [key, , color, presentation] of feature.outputs) {
             const input = value?.[key] || {};
             result[key] = {
                 visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
@@ -46,6 +53,7 @@ export function normalizeStyles(value = {}) {
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: [0,1,2].includes(input.style) ? input.style : 0,
             };
+            if(presentation==='zone')result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):20;
             if(key.startsWith('momentum_')) {
                 result[key].shape=['arrowUp','arrowDown','circle','square'].includes(input.shape)?input.shape:(key==='momentum_buy'?'arrowUp':'arrowDown');
                 result[key].label=typeof input.label==='boolean'?input.label:true;
