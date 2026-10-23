@@ -610,3 +610,10 @@ cover current refreshes preceding historical work and yielding after slow reques
 and exclusion of gaps/unfinished tails. These are correctness tests, not evidence
 of profitable historical performance. Run `python3 evaluate_strategy.py` on the
 machine holding actual formula-v3 market history for a read-only forward study.
+
+Momentum Indicator coverage: `test_di_decisions.py` checks read-only chart markers
+without ADCN records, predecessor lookback at page boundaries, and missing bars.
+`momentum_indicator.test.mjs` covers independent styles, forming/old-rule exclusion,
+sound preference validation, deduplication, historical suppression, and chart
+switches. `browser_di_decisions.py` checks visible markers, settings, persistence,
+style changes, visibility, synthesized audio and exactly-once delivery in Chromium.

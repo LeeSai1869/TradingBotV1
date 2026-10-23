@@ -191,3 +191,8 @@ export function mount() {
     request('/api/alerts/events').then(packet=>{eventCursor=packet.cursor;for(const event of packet.history||[])recent.push(event);renderActivity();timer=setTimeout(poll,2000);}).catch(()=>{timer=setTimeout(poll,5000);});
     window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
 }
+
+export async function enableSignalSound(){await unlock();}
+export function playSignalSound(key,level=.35){
+    const previous=volume;volume=level;sound(key);volume=previous;
+}

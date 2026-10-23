@@ -112,6 +112,19 @@ class DiMemoryTests(unittest.TestCase):
         self.assertEqual(report['pairs'][0]['buy_signals'],1)
         self.assertFalse(adcn_store.DB_PATH.exists())
 
+    def test_chart_momentum_projects_history_without_adcn_and_with_page_predecessors(self):
+        self.seed()
+        page=db.read_state_page('ETHUSDT','1m',1)
+        self.assertEqual(len(page['bars']),1)
+        bar=page['bars'][0]
+        self.assertEqual(bar['momentum']['signal_type'],'BUY')
+        self.assertIsNone(bar['adcn'])
+        self.assertFalse(adcn_store.DB_PATH.exists())
+        # Strict page boundary and a raw gap must not borrow unrelated history.
+        self.seed(times=[0,120000,180000],symbol='BTCUSDT')
+        page=db.read_state_page('BTCUSDT','1m',1)
+        self.assertEqual(page['bars'][0]['momentum']['decision_state'],'WARMUP')
+
     def test_sell_uses_same_closed_memory_pipeline(self):
         self.seed([di(30,10,adx=20,close=103),di(35,11,adx=21,close=102),di(27,15)])
         processor.catch_up('ETHUSDT','1m')

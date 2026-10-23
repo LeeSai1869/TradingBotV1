@@ -247,12 +247,11 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
         return {"bars": [], "next_before": None}
     conn = _read_connection(klines_store.DB_PATH)
     try:
-        rows = klines_store.read_page(conn, symbol, interval, limit + 1, before=before)
+        rows = klines_store.read_page(conn, symbol, interval, limit + 2, before=before)
         cursor=klines_store.history_cursor(conn,symbol,interval)
     finally:
         conn.close()
     has_more = len(rows) > limit
-    rows = rows[-limit:]
     if not rows:
         return {"bars": [], "next_before": None}
     start_ms, end_ms = int(rows[0][2]), int(rows[-1][2]) + 1
@@ -271,7 +270,11 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
             "features": features_by_time.get(open_time),
             "adcn": decisions_by_time.get(open_time),
         })
-    return {"bars": bars, "next_before": start_ms if has_more else None, "history_pending":cursor is not None}
+    # Two predecessor rows seed the same Section 8 gate at page boundaries.
+    # This is a bounded read-only projection; it does not backfill ADCN memory.
+    from Section_8_Decision_Engine.presentation import annotate
+    bars=annotate(bars)[-limit:]
+    return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
 
 
 # ==============================================================================

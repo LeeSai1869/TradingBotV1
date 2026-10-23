@@ -71,8 +71,8 @@ def read_page(conn, symbol, interval, limit, *, before=None):
     Count rows rather than estimating a duration: gaps and calendar months
     must not shorten a page when enough stored history exists.
     """
-    if not 1 <= limit <= 1001:
-        raise ValueError("limit must be between 1 and 1001")
+    if not 1 <= limit <= 1002:
+        raise ValueError("limit must be between 1 and 1002")
     where = "symbol=? AND interval=?"
     params = [symbol, interval]
     if before is not None:

@@ -96,7 +96,7 @@ const Composer = {
         for (const v of this.visuals) {
             try {
                 if (v.update) {
-                    v.update(chart, data, { ...options, visible: this.config.display?.[v.name] !== false });
+                    v.update(chart, data, { ...options, op, visible: this.config.display?.[v.name] !== false });
                 }
             } catch (e) {
                 console.error(

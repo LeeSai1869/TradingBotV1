@@ -60,3 +60,24 @@ Pine-condition translation; both BUY and SELL branches and closed-memory commits
 were tested. The available cloud candle/feature tables are empty, so a historical
 market performance result cannot be reported here. Use the command above on the
 Mac containing the downloaded history.
+
+## Momentum Indicator presentation
+
+Settings → Features → Momentum Indicator exposes independent BUY/SELL visibility,
+color, size, shape and label controls. The combined bar reader includes a
+read-only `momentum` projection from this same rule, using two extra predecessor
+candles at page boundaries. It does not depend on historical ADCN backfill or
+create a second strategy implementation in JavaScript. Existing decision rows
+remain unchanged. Only closed formula-v3 feature rows participate; gaps reset
+lookback, and provisional candles cannot create a marker. A historical report
+never wrote decisions, which previously left most counted signals invisible.
+Where current features are still replaying, current markers must wait for them.
+
+BUY/SELL sounds can each be None, Chime, Bell or Alarm, with volume and test
+buttons. Choosing a sound and applying settings unlocks browser audio; after
+reopening, use Enable signal sounds once if the browser blocks audio. Delivery
+only watches the open symbol/timeframe, deduplicates each candle/direction, and
+ignores candles closed before entering that chart. Historical loads, settings
+redraws and switching charts do not replay old sounds. Hiding the indicator or a
+direction mutes its sound. Defaults are silent until configured. This uses the
+existing alert audio system and does not create account-wide alert rules.

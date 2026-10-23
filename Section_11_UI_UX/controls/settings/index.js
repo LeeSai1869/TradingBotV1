@@ -3,6 +3,8 @@ import { FEATURE_STYLES, migrateStyles } from "./feature_styles.js";
 import {normalizeHud} from "../workspace/preferences.js";
 import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
+import {normalizeMomentum,SOUNDS} from '../../overlays/markers/preferences.js';
+import {enableSignalSound,playSignalSound} from '../alerts/index.js';
 import {normalizeCandleStyle} from './candle_style.js';
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
@@ -14,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP", "Support / Resistance", "FVG"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "VWAP", "Support / Resistance", "FVG", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -30,6 +32,7 @@ function validated(value) {
     result.outputs = migrateStyles(value);
     result.candleStyle=normalizeCandleStyle(value.candleStyle);
     result.hud = normalizeHud(value.hud);
+    result.momentumSounds=normalizeMomentum(value.momentumSounds);
     const lower=Number(value.rsiLevels?.lower??30), upper=Number(value.rsiLevels?.upper??70);
     result.rsiLevels = Number.isFinite(lower) && Number.isFinite(upper) && lower>=0 && upper<=100 && lower<upper?{lower,upper}:{lower:30,upper:70};
     return result;
@@ -38,6 +41,7 @@ function validated(value) {
 function apply() {
     const config = window.Composer.config;
     config.hud = saved.hud;
+    config.momentumSounds=saved.momentumSounds;
     config.rsiLevels = saved.rsiLevels;
     config.display = { ...config.display, candles: saved.candles, markers: saved.markers, ema50: saved.ema };
     config.featureStyles = saved.outputs;
@@ -79,6 +83,23 @@ function renderFeature() {
             content.querySelector(`[aria-pressed="true"]`).focus();
         };
     }
+    if(item==='Momentum Indicator') {
+        toggle('Show Momentum Indicator','markers');
+        note('Section 8 BUY/SELL signals use closed candles with complete formula-v3 features. Current signals wait for feature replay; historical markers never play sounds.');
+        for(const side of ['buy','sell']) {
+            const row=el('label',`${side.toUpperCase()} sound `,content,'settings-row'), select=el('select','',row);
+            select.setAttribute('aria-label',`${side.toUpperCase()} sound`);
+            for(const value of SOUNDS){const o=el('option',value,select);o.value=value;}
+            select.value=draft.momentumSounds[side];select.onchange=()=>{draft.momentumSounds[side]=select.value;};
+            const test=el('button',`Test ${side.toUpperCase()} sound`,content);
+            test.onclick=async()=>{try{await enableSignalSound();playSignalSound(draft.momentumSounds[side],draft.momentumSounds.volume);}catch(error){note(error.message);}};
+        }
+        const row=el('label','Signal volume ',content,'settings-row'), volume=el('input','',row);
+        volume.type='range';volume.min=0;volume.max=1;volume.step=.05;volume.value=draft.momentumSounds.volume;
+        volume.setAttribute('aria-label','Signal volume');volume.oninput=()=>{draft.momentumSounds.volume=Number(volume.value);};
+        const enable=el('button','Enable signal sounds',content);
+        enable.onclick=async()=>{try{await enableSignalSound();note('Signal sounds enabled for this session and the open symbol/timeframe.');}catch(error){note(error.message);}};
+    }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     const selection=el('div','',content,'settings-selection');
@@ -87,6 +108,7 @@ function renderFeature() {
         button.onclick=()=>{
             for(const [key] of feature.outputs)draft.outputs[key].visible=visible;
             if(item==='EMA' && visible)draft.ema=true;
+            if(item==='Momentum Indicator'&&visible)draft.markers=true;
             render();
         };
     }
@@ -112,7 +134,7 @@ function renderFeature() {
     }
     const table = el("div", "", content, "settings-style-table");
     const heading = el("div", "", table, "settings-style-row settings-style-heading");
-    for (const title of ["Output", "Color", "Width", "Line style"]) el("span", title, heading);
+    for (const title of ["Output", "Color", item==='Momentum Indicator'?"Size":"Width", item==='Momentum Indicator'?"Shape":"Line style"]) el("span", title, heading);
     for (const [key, label, , presentation = "line"] of feature.outputs) {
         const state = draft.outputs[key];
         const row = el("div", "", table, "settings-style-row");
@@ -124,6 +146,17 @@ function renderFeature() {
         const color = el("input", "", row); color.type = "color";
         color.value = state.color; color.setAttribute("aria-label", `${label} color`);
         color.oninput = () => { state.color = color.value; };
+        if(presentation==='marker') {
+            const size=el('select','',row);size.setAttribute('aria-label',`${label} size`);
+            for(const n of [1,2,3,4]){const o=el('option',String(n),size);o.value=n;}
+            size.value=state.width;size.onchange=()=>{state.width=Number(size.value);};
+            const shape=el('select','',row);shape.setAttribute('aria-label',`${label} shape`);
+            for(const value of ['arrowUp','arrowDown','circle','square']){const o=el('option',value,shape);o.value=value;}
+            shape.value=state.shape;shape.onchange=()=>{state.shape=shape.value;};
+            const labelToggle=el('label','Show label ',content,'settings-row'), input=el('input','',labelToggle);
+            input.type='checkbox';input.checked=state.label;input.setAttribute('aria-label',`${label} label`);input.onchange=()=>{state.label=input.checked;};
+            continue;
+        }
         for (const [field, title, options] of [
             ["width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
             ["style", "line style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
@@ -290,11 +323,14 @@ export async function mount() {
     const message = el("span", "", footer); message.setAttribute("role", "status");
     const cancel = el("button", "Cancel", footer); cancel.onclick = () => dialog.close();
     const save = el("button", "Apply", footer, "settings-apply");
-    save.onclick = () => {
+    save.onclick = async () => {
         if (!(draft.rsiLevels.lower>=0 && draft.rsiLevels.upper<=100 && draft.rsiLevels.lower<draft.rsiLevels.upper)) {
             message.textContent='RSI levels must be between 0 and 100, with lower below upper.';return;
         }
         const next = validated(draft);
+        if(next.momentumSounds.buy!=='none'||next.momentumSounds.sell!=='none') {
+            try{await enableSignalSound();}catch(error){message.textContent=error.message;return;}
+        }
         try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
         catch { message.textContent = "Could not save preferences in this browser."; return; }
         saved = next; apply(); window.dispatchEvent(new Event("chart-settings-change")); dialog.close();

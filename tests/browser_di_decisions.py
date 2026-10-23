@@ -37,7 +37,51 @@ LightweightCharts={...LightweightCharts,createSeriesMarkers:(series,markers,...a
         assert await page.evaluate('DataCache.latestBar.adcn.signal_type')=='BUY'
         assert await page.evaluate('DataCache.latestBar.adcn.final_score') is None
         marker=await page.evaluate('(time)=>window.decisionMarkers.find(x=>x.time===time)',rows[-1][2]//1000)
-        assert marker['text']=='B' and marker['position']=='belowBar',marker
+        assert marker['text']=='BUY' and marker['position']=='belowBar',marker
+        await page.get_by_role('button',name='Open settings').click()
+        dialog=page.get_by_role('dialog',name='Settings')
+        await dialog.get_by_role('tab',name='Features',exact=True).click()
+        await dialog.get_by_role('button',name='Momentum Indicator',exact=True).click()
+        await dialog.get_by_label('BUY color',exact=True).fill('#123456')
+        await dialog.get_by_label('BUY shape',exact=True).select_option('circle')
+        await dialog.get_by_label('BUY size',exact=True).select_option('3')
+        await dialog.get_by_label('SELL sound',exact=True).select_option('bell')
+        # Stub Web Audio so browser permission and actual sound delivery can be
+        # verified without playing host audio.
+        await page.evaluate("""() => {
+            window.soundNotes=0;
+            window.AudioContext=class {
+                state='running';currentTime=0;destination={};async resume(){}
+                createOscillator(){window.soundNotes++;return {frequency:{value:0},connect(){},start(){},stop(){}};}
+                createGain(){return {gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}};}
+            };
+        }""")
+        await dialog.get_by_label('BUY sound',exact=True).select_option('chime')
+        await dialog.get_by_role('button',name='Test BUY sound',exact=True).click()
+        assert await page.evaluate('soundNotes')==3
+        await dialog.get_by_role('button',name='Apply',exact=True).click()
+        await settle(page)
+        marker=await page.evaluate('(time)=>window.decisionMarkers.find(x=>x.time===time)',rows[-1][2]//1000)
+        assert marker['color']=='#123456' and marker['shape']=='circle' and marker['size']==3,marker
+        # A newly closed signal sounds once; redraw does not duplicate it.
+        await page.evaluate("""async () => {
+            const overlay=await import('/overlays/markers/index.js');
+            const now=Date.now(),bar={time:Math.floor(now/1000),open_time:now-900000,client:{close_time:now-1},momentum:{signal_type:'BUY'}};
+            const data={symbol:DataCache.symbol,timeframe:DataCache.timeframe,bars:[...DataCache.renderBars,bar]};
+            overlay.update(Canvas.chart,data,{op:'stored-refresh'});
+            overlay.update(Canvas.chart,data,{op:'stored-refresh'});
+        }""")
+        assert await page.evaluate('soundNotes')==6
+        await page.get_by_role('button',name='Open settings').click()
+        await dialog.get_by_role('switch',name='Show Momentum Indicator',exact=True).uncheck()
+        await dialog.get_by_role('button',name='Apply',exact=True).click()
+        await settle(page)
+        assert await page.evaluate('decisionMarkers.length')==0
+        await page.reload();await sign_in(page,'user')
+        await page.wait_for_function('Composer?.mounted && !DataCache.loading')
+        assert await page.evaluate('Composer.config.featureStyles.momentum_buy.color')=='#123456'
+        assert await page.evaluate('Composer.config.momentumSounds.sell')=='bell'
+        assert await page.evaluate('Composer.config.display.markers') is False
         assert not any('/api/decisions' in url for url in requests)
         assert not errors,errors
         print('PASS: closed DI rule writes ADCN and renders BUY on the same canonical candle without an invented score or separate decision request',flush=True)

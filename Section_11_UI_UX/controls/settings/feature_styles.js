@@ -1,5 +1,8 @@
 // Each output owns its presentation. This catalog also drives the settings rows.
 export const FEATURE_STYLES = {
+    'Momentum Indicator': {connected:true,outputs:[
+        ['momentum_buy','BUY','#26a69a','marker'],['momentum_sell','SELL','#ef5350','marker'],
+    ]},
     'Support / Resistance': { connected: true, outputs: [
         ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
@@ -38,11 +41,15 @@ export function normalizeStyles(value = {}) {
         for (const [key, , color] of feature.outputs) {
             const input = value?.[key] || {};
             result[key] = {
-                visible: typeof input.visible === "boolean" ? input.visible : key === "ema50",
+                visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
                 color: /^#[0-9a-f]{6}$/i.test(input.color) ? input.color : color,
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: [0,1,2].includes(input.style) ? input.style : 0,
             };
+            if(key.startsWith('momentum_')) {
+                result[key].shape=['arrowUp','arrowDown','circle','square'].includes(input.shape)?input.shape:(key==='momentum_buy'?'arrowUp':'arrowDown');
+                result[key].label=typeof input.label==='boolean'?input.label:true;
+            }
         }
     }
     return result;
