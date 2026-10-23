@@ -4,6 +4,7 @@
 // ============================================================
 
 import * as candles from "../overlays/candles/index.js";
+import * as volumeProfile from "../overlays/volume_profile/index.js";
 import * as zones from "../overlays/zones/index.js";
 import * as markers from "../overlays/markers/index.js";
 import * as indicators from "../overlays/indicators/index.js";
@@ -21,7 +22,7 @@ import * as alertsControl from "../controls/alerts/index.js";
 import * as workspaceControl from "../controls/workspace/index.js";
 import * as settingsControl from "../controls/settings/index.js";
 
-const VISUALS = [candles, markers, ema50, indicators, zones, candleDetails];
+const VISUALS = [candles, markers, ema50, indicators, zones, volumeProfile, candleDetails];
 const PANELS = [];
 
 const Composer = {

@@ -10,6 +10,7 @@ const DataCache = {
     liveEnabled: true,
     historyPending: false,
     formingBar: null,
+    volumeProfile: null,
     liveStatus: "loading",
     activeBars: [],
     latestBar: null,
@@ -59,6 +60,7 @@ const DataCache = {
 
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
+        if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);
         else if (this.liveEnabled) qs.set("live", "1");
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -104,11 +106,12 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
+            this.volumeProfile=packet.volume_profile??null;
             this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
             this.bars = packet.bars;
@@ -176,8 +179,10 @@ const DataCache = {
             if(prior?.client?.close_time && packet.bars.length && packet.bars[0].open_time>prior.client.close_time+1){
                 return this.loadInitial(this.symbol,this.timeframe);
             }
+            const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
+            this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged;
+            const changed = signature !== this._latestSignature || historyChanged || profileChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

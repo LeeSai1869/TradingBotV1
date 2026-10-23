@@ -6,7 +6,6 @@ const definitions={
     resistance_zones:['resistance_zone_low','resistance_zone_high','nearest_resistance_zone_id'],
     inst_support_zones:['inst_support_zone_low','inst_support_zone_high','nearest_inst_support_zone_id'],
     inst_resistance_zones:['inst_resistance_zone_low','inst_resistance_zone_high','nearest_inst_resistance_zone_id'],
-    vp_value_area:['vp_va_low','vp_va_high'],
     bull_fvg_zones:['nearest_bull_fvg_low','nearest_bull_fvg_high','nearest_bull_fvg_created_bar'],
     bear_fvg_zones:['nearest_bear_fvg_low','nearest_bear_fvg_high','nearest_bear_fvg_created_bar'],
 };

@@ -119,6 +119,9 @@ async function loadAll() {
         pending = { op: "settings", reset: !!pending?.reset,
             latest: pending?.latest, span: pending?.span };
         render();
+        if(!DataCache.volumeProfile && Object.entries(Composer.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible)){
+            void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
+        }
     });
     document.getElementById("symbol").addEventListener("change", loadAll);
     document.getElementById("interval").addEventListener("change", () => {

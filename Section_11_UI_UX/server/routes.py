@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core import data_policy
 
-from . import queries, hud, drawing_routes
+from . import queries, hud, drawing_routes, volume_profile
 from . import live_candle, admin_routes, alert_routes
 from .settings_catalog import read_coin_catalog
 
@@ -63,6 +63,8 @@ def handle_get(path, raw_qs, server):
                       "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",
                       **db.read_state_page(symbol, interval, limit, before=before)}
             active = data_policy.enabled(symbol, interval)
+            if before is None and qs.get('volume_profile',['0'])[0]=='1':
+                packet['volume_profile']=volume_profile.snapshot(symbol,interval,packet['bars'][-1] if packet['bars'] else None,packet['storage_epoch'])
         if before is None and qs.get("live", ["0"])[0] == "1":
             packet["live"] = live_candle.get_snapshot(symbol, interval) if active else {
                 "bar": None, "status": "inactive", "as_of": None, "error": None}

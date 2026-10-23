@@ -653,11 +653,14 @@ Volume Profile presentation: `volume_profile_display.test.mjs` covers independen
 POC/VAH/VAL/HVN/LVN visibility/styles, value-area fill, opacity validation, missing
 boundaries and gaps. `browser_zones.py` verifies these levels and shaded bands in
 the main price pane, saved colors/width/dashes/opacity, and S/R/FVG visibility.
-All displays consume the existing combined bars; no separate market-data requests
-or feature recalculation are introduced. Missing S/R boundaries are hidden rather
-than rendered as zero-width zones at a fallback price. This displays stored volume
-profile levels and value area; it does not invent a volume-by-price histogram from
-the price levels alone.
+All displays consume the existing combined bars; the optional histogram snapshot
+travels in the same `/api/bars` response. No separate market-data requests or
+feature recalculation are introduced. Missing S/R boundaries are hidden rather
+than rendered as zero-width zones at a fallback price. The profile displays the latest committed rolling histogram as horizontal bars,
+with independent HVN/LVN colors and current horizontal POC/VAH/VAL projections.
+`test_profile_snapshot.py` checks a known bin/POC/value-area vector, cache reuse,
+checkpoint/candle/epoch consistency, and withholding stale bins during repair.
+Bins are read from the runner checkpoint, never inferred from price levels.
 
 Daily registry refresh tests cover the optional CoinGecko key: process environment
 takes priority over the existing Symbols `.env` file; missing/empty configuration

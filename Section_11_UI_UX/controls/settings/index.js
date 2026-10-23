@@ -163,16 +163,17 @@ function renderFeature() {
         ]) {
             const select = el("select", "", row);
             select.setAttribute("aria-label", `${label} ${title}`);
-            for (const [value, text] of options) { const option = el("option", text, select); option.value = value; }
+            const choices=presentation==='profile'&&field==='width'?[[1,'10% chart'],[2,'20% chart'],[3,'30% chart'],[4,'40% chart']]:options;
+            for (const [value, text] of choices) { const option = el("option", text, select); option.value = value; }
             select.value = state[field];
             select.onchange = () => { state[field] = Number(select.value); };
-            if (presentation === "histogram") {
+            if (presentation === "histogram" || presentation==='profile'&&(field==='style'||key!=='vp_histogram')) {
                 select.disabled = true;
-                select.title = "Histogram output uses bar color; line controls do not apply.";
+                select.title = "Bars use color and opacity. Volume by price controls the shared profile width.";
             }
         }
     }
-    for(const [key,label,,presentation] of feature.outputs)if(presentation==='zone') {
+    for(const [key,label,,presentation] of feature.outputs)if(['zone','profile'].includes(presentation)) {
         const row=el('label',`${label} fill opacity (%) `,content,'settings-row');
         const input=el('input','',row);input.type='number';input.min=0;input.max=100;input.step=1;
         input.value=draft.outputs[key].opacity;input.setAttribute('aria-label',`${label} fill opacity`);

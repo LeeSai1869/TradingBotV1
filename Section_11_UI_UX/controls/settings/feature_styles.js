@@ -31,8 +31,9 @@ export const FEATURE_STYLES = {
     'Volume Profile': { connected: true, outputs: [
         ['vp_poc','Point of control (POC)','#f5c542'],
         ['vp_va_high','Value area high (VAH)','#38bdf8'],['vp_va_low','Value area low (VAL)','#38bdf8'],
-        ['vp_hvn_high','High-volume node high','#26a69a'],['vp_hvn_low','High-volume node low','#60ab64'],
-        ['vp_lvn_high','Low-volume node high','#ef5350'],['vp_lvn_low','Low-volume node low','#e747ae'],
+        ['vp_histogram','Volume by price','#748298','profile'],
+        ['vp_hvn_nodes','High-volume nodes','#26a69a','profile'],
+        ['vp_lvn_nodes','Low-volume nodes','#ef5350','profile'],
         ['vp_value_area','Value area band','#38bdf8','zone'],
     ] },
     VWAP: { connected: true, outputs: [
@@ -46,14 +47,15 @@ export function normalizeStyles(value = {}) {
     const result = {};
     for (const feature of Object.values(FEATURE_STYLES)) {
         for (const [key, , color, presentation] of feature.outputs) {
-            const input = value?.[key] || {};
+            const legacy=key==='vp_hvn_nodes'?(value?.vp_hvn_high?.visible?value.vp_hvn_high:value?.vp_hvn_low||value?.vp_hvn_high):key==='vp_lvn_nodes'?(value?.vp_lvn_high?.visible?value.vp_lvn_high:value?.vp_lvn_low||value?.vp_lvn_high):key==='vp_histogram'?value?.vp_poc:null;
+            const input = value?.[key] || legacy || {};
             result[key] = {
                 visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
                 color: /^#[0-9a-f]{6}$/i.test(input.color) ? input.color : color,
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: [0,1,2].includes(input.style) ? input.style : 0,
             };
-            if(presentation==='zone')result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):20;
+            if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(key.startsWith('momentum_')) {
                 result[key].shape=['arrowUp','arrowDown','circle','square'].includes(input.shape)?input.shape:(key==='momentum_buy'?'arrowUp':'arrowDown');
                 result[key].label=typeof input.label==='boolean'?input.label:true;
