@@ -1,4 +1,5 @@
 """One symbol owns historical download/replay work; live refreshes stay independent."""
+from contextlib import closing
 import sqlite3
 from .memory_storage.Storage import klines_store,features_store
 
@@ -18,11 +19,11 @@ def work_symbol(symbols,intervals):
     if identity!=_identity:_selected=None;_identity=identity
     if not symbols or not intervals:return None
     if not klines_store.DB_PATH.exists():return symbols[0]
-    with sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2) as raw:
+    with closing(sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
         checkpoints={}
         if features_store.DB_PATH.exists():
-            with sqlite3.connect(f'file:{features_store.DB_PATH}?mode=ro',uri=True,timeout=2) as features:
+            with closing(sqlite3.connect(f'file:{features_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as features:
                 if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
                     checkpoints={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,last_open_time FROM feature_engine_state')}
         def pending(s):

@@ -617,3 +617,9 @@ without ADCN records, predecessor lookback at page boundaries, and missing bars.
 sound preference validation, deduplication, historical suppression, and chart
 switches. `browser_di_decisions.py` checks visible markers, settings, persistence,
 style changes, visibility, synthesized audio and exactly-once delivery in Chromium.
+
+`test_scheduler_resources.py` verifies deterministic closure with retained
+connection references, early returns, SQL errors, and failure opening the second
+database. Its isolated subprocess performs 1,000 scheduler checks with garbage
+collection disabled and a 64-descriptor soft limit. This reproduces the resource
+constraint without touching production databases or the parent process limits.

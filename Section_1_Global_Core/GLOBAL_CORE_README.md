@@ -333,3 +333,13 @@ Section 8 now uses strict three-closed-candle DI/price/ADX BUY/SELL conditions,
 version 2. See its README for exact conditions and the read-only event study.
 Sections 6 and 7 are removed. Existing stored score columns remain readable;
 Sections 9 and 10 retain their original implementations and are not auto-enabled.
+
+### Scheduler connection lifetime — 2026-10-23
+
+Priority lookups explicitly close both read-only SQLite connections on every
+return and exception. A SQLite connection's `with` block manages transactions;
+it does not close the connection. Depending on cyclic garbage collection in the
+frequent scheduler path exhausted the runner's descriptor limit and caused both
+`Too many open files` and `unable to open database file` errors. The fix uses
+`contextlib.closing`, preserves scheduling order and replay checkpoints, and
+requires a runner restart to release handles held by the old process.
