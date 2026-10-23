@@ -641,3 +641,10 @@ dependent decision invalidation and strategy edits leaving Section 4 untouched.
 Live-preview coverage verifies that dirty values are withheld and repaired state
 refreshes even when the main candle cursor stays unchanged. Fixtures use isolated
 databases and synthetic candles, not production history.
+
+Cross-interpreter regression coverage in `test_selective_features.py` compares the
+portable fingerprints to the frozen baseline without using `ast.dump`, recovers
+pending and completed Python 3.13/3.14-format jobs without replay or cursor resets,
+preserves genuine input edits during recovery, and retires other symbols' false
+jobs without waiting for the selected history owner. Run this suite on Python
+3.14 as well as the main interpreter; native AST defaults differ between them.

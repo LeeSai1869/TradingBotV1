@@ -71,6 +71,19 @@ def changed(engine):
 def prepare(conn,engine,epoch):
     """Call under the Core writer guard. Never invalidate unrelated components."""
     e=engine.context;job=read_job(conn,e.symbol,e.timeframe);signature=current_signature()
+    # f67025e used ast.dump defaults, which changed in Python 3.13+. Recognize
+    # that exact old fingerprint of the *current* formulas, never arbitrary old
+    # formulas. Affected jobs changed identical formulas and can be retired while
+    # genuine parameter changes below still receive a selective repair.
+    if engine.component_sources!=catalog().source or job and job['signature']!=signature:
+        from .components import legacy_runtime_sources
+        legacy=legacy_runtime_sources()
+        if engine.component_sources==legacy:engine.component_sources=catalog().source
+        legacy_signature=digest([digest(legacy),desired_parameters()])
+        if job and job['signature']==legacy_signature and engine.component_sources==catalog().source:
+            conn.execute('DELETE FROM feature_replay_jobs WHERE symbol=? AND interval=?',(e.symbol,e.timeframe))
+            print(f'[features] {e.symbol} {e.timeframe}: retired Python AST-format-only repair; main checkpoint preserved at {e.last_time}',flush=True)
+            job=None
     dirty=changed(engine)
     if job and job['signature']==signature:return job
     if job:

@@ -110,6 +110,7 @@ def catch_up(symbol,interval):
 def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
     """Finish the selected symbol in bounded batches, without blocking live refresh."""
     global _cursor
+    _recover_runtime_format_job(symbols,intervals)
     from Section_1_Global_Core import work_priority
     owner=work_priority.work_symbol(symbols,intervals)
     ordered=([owner]+[s for s in symbols if s!=owner]) if owner else list(symbols)
@@ -141,6 +142,37 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
                     traceback.print_exc()
             if count>=max_bars or time.monotonic()>=deadline:break
     return count
+
+
+def _recover_runtime_format_job(symbols,intervals):
+    """Retire one proven formatting-only job, even outside the history owner.
+
+    Metadata work only: never run another symbol's feature calculations here.
+    Without this, completed frames of other symbols could stay masked behind a
+    long real history backlog of the selected owner.
+    """
+    if not Path(features_store.DB_PATH).exists():return
+    conn=features_store.open_db()
+    try:jobs=conn.execute('SELECT symbol,interval,signature FROM feature_replay_jobs').fetchall()
+    finally:conn.close()
+    if not jobs:return
+    from .execution.components import legacy_runtime_sources,digest,desired_parameters
+    signature=digest([digest(legacy_runtime_sources()),desired_parameters()])
+    for symbol,interval,revision in jobs:
+        if symbol not in symbols or interval not in intervals or revision!=signature:continue
+        if not data_policy.enabled(symbol,interval):continue
+        epoch=_epoch(symbol,interval)
+        with data_policy.locked():
+            if epoch!=_epoch(symbol,interval) or not data_policy.enabled(symbol,interval):return
+            conn=features_store.open_db()
+            try:
+                saved=conn.execute('SELECT state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                engine=checkpoint.restore(symbol,interval,saved[0],epoch) if saved else None
+                if engine:
+                    with conn:selective.prepare(conn,engine,epoch)
+            finally:conn.close()
+        reset_pair(symbol,interval)
+        return
 
 
 def _repair_daily(symbol,interval,deadline):

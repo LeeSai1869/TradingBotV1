@@ -53,6 +53,15 @@ to finish: selective repair does not manufacture uncalculated feature history or
 skip the original migration. Older rows can remain in the database while this
 backlog runs, so row count/latest row is not proof of current-formula completion.
 
+Fingerprints use a fixed AST representation on Python 3.12, 3.13 and 3.14. The
+first selective-replay release used `ast.dump` defaults; Python 3.13+ omits empty
+lists there, which incorrectly invalidated unchanged formulas against the 3.12
+baseline. Recovery recognizes that exact old fingerprint of the current formulas,
+retires formatting-only jobs and preserves the main checkpoint. Real input edits
+still receive their selective repair. Completed old-format checkpoints adopt the
+portable metadata without replay. Maintenance also recovers one queued old-format
+job per visit outside the history owner, without calculating other symbols.
+
 After editing calculation code or configured inputs, restart the existing runner.
 No manual historical rebuild command is required. `check_coin.py SYMBOL --logs`
 reports full replay checkpoints and any targeted repair's affected columns and

@@ -24,6 +24,33 @@ ROOT=Path(__file__).resolve().parents[2]
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,default=str).encode()).hexdigest()
 
 
+def stable_dump(node,*,include_attributes=False):
+    """Freeze Python 3.12's AST representation across supported interpreters.
+
+    Python 3.13+ omits empty optional lists in ast.dump by default. Those
+    formatting changes are not calculation changes. Never hash that default.
+    """
+    if isinstance(node,ast.AST):
+        fields=[]
+        for name,value in ast.iter_fields(node):
+            if value is not None or getattr(type(node),name,...) is not None:fields.append(name+'='+stable_dump(value))
+        return type(node).__name__+'('+', '.join(fields)+')'
+    if isinstance(node,list):return '['+', '.join(stable_dump(item) for item in node)+']'
+    return repr(node)
+
+
+def legacy_dump(node,*,include_attributes=False):
+    """Reproduce the accidental Python 3.13/3.14 fingerprint for migration only."""
+    if isinstance(node,ast.AST):
+        fields=[]
+        for name,value in ast.iter_fields(node):
+            if value==[]:continue
+            if value is not None or getattr(type(node),name,...) is not None:fields.append(name+'='+legacy_dump(value))
+        return type(node).__name__+'('+', '.join(fields)+')'
+    if isinstance(node,list):return '['+', '.join(legacy_dump(item) for item in node)+']'
+    return repr(node)
+
+
 def literal(value):
     if value is None or isinstance(value,(str,int,float,bool)):return value
     if isinstance(value,(list,tuple)):return [literal(v) for v in value]
@@ -47,7 +74,7 @@ def globals_used(tree,namespace):
     return result
 
 
-def function_hash(fn,seen=None):
+def function_hash(fn,seen=None,dumper=stable_dump):
     seen=set() if seen is None else seen
     if not inspect.isfunction(fn) or fn in seen:return ''
     seen.add(fn)
@@ -67,12 +94,12 @@ def function_hash(fn,seen=None):
         elif isinstance(n.func,ast.Attribute) and isinstance(n.func.value,ast.Name):
             obj=imports.get(n.func.value.id,fn.__globals__.get(n.func.value.id))
             target=getattr(obj,n.func.attr,None)
-        if inspect.isfunction(target):dependencies.append(function_hash(target,seen))
-    return digest([ast.dump(tree,include_attributes=False),dependencies,globals_used(tree,fn.__globals__)])
+        if inspect.isfunction(target):dependencies.append(function_hash(target,seen,dumper))
+    return digest([dumper(tree,include_attributes=False),dependencies,globals_used(tree,fn.__globals__)])
 
 
 @lru_cache(maxsize=None)
-def source_hash(fn):return function_hash(fn)
+def source_hash(fn,dumper=stable_dump):return function_hash(fn,dumper=dumper)
 
 def key(node):
     if isinstance(node,ast.Subscript) and isinstance(node.slice,ast.Constant) and isinstance(node.slice.value,str):
@@ -141,8 +168,8 @@ class Access(ast.NodeVisitor):
 
 
 class Catalog:
-    def __init__(self):
-        infrastructure=digest([ast.dump(ast.parse(textwrap.dedent(inspect.getsource(fn))),include_attributes=False) for fn in (Context.begin,Context.finish,Context.previous,Context.__getitem__,Context.__setitem__,Context.initialize,Context.daily,canonical)])
+    def __init__(self,dumper=stable_dump):
+        infrastructure=digest([dumper(ast.parse(textwrap.dedent(inspect.getsource(fn))),include_attributes=False) for fn in (Context.begin,Context.finish,Context.previous,Context.__getitem__,Context.__setitem__,Context.initialize,Context.daily,canonical)])
         self.units=[];self.modules={};self.producers=defaultdict(list)
         contract_types=dict(MANIFEST['contract'])
         export_aliases={'vwapValue':'vwap','nearestSupportPrice':'nearestSupport','nearestResistancePrice':'nearestResistance','prevDayHigh':'previousDayHigh','prevDayLow':'previousDayLow'}
@@ -153,10 +180,10 @@ class Catalog:
             counts=defaultdict(int)
             for statement in tree.body[0].body:
                 access=Access(module);access.visit(statement)
-                label=','.join(sorted(access.writes)) or ast.dump(statement,include_attributes=False)[:70]
+                label=','.join(sorted(access.writes)) or dumper(statement,include_attributes=False)[:70]
                 counts[label]+=1;uid=f'{name}:{label}:{counts[label]}'
                 source=digest([infrastructure,globals_used(statement,module.__dict__),[(w,contract_types.get(export_aliases.get(w,w)),w in HISTORY) for w in sorted(access.writes)],
-                               sorted((a,v) for a,v in ALIASES.items() if v in {snake(w) for w in access.writes}),ast.dump(statement,include_attributes=False),sorted(source_hash(f) for f in access.helpers),ast.dump(ast.parse(textwrap.dedent(inspect.getsource(Context.ta))),include_attributes=False) if access.dispatch else None])
+                               sorted((a,v) for a,v in ALIASES.items() if v in {snake(w) for w in access.writes}),dumper(statement,include_attributes=False),sorted(source_hash(f,dumper) for f in access.helpers),dumper(ast.parse(textwrap.dedent(inspect.getsource(Context.ta))),include_attributes=False) if access.dispatch else None])
                 unit=SimpleNamespace(id=uid,module=name,statement=statement,source=source,**{k:getattr(access,k) for k in ('reads','writes','history','sites','external')})
                 unit.guaranteed=set(access.assigned)
                 self.units.append(unit)
@@ -165,7 +192,7 @@ class Catalog:
         from ..features.vwap import session_value
         from ..features.volume import moving_average
         for uid,output,fn,params in [('context:vwap','mtfData.vwapValue',session_value,set()),('context:volume','mtfData.volumeMA',moving_average,{'volumeLookback'})]:
-            unit=SimpleNamespace(id=uid,module='context',statement=None,source=function_hash(fn),reads=params,writes={output},history=set(),sites=set(),external=params,guaranteed={output})
+            unit=SimpleNamespace(id=uid,module='context',statement=None,source=function_hash(fn,dumper=dumper),reads=params,writes={output},history=set(),sites=set(),external=params,guaranteed={output})
             self.units.insert(0,unit);self.producers[output].append(uid)
         self.by_id={u.id:u for u in self.units};self.edges=defaultdict(set);self.requires=defaultdict(lambda:defaultdict(set));self.fallback=defaultdict(set)
         shared=set(HISTORY)|set(MANIFEST['persistent'])|{n for n,_ in MANIFEST['contract']}
@@ -277,3 +304,8 @@ def current_signature():return digest([catalog().source_revision,desired_paramet
 def hydrate(e,field,column):
     value=e._stored.get(column)
     e.values[field]=rt.NA if value is None else value
+
+
+@lru_cache(maxsize=1)
+def legacy_runtime_sources():
+    return Catalog(dumper=legacy_dump).source

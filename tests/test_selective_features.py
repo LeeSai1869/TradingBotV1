@@ -216,3 +216,56 @@ class SelectiveFeatures(unittest.TestCase):
         for b in self.clients:reference.step(b)
         expected=reference.step(client,is_confirmed=False,is_realtime=True)
         self.assertEqual(processor.preview('ETHUSDT','1m',client)['rsi'],expected['rsi'])
+
+    def legacy_job(self):
+        legacy=components.legacy_runtime_sources()
+        signature=components.digest([components.digest(legacy),components.desired_parameters()])
+        conn=features_store.open_db()
+        with conn:
+            conn.execute('INSERT OR REPLACE INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',
+                         ('ETHUSDT','1m',signature,219*60000,49*60000,json.dumps(list(legacy)),None,json.dumps(list(features_store.COLUMNS))))
+        conn.close()
+
+    def test_unchanged_source_matches_frozen_baseline_on_each_python_version(self):
+        import ast
+        baseline,_=components.baseline_sources()
+        with patch.object(ast,'dump',side_effect=AssertionError('interpreter AST formatting must not determine revisions')):
+            current=components.Catalog()
+        self.assertEqual(current.source,baseline)
+
+    def test_ast_format_only_job_is_retired_without_calculation_or_cursor_reset(self):
+        self.legacy_job()
+        with patch.object(selective.PartialEngine,'step',side_effect=AssertionError('no repair needed')),patch.object(processor,'build_feature_packet',side_effect=AssertionError('no new candles')):
+            self.assertEqual(processor.catch_up('ETHUSDT','1m'),0)
+        conn=features_store.open_db()
+        try:
+            self.assertIsNone(selective.read_job(conn,'ETHUSDT','1m'))
+            self.assertEqual(conn.execute('SELECT last_open_time FROM feature_engine_state').fetchone()[0],219*60000)
+        finally:conn.close()
+        self.assertEqual(self.raw_features(),self.before)
+
+    def test_format_recovery_does_not_wait_for_another_symbols_history(self):
+        self.legacy_job()
+        with patch.object(selective.PartialEngine,'step',side_effect=AssertionError('metadata recovery must not calculate')):
+            processor._recover_runtime_format_job(['BTCUSDT','ETHUSDT'],['1m'])
+        conn=features_store.open_db()
+        try:self.assertIsNone(selective.read_job(conn,'ETHUSDT','1m'))
+        finally:conn.close()
+        self.assertEqual(self.raw_features(),self.before)
+
+    def test_completed_old_python_fingerprint_adopts_without_replay(self):
+        self.engine.component_sources=components.legacy_runtime_sources()
+        conn=features_store.open_db()
+        with conn:conn.execute('UPDATE feature_engine_state SET state=?',(checkpoint.dump(self.engine,(0,0)),))
+        conn.close()
+        with patch.object(selective.PartialEngine,'step',side_effect=AssertionError('no repair needed')):
+            self.assertEqual(processor.catch_up('ETHUSDT','1m'),0)
+        self.assertEqual(self.raw_features(),self.before)
+
+    def test_retiring_ast_format_job_retains_real_input_repair(self):
+        params=self.config(rsiLen=11);self.legacy_job()
+        with patch.object(momentum,'calculate_dmi',side_effect=AssertionError('ADX must not run')),patch.object(trend,'calculate_ema',side_effect=AssertionError('EMA must not run')):
+            self.finish()
+        reference=Engine('ETHUSDT','1m',params)
+        for client in self.clients:expected=reference.step(client)
+        self.assertEqual(self.raw_features()[-1]['rsi'],expected['rsi'])
