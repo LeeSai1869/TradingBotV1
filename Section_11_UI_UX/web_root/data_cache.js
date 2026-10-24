@@ -11,6 +11,7 @@ const DataCache = {
     historyPending: false,
     formingBar: null,
     volumeProfile: null,
+    fvgFrames: {},
     liveStatus: "loading",
     activeBars: [],
     latestBar: null,
@@ -60,6 +61,14 @@ const DataCache = {
 
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
+        if(before===null){
+            const match=/^(\d+)([mhdwM])$/.exec(timeframe),units={m:60000,h:3600000,d:86400000,w:604800000,M:2678400000};
+            const duration=match?Number(match[1])*units[match[2]]:Infinity;
+            const frames=['4h','1d','1w'].filter(tf=>({ '4h':14400000,'1d':86400000,'1w':604800000 }[tf]>duration)&&['bull','bear'].some(side=>window.Composer?.config.featureStyles?.[`${side}_fvg_${tf}_zones`]?.visible));
+            if(frames.length)qs.set('fvg_frames',frames.join(','));
+            if(['bull_fvg_zones','bear_fvg_zones'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('fvg_current','1');
+            qs.set('fvg_versions',JSON.stringify(Object.fromEntries(Object.entries(this.fvgFrames).map(([tf,frame])=>[tf,frame.version]))));
+        }
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);
         else if (this.liveEnabled) qs.set("live", "1");
@@ -84,6 +93,15 @@ const DataCache = {
         }
     },
 
+    _applyFVG(packet){
+        let changed=false;
+        for(const [tf,frame] of Object.entries(packet.fvg_frames||{}))if(!frame.unchanged){
+            if(this.fvgFrames[tf]?.version!==frame.version)changed=true;
+            this.fvgFrames[tf]=frame;
+        }
+        return changed;
+    },
+
     _merge(rows) {
         const byTime = new Map(this.bars.map(bar => [bar.open_time, bar]));
         for (const bar of rows) byTime.set(bar.open_time, bar);
@@ -106,11 +124,12 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, fvgFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
+            this._applyFVG(packet);
             this.volumeProfile=packet.volume_profile??null;
             this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
@@ -179,10 +198,11 @@ const DataCache = {
             if(prior?.client?.close_time && packet.bars.length && packet.bars[0].open_time>prior.client.close_time+1){
                 return this.loadInitial(this.symbol,this.timeframe);
             }
+            const fvgChanged=this._applyFVG(packet);
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged;
+            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

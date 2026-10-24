@@ -102,6 +102,7 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear only on lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Filled node bars stay on the side, span their full price ranges, and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
@@ -171,7 +172,7 @@ function renderFeature() {
         }
         for (const [field, title, options] of [
             ["width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],
-            ["style", "line style", [[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
+            ["style", "line style", presentation==='zone'?[[0,"Solid"],[1,"Dotted"],[2,"Dashed"],[3,"No border"]]:[[0,"Solid"],[1,"Dotted"],[2,"Dashed"]]],
         ]) {
             const select = el("select", "", row);
             select.setAttribute("aria-label", `${label} ${title}`);

@@ -565,7 +565,7 @@ and FVG (bull/bear). `browser_zones.py` covers combined-stream zone rendering,
 style persistence and visibility without extra feature requests. Zone primitives
 stay in the price pane behind candles and only draw visible segments. The stored
 zone bounds are the selected zone's actual array entries, not an ATR approximation.
-Older dynamic S/R rows lacking new bounds can show their stored level as a line.
+Older dynamic S/R rows lacking bounds remain hidden until range data is available.
 New bounds populate as chronological replay reaches each bar; no reset is needed.
 
 Profiling identified the VP histogram loop and repeated field-name regex work.
@@ -684,3 +684,22 @@ A rolling-window calculation/storage vector verifies changed levels on a new
 closed candle without overwriting the previous candle's profile values. The
 latest closed histogram remains on the side; it is not substituted for the
 historical line series. No feature formula or replay version changes are needed.
+
+FVG lifecycle display: `fvg_lifecycle.test.mjs` verifies that nearest-zone changes,
+missing feature packets and wick touches do not split a valid gap. Zones end at
+closed touched price-through invalidation, matching the Pine FVG rule; unknown
+raw-history gaps truncate coverage. Forming candles extend valid boxes without
+invalidating them. Source candles must close before 4H/1D/1W gaps appear on a lower
+frame, and source invalidation is projected to the corresponding lower candle.
+All zone styles accept `No border` while preserving fill opacity.
+
+`test_fvg_frames.py` checks bounded, read-only source projections through Core,
+all active checkpoint gaps (including ones that are never nearest), conditional
+versions avoiding repeated history reads, repair masking, deletion epochs, and
+continuity while the next raw candle waits for features. `browser_zones.py` checks
+a selectable borderless 4H gap across a 15-minute chart, style persistence and
+independent visibility alongside current-frame FVGs. Projections travel with the
+existing `/api/bars` request; unchanged source histories are not retransmitted.
+Each higher frame supplies up to 1,000 stored source candles plus active checkpoint
+gaps. Older-than-window active gaps are clipped to that coverage boundary. No
+formula revision, recalculation, external download or extra worker is introduced.

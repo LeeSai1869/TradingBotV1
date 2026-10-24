@@ -5,6 +5,7 @@ import * as timeframeControl from "../controls/timeframe/index.js";
 import * as reloadControl from "../controls/reload/index.js";
 import * as latestControl from "../controls/latest/index.js";
 import * as storedPoll from "./stored_poll.js";
+import {HTF,intervalMs} from "../overlays/zones/fvg.js";
 
 const PREFETCH_BARS = 500;
 const status = () => document.getElementById("status");
@@ -119,7 +120,11 @@ async function loadAll() {
         pending = { op: "settings", reset: !!pending?.reset,
             latest: pending?.latest, span: pending?.span };
         render();
-        if(!DataCache.volumeProfile && Object.entries(Composer.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible)){
+        const outputs=Composer.config.featureStyles||{};
+        const needProfile=!DataCache.volumeProfile&&Object.entries(outputs).some(([k,v])=>k.startsWith('vp_')&&v.visible);
+        const needCurrent=!DataCache.fvgFrames.current&&['bull_fvg_zones','bear_fvg_zones'].some(k=>outputs[k]?.visible);
+        const needHigher=Object.entries(HTF).some(([tf,duration])=>duration>intervalMs(DataCache.timeframe)&&!DataCache.fvgFrames[tf]&&['bull','bear'].some(side=>outputs[`${side}_fvg_${tf}_zones`]?.visible));
+        if(needProfile||needCurrent||needHigher){
             void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
         }
     });

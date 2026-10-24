@@ -9,6 +9,7 @@ export const FEATURE_STYLES = {
     ] },
     FVG: { connected: true, outputs: [
         ['bull_fvg_zones','Bullish FVG','#26a69a','zone'],['bear_fvg_zones','Bearish FVG','#ef5350','zone'],
+        ...['4h','1d','1w'].flatMap(tf=>[[`bull_fvg_${tf}_zones`,`${tf.toUpperCase()} bullish FVG`,'#26a69a','zone'],[`bear_fvg_${tf}_zones`,`${tf.toUpperCase()} bearish FVG`,'#ef5350','zone']]),
     ] },
     EMA: { connected: true, outputs: [
         ["ema7", "EMA 7", "#f5c542"], ["ema25", "EMA 25", "#e747ae"],
@@ -52,7 +53,7 @@ export function normalizeStyles(value = {}) {
                 visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
                 color: /^#[0-9a-f]{6}$/i.test(input.color) ? input.color : color,
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
-                style: [0,1,2].includes(input.style) ? input.style : 0,
+                style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
             };
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(key==='vp_histogram'){

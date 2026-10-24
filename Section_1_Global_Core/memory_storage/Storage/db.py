@@ -362,7 +362,7 @@ __all__ = [
 
     # canonical state
     "read_state_range",
-    "read_state_page", "read_state_after",
+    "read_state_page", "read_state_after", "read_fvg_frame",
 ]
 
 
@@ -465,3 +465,66 @@ def read_previous_decision_candidate(symbol,interval,before):
                 if signal:return signal
             if len(rows)<514:return None
             before=rows[2][2]
+
+
+FVG_COLUMNS=tuple([f'qualified_{side}_fvg' for side in ('bull','bear')]+
+                  [f'{side}_fvg_{edge}' for side in ('bull','bear') for edge in ('low','high')]+
+                  [f'nearest_{side}_fvg_{field}' for side in ('bull','bear') for field in ('low','high','created_bar','age')])
+
+
+def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
+    """Bounded source-frame projection; no network, calculations or schema writes."""
+    import time
+    import json
+    raw=_read_connection(klines_store.DB_PATH) if klines_store.DB_PATH.exists() else None
+    if raw is None:return {'version':'empty','bars':[]}
+    try:
+        latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
+    finally:raw.close()
+    features=_read_connection(features_store.DB_PATH) if features_store.DB_PATH.exists() else None
+    try:
+        from Section_1_Global_Core import data_policy
+        epochs=data_policy.read()['epochs']
+        version=[latest,epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]
+        if features:
+            for table,columns in [('feature_engine_state','last_open_time'),('feature_calculation_versions','signature'),('feature_replay_jobs','last_time')]:
+                row=features.execute(f'SELECT {columns} FROM {table} WHERE symbol=? AND interval=?',(symbol,interval)).fetchone() if features.execute('SELECT 1 FROM sqlite_master WHERE name=?',(table,)).fetchone() else None
+                version.append(row[0] if row else None)
+        version=json.dumps(version,separators=(',',':'))
+        if version==known_version:return {'version':version,'unchanged':True}
+        raw=_read_connection(klines_store.DB_PATH)
+        try:rows=klines_store.read_last_n(raw,symbol,interval,1000)
+        finally:raw.close()
+        rows=[r for r in rows if r[8]<int(time.time()*1000)]
+        values=[]
+        if features and rows and include_bars:
+            values=features_store.read_replay_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1,FVG_COLUMNS)
+            features_store.mask_replays(features,symbol,interval,values)
+        by_time={r['open_time']:r for r in values}
+        active=[]
+        if features and rows:
+            state=features.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone() if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone() else None
+            task=features_store.pending_replay(features,symbol,interval)
+            position=next((i for i,r in enumerate(rows) if state and r[2]==state[0]),None)
+            if state and position is not None and not (task and any('fvg' in c for c in task[2])):
+                try:
+                    saved=json.loads(state[1]);s=saved['state'];arrays=s['persistent']
+                    if saved.get('version')==3 and saved.get('epoch')==[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:
+                        for side,label in [('bull','Bull'),('bear','Bear')]:
+                            for low,high,created in zip(arrays.get('fvg'+label+'Low',[]),arrays.get('fvg'+label+'High',[]),arrays.get('fvg'+label+'CreatedBar',[])):
+                                age=s['index']-created
+                                if not isinstance(age,int) or age<0:continue
+                                birth=rows[position-age] if age<=position else rows[0]
+                                if not isinstance(low,(int,float)) or not isinstance(high,(int,float)):continue
+                                previous=rows[position];valid=True
+                                for subsequent in rows[position+1:]:
+                                    touched=subsequent[5]<=high and subsequent[4]>=low
+                                    if subsequent[2]!=previous[8]+1 or touched and (subsequent[6]<low if side=='bull' else subsequent[6]>high):valid=False;break
+                                    previous=subsequent
+                                if not valid:continue
+                                active.append({'side':side,'low':low,'high':high,'created':created,'time':birth[2]//1000,'close_time':birth[8],'older':age>position})
+                except (KeyError,TypeError,ValueError):pass
+        return {'version':version,'active':active,'bars':[{'time':r[2]//1000,'open_time':r[2],
+                 'client':dict(zip(_KLINE_COLUMNS,r)),'features':by_time.get(r[2])} for r in rows] if include_bars else []}
+    finally:
+        if features:features.close()

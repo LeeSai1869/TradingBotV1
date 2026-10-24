@@ -1,6 +1,7 @@
 """HTTP dispatch for /api/* endpoints."""
 from __future__ import annotations
 import json
+import sqlite3
 from urllib.parse import urlparse, parse_qs
 
 from Section_1_Global_Core.memory_storage.Storage import db
@@ -30,6 +31,14 @@ def _int(qs, name, default=None):
         return default
 
 
+def _fvg_frame(symbol,interval,version=None,**options):
+    try:return db.read_fvg_frame(symbol,interval,version,**options)
+    except (sqlite3.Error,OSError):
+        # An optional source must not prevent the main candles from loading.
+        # Retain any known coverage and retry in the next existing chart poll.
+        return {'unchanged':True,'status':'stored FVG source unavailable'}
+
+
 def handle_get(path, raw_qs, server):
     status, payload = drawing_routes.handle_get(path, raw_qs, server)
     if status is not None:
@@ -57,12 +66,24 @@ def handle_get(path, raw_qs, server):
             return 400, {"error": "limit and before must be integers"}
         if not symbol or not interval or not 1 <= limit <= 1000:
             return 400, {"error": "symbol, interval and limit between 1 and 1000 required"}
+        frames=qs.get('fvg_frames',[''])[0].split(',') if qs.get('fvg_frames',[''])[0] else []
+        if any(tf not in ('4h','1d','1w') for tf in frames) or len(frames)>3:return 400,{'error':'Unsupported FVG source frames'}
+        if frames:
+            if interval not in data_policy.INTERVALS:return 400,{'error':'Unsupported target timeframe'}
+            frames=[tf for tf in frames if data_policy.INTERVALS.index(tf)>data_policy.INTERVALS.index(interval)]
+        try:known=json.loads(qs.get('fvg_versions',['{}'])[0])
+        except ValueError:return 400,{'error':'Invalid FVG versions'}
+        if not isinstance(known,dict):return 400,{'error':'Invalid FVG versions'}
         with data_policy.snapshot_guard():
             epochs = data_policy.read()['epochs']
             packet = {"symbol": symbol, "interval": interval,
                       "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",
                       **db.read_state_page(symbol, interval, limit, before=before)}
             active = data_policy.enabled(symbol, interval)
+            if before is None and frames:
+                packet['fvg_frames']={tf:_fvg_frame(symbol,tf,known.get(tf)) for tf in frames}
+            if before is None and qs.get('fvg_current',['0'])[0]=='1':
+                packet.setdefault('fvg_frames',{})['current']=_fvg_frame(symbol,interval,known.get('current'),include_bars=False)
             if before is None and qs.get('volume_profile',['0'])[0]=='1':
                 packet['volume_profile']=volume_profile.snapshot(symbol,interval,packet['bars'][-1] if packet['bars'] else None,packet['storage_epoch'])
         if before is None and qs.get("live", ["0"])[0] == "1":

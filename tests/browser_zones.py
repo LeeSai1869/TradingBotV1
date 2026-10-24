@@ -23,6 +23,12 @@ async def exercise(base,library):
         nearest_bull_fvg_low=price-2,nearest_bull_fvg_high=price-1,nearest_bull_fvg_created_bar=10,
         nearest_bear_fvg_low=price+1,nearest_bear_fvg_high=price+2,nearest_bear_fvg_created_bar=20,
         vp_poc=profiles[r[2]]['vp_poc'],vp_va_low=profiles[r[2]]['vp_va_low'],vp_va_high=profiles[r[2]]['vp_va_high']) for r in rows])
+    step=14400000;start=(rows[-1][2]//step-3)*step
+    source=[dict(symbol='BTCUSDT',interval='4h',open_time=start+i*step,close_time=start+(i+1)*step-1,
+                 open=price,close=price,high=price+1,low=price-1,volume=5) for i in range(3)]
+    db.write_klines(source)
+    db.write_features([dict(symbol='BTCUSDT',interval='4h',open_time=b['open_time'],formula_version=3,
+                     qualified_bull_fvg=i==0,bull_fvg_low=price-8,bull_fvg_high=price-7) for i,b in enumerate(source)])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000});errors=[];requests=[]
@@ -45,12 +51,20 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
         await dialog.get_by_role('button',name='FVG',exact=True).click()
+        await dialog.get_by_label('4H bullish FVG line style',exact=True).select_option('3')
         await dialog.get_by_label('Bullish FVG color',exact=True).fill('#abcdef')
         await dialog.get_by_label('Bullish FVG width',exact=True).select_option('3')
         await dialog.get_by_label('Bullish FVG line style',exact=True).select_option('2')
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
-        assert count==6,count
+        await page.wait_for_function("DataCache.fvgFrames['4h']?.bars.length===3")
+        await settle(page)
+        count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
+        assert count==7,count
+        higher=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='bull_fvg_4h_zones'))")
+        assert higher['start']==(source[0]['close_time']+1)//1000
+        assert higher['end']==rows[-1][2]//1000
+        assert await page.evaluate('Composer.config.featureStyles.bull_fvg_4h_zones.style')==3
         await page.evaluate("import('/overlays/volume_profile/index.js').then(x=>window.profileOverlay=x)")
         try:await page.wait_for_function("window.profileOverlay.getProfile()?.bins.length===24",timeout=10000)
         except Exception:
@@ -73,7 +87,7 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==6
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==7
         assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
         assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
         await page.get_by_role('button',name='Open settings',exact=True).click()
