@@ -1,6 +1,7 @@
 """Stored support/resistance and FVG displays/styles share canonical bars."""
 from pathlib import Path
 import sys
+import json
 from playwright.async_api import async_playwright
 from browser_smoke import run,sign_in,settle,db,features_store
 from Section_4_Features.execution.engine import Engine
@@ -23,6 +24,24 @@ async def exercise(base,library):
         nearest_bull_fvg_low=price-2,nearest_bull_fvg_high=price-1,nearest_bull_fvg_created_bar=10,
         nearest_bear_fvg_low=price+1,nearest_bear_fvg_high=price+2,nearest_bear_fvg_created_bar=20,
         vp_poc=profiles[r[2]]['vp_poc'],vp_va_low=profiles[r[2]]['vp_va_low'],vp_va_high=profiles[r[2]]['vp_va_high']) for r in rows])
+    # Actual lifecycle events, including a merge/bound update, must render one
+    # connected band even when nearest selection disappears for many bars.
+    zones={
+        's1':dict(side='support',low=price-4,high=price-3,institutional=False),
+        'r1':dict(side='resistance',low=price+3,high=price+4,institutional=False),
+        'is1':dict(side='support',low=price-6,high=price-5,institutional=True),
+        'ir1':dict(side='resistance',low=price+5,high=price+6,institutional=True),
+    }
+    events={rows[0][2]:[dict(id=k,**v,before=None) for k,v in zones.items()]}
+    before=dict(zones['s1']);zones['s1']={**before,'low':price-4.5,'high':price-3.5}
+    events[rows[70][2]]=[dict(id='s1',**zones['s1'],before=before)]
+    conn=features_store.open_db()
+    with conn:conn.executemany('UPDATE features SET sr_zone_events=? WHERE symbol=? AND interval=? AND open_time=?',[(json.dumps(events.get(r[2],[])),'BTCUSDT','15m',r[2]) for r in rows])
+    conn.close()
+    engine.context.persistent['srDisplayPrevious']=zones
+    conn=features_store.open_db()
+    with conn:conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(dump(engine,(0,0)),'BTCUSDT','15m'))
+    conn.close()
     step=14400000;start=(rows[-1][2]//step-3)*step
     source=[dict(symbol='BTCUSDT',interval='4h',open_time=start+i*step,close_time=start+(i+1)*step-1,
                  open=price,close=price,high=price+1,low=price-1,volume=5) for i in range(3)]
@@ -61,6 +80,11 @@ async def exercise(base,library):
         await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
         assert count==7,count
+        band=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='support_zones:s1'))")
+        assert band['start']==rows[0][2]//1000
+        assert band['end']==rows[-1][2]//1000
+        assert len(band['history'])==2
+        assert await page.evaluate('DataCache.srSnapshot.through')==rows[-1][2]//1000
         higher=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='bull_fvg_4h_zones'))")
         assert higher['start']==(source[0]['close_time']+1)//1000
         assert higher['end']==rows[-1][2]//1000

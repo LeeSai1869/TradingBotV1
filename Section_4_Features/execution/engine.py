@@ -7,6 +7,10 @@ from .contract import canonical
 
 STEPS=tuple((importlib.import_module(step['module'] if '.' in step['module'] else 'Section_4_Features.features.'+step['module'],__package__),step['function']) for step in MANIFEST['steps'])
 
+EXTRA_STEP={'module':'Section_4_Features.execution.zone_lifecycle','function':'update'}
+STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['function']))
+EXTRA_FIELDS=('srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh')
+
 class Engine:
     def __init__(self,symbol,timeframe,parameters=None):
         self.context=Context(symbol,timeframe,parameters)
@@ -21,4 +25,7 @@ class Engine:
         aliases={'vwap':'vwapValue','nearestSupport':'nearestSupportPrice','nearestResistance':'nearestResistancePrice','previousDayHigh':'prevDayHigh','previousDayLow':'prevDayLow'}
         values={name:e[aliases.get(name,name)] for name,_ in MANIFEST['contract']}
         values.update({key:e[key] for key in ('controlState','energyState','regimeState','fatigueState','trendState','transitionState')})
-        result=canonical(values,e);e.finish();return rt.clean(result)
+        result=canonical(values,e)
+        from .contract import snake
+        result.update({snake(name):e[name] for name in EXTRA_FIELDS})
+        e.finish();return rt.clean(result)

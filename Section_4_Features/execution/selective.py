@@ -33,7 +33,10 @@ class PartialEngine:
             ids=e.persistent.get(prefix+'ZoneIDArray',[]);identity=e.values.get('nearest'+prefix[0].upper()+prefix[1:]+'ZoneID')
             index=ids.index(identity) if identity in ids else None
             for edge in edges:
-                levels=e.persistent.get(prefix+edge.title()+'Array',[])
+                levels=e.persistent.get(('support' if side=='inst_support' else 'resistance' if side=='inst_resistance' else prefix)+edge.title()+'Array',[])
+                if side.startswith('inst_'):
+                    dynamic_ids=e.persistent.get(('support' if side=='inst_support' else 'resistance')+'ZoneIDArray',[])
+                    index=dynamic_ids.index(identity) if identity in dynamic_ids else None
                 result[f'{side}_zone_{edge}']=levels[index] if index is not None and index<len(levels) else None
         result['open_time']=client['open_time']
         e.finish(history_keys=self.plan.history_keys);return rt.clean(result)

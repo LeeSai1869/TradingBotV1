@@ -362,7 +362,7 @@ __all__ = [
 
     # canonical state
     "read_state_range",
-    "read_state_page", "read_state_after", "read_fvg_frame", "read_feature_progress",
+    "read_state_page", "read_state_after", "read_fvg_frame", "read_feature_progress", "read_sr_snapshot",
 ]
 
 
@@ -547,4 +547,24 @@ def read_feature_progress(symbol,interval,latest=None,*,history_pending=False):
         elif row:result['status']='historical feature replay'
         if history_pending and result['status']!='features current':result['history_pending']=True
         return result
+    finally:conn.close()
+
+
+def read_sr_snapshot(symbol, interval):
+    """Read committed zone identities; never infer invalidation from nearest prices."""
+    import json
+    if not features_store.DB_PATH.exists():return None
+    conn=_read_connection(features_store.DB_PATH)
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():return None
+        row=conn.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+        if not row:return None
+        task=features_store.pending_replay(conn,symbol,interval)
+        if task and 'sr_zone_events' in task[2]:return None
+        saved=json.loads(row[1])
+        from Section_1_Global_Core import data_policy
+        epochs=data_policy.read()['epochs']
+        if saved.get('epoch')!=[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:return None
+        zones=saved['state']['persistent'].get('srDisplayPrevious')
+        return dict(through=row[0]//1000,zones=zones) if zones is not None else None
     finally:conn.close()

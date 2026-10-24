@@ -83,6 +83,8 @@ def handle_get(path, raw_qs, server):
             if before is None:
                 packet['feature_progress']=db.read_feature_progress(symbol,interval,packet['bars'][-1]['open_time'] if packet['bars'] else None,history_pending=packet.get('history_pending',False))
                 packet['feature_progress']['active']=active
+            if before is None and qs.get('sr_zones',['0'])[0]=='1':
+                packet['sr_snapshot']=db.read_sr_snapshot(symbol,interval)
             if before is None and frames:
                 packet['fvg_frames']={tf:_fvg_frame(symbol,tf,known.get(tf)) for tf in frames}
             if before is None and qs.get('fvg_current',['0'])[0]=='1':

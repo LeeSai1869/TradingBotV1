@@ -1300,9 +1300,9 @@ def update(e):
     # Pine 1985
     e['instSupportLastTestAgeNormalized'] = rt.normalize(e['nearestInstSupportLastTestAge'], e['minInstSupportLastTestAge'], e['maxInstSupportLastTestAge'], e['normalizationPower'], False)
     # Pine 1986
-    e['instSupportWTNormalized'] = rt.normalize(e['nearestSupportWeakTouches'], e['minInstSupportWeakTouches'], e['maxInstSupportWeakTouches'], e['normalizationPower'], True)
+    e['instSupportWTNormalized'] = rt.normalize((rt.math_max(0, rt.binary('-', rt.arr_get(e['supportTouchArray'], rt.arr_indexof(e['supportZoneIDArray'], e['nearestInstSupportZoneID'])), rt.arr_get(e['supportStrongRejectArray'], rt.arr_indexof(e['supportZoneIDArray'], e['nearestInstSupportZoneID'])))) if rt.truth(rt.binary('!=', rt.arr_indexof(e['supportZoneIDArray'], e['nearestInstSupportZoneID']), rt.neg(1))) else rt.NA), e['minInstSupportWeakTouches'], e['maxInstSupportWeakTouches'], e['normalizationPower'], True)
     # Pine 1987
-    e['instSupportSTNormalized'] = rt.normalize(e['nearestSupportStrongTouches'], e['minInstSupportStrongTouches'], e['maxInstSupportStrongTouches'], e['normalizationPower'], True)
+    e['instSupportSTNormalized'] = rt.normalize((rt.arr_get(e['supportStrongRejectArray'], rt.arr_indexof(e['supportZoneIDArray'], e['nearestInstSupportZoneID'])) if rt.truth(rt.binary('!=', rt.arr_indexof(e['supportZoneIDArray'], e['nearestInstSupportZoneID']), rt.neg(1))) else rt.NA), e['minInstSupportStrongTouches'], e['maxInstSupportStrongTouches'], e['normalizationPower'], True)
     # Pine 1988
     e['instSupportFailureNormalized'] = rt.normalize(e['nearestInstSupportFailureCount'], e['minInstSupportFailures'], e['maxInstSupportFailures'], e['normalizationPower'], True)
     # Pine 1989
@@ -2376,9 +2376,9 @@ def update(e):
     # Pine 2755
     e['averageInstResistanceLastTestAge'] = (rt.binary('/', e['instResistanceLastTestAgeSum'], e['instResistanceLastTestAgeCount']) if rt.truth(rt.binary('>', e['instResistanceLastTestAgeCount'], 0)) else rt.NA)
     # Pine 2756
-    e['instResistanceWTNormalized'] = rt.normalize(e['nearestResistanceWeakTouches'], e['minInstResistanceWeakTouches'], e['maxInstResistanceWeakTouches'], e['normalizationPower'], True)
+    e['instResistanceWTNormalized'] = rt.normalize((rt.math_max(0, rt.binary('-', rt.arr_get(e['resistanceTouchArray'], rt.arr_indexof(e['resistanceZoneIDArray'], e['nearestInstResistanceZoneID'])), rt.arr_get(e['resistanceStrongRejectArray'], rt.arr_indexof(e['resistanceZoneIDArray'], e['nearestInstResistanceZoneID'])))) if rt.truth(rt.binary('!=', rt.arr_indexof(e['resistanceZoneIDArray'], e['nearestInstResistanceZoneID']), rt.neg(1))) else rt.NA), e['minInstResistanceWeakTouches'], e['maxInstResistanceWeakTouches'], e['normalizationPower'], True)
     # Pine 2757
-    e['instResistanceSTNormalized'] = rt.normalize(e['nearestResistanceStrongTouches'], e['minInstResistanceStrongTouches'], e['maxInstResistanceStrongTouches'], e['normalizationPower'], True)
+    e['instResistanceSTNormalized'] = rt.normalize((rt.arr_get(e['resistanceStrongRejectArray'], rt.arr_indexof(e['resistanceZoneIDArray'], e['nearestInstResistanceZoneID'])) if rt.truth(rt.binary('!=', rt.arr_indexof(e['resistanceZoneIDArray'], e['nearestInstResistanceZoneID']), rt.neg(1))) else rt.NA), e['minInstResistanceStrongTouches'], e['maxInstResistanceStrongTouches'], e['normalizationPower'], True)
     # Pine 2758
     e['instResistanceESNormalized'] = rt.normalize(e['nearestInstResistanceES'], e['minInstResistanceES'], e['maxInstResistanceES'], e['normalizationPower'], True)
     # Pine 2759

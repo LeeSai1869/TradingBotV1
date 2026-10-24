@@ -1,6 +1,7 @@
-// Stored S/R and nearest active FVG zones share the existing combined bar stream.
+// Stored zone lifecycles share the existing combined bar stream.
 import {getSeries} from '../candles/index.js';
 import {fvgSegments} from './fvg.js';
+import {srSegments} from './sr.js';
 export const name='zones';
 const definitions={
     support_zones:['support_zone_low','support_zone_high','nearest_support_zone_id'],
@@ -14,22 +15,10 @@ let primitive,axis=[];
 const styles=()=>window.Composer.config.featureStyles||{};
 export function segments(bars,config,frames={},target=''){
     const result=[];
-    for(const [key,[low,high,id]] of Object.entries(definitions)){
-        if(key.includes('fvg'))continue;
-        if(!config[key]?.visible)continue;
-        let current=null;
-        for(const bar of bars){
-            const f=bar.features||{};
-            let lo=f[low],hi=f[high];
-            if(!Number.isFinite(lo)||!Number.isFinite(hi)||hi<=lo){current=null;continue;}
-            const identity=f[id]??`${lo}:${hi}`;
-            if(current&&current.identity===identity&&current.low===lo&&current.high===hi)current.end=bar.time;
-            else{current={key,identity,low:lo,high:hi,start:bar.time,end:bar.time};result.push(current);}
-        }
-    }
+    result.push(...srSegments(bars,config,frames.sr));
     const endTime=bars.at(-1)?.time;
     result.push(...fvgSegments(bars,config,{target,endTime,seeds:frames.current?.active}));
-    for(const [source,frame] of Object.entries(frames))if(source!=='current')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
+    for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
     return result;
 }
 class Zones {
@@ -53,10 +42,19 @@ class Zones {
                 const x1=this.chart.timeScale().timeToCoordinate(this.timeAt(item.start,true)),x2=this.chart.timeScale().timeToCoordinate(this.timeAt(item.end,false));
                 const y1=this.series.priceToCoordinate(item.high),y2=this.series.priceToCoordinate(item.low);
                 if([x1,x2,y1,y2].some(x=>x===null)||x2<x1||x2<0||x1>mediaSize.width)continue;
-                const left=x1-spacing/2,width=Math.max(spacing,x2-x1+spacing),height=Math.max(1,y2-y1);
-                context.save();context.fillStyle=style.color;context.globalAlpha=(style.opacity??20)/100;context.fillRect(left,y1,width,height);context.globalAlpha=1;
+                const left=x1-spacing/2,width=Math.max(spacing,x2-x1+spacing);
+                context.save();context.fillStyle=style.color;context.globalAlpha=(style.opacity??20)/100;
+                context.beginPath();
+                const points=item.history||[{time:item.start,low:item.low,high:item.high}];
+                const edges=points.map((p,i)=>({left:i?this.chart.timeScale().timeToCoordinate(this.timeAt(p.time,true))-spacing/2:left,
+                    right:i+1<points.length?this.chart.timeScale().timeToCoordinate(this.timeAt(points[i+1].time,true))-spacing/2:left+width,
+                    top:this.series.priceToCoordinate(p.high),bottom:this.series.priceToCoordinate(p.low)}));
+                context.moveTo(edges[0].left,edges[0].top);
+                for(const e of edges){context.lineTo(e.left,e.top);context.lineTo(e.right,e.top);}
+                for(const e of [...edges].reverse()){context.lineTo(e.right,e.bottom);context.lineTo(e.left,e.bottom);}
+                context.closePath();context.fill();context.globalAlpha=1;
                 context.strokeStyle=style.color;context.lineWidth=style.width||2;context.setLineDash(style.style===1?[2,3]:style.style===2?[6,4]:[]);
-                if(style.style!==3)context.strokeRect(left,y1,width,height);context.restore();
+                if(style.style!==3)context.stroke();context.restore();
             }
         });
     }
@@ -64,7 +62,7 @@ class Zones {
 export function mount(){primitive=new Zones();getSeries().attachPrimitive(primitive);}
 export function update(chart,data){
     primitive.times=(data.bars||[]).map(b=>b.time);
-    primitive.items=segments(data.bars||[],styles(),data.fvgFrames,data.timeframe);primitive.requestUpdate?.();
+    primitive.items=segments(data.bars||[],styles(),{...data.fvgFrames,sr:data.srSnapshot},data.timeframe);primitive.requestUpdate?.();
     // Labels use the last actually calculated closed candle, never fabricated levels.
     const series=getSeries();for(const line of axis)series.removePriceLine(line);axis=[];
     const last=data.bars?.at(-1),f=last?.features||{};
@@ -76,7 +74,7 @@ export function update(chart,data){
 export function updateLive(chart,bar){
     if(!bar)return;
     if(primitive.times?.at(-1)<bar.time)primitive.times.push(bar.time);
-    for(const item of primitive.items||[])if(item.key.includes('fvg')&&!item.invalidated&&!item.truncated)item.end=Math.max(item.end,Math.min(bar.time,item.until??bar.time));
+    for(const item of primitive.items||[])if(!item.invalidated&&!item.truncated&&Number.isFinite(item.until))item.end=Math.max(item.end,Math.min(bar.time,item.until??bar.time));
     primitive.requestUpdate?.();
 }
 export function getSegments(){return primitive?.items||[];}

@@ -128,7 +128,8 @@ async function loadAll() {
         const needProfile=!DataCache.volumeProfile&&Object.entries(outputs).some(([k,v])=>k.startsWith('vp_')&&v.visible);
         const needCurrent=!DataCache.fvgFrames.current&&['bull_fvg_zones','bear_fvg_zones'].some(k=>outputs[k]?.visible);
         const needHigher=Object.entries(HTF).some(([tf,duration])=>duration>intervalMs(DataCache.timeframe)&&!DataCache.fvgFrames[tf]&&['bull','bear'].some(side=>outputs[`${side}_fvg_${tf}_zones`]?.visible));
-        if(needProfile||needCurrent||needHigher){
+        const needSR=!DataCache.srSnapshot&&['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].some(k=>outputs[k]?.visible);
+        if(needProfile||needCurrent||needHigher||needSR){
             void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
         }
     });

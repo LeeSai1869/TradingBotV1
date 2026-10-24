@@ -47,6 +47,7 @@ class CompleteConversionTests(unittest.TestCase):
             packet=engine.step(client)
             # Newly exported legacy candle field was absent from the old packet.
             packet.pop('prev_candle_range')
+            packet.pop('sr_zone_events')
             for side in ('support','resistance','inst_support','inst_resistance'):
                 for edge in ('low','high'):packet.pop(f'{side}_zone_{edge}')
             digest.update(json.dumps(packet,sort_keys=True,separators=(',',':')).encode())

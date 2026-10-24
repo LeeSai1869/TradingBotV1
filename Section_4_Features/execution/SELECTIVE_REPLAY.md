@@ -72,3 +72,38 @@ The component graph is built from local Python AST, not from database code or
 remote Pine text. Feature code must use the existing explicit `e[...]`,
 `e.previous(...)`, indicator sites and persistent-array helpers so dependencies
 remain discoverable. New execution idioms need graph coverage and reference tests.
+
+## Support/resistance lifecycle display
+
+`zone_lifecycle.py` runs after the translated feature steps and exports
+`sr_zone_events`: compact JSON deltas for births, changed bounds/classification,
+and removals **after** the engine's existing merge/invalidation rules. Unchanged
+candles store `[]`, rather than copying every live zone into every feature row.
+Each change retains its previous geometry so a chart window can reconstruct
+older active and retired zones from the current committed checkpoint. The
+combined bars request optionally includes `sr_snapshot`; it performs no feature
+calculations and opens no second market-data connection to the exchange.
+
+The chart no longer treats a change in the *nearest* zone as an invalidation.
+One identity retains a continuous stepped polygon as its bounds change; old
+bounds are not rewritten retrospectively. Institutional promotion switches its
+style without overlapping ordinary/institutional fills. Missing feature rows,
+masked repair ranges, and raw history gaps stop claimed coverage. A forming
+candle may extend an active band's display by one candle; it cannot invalidate
+it. Existing no-border/color/opacity controls apply.
+
+Old nearest-only rows do not contain enough information to reconstruct all
+zone lifetimes. The new export therefore needs a one-time **S/R-only** historical
+repair to the existing checkpoint, then normal chronological processing resumes.
+The four corrected institutional touch normalizations and four institutional
+band edges are also repaired selectively. EMA, DMI, RSI, VP and unrelated stored
+columns are preserved; the current DI strategy does not depend on these fields.
+The original full formula-v3 backlog, if present, still has to finish.
+
+The numerical merge rules are unchanged: a new ordinary zone merges with the
+nearest eligible zone within `srMergeDistance`, preserves the survivor's height,
+and excludes institutional candidates. Similar-looking ranges can thus remain
+different valid identities; the UI does not silently combine them or impose a
+new maximum zone count. The source's reverse removal loops, parallel arrays and
+NA propagation are covered by regression checks. Arrays are initialized by
+`execution.memory.update`, before numbered feature functions run.

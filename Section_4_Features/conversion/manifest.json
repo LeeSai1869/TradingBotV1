@@ -1,5 +1,5 @@
 {
-  "source_sha256": "514eb1d0878d0450d381b6039a8913cb2e47d909699f17f7759d6399e52d09aa",
+  "source_sha256": "6d6b9d3578eea640691bfe73afcf7e01584cbad54eb8f048b22cb4d26364fe23",
   "modules": [
     "price",
     "trend",
@@ -2104,10 +2104,12 @@
     "nearestInstResistanceES",
     "nearestInstResistanceFailureCount",
     "nearestInstResistanceLastTestAge",
+    "nearestInstResistanceZoneID",
     "nearestInstSupportDistanceATR",
     "nearestInstSupportES",
     "nearestInstSupportFailureCount",
     "nearestInstSupportLastTestAge",
+    "nearestInstSupportZoneID",
     "nearestLowPriceDistance",
     "nearestResistanceDistance",
     "nearestResistanceES",

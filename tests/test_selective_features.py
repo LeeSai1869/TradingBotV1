@@ -230,15 +230,15 @@ class SelectiveFeatures(unittest.TestCase):
                          ('ETHUSDT','1m',signature,219*60000,49*60000,json.dumps(list(legacy)),None,json.dumps(list(features_store.COLUMNS))))
         conn.close()
 
-    def test_portable_baseline_changes_are_limited_to_the_reviewed_fvg_owner(self):
+    def test_portable_baseline_changes_are_limited_to_reviewed_zone_owners(self):
         import ast
         baseline,_=components.baseline_sources()
         with patch.object(ast,'dump',side_effect=AssertionError('interpreter AST formatting must not determine revisions')):
             current=components.Catalog()
         changed={uid for uid in current.source if current.source[uid]!=baseline.get(uid)}
         self.assertTrue(changed)
-        self.assertTrue(all(current.by_id[uid].module.endswith('.fair_value_gaps') for uid in changed))
-        self.assertTrue(all('fvg' in col for col in current.plan(current.changed(baseline,{},{})).columns))
+        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle')) for uid in changed))
+        self.assertTrue(all('fvg' in col or col=='sr_zone_events' or col.startswith(('inst_support_','inst_resistance_')) for col in current.plan(current.changed(baseline,{},{})).columns))
 
     def test_ast_format_only_job_is_retired_without_calculation_or_cursor_reset(self):
         self.legacy_job()
@@ -296,3 +296,31 @@ class SelectiveFeatures(unittest.TestCase):
         for key,value in expected.items():
             if value is not None and (features_store._translated_fields.get(key)=='string' or key.endswith('_type')):value=str(value)
             self.assertEqual(result[key],value,key)
+
+    def test_zone_lifecycle_backfill_preserves_other_columns_and_checkpoint(self):
+        c=components.catalog()
+        self.engine.component_sources={k:v for k,v in c.source.items() if '.zone_lifecycle:' not in k}
+        for key in list(self.engine.context.persistent):
+            if key.startswith('srDisplay'):del self.engine.context.persistent[key]
+        conn=features_store.open_db()
+        with conn:
+            conn.execute('UPDATE features SET sr_zone_events=NULL,inst_support_zone_low=NULL,inst_support_zone_high=NULL,inst_resistance_zone_low=NULL,inst_resistance_zone_high=NULL')
+            conn.execute('UPDATE feature_engine_state SET state=?',(checkpoint.dump(self.engine,(0,0)),))
+        conn.close()
+        with patch.object(momentum,'calculate_dmi',side_effect=AssertionError('DMI must not run')),patch.object(trend,'calculate_ema',side_effect=AssertionError('EMA must not run')),patch.object(volume_profile,'accumulate_histogram',side_effect=AssertionError('VP must not run')):
+            self.finish()
+        self.assertEqual(self.raw_features(),self.before)
+        conn=features_store.open_db()
+        try:self.assertEqual(conn.execute('SELECT last_open_time FROM feature_engine_state').fetchone()[0],self.clients[-1]['open_time'])
+        finally:conn.close()
+        self.stack.enter_context(patch.object(processor.data_policy,'read',return_value={'epochs':{}}))
+        snapshot=db.read_sr_snapshot('ETHUSDT','1m')
+        self.assertEqual(snapshot['through'],self.clients[-1]['open_time']//1000)
+        self.assertEqual(snapshot['zones'],processor._load('ETHUSDT','1m',(0,0)).context.persistent['srDisplayPrevious'])
+        reference=Engine('ETHUSDT','1m')
+        for client in self.clients:reference.step(client)
+        next_bar=bar(220,114);expected=reference.step(next_bar)
+        db.write_klines([next_bar]);processor._ENGINES.clear();processor.catch_up('ETHUSDT','1m')
+        actual=db.read_features('ETHUSDT','1m',next_bar['open_time'])
+        self.assertEqual(actual['sr_zone_events'],expected['sr_zone_events'])
+        self.assertEqual(actual['inst_support_zone_low'],expected['inst_support_zone_low'])

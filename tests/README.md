@@ -719,3 +719,12 @@ closure with retained connection references. Status tests verify checkpoint and
 repair cursors and that an unchanged candle payload still redraws feature progress.
 Diagnostic tests distinguish historical stderr using actual modification/start
 times; no error log is deleted or truncated.
+
+Support/resistance lifecycle checks: `test_sr_lifecycle.py` verifies reverse
+parallel-array removal, NA propagation, institutional identity-based band bounds
+and touch normalization, sparse reversible lifecycle events, and selective output
+ownership. `sr_lifecycle.test.mjs` checks continuous lifetimes, merge geometry,
+institutional style changes, checkpoint seeding and missing-data boundaries.
+`test_selective_features.py` exercises S/R-only historical export migration while
+prohibiting EMA, DMI and VP calculations. `browser_zones.py` also renders stored
+S/R lifecycle events and a bound change through the actual combined bars API.

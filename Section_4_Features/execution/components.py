@@ -173,7 +173,8 @@ class Catalog:
         self.units=[];self.modules={};self.producers=defaultdict(list)
         contract_types=dict(MANIFEST['contract'])
         export_aliases={'vwapValue':'vwap','nearestSupportPrice':'nearestSupport','nearestResistancePrice':'nearestResistance','prevDayHigh':'previousDayHigh','prevDayLow':'previousDayLow'}
-        for step in [{'module':'Section_4_Features.execution.memory','function':'update'},*MANIFEST['steps']]:
+        from .engine import EXTRA_STEP,EXTRA_FIELDS
+        for step in [{'module':'Section_4_Features.execution.memory','function':'update'},*MANIFEST['steps'],EXTRA_STEP]:
             name=step['module'] if '.' in step['module'] else 'Section_4_Features.features.'+step['module']
             module=importlib.import_module(name);self.modules[name]=module
             tree=ast.parse(inspect.getsource(getattr(module,step['function'])))
@@ -222,6 +223,7 @@ class Catalog:
         self.export={name:snake(name) for name,_ in MANIFEST['contract']}
         self.export.update(vwapValue='vwap',nearestSupportPrice='nearest_support',nearestResistancePrice='nearest_resistance',prevDayHigh='previous_day_high',prevDayLow='previous_day_low',prevCandleRange='prev_candle_range')
         for field in ('controlState','energyState','regimeState','fatigueState','trendState','transitionState'):self.export[field]=snake(field)
+        self.export.update({field:snake(field) for field in EXTRA_FIELDS})
         self.export_inverse={column:field for field,column in self.export.items()}
 
     def changed(self,sources,old_parameters,new_parameters):

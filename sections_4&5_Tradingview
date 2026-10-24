@@ -1983,8 +1983,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     averageInstSupportES := instSupportCount > 0 ? instSupportESSum / instSupportCount : na
     averageInstSupportLastTestAge := instSupportLastTestAgeCount > 0 ? instSupportLastTestAgeSum / instSupportLastTestAgeCount : na
     instSupportLastTestAgeNormalized := normalizeRelative(nearestInstSupportLastTestAge, minInstSupportLastTestAge, maxInstSupportLastTestAge, normalizationPower, false)
-    instSupportWTNormalized := normalizeRelative(nearestSupportWeakTouches, minInstSupportWeakTouches, maxInstSupportWeakTouches, normalizationPower, true)
-    instSupportSTNormalized := normalizeRelative(nearestSupportStrongTouches, minInstSupportStrongTouches, maxInstSupportStrongTouches, normalizationPower, true)
+    instSupportWTNormalized := normalizeRelative(array.indexof(supportZoneIDArray, nearestInstSupportZoneID) != -1 ? math.max(0, array.get(supportTouchArray, array.indexof(supportZoneIDArray, nearestInstSupportZoneID)) - array.get(supportStrongRejectArray, array.indexof(supportZoneIDArray, nearestInstSupportZoneID))) : na, minInstSupportWeakTouches, maxInstSupportWeakTouches, normalizationPower, true)
+    instSupportSTNormalized := normalizeRelative(array.indexof(supportZoneIDArray, nearestInstSupportZoneID) != -1 ? array.get(supportStrongRejectArray, array.indexof(supportZoneIDArray, nearestInstSupportZoneID)) : na, minInstSupportStrongTouches, maxInstSupportStrongTouches, normalizationPower, true)
     instSupportFailureNormalized := normalizeRelative(nearestInstSupportFailureCount, minInstSupportFailures, maxInstSupportFailures, normalizationPower, true)
     instSupportESNormalized := normalizeRelative(nearestInstSupportES, minInstSupportES, maxInstSupportES, normalizationPower, true)
 
@@ -2753,8 +2753,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     averageInstResistanceScore := instResistanceCount > 0 ? instResistanceScoreSum / instResistanceCount : na
     averageInstResistanceES := instResistanceCount > 0 ? instResistanceESSum / instResistanceCount : na
     averageInstResistanceLastTestAge := instResistanceLastTestAgeCount > 0 ? instResistanceLastTestAgeSum / instResistanceLastTestAgeCount : na
-    instResistanceWTNormalized := normalizeRelative(nearestResistanceWeakTouches, minInstResistanceWeakTouches, maxInstResistanceWeakTouches, normalizationPower, true)
-    instResistanceSTNormalized := normalizeRelative(nearestResistanceStrongTouches, minInstResistanceStrongTouches, maxInstResistanceStrongTouches, normalizationPower, true)
+    instResistanceWTNormalized := normalizeRelative(array.indexof(resistanceZoneIDArray, nearestInstResistanceZoneID) != -1 ? math.max(0, array.get(resistanceTouchArray, array.indexof(resistanceZoneIDArray, nearestInstResistanceZoneID)) - array.get(resistanceStrongRejectArray, array.indexof(resistanceZoneIDArray, nearestInstResistanceZoneID))) : na, minInstResistanceWeakTouches, maxInstResistanceWeakTouches, normalizationPower, true)
+    instResistanceSTNormalized := normalizeRelative(array.indexof(resistanceZoneIDArray, nearestInstResistanceZoneID) != -1 ? array.get(resistanceStrongRejectArray, array.indexof(resistanceZoneIDArray, nearestInstResistanceZoneID)) : na, minInstResistanceStrongTouches, maxInstResistanceStrongTouches, normalizationPower, true)
     instResistanceESNormalized := normalizeRelative(nearestInstResistanceES, minInstResistanceES, maxInstResistanceES, normalizationPower, true)
     instResistanceFailureNormalized := normalizeRelative(nearestInstResistanceFailureCount, minInstResistanceFailures, maxInstResistanceFailures, normalizationPower, true)
     instResistanceLastTestAgeNormalized := normalizeRelative(nearestInstResistanceLastTestAge, minInstResistanceLastTestAge, maxInstResistanceLastTestAge, normalizationPower, false)

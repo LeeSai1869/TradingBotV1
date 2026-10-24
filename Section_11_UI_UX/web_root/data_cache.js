@@ -13,6 +13,7 @@ const DataCache = {
     featureProgress: null,
     volumeProfile: null,
     fvgFrames: {},
+    srSnapshot:null,
     liveStatus: "loading",
     activeBars: [],
     latestBar: null,
@@ -63,6 +64,7 @@ const DataCache = {
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
+            if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('sr_zones','1');
             const match=/^(\d+)([mhdwM])$/.exec(timeframe),units={m:60000,h:3600000,d:86400000,w:604800000,M:2678400000};
             const duration=match?Number(match[1])*units[match[2]]:Infinity;
             const frames=['4h','1d','1w'].filter(tf=>({ '4h':14400000,'1d':86400000,'1w':604800000 }[tf]>duration)&&['bull','bear'].some(side=>window.Composer?.config.featureStyles?.[`${side}_fvg_${tf}_zones`]?.visible));
@@ -125,12 +127,13 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, featureProgress:null, fvgFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
             this.featureProgress=packet.feature_progress??null;
+            this.srSnapshot=packet.sr_snapshot??null;
             this._applyFVG(packet);
             this.volumeProfile=packet.volume_profile??null;
             this.historyPending=!!packet.history_pending;
@@ -202,11 +205,13 @@ const DataCache = {
             }
             const progressChanged=JSON.stringify(this.featureProgress)!==JSON.stringify(packet.feature_progress??null);
             this.featureProgress=packet.feature_progress??null;
+            const srChanged=JSON.stringify(this.srSnapshot)!==JSON.stringify(packet.sr_snapshot??null);
+            this.srSnapshot=packet.sr_snapshot??null;
             const fvgChanged=this._applyFVG(packet);
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged;
+            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);
