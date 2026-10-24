@@ -12,7 +12,6 @@ test('Volume Profile offers independent lines and histogram controls',()=>{
     assert.equal(styles.vp_va_high.visible,false);
     assert.equal(styles.vp_histogram.visible,false);
     assert.equal(styles.vp_histogram.lengthPercent,45);
-    assert.equal(styles.vp_histogram.thickness,3);
     assert.equal(normalizeStyles({support_zones:{opacity:120}}).support_zones.opacity,100);
     assert.equal(normalizeStyles().support_zones.opacity,20);
     assert.equal(normalizeStyles({vp_hvn_low:{visible:true}}).vp_hvn_nodes.visible,true);
@@ -46,13 +45,15 @@ test('POC VAH and VAL never enable histogram rows',()=>{
     styles.vp_poc.visible=styles.vp_va_high.visible=styles.vp_va_low.visible=false;
     assert.equal(histogramRows(profile,styles).length,1);
 });
-test('bars are thin and extend into chart without changing volume proportions',()=>{
+test('filled bars span exact low/high ranges and preserve volume proportions',()=>{
     const styles=normalizeStyles(),coordinate=price=>price*20;
     const full=barGeometry({low:1,high:2,fraction:1},coordinate,1000,styles);
     const half=barGeometry({low:1,high:2,fraction:.5},coordinate,1000,styles);
-    assert.equal(full.height,3);assert.equal(full.width,450);assert.equal(half.width,225);
-    assert.equal(full.top,28.5);
+    assert.equal(full.height,20);assert.equal(full.width,450);assert.equal(half.width,225);
+    assert.equal(full.top,20);
     const dense=barGeometry({low:1,high:1.05,fraction:1},coordinate,1000,styles);
-    assert.ok(dense.height<=1);
+    assert.ok(Math.abs(dense.height-1)<1e-12);
+    const reversed=barGeometry({low:1,high:2,fraction:1},price=>100-price*20,1000,styles);
+    assert.equal(reversed.top,60);assert.equal(reversed.height,20);
     assert.equal(barGeometry({low:1,high:2,fraction:1},()=>null,1000,styles),null);
 });

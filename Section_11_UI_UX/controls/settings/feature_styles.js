@@ -57,7 +57,6 @@ export function normalizeStyles(value = {}) {
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(key==='vp_histogram'){
                 result[key].lengthPercent=Number.isFinite(input.lengthPercent)?Math.max(10,Math.min(80,input.lengthPercent)):45;
-                result[key].thickness=Number.isFinite(input.thickness)?Math.max(1,Math.min(12,input.thickness)):3;
             }
             if(key.startsWith('momentum_')) {
                 result[key].shape=['arrowUp','arrowDown','circle','square'].includes(input.shape)?input.shape:(key==='momentum_buy'?'arrowUp':'arrowDown');

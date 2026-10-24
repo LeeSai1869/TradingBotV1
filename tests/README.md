@@ -670,8 +670,9 @@ the previous registry, and failed refreshes retain the existing hourly retry.
 
 VP per-candle lines and histogram bars have independent visibility: selecting POC,
 VAH and VAL must not enable any bars. The tests check this migration regression,
-volume-proportional lengths, configurable chart length/pixel thickness and zoom
-spacing without changing price-bin resolution. The extra VP value-area rectangle
+volume-proportional lengths, configurable chart length, and exact low-to-high
+price extents at different zoom scales. Fixed pixel thickness is removed so
+filled node bars show their actual ranges without changing price-bin resolution. The extra VP value-area rectangle
 was removed. Calculations retain the Pine rolling OHLCV allocation and custom
 HVN/LVN thresholds; these UI tests do not establish equivalence to a lower-timeframe
 or exchange-trade volume profile.

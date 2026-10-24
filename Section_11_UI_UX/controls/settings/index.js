@@ -102,7 +102,7 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
-    if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Node bars stay on the side and have separate opacity controls.');
+    if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Filled node bars stay on the side, span their full price ranges, and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
         const button=el('button',label,selection);
@@ -135,7 +135,7 @@ function renderFeature() {
         return;
     }
     if(item==='Volume Profile'){
-        for(const [key,label,min,max] of [['lengthPercent','Profile bar length (% of chart)',10,80],['thickness','Profile bar thickness (px)',1,12]]){
+        for(const [key,label,min,max] of [['lengthPercent','Profile bar length (% of chart)',10,80]]){
             const row=el('label',label+' ',content,'settings-row'),input=el('input','',row);
             input.type='number';input.min=min;input.max=max;input.step=1;input.value=draft.outputs.vp_histogram[key];input.setAttribute('aria-label',label);
             input.onchange=()=>{draft.outputs.vp_histogram[key]=Math.max(min,Math.min(max,Number(input.value)||min));};
@@ -180,7 +180,7 @@ function renderFeature() {
             select.onchange = () => { state[field] = Number(select.value); };
             if (presentation === "histogram") {
                 select.disabled = true;
-                select.title = "Bars use color and opacity. The profile bar length and thickness controls apply to all bins.";
+                select.title = "Bars use color and opacity. Profile length applies to all bins; each bar spans its full price range.";
             }
         }
     }

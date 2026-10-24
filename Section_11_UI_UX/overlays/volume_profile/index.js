@@ -13,15 +13,15 @@ export function histogramRows(snapshot,config){
         return key?{...b,key,fraction:b.volume/maximum}:null;
     }).filter(Boolean);
 }
-// Pixel presentation does not subdivide or otherwise change the stored bins.
+// Filled nodes span the exact stored price interval; width represents volume.
 export function barGeometry(row,coordinate,paneWidth,config){
     const a=coordinate(row.high),b=coordinate(row.low);
     if(a===null||b===null)return null;
     const available=Math.abs(b-a);
     if(!available)return null;
-    const height=Math.min(available*.8,config.vp_histogram?.thickness??3);
+    const height=available;
     const width=paneWidth*(config.vp_histogram?.lengthPercent??45)/100*row.fraction;
-    return {left:paneWidth-5-width,top:(a+b)/2-height/2,width,height};
+    return {left:paneWidth-5-width,top:Math.min(a,b),width,height};
 }
 class Profile {
     attached({series,requestUpdate}){this.series=series;this.requestUpdate=requestUpdate;}
