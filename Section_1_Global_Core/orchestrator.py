@@ -184,6 +184,7 @@ class GlobalCoreOrchestrator:
         # Feature replay progresses even when this interval has no new candles.
         # Each processor owns a bounded budget; downloads stay in this runner.
         maintained = set()
+        maintenance_rows={}
         for name, fn in self._processors:
             module_name = name.rsplit('.', 1)[0]
             if module_name in maintained:
@@ -196,7 +197,8 @@ class GlobalCoreOrchestrator:
             maintenance = getattr(module, 'maintenance', None)
             if maintenance:
                 try:
-                    maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                    completed=maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                    maintenance_rows[module_name]=completed if isinstance(completed,int) else 0
                 except Exception as error:
                     print(f'[orchestrator] maintenance failed {module_name}; continuing other processors and pairs: {error}',flush=True)
                     traceback.print_exc()
@@ -254,7 +256,7 @@ class GlobalCoreOrchestrator:
                 continue
 
             if bars:
-                print(f"[orchestrator] feature batch {s} {iv}: {len(bars)} bars after {since}",flush=True)
+                print(f"[orchestrator] pending event batch {s} {iv}: {len(bars)} bars after {since}",flush=True)
             for row in bars:
                 if time.monotonic()>=event_deadline:break
                 (ot, ct, o, h, l, c, v) = row
@@ -295,6 +297,8 @@ class GlobalCoreOrchestrator:
         print(
             f"[orchestrator] cycle: +{inserted} klines, "
             f"audit_pass={audit_pass}, events={events_fired}, "
+            f"maintenance_features={maintenance_rows.get('Section_4_Features.processor',0)}, "
+            f"maintenance_decisions={maintenance_rows.get('Section_8_Decision_Engine.processor',0)}, "
             f"{dt:.1f}s",
             flush=True,
         )

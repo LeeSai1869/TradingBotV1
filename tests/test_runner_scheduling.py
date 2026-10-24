@@ -12,7 +12,7 @@ class DownloadSchedulingTests(TestCase):
     def test_current_refreshes_rotate_before_sticky_symbol_history(self):
         with TemporaryDirectory() as directory:
             path=Path(directory)/'klines.db';path.touch()
-            with patch.object(updater,'DB_PATH',path),patch.object(updater,'_DOWNLOAD_CURSOR',0),patch.object(updater,'_open_db',return_value=MagicMock()),patch.object(updater,'_audit_runner',None),patch.object(updater.data_policy,'active_symbols',return_value=['A','B','C']),patch.object(updater.data_policy,'active_intervals',return_value=['5m']),patch.object(updater,'update_one',return_value=1) as update:
+            with patch.object(updater,'DB_PATH',path),patch.object(updater,'_DOWNLOAD_CURSOR',0),patch.object(updater,'_open_db',return_value=MagicMock()),patch.object(updater,'_audit_runner',None),patch('Section_1_Global_Core.work_priority.service_pair',return_value=None),patch.object(updater.data_policy,'active_symbols',return_value=['A','B','C']),patch.object(updater.data_policy,'active_intervals',return_value=['5m']),patch.object(updater,'update_one',return_value=1) as update:
                 self.assertEqual(updater.update_all(max_pairs=2,time_budget=10),3)
                 self.assertEqual(updater.update_all(max_pairs=2,time_budget=10),3)
                 self.assertEqual(updater.update_all(max_pairs=2,time_budget=10),3)

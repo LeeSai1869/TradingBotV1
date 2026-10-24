@@ -54,6 +54,20 @@ def verify_latest(symbol, interval, path=None, fetch=None):
     return label, f'{stamp(t)} | local close={row[4]:g} | '+('; '.join(differences) if differences else 'OHLCV matches exchange for this timestamp')
 
 
+def print_log_tail(path,count,*,runner_started=None):
+    """Read a bounded tail and distinguish old stderr from this runner's errors."""
+    try:
+        modified=path.stat().st_mtime
+        print(f'\nRecent {path.name} (last modified {datetime.fromtimestamp(modified,timezone.utc).isoformat()}; appended across starts):')
+        if path.name=='runner-error.log' and runner_started is not None and modified<runner_started:
+            print('No stderr updates since this runner started. Older errors remain in the log file.');return
+        with path.open('rb') as stream:
+            stream.seek(0,2);end=stream.tell();stream.seek(max(0,end-131072))
+            lines=stream.read().decode('utf-8',errors='replace').splitlines()
+        for line in lines[-count:]:print(line)
+    except OSError as error:print(f'Cannot read {path}: {error}')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('symbol',nargs='?',default='ETHUSDT')
@@ -63,6 +77,7 @@ def main():
     project=Path(__file__).resolve().parent
     print('Checked project:',project)
     print('Candle database:',Path(klines_store.DB_PATH).resolve())
+    runner_started=None
     registry=data_admin.catalog()
     print(f'{symbol}: ' + ', '.join(key for key in ('approved','pending','staged','disapproved','top50') if any(r['symbol']==symbol for r in registry.get(key,[]))))
     print('Runner policy:', 'ACTIVE' if symbol in data_policy.active_symbols() else 'INACTIVE')
@@ -74,6 +89,9 @@ def main():
         if len(rows)>1: print('WARNING: multiple runner services are loaded. Run python3 restart_runner.py to consolidate them.')
         print('Runner launchd PID:',rows[0][0] if rows else 'not loaded (a manual runner may still be running)')
         if rows and rows[0][0].isdigit():
+            started=subprocess.run(['ps','-p',rows[0][0],'-o','lstart='],capture_output=True,text=True).stdout.strip()
+            try:runner_started=datetime.strptime(started,'%a %b %d %H:%M:%S %Y').timestamp()
+            except ValueError:pass
             cwd=subprocess.run(['lsof','-a','-p',rows[0][0],'-d','cwd','-Fn'],capture_output=True,text=True)
             paths=[line[1:] for line in cwd.stdout.splitlines() if line.startswith('n')]
             print('Runner working folder:',paths[0] if paths else 'unknown')
@@ -93,6 +111,7 @@ def main():
     if sys.platform=='darwin' and not rows:
         print('To install/re-enable the login runner: python3 restart_runner.py')
     print('Run again in 30–60 seconds; increasing 1m counts/timestamps confirm progress; current timestamps can mean already caught up.')
+    print('The bulk history owner gets priority; other active symbols receive bounded background download and feature turns.')
     print('Timeframe   candles       latest candle UTC                 features      latest feature UTC                  policy')
     errors=set()
     for iv in data_policy.INTERVALS:
@@ -167,13 +186,9 @@ def main():
 
     if args.logs:
         logs=Path.home()/'Library/Logs/TradingBotV1'
-        from collections import deque
         for name,count in [('runner.log',80),('runner-error.log',60)]:
-            print(f'\nRecent {name} (appended across runner starts):')
-            try:
-                with (logs/name).open(errors='replace') as stream:
-                    for line in deque(stream,maxlen=count):print(line,end='')
-            except OSError as error:print(f'Cannot read {logs/name}: {error}')
+            print_log_tail(logs/name,count,runner_started=runner_started)
+
 
 
 if __name__=='__main__': main()

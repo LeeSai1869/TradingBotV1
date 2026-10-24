@@ -108,7 +108,7 @@ def catch_up(symbol,interval):
 
 
 def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
-    """Finish the selected symbol in bounded batches, without blocking live refresh."""
+    """Keep bulk symbol priority while reserving progress for other active pairs."""
     global _cursor
     _recover_runtime_format_job(symbols,intervals)
     from Section_1_Global_Core import work_priority
@@ -116,12 +116,23 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
     ordered=([owner]+[s for s in symbols if s!=owner]) if owner else list(symbols)
     pairs=[(symbol,interval) for symbol in ordered for interval in intervals]
     if not pairs:return 0
-    start=time.monotonic();deadline=start+time_budget;count=0
+    start=time.monotonic();deadline=start+time_budget;count=0;service_extra=0
     with _LOCK:
+        service=work_priority.service_pair(symbols,intervals,owner,'features')
+        if service:
+            try:
+                print(f'[processor] background feature turn: {service[0]} {service[1]}',flush=True)
+                cap=max(1,max_bars//4)
+                serviced=_advance(*service,cap,min(deadline,start+time_budget*.25));count+=serviced
+                service_extra=max(0,serviced-cap)
+            except Exception:
+                reset_pair(*service);traceback.print_exc()
         for _ in range(len(intervals)):
+            if count-service_extra>=max_bars or time.monotonic()>=deadline:break
+
             # Cursor rotates frames of the owner, not the entire coin universe.
             symbol,interval=pairs[_cursor%len(intervals)];_cursor+=1
-            try:count+=_advance(symbol,interval,max_bars-count,deadline)
+            try:count+=_advance(symbol,interval,max_bars-count+service_extra,deadline)
             except Exception as error:
                 reset_pair(symbol,interval)
                 print(f'[processor] replay failed {symbol} {interval}; checkpoint retained, other pairs continue: {error}',flush=True)
@@ -130,8 +141,8 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
                 # checkpoint remains unchanged and it is retried next cycle.
                 for other in ordered[1:]:
                     for other_interval in intervals:
-                        if count>=max_bars or time.monotonic()>=deadline:break
-                        try:count+=_advance(other,other_interval,max_bars-count,deadline)
+                        if count-service_extra>=max_bars or time.monotonic()>=deadline:break
+                        try:count+=_advance(other,other_interval,max_bars-count+service_extra,deadline)
                         except Exception:
                             reset_pair(other,other_interval);traceback.print_exc()
                 break
@@ -140,7 +151,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
                 except Exception as error:
                     print(f'[processor] daily repair failed {symbol} {interval}: {error}',flush=True)
                     traceback.print_exc()
-            if count>=max_bars or time.monotonic()>=deadline:break
+            if count-service_extra>=max_bars or time.monotonic()>=deadline:break
     return count
 
 

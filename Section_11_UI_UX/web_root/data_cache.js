@@ -10,6 +10,7 @@ const DataCache = {
     liveEnabled: true,
     historyPending: false,
     formingBar: null,
+    featureProgress: null,
     volumeProfile: null,
     fvgFrames: {},
     liveStatus: "loading",
@@ -124,11 +125,12 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, fvgFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, featureProgress:null, fvgFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
+            this.featureProgress=packet.feature_progress??null;
             this._applyFVG(packet);
             this.volumeProfile=packet.volume_profile??null;
             this.historyPending=!!packet.history_pending;
@@ -198,11 +200,13 @@ const DataCache = {
             if(prior?.client?.close_time && packet.bars.length && packet.bars[0].open_time>prior.client.close_time+1){
                 return this.loadInitial(this.symbol,this.timeframe);
             }
+            const progressChanged=JSON.stringify(this.featureProgress)!==JSON.stringify(packet.feature_progress??null);
+            this.featureProgress=packet.feature_progress??null;
             const fvgChanged=this._applyFVG(packet);
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged;
+            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

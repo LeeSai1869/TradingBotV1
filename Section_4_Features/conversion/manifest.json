@@ -1,5 +1,5 @@
 {
-  "source_sha256": "53788214fddf98ae8d5bd2cdb50bb9c413e7689f9c0a4b28221c46ad1a97dde5",
+  "source_sha256": "514eb1d0878d0450d381b6039a8913cb2e47d909699f17f7759d6399e52d09aa",
   "modules": [
     "price",
     "trend",

@@ -362,7 +362,7 @@ __all__ = [
 
     # canonical state
     "read_state_range",
-    "read_state_page", "read_state_after", "read_fvg_frame",
+    "read_state_page", "read_state_after", "read_fvg_frame", "read_feature_progress",
 ]
 
 
@@ -528,3 +528,23 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
                  'client':dict(zip(_KLINE_COLUMNS,r)),'features':by_time.get(r[2])} for r in rows] if include_bars else []}
     finally:
         if features:features.close()
+
+
+def read_feature_progress(symbol,interval,latest=None,*,history_pending=False):
+    """Small indexed checkpoint status; row counts can contain legacy formulas."""
+    result={'through':None,'latest':latest,'status':'waiting for features','repair':None}
+    if not features_store.DB_PATH.exists():return result
+    conn=_read_connection(features_store.DB_PATH)
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():return result
+        row=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+        result['through']=row[0] if row else None
+        repair=features_store.pending_replay(conn,symbol,interval)
+        if repair:
+            result['repair']={'through':repair[0] if repair[0]>=0 else None,'target':repair[1],'columns':len(repair[2])}
+            result['status']='updating affected features'
+        elif row and latest is not None and row[0]>=latest:result['status']='features current'
+        elif row:result['status']='historical feature replay'
+        if history_pending and result['status']!='features current':result['history_pending']=True
+        return result
+    finally:conn.close()

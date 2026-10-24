@@ -168,4 +168,26 @@ unchanged. Canonical field-name conversion is memoized. Checkpoint/formula versi
 Eight additional display fields expose the selected dynamic/institutional S/R
 zone's actual low/high from its persistent arrays. These do not change scoring or
 existing output values. New rows include them, while old rows remain readable.
-FVG rendering uses the existing nearest bull/bear FVG bounds and creation identity.
+FVG rendering tracks qualified events and checkpoint-active gaps through their
+source-candle invalidation; nearest-selection changes do not end a zone.
+
+
+## Reviewed FVG corrections — 2026-10-24
+
+The supplied Pine contained two confirmed source defects: bear normalization
+bounds read the bull array and both used its maximum; bullish reaction activation
+was never persisted on touch. Both the Pine reference and regenerated Python now
+use the bear population's min/max and persist the bull active flag every pass.
+A continuous touch counts once; completing and then starting another reaction
+counts again, consistently for both directions.
+
+Bear normalized reaction quality now uses `higher_is_better=True`, matching bull
+quality. This is an intentional scoring-semantic correction: the old `False`
+inverted quality, rather than clamping it. Existing low aliases, NA comparisons,
+zero-divisor protection and reverse removal semantics remain unchanged.
+
+The frozen component baseline is preserved. The source diff schedules 34 FVG
+outputs/dependents for selective repair, never a full feature reset. Main replay
+checkpoints and all unrelated columns remain intact; the repair's own historical
+cursor is shown separately. The current DI/ADX decision strategy does not depend
+on these FVG fields and therefore receives no new decision-generation reset.

@@ -73,6 +73,7 @@ _LAST_UPDATE_MS = {}
 LAST_AUDIT = None
 _DOWNLOAD_CURSOR = 0
 _HISTORY_CURSORS = {}
+_HISTORY_PHASE = 0
 _LATEST_UPDATE_MS = {}
 
 
@@ -240,7 +241,7 @@ def update_all(*, max_pairs=512, time_budget=2.0):
     Safe to call every runner cycle. Interval-boundary tracking means
     caught-up pairs are queried at most once per bar period; history keeps paging.
     """
-    global LAST_AUDIT, _DOWNLOAD_CURSOR
+    global LAST_AUDIT, _DOWNLOAD_CURSOR, _HISTORY_PHASE
     LAST_AUDIT = None
     if not DB_PATH.exists():
         return 0
@@ -262,15 +263,24 @@ def update_all(*, max_pairs=512, time_budget=2.0):
             total+=update_one(symbol,interval,conn,latest_only=True)
             if time.monotonic()>=refresh_deadline:break
         owner=work_priority.work_symbol(symbols,intervals)
-        if owner is not None and time.monotonic()<deadline:
-            # Rotate frames within this symbol, retaining ownership across cycles
-            # until both its downloads and feature replay have completed.
-            cursor=_HISTORY_CURSORS.get(owner,0)
-            for _ in range(min(max_pairs,len(intervals))):
-                interval=intervals[cursor%len(intervals)];cursor+=1
-                total+=update_one(owner,interval,conn)
-                if time.monotonic()>=deadline:break
-            _HISTORY_CURSORS[owner]=cursor
+        # Alternate who goes first: one slow request may exceed the soft time
+        # budget, but cannot permanently deny either bulk or background work.
+        order=('background','owner') if _HISTORY_PHASE%2==0 else ('owner','background')
+        _HISTORY_PHASE+=1
+        for phase in order:
+            if time.monotonic()>=deadline:break
+            if phase=='background':
+                service=work_priority.service_pair(symbols,intervals,owner,'downloads')
+                if service:
+                    print(f'[update_klines] background history turn: {service[0]} {service[1]}',flush=True)
+                    total+=update_one(*service,conn)
+            elif owner is not None:
+                cursor=_HISTORY_CURSORS.get(owner,0)
+                for _ in range(min(max_pairs,len(intervals))):
+                    interval=intervals[cursor%len(intervals)];cursor+=1
+                    total+=update_one(owner,interval,conn)
+                    if time.monotonic()>=deadline:break
+                _HISTORY_CURSORS[owner]=cursor
         print(f'[update_klines] current refresh: {visited}/{len(pairs)} pairs; history symbol={owner}; yielding to features',flush=True)
     finally:
         conn.close()

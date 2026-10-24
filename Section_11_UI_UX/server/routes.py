@@ -80,6 +80,9 @@ def handle_get(path, raw_qs, server):
                       "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",
                       **db.read_state_page(symbol, interval, limit, before=before)}
             active = data_policy.enabled(symbol, interval)
+            if before is None:
+                packet['feature_progress']=db.read_feature_progress(symbol,interval,packet['bars'][-1]['open_time'] if packet['bars'] else None,history_pending=packet.get('history_pending',False))
+                packet['feature_progress']['active']=active
             if before is None and frames:
                 packet['fvg_frames']={tf:_fvg_frame(symbol,tf,known.get(tf)) for tf in frames}
             if before is None and qs.get('fvg_current',['0'])[0]=='1':

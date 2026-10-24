@@ -635,8 +635,8 @@ Selective calculation repair: `test_selective_features.py` compares repaired
 historical columns and the next new candle against full-engine references for
 RSI, EMA, ADX/DI, ATR, volume, volume profile, S/R, VWAP and pivot inputs. It checks
 every unrelated column remains unchanged, blocks unrelated EMA/ADX computation
-during RSI repair, verifies source-change detection, checkpoint adoption without
-replay, restart/resume, input reversal, transaction rollback, masked dirty values,
+during RSI repair, verifies source-change detection, compatible checkpoint adoption and FVG-only source repair without
+resetting the main cursor, restart/resume, input reversal, transaction rollback, masked dirty values,
 dependent decision invalidation and strategy edits leaving Section 4 untouched.
 Live-preview coverage verifies that dirty values are withheld and repaired state
 refreshes even when the main candle cursor stays unchanged. Fixtures use isolated
@@ -703,3 +703,19 @@ existing `/api/bars` request; unchanged source histories are not retransmitted.
 Each higher frame supplies up to 1,000 stored source candles plus active checkpoint
 gaps. Older-than-window active gaps are clipped to that coverage boundary. No
 formula revision, recalculation, external download or extra worker is introduced.
+
+FVG correction tests reproduce consecutive weak touches, completion and renewed
+reactions on both sides, plus independent bear score bounds with higher-quality
+scores normalizing higher. Runtime tests protect zero ATR, missing comparisons
+and descending array removal. The Pine reference and regenerated module agree;
+the component baseline remains frozen and all changed outputs are FVG-related.
+Selective replay tests block EMA/ADX/Volume Profile computation, preserve every
+unrelated stored column and compare the next new full packet after state merge.
+
+`test_fair_service.py` recreates a permanently busy BTC owner and verifies ENA/SUI
+both receive download/feature turns. It checks raw-gap barriers, reserved budget,
+owner progress even during cheap targeted replay or slow network requests, and deterministic resource
+closure with retained connection references. Status tests verify checkpoint and
+repair cursors and that an unchanged candle payload still redraws feature progress.
+Diagnostic tests distinguish historical stderr using actual modification/start
+times; no error log is deleted or truncated.

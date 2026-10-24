@@ -227,3 +227,13 @@ test('finishing historical catch-up reloads the cached window to remove old gaps
     assert.equal(calls,3);assert.equal(c.historyPending,false);
     assert.deepEqual(Array.from(c.bars,b=>b.time),[3,4,5,6,7,8,9,10,11]);
 });
+
+test('feature checkpoint progress redraws status even when candle data is unchanged',async()=>{
+    const c=cache();let through=0;
+    c._fetchPage=async()=>({...page([60]),feature_progress:{through,status:'historical feature replay'}});
+    await c.loadInitial('ENAUSDT','1m');const events=[];c.subscribe((_,op)=>events.push(op));
+    through=60000;
+    assert.equal(await c.refreshStored(),true);
+    assert.equal(c.featureProgress.through,60000);assert.deepEqual(events,['stored-refresh']);
+    assert.equal(c.bars.length,1);assert.equal(await c.refreshStored(),false);
+});

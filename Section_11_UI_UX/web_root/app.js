@@ -42,12 +42,16 @@ async function loadAll() {
         const bar=DataCache.latestBar, client=bar?.client;
         const duration=client ? client.close_time-bar.open_time+1 : 0;
         const behind=duration>0 && Date.now()-client.close_time>2*duration;
-        const historyNotice=DataCache.historyPending ? ' | Earlier history is downloading' : behind ? ` | Historical data through ${new Date(client.close_time).toLocaleString()} — not current price` : '';
+        const historyNotice=DataCache.historyPending ? ' | Earlier history pending' : behind ? ` | Historical data through ${new Date(client.close_time).toLocaleString()} — not current price` : '';
+        const progress=DataCache.featureProgress;
+        const stamp=t=>t==null?'not started':new Date(t).toLocaleString();
+        const featureNotice=progress?progress.repair?` | Feature repair${progress.active===false?' paused':''}: ${progress.repair.columns} columns through ${stamp(progress.repair.through)}`:
+            progress.active===false?` | Features paused at ${stamp(progress.through)}`:progress.status==='features current'?' | Features current':` | Features through ${stamp(progress.through)} (${progress.status})`:'';
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
-              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice;
+              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice + featureNotice;
     }
 
     function checkBoundary() {

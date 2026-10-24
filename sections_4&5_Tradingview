@@ -3601,10 +3601,10 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
                 bool bullReactionComplete = bullReactionActive and o > bullHigh and l > bullHigh and c > bullHigh and h > bullHigh
                 if bullReactionComplete
                     bullReactionActive := false
-                    array.set(fvgBullReactionActive, i, bullReactionActive)
+
                     int reactionScore = bullLastReactionType == FVG_WEAK_TOUCH ? 2 : bullLastReactionType == FVG_STRONG_TOUCH ? 3 : 0
                     bullReactionScore += reactionScore
-
+                array.set(fvgBullReactionActive, i, bullReactionActive)
                 array.set(fvgBullReactionScore, i, bullReactionScore)
 
                 // FVG INVALIDATION
@@ -3840,8 +3840,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     float maxBearFVGReactionScore = na
 
     if hasBearFVG
-        minBearFVGReactionScore := array.max(fvgBullReactionScore)
-        maxBearFVGReactionScore := array.max(fvgBullReactionScore)
+        minBearFVGReactionScore := array.min(fvgBearReactionScore)
+        maxBearFVGReactionScore := array.max(fvgBearReactionScore)
 
         for i = array.size(fvgBearLow) - 1 to 0
             float bearLow = array.get(fvgBearLow, i)
@@ -3866,7 +3866,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
 
     if not na(nearestbearFVGReactionScore)
         if maxBearFVGReactionScore > minBearFVGReactionScore
-            nearestBearFVGReactionScoreNormalized := normalizeRelative(nearestbearFVGReactionScore, minBearFVGReactionScore, maxBearFVGReactionScore, normalizationPower, false)
+            nearestBearFVGReactionScoreNormalized := normalizeRelative(nearestbearFVGReactionScore, minBearFVGReactionScore, maxBearFVGReactionScore, normalizationPower, true)
 
     bool priceInsideBearMemoryFVG = hasBearFVG and l <= nearestBearFVGHigh and h >= nearestBearFVGLow
     bool nearBearMemoryFVG = not na(nearestBearFVGDistanceATR) and nearestBearFVGDistanceATR <= fvgZoneDistanceATR

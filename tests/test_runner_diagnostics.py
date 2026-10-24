@@ -75,3 +75,18 @@ class RunnerDiagnosticTests(unittest.TestCase):
             output=io.StringIO()
             with contextlib.redirect_stdout(output):check_coin.main()
             self.assertIn('No formula-v3 checkpoint table yet',output.getvalue())
+
+
+class LogFreshnessTests(unittest.TestCase):
+    def test_old_stderr_is_not_reported_as_a_current_runner_failure(self):
+        import os
+        import io
+        import contextlib
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'runner-error.log';path.write_text('old descriptor failure\n');os.utime(path,(10,10))
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):check_coin.print_log_tail(path,60,runner_started=20)
+            self.assertIn('No stderr updates since this runner started',output.getvalue());self.assertNotIn('old descriptor failure',output.getvalue())
+            os.utime(path,(30,30));output=io.StringIO()
+            with contextlib.redirect_stdout(output):check_coin.print_log_tail(path,60,runner_started=20)
+            self.assertIn('old descriptor failure',output.getvalue())

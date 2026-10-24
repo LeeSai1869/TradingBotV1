@@ -251,7 +251,7 @@ button:hover { background: #333; }
 #candle-details dl {display:flex;flex-wrap:wrap;gap:4px 8px;margin:0;align-items:baseline;}
 #candle-details dt {color:#94a3b8;}
 #candle-details dd {margin:0 10px 0 0;font-variant-numeric:tabular-nums;}
-#status {margin:0;padding:5px 12px;flex:0 0 auto;font-size:11px;color:#999;border-top:1px solid #333;background:#181818;}
+#status {white-space:normal;margin:0;padding:5px 12px;flex:0 0 auto;font-size:11px;color:#999;border-top:1px solid #333;background:#181818;}
 .chart-hud[data-position="top-left"] {top:76px;}
 .settings-selection {display:flex;gap:8px;margin:10px 0;}
 .drawing-tools {display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex:1 1 100%;min-width:0;max-width:100%;}

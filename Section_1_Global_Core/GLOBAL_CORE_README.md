@@ -302,9 +302,12 @@ matching rule checkpoints and epoch changes invalidate transient state.
 
 This supersedes the round-robin historical scheduling described above. Each
 bounded download slice first refreshes existing symbols' current closed bars,
-using a separate rotating live-refresh cursor. Historical work then belongs to
+using a separate rotating live-refresh cursor. Bulk historical work then belongs to
 one symbol across its enabled timeframes until both raw history and committed
-feature replay finish. Existing stored symbols precede empty new symbols.
+feature replay finish. Each download pass also reserves one rotating non-owner
+history pair (alternating first place with the bulk owner when requests are
+slow), and feature maintenance reserves a quarter-budget non-owner turn
+before spending the remaining budget on the bulk owner. Existing stored symbols precede empty new symbols.
 Frames rotate within the owner so daily dependencies and slower frames progress.
 Pausing/removing the owner releases it. Current events for other already-ready
 symbols remain eligible; their historical replay does not steal ownership.
@@ -313,8 +316,9 @@ Network timeouts remain soft-budget exceptions; no second downloader is started.
 
 `work_priority.py` uses indexed latest-bar lookups and small checkpoint/progress
 tables, not full candle scans. Restarting retains database progress and chooses an
-owner again. A large existing replay can therefore delay a new symbol's history;
-existing current candles continue to receive refresh opportunities.
+owner again. A large existing replay does not prevent other symbols' historical cursors or
+feature checkpoints from advancing. Pending pairs rotate; blocked raw prefixes
+are not skipped. Existing current candles continue to receive refresh opportunities.
 
 ### Daily eligible top-50 refresh
 
@@ -330,7 +334,7 @@ The existing runner now calls a nonblocking daily scheduler for the existing
 24 hours. Failures log an explanation and retry after one hour. Downloads do not
 wait for CoinGecko/Binance universe requests. Configure the existing
 `COINGECKO_API_KEY` in `Section_1_Global_Core/Symbols/.env`; missing credentials
-produce a logged failure, not a false success. This is the **filtered eligible**
+use the public endpoint, whose failures remain visible and never count as success. This is the **filtered eligible**
 top 50 defined by the existing eligibility logic, not the unfiltered market list.
 New entries still require approval. Incomplete universe responses retain the
 previous registry, and concurrent administrator changes cancel the write.
@@ -359,3 +363,16 @@ formula-v3 migration retains its progress. See
 [`SELECTIVE_REPLAY.md`](../Section_4_Features/execution/SELECTIVE_REPLAY.md) for
 dependency, visibility and state-merging behavior. `check_coin.py SYMBOL --logs`
 lists affected columns and repair progress separately from feature row counts.
+
+### Checkpoint-based chart progress and diagnostic logs
+
+The existing chart response includes an indexed `feature_progress` projection.
+The status shows the selected pair's actual chronological checkpoint or targeted
+repair cursor, independently of unchanged candle payloads and legacy row counts.
+Pending event batches are labelled as events; only the processor's committed row
+messages report completed calculations. Background turns identify their pair in
+runner logs. No feature generation runs in the status endpoint.
+
+`check_coin.py --logs` reads bounded log tails, reports modification times, and on
+macOS compares stderr modification time to the running PID's start time. Errors
+that predate that start remain in the file but are not presented as new failures.

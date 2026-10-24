@@ -196,12 +196,12 @@ def update(e):
                 if rt.truth(e['bullReactionComplete']):
                     # Pine 3603
                     e['bullReactionActive'] = False
-                    # Pine 3604
-                    rt.arr_set(e['fvgBullReactionActive'], e['i'], e['bullReactionActive'])
                     # Pine 3605
                     e['reactionScore'] = (2 if rt.truth(rt.binary('==', e['bullLastReactionType'], e['FVG_WEAK_TOUCH'])) else (3 if rt.truth(rt.binary('==', e['bullLastReactionType'], e['FVG_STRONG_TOUCH'])) else 0))
                     # Pine 3606
                     e['bullReactionScore'] = rt.binary('+', e['bullReactionScore'], e['reactionScore'])
+                # Pine 3607
+                rt.arr_set(e['fvgBullReactionActive'], e['i'], e['bullReactionActive'])
                 # Pine 3608
                 rt.arr_set(e['fvgBullReactionScore'], e['i'], e['bullReactionScore'])
                 # Pine 3611
@@ -551,9 +551,9 @@ def update(e):
     # Pine 3842
     if rt.truth(e['hasBearFVG']):
         # Pine 3843
-        e['minBearFVGReactionScore'] = rt.arr_max(e['fvgBullReactionScore'])
+        e['minBearFVGReactionScore'] = rt.arr_min(e['fvgBearReactionScore'])
         # Pine 3844
-        e['maxBearFVGReactionScore'] = rt.arr_max(e['fvgBullReactionScore'])
+        e['maxBearFVGReactionScore'] = rt.arr_max(e['fvgBearReactionScore'])
         # Pine 3846
         for e['i'] in rt.inclusive(rt.binary('-', rt.arr_size(e['fvgBearLow']), 1), 0):
             # Pine 3847
@@ -599,7 +599,7 @@ def update(e):
         # Pine 3868
         if rt.truth(rt.binary('>', e['maxBearFVGReactionScore'], e['minBearFVGReactionScore'])):
             # Pine 3869
-            e['nearestBearFVGReactionScoreNormalized'] = rt.normalize(e['nearestbearFVGReactionScore'], e['minBearFVGReactionScore'], e['maxBearFVGReactionScore'], e['normalizationPower'], False)
+            e['nearestBearFVGReactionScoreNormalized'] = rt.normalize(e['nearestbearFVGReactionScore'], e['minBearFVGReactionScore'], e['maxBearFVGReactionScore'], e['normalizationPower'], True)
     # Pine 3871
     e['priceInsideBearMemoryFVG'] = (rt.truth((rt.truth(e['hasBearFVG']) and rt.truth(rt.binary('<=', e['l'], e['nearestBearFVGHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['nearestBearFVGLow'])))
     # Pine 3872

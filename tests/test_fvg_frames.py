@@ -71,3 +71,16 @@ class FVGFramesTests(unittest.TestCase):
         from Section_11_UI_UX.server import routes
         with patch.object(db,'read_fvg_frame',side_effect=sqlite3.OperationalError('busy')):
             self.assertEqual(routes._fvg_frame('ETHUSDT','4h'),{'unchanged':True,'status':'stored FVG source unavailable'})
+
+    def test_progress_reports_checkpoint_and_affected_repair_separately(self):
+        latest=self.bars[-1]['open_time']
+        progress=db.read_feature_progress('ETHUSDT','4h',latest)
+        self.assertEqual(progress['through'],latest);self.assertEqual(progress['status'],'features current')
+        pending=db.read_feature_progress('ETHUSDT','4h',latest+14400000,history_pending=True)
+        self.assertEqual(pending['status'],'historical feature replay');self.assertTrue(pending['history_pending'])
+        conn=features_store.open_db()
+        with conn:conn.execute('INSERT INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',('ETHUSDT','4h','test',latest,0,'[]',None,json.dumps(['nearest_bull_fvg_reaction_count'])))
+        conn.close()
+        repair=db.read_feature_progress('ETHUSDT','4h',latest)
+        self.assertEqual(repair['repair'],{'through':0,'target':latest,'columns':1})
+        self.assertEqual(repair['status'],'updating affected features')
