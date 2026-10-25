@@ -10,7 +10,7 @@ export function fvgSegments(bars,config,{source='',target='',endTime=null,seeds=
     const confirmed=bars.filter(b=>!b.provisional&&b.client),result=[],active=new Map(),retired=new Set();
     const higher=!!source&&source!==target,step=intervalMs(target||source);
     if(higher&&(!HTF[source]||HTF[source]<=step))return [];
-    const keyFor=side=>higher?`${side}_fvg_${source}_zones`:`${side}_fvg_zones`;
+    const keyFor=side=>higher?`${side}_fvg_${source}_zones`:HTF[target]&&config[`${side}_fvg_${target}_zones`]?.visible?`${side}_fvg_${target}_zones`:`${side}_fvg_zones`;
     let previous=null;
     for(let i=0;i<confirmed.length;i++){
         const bar=confirmed[i],f=bar.features||{},c=bar.client;

@@ -1,4 +1,4 @@
-"""Sticky bulk history priority plus bounded service turns for other active pairs."""
+"""Closest-to-completion bulk priority with bounded service for other pairs."""
 from contextlib import closing
 import sqlite3
 from .memory_storage.Storage import klines_store,features_store
@@ -10,7 +10,7 @@ _identity=None
 def work_symbol(symbols,intervals):
     """Keep the current symbol until its raw history and feature checkpoints finish.
 
-    Existing symbols retain registry order ahead of empty symbols. Never use feature
+    Existing symbols closest to completion precede larger backlogs and empty symbols. Never use feature
     row counts as replay progress: older formula rows can still exist.
     """
     global _selected,_identity
@@ -21,7 +21,10 @@ def work_symbol(symbols,intervals):
     if not klines_store.DB_PATH.exists():return symbols[0]
     with closing(sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
-        checkpoints={};versions=None;jobs=set()
+        history_cursors={}
+        if history and 'next_open_time' in {r[1] for r in raw.execute('PRAGMA table_info(history_progress)')}:
+            history_cursors={(s,t):v for s,t,v in raw.execute('SELECT symbol,interval,next_open_time FROM history_progress')}
+        checkpoints={};versions=None;jobs=set();repairs={}
         if features_store.DB_PATH.exists():
             with closing(sqlite3.connect(f'file:{features_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as features:
                 if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
@@ -31,6 +34,7 @@ def work_symbol(symbols,intervals):
                     signature=current_signature()
                     versions={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,signature FROM feature_calculation_versions')}
                     jobs=set(features.execute('SELECT symbol,interval FROM feature_replay_jobs'))
+                    repairs={(s,t):(last,target) for s,t,last,target in features.execute('SELECT symbol,interval,last_time,target FROM feature_replay_jobs')}
         def pending(s):
             for t in intervals:
                 if (s,t) in history or (s,t) in jobs or versions is not None and versions.get((s,t))!=signature:return True
@@ -39,9 +43,32 @@ def work_symbol(symbols,intervals):
                 if latest is None or checkpoints.get((s,t),-1)<latest:return True
             return False
         if _selected in symbols and pending(_selected):return _selected
-        existing=[s for s in symbols if raw.execute('SELECT 1 FROM klines WHERE symbol=? LIMIT 1',(s,)).fetchone()]
-        _selected=next((s for s in existing+[s for s in symbols if s not in existing] if pending(s)),None)
+        def backlog(symbol):
+            remaining=0.;populated=False
+            for interval in intervals:
+                first=raw.execute('SELECT MIN(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
+                latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
+                if latest is None:remaining+=float('inf');continue
+                populated=True
+                step=interval_milliseconds(interval)
+                through=checkpoints.get((symbol,interval),first-step)
+                remaining+=max(0,latest-through)/step
+                repair=repairs.get((symbol,interval))
+                if repair:remaining+=max(0,repair[1]-max(first-step,repair[0]))/step
+                elif versions is not None and versions.get((symbol,interval))!=signature:
+                    remaining+=max(1,(through-first)/step)
+                if (symbol,interval) in history:
+                    cursor=history_cursors.get((symbol,interval))
+                    remaining+=max(1,(latest-cursor)/step) if cursor is not None else 1
+            return (not populated,remaining,symbols.index(symbol))
+        candidates=[s for s in symbols if pending(s)]
+        _selected=min(candidates,key=backlog) if candidates else None
     return _selected
+
+
+def interval_milliseconds(interval):
+    units={'m':60000,'h':3600000,'d':86400000,'w':604800000,'M':2678400000}
+    return max(1,int(interval[:-1])*units[interval[-1]])
 
 
 def owns_history(symbol):

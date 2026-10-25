@@ -18,6 +18,8 @@ async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',150);price=rows[-1][6]
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],ema50=r[6]-.5,
         support_zone_low=price-4,support_zone_high=price-3,nearest_support_zone_id='s1',
+        current_structure='STRUCTURE_RANGE',structure_range_low=price-9,structure_range_high=price-8,structure_origin_bar=1,
+        protected_high=price+8,protected_low=price-8,latest_confirmed_pivot_high=price+10,latest_confirmed_pivot_low=price-10,
         resistance_zone_low=price+3,resistance_zone_high=price+4,nearest_resistance_zone_id='r1',
         inst_support_zone_low=price-6,inst_support_zone_high=price-5,nearest_inst_support_zone_id='is1',
         inst_resistance_zone_low=price+5,inst_resistance_zone_high=price+6,nearest_inst_resistance_zone_id='ir1',
@@ -63,7 +65,7 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         dialog=page.get_by_role('dialog',name='Settings',exact=True)
         await dialog.get_by_role('tab',name='Features',exact=True).click()
-        for name in ('Support / Resistance','FVG','Volume Profile'):
+        for name in ('Market Structure','Support / Resistance','FVG','Volume Profile'):
             await dialog.get_by_role('button',name=name,exact=True).click()
             await dialog.get_by_role('button',name='Select all',exact=True).click()
         await dialog.get_by_label('Point of control (POC) color',exact=True).fill('#fedcba')
@@ -74,7 +76,14 @@ async def exercise(base,library):
         await dialog.get_by_label('Low-volume nodes bar opacity',exact=True).fill('75')
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
+        await dialog.get_by_role('button',name='Display',exact=True).click()
+        await dialog.get_by_role('button',name='Deselect all scores',exact=True).click()
+        assert not await dialog.get_by_label('Institutional support show scores',exact=True).is_checked()
+        await dialog.get_by_role('button',name='Select all scores',exact=True).click()
+        assert await dialog.get_by_label('Institutional support show scores',exact=True).is_checked()
         await dialog.get_by_label('Support zones show scores',exact=True).uncheck()
+        await dialog.get_by_role('button',name='Style',exact=True).click()
+        assert await dialog.get_by_label('Institutional support show scores',exact=True).count()==0
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_label('4H bullish FVG line style',exact=True).select_option('3')
         await dialog.get_by_label('Bullish FVG color',exact=True).fill('#abcdef')
@@ -85,12 +94,17 @@ async def exercise(base,library):
         await page.wait_for_function("DataCache.fvgFrames['4h']?.bars.length===3")
         await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
-        assert count==7,count
+        assert count==8,count
         band=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='support_zones:s1'))")
         assert band['start']==rows[0][2]//1000
         assert band['end']==rows[-1][2]//1000
         assert len(band['history'])==2
         assert band['score']==19.25
+        structure=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='structure_range_zones'))")
+        assert structure['low']==price-9 and structure['high']==price-8
+        inst=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='inst_support_zones:is1'))")
+        assert inst['score']==33.5
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.zoneScoreLabel({key:'inst_support_zones',score:33.5}))")=='S/R score: 33.50'
         assert await page.evaluate('Composer.config.featureStyles.support_zones.scores') is False
         assert await page.evaluate('DataCache.srSnapshot.through')==rows[-1][2]//1000
         higher=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='bull_fvg_4h_zones'))")
@@ -120,7 +134,7 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==7
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==8
         assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
         assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
         await page.get_by_role('button',name='Open settings',exact=True).click()
@@ -128,10 +142,20 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_role('button',name='Deselect all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==4
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==5
         assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
-        print('PASS: S/R bands, per-candle VP plots and side nodes, saved length/opacity/styles and combined-stream reuse',flush=True)
+        await page.get_by_role('button',name='Open settings',exact=True).click()
+        await dialog.get_by_role('button',name='Display',exact=True).click()
+        await dialog.get_by_role('checkbox',name='4H bullish FVG',exact=True).check()
+        await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
+        await page.evaluate("DataCache.loadInitial('BTCUSDT','4h')")
+        await page.wait_for_function("!DataCache.loading && !DataCache._olderPromise")
+        await settle(page)
+        own=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().filter(z=>z.key==='bull_fvg_4h_zones'))")
+        assert len(own)==1,own
+        assert not errors,errors
+        print('PASS: institutional scores and Display controls, source-chart FVG, structure ranges, VP and combined-stream reuse',flush=True)
         await browser.close()
 
 

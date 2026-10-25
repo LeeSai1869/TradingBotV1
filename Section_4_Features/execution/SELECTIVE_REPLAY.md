@@ -119,3 +119,9 @@ historical replay. In a six-run local setup benchmark, median compilation was
 48 ms uncached versus 0.004 ms for cached lookup. This measures plan setup only,
 not production database throughput or total catch-up time. Targeted replay log
 lines now include measured batch rows/s, including checkpoint/SQL overhead.
+
+Persistent state has dependencies across candle boundaries. A writer near the
+end of a feature step can affect readers near its beginning on the next candle.
+The catalog includes these feedback edges and closes them when compiling a plan,
+including a resumed repair's saved changed-unit set. Tests compare every affected
+historical value and the next streamed packet after ATR/config/source changes.

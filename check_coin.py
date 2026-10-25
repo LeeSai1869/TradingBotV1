@@ -111,7 +111,7 @@ def main():
     if sys.platform=='darwin' and not rows:
         print('To install/re-enable the login runner: python3 restart_runner.py')
     print('Run again in 30–60 seconds; increasing 1m counts/timestamps confirm progress; current timestamps can mean already caught up.')
-    print('The bulk history owner gets priority; other active symbols receive bounded background download and feature turns.')
+    print('The closest-to-completion symbol gets bulk priority; other active symbols receive bounded background download and feature turns.')
     print('Timeframe   candles       latest candle UTC                 features      latest feature UTC                  policy')
     errors=set()
     for iv in data_policy.INTERVALS:

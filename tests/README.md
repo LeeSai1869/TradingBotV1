@@ -735,3 +735,14 @@ extra boxes. The browser fixture checks the saved score toggle and a calculated
 S/R score through the combined API. FVG frame tests validate checkpoint reaction
 scores. The selective-plan cache regression ensures repeated jobs reuse a plan
 while separate Catalog instances and formula sources remain independent.
+
+Market-structure review coverage includes first-swing bootstrap, no same-candle
+opposite confirmation, two real foundation pivots, single BOS completion, and
+bull/bear/range establishment without duplicate pivot identities. A selective
+migration test verifies repaired historical rows and the next streamed packet
+while prohibiting EMA, DMI and VP computation. The 700-bar reference vector was
+reviewed against 9bdd0cd; changes belong to structure-dependent outputs.
+Closest-symbol priority tests use different checkpoint lags and verify empty
+symbols wait until existing work is finished. FVG tests include source-equals-
+target behavior, and browser settings checks cover independent Display score
+bulk controls and institutional scores.

@@ -2793,14 +2793,14 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
                 candidatePivotHighBar := bar_index
                 candidatePivotHighTime := time
                 currentSwingDirection := "SWING_UP"
-
+                candidatePivotLowPrice := l[1]
             else if l < l[1]
                 candidatePivot := -1
                 candidatePivotLowPrice := l
                 candidatePivotLowBar := bar_index
                 candidatePivotLowTime := time
                 currentSwingDirection := "SWING_DOWN"
-
+                candidatePivotHighPrice := h[1]
     // Update Candidate Pivot High
     if barstate.isconfirmed and candidatePivot == 1
         if h > candidatePivotHighPrice
@@ -2812,17 +2812,17 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
             swingTransition := 0
 
     int swingLowCount = array.size(swingLowPriceArray)
-    if swingLowCount > 0
-        latestConfirmedPivotLow := array.get(swingLowPriceArray, swingLowCount - 1)
-        float swingDistance = candidatePivotHighPrice - latestConfirmedPivotLow
+    if candidatePivot == 1 and (swingLowCount > 0 or not na(candidatePivotLowPrice))
+        latestConfirmedPivotLow := swingLowCount > 0 ? array.get(swingLowPriceArray, swingLowCount - 1) : na
+        float swingDistance = candidatePivotHighPrice - (swingLowCount > 0 ? latestConfirmedPivotLow : candidatePivotLowPrice)
         float validationDistance = swingDistance * swingValidationRatio
         pivotHighConfirmationPrice := candidatePivotHighPrice - validationDistance
     
-    if barstate.isconfirmed and h < candidatePivotHighPrice and c > pivotHighConfirmationPrice
+    if barstate.isconfirmed and candidatePivot == 1 and candidatePivotHighBar < bar_index and h < candidatePivotHighPrice and c > pivotHighConfirmationPrice
         currentSwingDirection := "SWING_UP"
         swingTransition := 1
 
-    else if barstate.isconfirmed and c <= pivotHighConfirmationPrice
+    else if barstate.isconfirmed and candidatePivot == 1 and candidatePivotHighBar < bar_index and c <= pivotHighConfirmationPrice
         lastConfirmedPivotType := 1
         array.push(swingHighPriceArray, candidatePivotHighPrice)
         array.push(swingHighBarArray, candidatePivotHighBar)
@@ -2854,17 +2854,17 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
             swingTransition := 0
 
     int swingHighCount = array.size(swingHighPriceArray)
-    if swingHighCount > 0
-        latestConfirmedPivotHigh := array.get(swingHighPriceArray, swingHighCount - 1)
-        float swingDistance = latestConfirmedPivotHigh - candidatePivotLowPrice
+    if candidatePivot == -1 and (swingHighCount > 0 or not na(candidatePivotHighPrice))
+        latestConfirmedPivotHigh := swingHighCount > 0 ? array.get(swingHighPriceArray, swingHighCount - 1) : na
+        float swingDistance = (swingHighCount > 0 ? latestConfirmedPivotHigh : candidatePivotHighPrice) - candidatePivotLowPrice
         float validationDistance = swingDistance * swingValidationRatio
         pivotLowConfirmationPrice := candidatePivotLowPrice + validationDistance
 
-    if barstate.isconfirmed and l > candidatePivotLowPrice and c < pivotLowConfirmationPrice
+    if barstate.isconfirmed and candidatePivot == -1 and candidatePivotLowBar < bar_index and l > candidatePivotLowPrice and c < pivotLowConfirmationPrice
         currentSwingDirection := "SWING_DOWN"
         swingTransition := 1
 
-    else if barstate.isconfirmed and c >= pivotLowConfirmationPrice
+    else if barstate.isconfirmed and candidatePivot == -1 and candidatePivotLowBar < bar_index and c >= pivotLowConfirmationPrice
         lastConfirmedPivotType := -1
         array.push(swingLowPriceArray, candidatePivotLowPrice)
         array.push(swingLowBarArray, candidatePivotLowBar)
@@ -2921,31 +2921,31 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     var int structureStartBar = na
     float pivotEstablishmentRetracement = 0.20
 
-    // Structure Foundation Pivots
+    var int lastStructureResetBar = -1
     var float foundationPivotHigh = na
     var int foundationPivotHighBar = na
     var float foundationPivotLow = na
     var int foundationPivotLowBar = na
 
     if array.size(structureState) == 0
-        if swingHighCount >= 2
+        if swingHighCount >= 2 and swingLowCount >= 2 and (array.size(structurePivotHigh) == 0 or array.get(structurePivotHighBar, array.size(structurePivotHighBar) - 1) != array.get(swingHighBarArray, swingHighCount - 1)) and array.get(swingHighBarArray, swingHighCount - 2) > lastStructureResetBar
             foundationPivotHigh := array.get(swingHighPriceArray, swingHighCount - 2)
             foundationPivotHighBar := array.get(swingHighBarArray, swingHighCount - 2)
-            array.push(structurePivotHigh, foundationPivotHigh)
-            array.push(structurePivotHighBar, foundationPivotHighBar)
-            array.push(structureHighType, "High")
-            newHighCount += 1
-            array.push(structureHighsCount, newHighCount)
+            structurePivotHigh := array.from(foundationPivotHigh, array.get(swingHighPriceArray, swingHighCount - 1))
+            structurePivotHighBar := array.from(foundationPivotHighBar, array.get(swingHighBarArray, swingHighCount - 1))
+            structureHighType := array.from("High", array.get(swingHighPriceArray, swingHighCount - 1) > foundationPivotHigh ? "HH" : array.get(swingHighPriceArray, swingHighCount - 1) >= foundationPivotHigh - (array.get(swingHighPriceArray, swingHighCount - 2) - array.get(swingLowPriceArray, swingLowCount - 2)) * pivotEstablishmentRetracement ? "EH" : "LH")
+            newHighCount := 2
+            structureHighsCount := array.from(1, 2)
             originHighBar := foundationPivotHighBar
 
-        if swingLowCount >= 2
+        if swingLowCount >= 2 and swingHighCount >= 2 and (array.size(structurePivotLow) == 0 or array.get(structurePivotLowBar, array.size(structurePivotLowBar) - 1) != array.get(swingLowBarArray, swingLowCount - 1)) and array.get(swingLowBarArray, swingLowCount - 2) > lastStructureResetBar
             foundationPivotLow := array.get(swingLowPriceArray, swingLowCount - 2)
             foundationPivotLowBar := array.get(swingLowBarArray, swingLowCount - 2)
-            array.push(structurePivotLow, foundationPivotLow)
-            array.push(structurePivotLowBar, foundationPivotLowBar)
-            array.push(structureLowType, "Low")
-            newLowCount += 1
-            array.push(structureLowsCount, newLowCount)
+            structurePivotLow := array.from(foundationPivotLow, array.get(swingLowPriceArray, swingLowCount - 1))
+            structurePivotLowBar := array.from(foundationPivotLowBar, array.get(swingLowBarArray, swingLowCount - 1))
+            structureLowType := array.from("Low", array.get(swingLowPriceArray, swingLowCount - 1) < foundationPivotLow ? "LL" : array.get(swingLowPriceArray, swingLowCount - 1) <= foundationPivotLow + (array.get(swingHighPriceArray, swingHighCount - 2) - array.get(swingLowPriceArray, swingLowCount - 2)) * pivotEstablishmentRetracement ? "EL" : "HL")
+            newLowCount := 2
+            structureLowsCount := array.from(1, 2)
             originLowBar := foundationPivotLowBar
 
     // Structure High Pivot Types
@@ -3101,7 +3101,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     var string protectedHighType = na
     var string protectedLowType = na
 
-    if structureWasActiveBeforeBar and lastConfirmedPivotType == 1
+    if structureWasActiveBeforeBar and lastConfirmedPivotType == 1 and array.size(swingHighBarArray) > 0 and (array.size(structurePivotHighBar) == 0 or array.get(structurePivotHighBar, array.size(structurePivotHighBar) - 1) != array.get(swingHighBarArray, array.size(swingHighBarArray) - 1))
         if swingTransition == 0 and prevActivePivotType == -1
             if validPivotHigh
                 int confirmedHighIndex = array.size(swingHighPriceArray) - 1
@@ -3120,7 +3120,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
                 if array.size(structurePivotHigh) == 2 and na(ageHighBar)
                     ageHighBar := confirmedHighBar
 
-    if structureWasActiveBeforeBar and lastConfirmedPivotType == -1
+    if structureWasActiveBeforeBar and lastConfirmedPivotType == -1 and array.size(swingLowBarArray) > 0 and (array.size(structurePivotLowBar) == 0 or array.get(structurePivotLowBar, array.size(structurePivotLowBar) - 1) != array.get(swingLowBarArray, array.size(swingLowBarArray) - 1))
         if swingTransition == 0 and prevActivePivotType == 1
             if validPivotLow
                 int confirmedLowIndex = array.size(swingLowPriceArray) - 1
@@ -3219,8 +3219,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
 
     if activeTransition == 1
         if not validPivotHigh and lastConfirmedPivotType == 1
-            int confirmedHighIndex = array.size(structurePivotHighBar) - 1
-            int confirmedHighBar = array.get(structurePivotHighBar, confirmedHighIndex)
+            int confirmedHighIndex = array.size(swingHighBarArray) - 1
+            int confirmedHighBar = confirmedHighIndex >= 0 ? array.get(swingHighBarArray, confirmedHighIndex) : na
             if confirmedHighBar == candidateTransitionHighBar
                 array.push(structureTransition, activeTransitionType)
                 activeTransition := 0
@@ -3228,8 +3228,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
                 candidateTransitionHigh := na
 
         else if not validPivotLow and lastConfirmedPivotType == -1
-            int confirmedLowIndex = array.size(structurePivotLowBar) - 1
-            int confirmedLowBar = array.get(structurePivotLowBar, confirmedLowIndex)
+            int confirmedLowIndex = array.size(swingLowBarArray) - 1
+            int confirmedLowBar = confirmedLowIndex >= 0 ? array.get(swingLowBarArray, confirmedLowIndex) : na
             if confirmedLowBar == candidateTransitionLowBar
                 array.push(structureTransition, activeTransitionType)
                 activeTransition := 0
@@ -3316,7 +3316,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
         
             else if validPivotHigh
                 int confirmedHighIndex = array.size(structurePivotHighBar) - 1
-                int confirmedHighBar = array.get(structurePivotHighBar, confirmedHighIndex)
+                int confirmedHighBar = confirmedHighIndex >= 0 ? array.get(structurePivotHighBar, confirmedHighIndex) : na
                 if confirmedHighBar == bosCandidatePivotBar
                     activeBOS := 2
 
@@ -3330,10 +3330,10 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
 
             else if validPivotLow
                 int confirmedLowIndex = array.size(structurePivotLowBar) - 1
-                int confirmedLowBar = array.get(structurePivotLowBar, confirmedLowIndex)
+                int confirmedLowBar = confirmedLowIndex >= 0 ? array.get(structurePivotLowBar, confirmedLowIndex) : na
                 if confirmedLowBar == bosCandidatePivotBar
                     activeBOS := 2
-
+    lastStructureResetBar := activeBOS == 2 ? bar_index : lastStructureResetBar
     if activeBOS == 2
         if bosCandidatePivotType == 1
             int highIndex = array.size(structurePivotHigh) - 1

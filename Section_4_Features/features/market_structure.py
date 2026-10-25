@@ -69,6 +69,8 @@ def update(e):
                 e['candidatePivotHighTime'] = e['time']
                 # Pine 2795
                 e['currentSwingDirection'] = 'SWING_UP'
+                # Pine 2796
+                e['candidatePivotLowPrice'] = e.previous('l', 1)
             # Pine 2797
             elif rt.truth(rt.binary('<', e['l'], e.previous('l', 1))):
                 # Pine 2798
@@ -81,6 +83,8 @@ def update(e):
                 e['candidatePivotLowTime'] = e['time']
                 # Pine 2802
                 e['currentSwingDirection'] = 'SWING_DOWN'
+                # Pine 2803
+                e['candidatePivotHighPrice'] = e.previous('h', 1)
     # Pine 2805
     if rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('==', e['candidatePivot'], 1)))):
         # Pine 2806
@@ -100,23 +104,23 @@ def update(e):
     # Pine 2814
     e['swingLowCount'] = rt.arr_size(e['swingLowPriceArray'])
     # Pine 2815
-    if rt.truth(rt.binary('>', e['swingLowCount'], 0)):
+    if rt.truth((rt.truth(rt.binary('==', e['candidatePivot'], 1)) and rt.truth((rt.truth(rt.binary('>', e['swingLowCount'], 0)) or rt.truth((not rt.truth(rt.is_na(e['candidatePivotLowPrice'])))))))):
         # Pine 2816
-        e['latestConfirmedPivotLow'] = rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 1))
+        e['latestConfirmedPivotLow'] = (rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 1)) if rt.truth(rt.binary('>', e['swingLowCount'], 0)) else rt.NA)
         # Pine 2817
-        e['swingDistance'] = rt.binary('-', e['candidatePivotHighPrice'], e['latestConfirmedPivotLow'])
+        e['swingDistance'] = rt.binary('-', e['candidatePivotHighPrice'], (e['latestConfirmedPivotLow'] if rt.truth(rt.binary('>', e['swingLowCount'], 0)) else e['candidatePivotLowPrice']))
         # Pine 2818
         e['validationDistance'] = rt.binary('*', e['swingDistance'], e['swingValidationRatio'])
         # Pine 2819
         e['pivotHighConfirmationPrice'] = rt.binary('-', e['candidatePivotHighPrice'], e['validationDistance'])
     # Pine 2821
-    if rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('<', e['h'], e['candidatePivotHighPrice'])))) and rt.truth(rt.binary('>', e['c'], e['pivotHighConfirmationPrice'])))):
+    if rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('==', e['candidatePivot'], 1)))) and rt.truth(rt.binary('<', e['candidatePivotHighBar'], e['bar_index'])))) and rt.truth(rt.binary('<', e['h'], e['candidatePivotHighPrice'])))) and rt.truth(rt.binary('>', e['c'], e['pivotHighConfirmationPrice'])))):
         # Pine 2822
         e['currentSwingDirection'] = 'SWING_UP'
         # Pine 2823
         e['swingTransition'] = 1
     # Pine 2825
-    elif rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('<=', e['c'], e['pivotHighConfirmationPrice'])))):
+    elif rt.truth((rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('==', e['candidatePivot'], 1)))) and rt.truth(rt.binary('<', e['candidatePivotHighBar'], e['bar_index'])))) and rt.truth(rt.binary('<=', e['c'], e['pivotHighConfirmationPrice'])))):
         # Pine 2826
         e['lastConfirmedPivotType'] = 1
         # Pine 2827
@@ -170,23 +174,23 @@ def update(e):
     # Pine 2856
     e['swingHighCount'] = rt.arr_size(e['swingHighPriceArray'])
     # Pine 2857
-    if rt.truth(rt.binary('>', e['swingHighCount'], 0)):
+    if rt.truth((rt.truth(rt.binary('==', e['candidatePivot'], rt.neg(1))) and rt.truth((rt.truth(rt.binary('>', e['swingHighCount'], 0)) or rt.truth((not rt.truth(rt.is_na(e['candidatePivotHighPrice'])))))))):
         # Pine 2858
-        e['latestConfirmedPivotHigh'] = rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 1))
+        e['latestConfirmedPivotHigh'] = (rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 1)) if rt.truth(rt.binary('>', e['swingHighCount'], 0)) else rt.NA)
         # Pine 2859
-        e['swingDistance'] = rt.binary('-', e['latestConfirmedPivotHigh'], e['candidatePivotLowPrice'])
+        e['swingDistance'] = rt.binary('-', (e['latestConfirmedPivotHigh'] if rt.truth(rt.binary('>', e['swingHighCount'], 0)) else e['candidatePivotHighPrice']), e['candidatePivotLowPrice'])
         # Pine 2860
         e['validationDistance'] = rt.binary('*', e['swingDistance'], e['swingValidationRatio'])
         # Pine 2861
         e['pivotLowConfirmationPrice'] = rt.binary('+', e['candidatePivotLowPrice'], e['validationDistance'])
     # Pine 2863
-    if rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('>', e['l'], e['candidatePivotLowPrice'])))) and rt.truth(rt.binary('<', e['c'], e['pivotLowConfirmationPrice'])))):
+    if rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('==', e['candidatePivot'], rt.neg(1))))) and rt.truth(rt.binary('<', e['candidatePivotLowBar'], e['bar_index'])))) and rt.truth(rt.binary('>', e['l'], e['candidatePivotLowPrice'])))) and rt.truth(rt.binary('<', e['c'], e['pivotLowConfirmationPrice'])))):
         # Pine 2864
         e['currentSwingDirection'] = 'SWING_DOWN'
         # Pine 2865
         e['swingTransition'] = 1
     # Pine 2867
-    elif rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('>=', e['c'], e['pivotLowConfirmationPrice'])))):
+    elif rt.truth((rt.truth((rt.truth((rt.truth(e['barstate.isconfirmed']) and rt.truth(rt.binary('==', e['candidatePivot'], rt.neg(1))))) and rt.truth(rt.binary('<', e['candidatePivotLowBar'], e['bar_index'])))) and rt.truth(rt.binary('>=', e['c'], e['pivotLowConfirmationPrice'])))):
         # Pine 2868
         e['lastConfirmedPivotType'] = rt.neg(1)
         # Pine 2869
@@ -291,6 +295,9 @@ def update(e):
         e.initialize('structureStartBar', rt.NA)
     # Pine 2922
     e['pivotEstablishmentRetracement'] = 0.2
+    # Pine 2924
+    if 'lastStructureResetBar' not in e.persistent:
+        e.initialize('lastStructureResetBar', rt.neg(1))
     # Pine 2925
     if 'foundationPivotHigh' not in e.persistent:
         e.initialize('foundationPivotHigh', rt.NA)
@@ -306,39 +313,39 @@ def update(e):
     # Pine 2930
     if rt.truth(rt.binary('==', rt.arr_size(e['structureState']), 0)):
         # Pine 2931
-        if rt.truth(rt.binary('>=', e['swingHighCount'], 2)):
+        if rt.truth((rt.truth((rt.truth((rt.truth(rt.binary('>=', e['swingHighCount'], 2)) and rt.truth(rt.binary('>=', e['swingLowCount'], 2)))) and rt.truth((rt.truth(rt.binary('==', rt.arr_size(e['structurePivotHigh']), 0)) or rt.truth(rt.binary('!=', rt.arr_get(e['structurePivotHighBar'], rt.binary('-', rt.arr_size(e['structurePivotHighBar']), 1)), rt.arr_get(e['swingHighBarArray'], rt.binary('-', e['swingHighCount'], 1)))))))) and rt.truth(rt.binary('>', rt.arr_get(e['swingHighBarArray'], rt.binary('-', e['swingHighCount'], 2)), e['lastStructureResetBar'])))):
             # Pine 2932
             e['foundationPivotHigh'] = rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 2))
             # Pine 2933
             e['foundationPivotHighBar'] = rt.arr_get(e['swingHighBarArray'], rt.binary('-', e['swingHighCount'], 2))
             # Pine 2934
-            rt.arr_push(e['structurePivotHigh'], e['foundationPivotHigh'])
+            e['structurePivotHigh'] = rt.arr_from_values(e['foundationPivotHigh'], rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 1)))
             # Pine 2935
-            rt.arr_push(e['structurePivotHighBar'], e['foundationPivotHighBar'])
+            e['structurePivotHighBar'] = rt.arr_from_values(e['foundationPivotHighBar'], rt.arr_get(e['swingHighBarArray'], rt.binary('-', e['swingHighCount'], 1)))
             # Pine 2936
-            rt.arr_push(e['structureHighType'], 'High')
+            e['structureHighType'] = rt.arr_from_values('High', ('HH' if rt.truth(rt.binary('>', rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 1)), e['foundationPivotHigh'])) else ('EH' if rt.truth(rt.binary('>=', rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 1)), rt.binary('-', e['foundationPivotHigh'], rt.binary('*', rt.binary('-', rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 2)), rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 2))), e['pivotEstablishmentRetracement'])))) else 'LH')))
             # Pine 2937
-            e['newHighCount'] = rt.binary('+', e['newHighCount'], 1)
+            e['newHighCount'] = 2
             # Pine 2938
-            rt.arr_push(e['structureHighsCount'], e['newHighCount'])
+            e['structureHighsCount'] = rt.arr_from_values(1, 2)
             # Pine 2939
             e['originHighBar'] = e['foundationPivotHighBar']
         # Pine 2941
-        if rt.truth(rt.binary('>=', e['swingLowCount'], 2)):
+        if rt.truth((rt.truth((rt.truth((rt.truth(rt.binary('>=', e['swingLowCount'], 2)) and rt.truth(rt.binary('>=', e['swingHighCount'], 2)))) and rt.truth((rt.truth(rt.binary('==', rt.arr_size(e['structurePivotLow']), 0)) or rt.truth(rt.binary('!=', rt.arr_get(e['structurePivotLowBar'], rt.binary('-', rt.arr_size(e['structurePivotLowBar']), 1)), rt.arr_get(e['swingLowBarArray'], rt.binary('-', e['swingLowCount'], 1)))))))) and rt.truth(rt.binary('>', rt.arr_get(e['swingLowBarArray'], rt.binary('-', e['swingLowCount'], 2)), e['lastStructureResetBar'])))):
             # Pine 2942
             e['foundationPivotLow'] = rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 2))
             # Pine 2943
             e['foundationPivotLowBar'] = rt.arr_get(e['swingLowBarArray'], rt.binary('-', e['swingLowCount'], 2))
             # Pine 2944
-            rt.arr_push(e['structurePivotLow'], e['foundationPivotLow'])
+            e['structurePivotLow'] = rt.arr_from_values(e['foundationPivotLow'], rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 1)))
             # Pine 2945
-            rt.arr_push(e['structurePivotLowBar'], e['foundationPivotLowBar'])
+            e['structurePivotLowBar'] = rt.arr_from_values(e['foundationPivotLowBar'], rt.arr_get(e['swingLowBarArray'], rt.binary('-', e['swingLowCount'], 1)))
             # Pine 2946
-            rt.arr_push(e['structureLowType'], 'Low')
+            e['structureLowType'] = rt.arr_from_values('Low', ('LL' if rt.truth(rt.binary('<', rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 1)), e['foundationPivotLow'])) else ('EL' if rt.truth(rt.binary('<=', rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 1)), rt.binary('+', e['foundationPivotLow'], rt.binary('*', rt.binary('-', rt.arr_get(e['swingHighPriceArray'], rt.binary('-', e['swingHighCount'], 2)), rt.arr_get(e['swingLowPriceArray'], rt.binary('-', e['swingLowCount'], 2))), e['pivotEstablishmentRetracement'])))) else 'HL')))
             # Pine 2947
-            e['newLowCount'] = rt.binary('+', e['newLowCount'], 1)
+            e['newLowCount'] = 2
             # Pine 2948
-            rt.arr_push(e['structureLowsCount'], e['newLowCount'])
+            e['structureLowsCount'] = rt.arr_from_values(1, 2)
             # Pine 2949
             e['originLowBar'] = e['foundationPivotLowBar']
     # Pine 2952
@@ -582,7 +589,7 @@ def update(e):
     if 'protectedLowType' not in e.persistent:
         e.initialize('protectedLowType', rt.NA)
     # Pine 3104
-    if rt.truth((rt.truth(e['structureWasActiveBeforeBar']) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], 1)))):
+    if rt.truth((rt.truth((rt.truth((rt.truth(e['structureWasActiveBeforeBar']) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], 1)))) and rt.truth(rt.binary('>', rt.arr_size(e['swingHighBarArray']), 0)))) and rt.truth((rt.truth(rt.binary('==', rt.arr_size(e['structurePivotHighBar']), 0)) or rt.truth(rt.binary('!=', rt.arr_get(e['structurePivotHighBar'], rt.binary('-', rt.arr_size(e['structurePivotHighBar']), 1)), rt.arr_get(e['swingHighBarArray'], rt.binary('-', rt.arr_size(e['swingHighBarArray']), 1)))))))):
         # Pine 3105
         if rt.truth((rt.truth(rt.binary('==', e['swingTransition'], 0)) and rt.truth(rt.binary('==', e['prevActivePivotType'], rt.neg(1))))):
             # Pine 3106
@@ -614,7 +621,7 @@ def update(e):
                     # Pine 3121
                     e['ageHighBar'] = e['confirmedHighBar']
     # Pine 3123
-    if rt.truth((rt.truth(e['structureWasActiveBeforeBar']) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], rt.neg(1))))):
+    if rt.truth((rt.truth((rt.truth((rt.truth(e['structureWasActiveBeforeBar']) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], rt.neg(1))))) and rt.truth(rt.binary('>', rt.arr_size(e['swingLowBarArray']), 0)))) and rt.truth((rt.truth(rt.binary('==', rt.arr_size(e['structurePivotLowBar']), 0)) or rt.truth(rt.binary('!=', rt.arr_get(e['structurePivotLowBar'], rt.binary('-', rt.arr_size(e['structurePivotLowBar']), 1)), rt.arr_get(e['swingLowBarArray'], rt.binary('-', rt.arr_size(e['swingLowBarArray']), 1)))))))):
         # Pine 3124
         if rt.truth((rt.truth(rt.binary('==', e['swingTransition'], 0)) and rt.truth(rt.binary('==', e['prevActivePivotType'], 1)))):
             # Pine 3125
@@ -778,9 +785,9 @@ def update(e):
         # Pine 3221
         if rt.truth((rt.truth((not rt.truth(e['validPivotHigh']))) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], 1)))):
             # Pine 3222
-            e['confirmedHighIndex'] = rt.binary('-', rt.arr_size(e['structurePivotHighBar']), 1)
+            e['confirmedHighIndex'] = rt.binary('-', rt.arr_size(e['swingHighBarArray']), 1)
             # Pine 3223
-            e['confirmedHighBar'] = rt.arr_get(e['structurePivotHighBar'], e['confirmedHighIndex'])
+            e['confirmedHighBar'] = (rt.arr_get(e['swingHighBarArray'], e['confirmedHighIndex']) if rt.truth(rt.binary('>=', e['confirmedHighIndex'], 0)) else rt.NA)
             # Pine 3224
             if rt.truth(rt.binary('==', e['confirmedHighBar'], e['candidateTransitionHighBar'])):
                 # Pine 3225
@@ -794,9 +801,9 @@ def update(e):
         # Pine 3230
         elif rt.truth((rt.truth((not rt.truth(e['validPivotLow']))) and rt.truth(rt.binary('==', e['lastConfirmedPivotType'], rt.neg(1))))):
             # Pine 3231
-            e['confirmedLowIndex'] = rt.binary('-', rt.arr_size(e['structurePivotLowBar']), 1)
+            e['confirmedLowIndex'] = rt.binary('-', rt.arr_size(e['swingLowBarArray']), 1)
             # Pine 3232
-            e['confirmedLowBar'] = rt.arr_get(e['structurePivotLowBar'], e['confirmedLowIndex'])
+            e['confirmedLowBar'] = (rt.arr_get(e['swingLowBarArray'], e['confirmedLowIndex']) if rt.truth(rt.binary('>=', e['confirmedLowIndex'], 0)) else rt.NA)
             # Pine 3233
             if rt.truth(rt.binary('==', e['confirmedLowBar'], e['candidateTransitionLowBar'])):
                 # Pine 3234
@@ -950,7 +957,7 @@ def update(e):
                 # Pine 3318
                 e['confirmedHighIndex'] = rt.binary('-', rt.arr_size(e['structurePivotHighBar']), 1)
                 # Pine 3319
-                e['confirmedHighBar'] = rt.arr_get(e['structurePivotHighBar'], e['confirmedHighIndex'])
+                e['confirmedHighBar'] = (rt.arr_get(e['structurePivotHighBar'], e['confirmedHighIndex']) if rt.truth(rt.binary('>=', e['confirmedHighIndex'], 0)) else rt.NA)
                 # Pine 3320
                 if rt.truth(rt.binary('==', e['confirmedHighBar'], e['bosCandidatePivotBar'])):
                     # Pine 3321
@@ -974,11 +981,13 @@ def update(e):
                 # Pine 3332
                 e['confirmedLowIndex'] = rt.binary('-', rt.arr_size(e['structurePivotLowBar']), 1)
                 # Pine 3333
-                e['confirmedLowBar'] = rt.arr_get(e['structurePivotLowBar'], e['confirmedLowIndex'])
+                e['confirmedLowBar'] = (rt.arr_get(e['structurePivotLowBar'], e['confirmedLowIndex']) if rt.truth(rt.binary('>=', e['confirmedLowIndex'], 0)) else rt.NA)
                 # Pine 3334
                 if rt.truth(rt.binary('==', e['confirmedLowBar'], e['bosCandidatePivotBar'])):
                     # Pine 3335
                     e['activeBOS'] = 2
+    # Pine 3336
+    e['lastStructureResetBar'] = (e['bar_index'] if rt.truth(rt.binary('==', e['activeBOS'], 2)) else e['lastStructureResetBar'])
     # Pine 3337
     if rt.truth(rt.binary('==', e['activeBOS'], 2)):
         # Pine 3338

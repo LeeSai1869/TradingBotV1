@@ -34,7 +34,7 @@ test('higher frames confirm before visibility and end on the source invalidation
         assert.deepEqual(fvgSegments(rows,settings,{source,target:'1h',endTime:step/1000-1}),[]);
         const zones=fvgSegments(rows,settings,{source,target:'1h',endTime:2*step/1000});
         assert.equal(zones[0].start,step/1000);assert.equal(zones[0].end,(2*step-3600000)/1000);
-        assert.deepEqual(fvgSegments(rows,settings,{source,target:source}),[]);
+        assert.equal(fvgSegments(rows,settings,{source,target:source}).length,1);
         assert.deepEqual(fvgSegments(rows,{},{source,target:'1m'}),[]);
     }
 });

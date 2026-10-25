@@ -26,3 +26,10 @@ test('FVG checkpoint scores enrich existing gaps rather than duplicate them',()=
     const zones=fvgSegments(bars,{bull_fvg_zones:{visible:true}},{target:'1m',seeds:[{side:'bull',low:10,high:12,time:0,score:9,score_time:0}]});
     assert.equal(zones.length,1);assert.equal(zones[0].score,9);
 });
+test('MTF options display on their own source charts without duplicate generic gaps',()=>{
+    for(const target of ['4h','1d','1w']){
+        const key=`bull_fvg_${target}_zones`,bars=[{time:0,client:{low:14,high:16,close:15,open_time:0,close_time:59999},features:{qualified_bull_fvg:true,bull_fvg_low:10,bull_fvg_high:12}}];
+        const zones=fvgSegments(bars,{[key]:{visible:true},bull_fvg_zones:{visible:true}},{target});
+        assert.equal(zones.length,1);assert.equal(zones[0].key,key);
+    }
+});

@@ -213,6 +213,16 @@ class Catalog:
                 if field in shared and field in latest and latest[field]!=u.id and field not in u.guaranteed:self.edges[latest[field]].add(u.id)
                 local[u.module,field]=u.id
                 latest[field]=u.id
+        # A persistent write can change consumers earlier in the next candle.
+        # Forward-only dependencies miss state-machine feedback (e.g. a BOS
+        # cleanup changing the next candle's protected levels/foundations).
+        persistent=set(MANIFEST['persistent'])|{'lastStructureResetBar'}
+        for unit in self.units:
+            for field in unit.reads & persistent:
+                for producer in self.producers.get(field,()):
+                    if producer!=unit.id:
+                        self.edges[producer].add(unit.id)
+                        self.requires[unit.id][field].add(producer)
         self.final=dict(latest)
         # Context.begin carries the prior regime into Section 5.
         for source in self.producers.get('regimeState',[]):
@@ -243,6 +253,11 @@ class Catalog:
 
     @lru_cache(maxsize=32)
     def _plan(self,changed):
+        changed=set(changed)
+        while True:
+            expanded=changed|{v for u in changed for v in self.edges[u]}
+            if expanded==changed:break
+            changed=expanded
         execute=set(changed)
         # Internal arrays/intermediates absent from stored rows require their
         # producing calculations; exported prerequisites are hydrated instead.

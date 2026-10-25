@@ -1,6 +1,7 @@
 // Stored zone lifecycles share the existing combined bar stream.
 import {getSeries} from '../candles/index.js';
 import {fvgSegments} from './fvg.js';
+import {structureSegments} from './structure.js';
 import {srSegments} from './sr.js';
 export const name='zones';
 export function zoneScoreLabel(item){
@@ -19,7 +20,7 @@ let primitive,axis=[];
 const styles=()=>window.Composer.config.featureStyles||{};
 export function segments(bars,config,frames={},target=''){
     const result=[];
-    result.push(...srSegments(bars,config,frames.sr));
+    result.push(...srSegments(bars,config,frames.sr),...structureSegments(bars,config));
     const endTime=bars.at(-1)?.time;
     result.push(...fvgSegments(bars,config,{target,endTime,seeds:frames.current?.active}));
     for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
@@ -59,7 +60,7 @@ class Zones {
                 context.closePath();context.fill();context.globalAlpha=1;
                 context.strokeStyle=style.color;context.lineWidth=style.width||2;context.setLineDash(style.style===1?[2,3]:style.style===2?[6,4]:[]);
                 if(style.style!==3)context.stroke();
-                if(style.scores!==false){
+                if(style.scores!==false&&item.key!=='structure_range_zones'){
                     context.font='12px sans-serif';
                     const text=zoneScoreLabel(item);
                     const x=Math.max(2,Math.min(mediaSize.width-context.measureText(text).width-12,x2-4));

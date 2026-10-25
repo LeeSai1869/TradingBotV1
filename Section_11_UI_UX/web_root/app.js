@@ -126,7 +126,7 @@ async function loadAll() {
         render();
         const outputs=Composer.config.featureStyles||{};
         const needProfile=!DataCache.volumeProfile&&Object.entries(outputs).some(([k,v])=>k.startsWith('vp_')&&v.visible);
-        const needCurrent=!DataCache.fvgFrames.current&&['bull_fvg_zones','bear_fvg_zones'].some(k=>outputs[k]?.visible);
+        const needCurrent=!DataCache.fvgFrames.current&&['bull_fvg_zones','bear_fvg_zones',`bull_fvg_${DataCache.timeframe}_zones`,`bear_fvg_${DataCache.timeframe}_zones`].some(k=>outputs[k]?.visible);
         const needHigher=Object.entries(HTF).some(([tf,duration])=>duration>intervalMs(DataCache.timeframe)&&!DataCache.fvgFrames[tf]&&['bull','bear'].some(side=>outputs[`${side}_fvg_${tf}_zones`]?.visible));
         const needSR=!DataCache.srSnapshot&&['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].some(k=>outputs[k]?.visible);
         if(needProfile||needCurrent||needHigher||needSR){

@@ -69,7 +69,7 @@ const DataCache = {
             const duration=match?Number(match[1])*units[match[2]]:Infinity;
             const frames=['4h','1d','1w'].filter(tf=>({ '4h':14400000,'1d':86400000,'1w':604800000 }[tf]>duration)&&['bull','bear'].some(side=>window.Composer?.config.featureStyles?.[`${side}_fvg_${tf}_zones`]?.visible));
             if(frames.length)qs.set('fvg_frames',frames.join(','));
-            if(['bull_fvg_zones','bear_fvg_zones'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('fvg_current','1');
+            if(['bull_fvg_zones','bear_fvg_zones',`bull_fvg_${timeframe}_zones`,`bear_fvg_${timeframe}_zones`].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('fvg_current','1');
             qs.set('fvg_versions',JSON.stringify(Object.fromEntries(Object.entries(this.fvgFrames).map(([tf,frame])=>[tf,frame.version]))));
         }
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');

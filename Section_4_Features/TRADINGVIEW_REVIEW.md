@@ -191,3 +191,16 @@ outputs/dependents for selective repair, never a full feature reset. Main replay
 checkpoints and all unrelated columns remain intact; the repair's own historical
 cursor is shown separately. The current DI/ADX decision strategy does not depend
 on these FVG fields and therefore receives no new decision-generation reset.
+
+## Reviewed market-structure corrections — 2026-10-25
+
+See `MARKET_STRUCTURE_REVIEW.md` for confirmed findings and disagreements with
+the submitted critique. The reference and generated Python now bootstrap the
+first swing without an invented confirmed pivot, seed typed foundations from
+actual confirmed pairs, refresh pre-establishment pairs by identity, avoid
+re-appending a confirmed continuation pivot, and wait for fresh pairs after BOS.
+Missing confirmation-array entries remain NA instead of raising out-of-bounds.
+A forced BOS completion is verified to reset once, rather than increment every
+later candle. The reviewed 700-bar vector changes 42 structure-dependent fields;
+core EMA, DMI/ADX, RSI and VP outputs are unchanged. Affected state and downstream
+columns are repaired using the dependency graph, including cross-candle feedback.

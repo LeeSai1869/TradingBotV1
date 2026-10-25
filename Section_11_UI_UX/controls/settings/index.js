@@ -16,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Support / Resistance", "FVG", "Momentum Indicator"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -102,8 +102,8 @@ function renderFeature() {
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
-    if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear only on lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
-    if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly.');
+    if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
+    if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');
     if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Filled node bars stay on the side, span their full price ranges, and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
@@ -132,6 +132,20 @@ function renderFeature() {
             check.checked = draft.outputs[key].visible;
             check.disabled = !feature.connected;
             check.onchange = () => { draft.outputs[key].visible = check.checked; };
+        }
+        if(['FVG','Support / Resistance'].includes(item)){
+            el('h4','Score labels',content);
+            const selection=el('div','',content,'settings-selection');
+            for(const [label,enabled] of [['Select all scores',true],['Deselect all scores',false]]){
+                const button=el('button',label,selection);
+                button.onclick=()=>{for(const [key] of feature.outputs)draft.outputs[key].scores=enabled;render();};
+            }
+            for(const [key,label] of feature.outputs){
+                const row=el('label',`${label} show scores `,content,'settings-row');
+                const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs[key].scores;
+                input.setAttribute('aria-label',`${label} show scores`);
+                input.onchange=()=>{draft.outputs[key].scores=input.checked;};
+            }
         }
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
@@ -187,11 +201,6 @@ function renderFeature() {
         }
     }
     for(const [key,label,,presentation] of feature.outputs)if(['zone','profile'].includes(presentation)) {
-        if(presentation==='zone'){
-            const row=el('label',`${label} show scores `,content,'settings-row');
-            const toggle=el('input','',row);toggle.type='checkbox';toggle.checked=draft.outputs[key].scores;toggle.setAttribute('aria-label',`${label} show scores`);
-            toggle.onchange=()=>{draft.outputs[key].scores=toggle.checked;};
-        }
         const caption=presentation==='profile'?`${label} bar opacity`:`${label} fill opacity`;
         const row=el('label',`${caption} (%) `,content,'settings-row');
         const input=el('input','',row);input.type='number';input.min=0;input.max=100;input.step=1;

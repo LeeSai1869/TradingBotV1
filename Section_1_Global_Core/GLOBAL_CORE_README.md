@@ -376,3 +376,16 @@ runner logs. No feature generation runs in the status endpoint.
 `check_coin.py --logs` reads bounded log tails, reports modification times, and on
 macOS compares stderr modification time to the running PID's start time. Errors
 that predate that start remain in the file but are not presented as new failures.
+
+### Closest-to-completion symbol priority
+
+When selecting a new bulk-work owner, the runner ranks enabled symbols by an
+estimated outstanding bar workload across enabled frames: feature checkpoint lag,
+pending targeted-repair span, and historical download cursor lag. Indexed
+MIN/MAX endpoint lookups and small metadata tables are used; it does not COUNT
+millions of rows each cycle. Monthly duration is an estimate for ranking only.
+Empty symbols come last; registry order breaks ties. The selected owner remains
+sticky until its history/features complete, then the remaining symbols are
+ranked again. Pausing/removing it releases ownership. Current candle refreshes
+and bounded non-owner service turns continue, preventing complete starvation.
+This changes scheduling only and never resets feature checkpoints.

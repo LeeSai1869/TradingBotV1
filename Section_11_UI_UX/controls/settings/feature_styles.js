@@ -7,6 +7,11 @@ export const FEATURE_STYLES = {
         ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
+    'Market Structure': {connected:true,outputs:[
+        ['structure_range_zones','Structure range','#748298','zone'],
+        ['protected_high','Protected high','#ef5350'],['protected_low','Protected low','#26a69a'],
+        ['latest_confirmed_pivot_high','Confirmed swing high','#f59e0b'],['latest_confirmed_pivot_low','Confirmed swing low','#38bdf8'],
+    ]},
     FVG: { connected: true, outputs: [
         ['bull_fvg_zones','Bullish FVG','#26a69a','zone'],['bear_fvg_zones','Bearish FVG','#ef5350','zone'],
         ...['4h','1d','1w'].flatMap(tf=>[[`bull_fvg_${tf}_zones`,`${tf.toUpperCase()} bullish FVG`,'#26a69a','zone'],[`bear_fvg_${tf}_zones`,`${tf.toUpperCase()} bearish FVG`,'#ef5350','zone']]),

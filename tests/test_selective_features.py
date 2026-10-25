@@ -237,8 +237,10 @@ class SelectiveFeatures(unittest.TestCase):
             current=components.Catalog()
         changed={uid for uid in current.source if current.source[uid]!=baseline.get(uid)}
         self.assertTrue(changed)
-        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle')) for uid in changed))
-        self.assertTrue(all('fvg' in col or col=='sr_zone_events' or col.startswith(('inst_support_','inst_resistance_')) for col in current.plan(current.changed(baseline,{},{})).columns))
+        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure')) for uid in changed))
+        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle'))}).columns)
+        self.assertLessEqual(current.plan(current.changed(baseline,{},{})).columns,allowed)
+        self.assertFalse({'ema50','adx','rsi','vp_poc'} & current.plan(current.changed(baseline,{},{})).columns)
 
     def test_ast_format_only_job_is_retired_without_calculation_or_cursor_reset(self):
         self.legacy_job()
@@ -324,3 +326,21 @@ class SelectiveFeatures(unittest.TestCase):
         actual=db.read_features('ETHUSDT','1m',next_bar['open_time'])
         self.assertEqual(actual['sr_zone_events'],expected['sr_zone_events'])
         self.assertEqual(actual['inst_support_zone_low'],expected['inst_support_zone_low'])
+
+    def test_structure_repair_preserves_core_indicators_and_future_state(self):
+        c=components.catalog()
+        self.engine.component_sources={k:('old-structure' if c.by_id.get(k) and c.by_id[k].module.endswith('.market_structure') else v) for k,v in c.source.items()}
+        conn=features_store.open_db()
+        with conn:
+            conn.execute('UPDATE features SET nearest_swing_high=-999')
+            conn.execute('UPDATE feature_engine_state SET state=?',(checkpoint.dump(self.engine,(0,0)),))
+        conn.close()
+        with patch.object(momentum,'calculate_dmi',side_effect=AssertionError('DMI must not run')),patch.object(trend,'calculate_ema',side_effect=AssertionError('EMA must not run')),patch.object(volume_profile,'accumulate_histogram',side_effect=AssertionError('VP must not run')):
+            self.finish()
+        self.assertEqual(self.raw_features(),self.before)
+        next_bar=bar(220,114);expected=self.engine.step(next_bar)
+        db.write_klines([next_bar]);processor._ENGINES.clear();processor.catch_up('ETHUSDT','1m')
+        actual=db.read_features('ETHUSDT','1m',next_bar['open_time'])
+        for key,value in expected.items():
+            if value is not None and (features_store._translated_fields.get(key)=='string' or key.endswith('_type')):value=str(value)
+            self.assertEqual(actual[key],value,key)

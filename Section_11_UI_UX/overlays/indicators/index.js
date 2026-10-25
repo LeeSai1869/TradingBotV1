@@ -22,7 +22,7 @@ function positionHeaders(){
     for(const state of groups.values())if(state.header){const row=state.pane.getHTMLElement();if(row)state.header.style.top=(row.getBoundingClientRect().top-outer.top+5)+'px';}
 }
 function create(feature){
-    const state={feature,lines:new Map(),pane:['VWAP','WMA','Volume Profile'].includes(feature)?null:chart.addPane(true),header:null,collapsed:false,levels:[]};
+    const state={feature,lines:new Map(),pane:['VWAP','WMA','Volume Profile','Market Structure'].includes(feature)?null:chart.addPane(true),header:null,collapsed:false,levels:[]};
     if(state.pane){
         state.pane.setStretchFactor(.5);
         const header=document.createElement('div');header.className='indicator-pane-header';header.dataset.feature=feature;
@@ -72,7 +72,7 @@ export function mount(instance){
 }
 export function update(instance,data){
     barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
-    for(const feature of [...LOWER,'VWAP','WMA','Volume Profile']){
+    for(const feature of [...LOWER,'VWAP','WMA','Volume Profile','Market Structure']){
         const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&styles()[key]?.visible);
         let state=groups.get(feature);
         if(!enabled){if(state)remove(state);continue;}
