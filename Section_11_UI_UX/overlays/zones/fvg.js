@@ -50,14 +50,21 @@ export function fvgSegments(bars,config,{source='',target='',endTime=null,seeds=
             const start=birth?(higher?(birth.client.close_time+1)/1000:birth.time):available;
             add(identity,low,high,start);
         }
+        for(const side of ['bull','bear']){
+            const score=f[`nearest${side}_fvg_reaction_score`];
+            const low=f[`nearest_${side}_fvg_low`],high=f[`nearest_${side}_fvg_high`];
+            if(Number.isFinite(score))for(const zone of active.values())if(zone.side===side&&zone.low===low&&zone.high===high){zone.score=score;zone.scoreTime=bar.time;}
+        }
         previous=c;
     }
     for(const seed of seeds){
         const key=keyFor(seed.side),identity=seed.side+':'+(seed.older?`prior:${seed.created}`:seed.time);
-        if(!config[key]?.visible||retired.has(identity)||result.some(z=>z.identity===identity||!z.invalidated&&z.side===seed.side&&z.low===seed.low&&z.high===seed.high))continue;
+        if(!config[key]?.visible||retired.has(identity))continue;
+        const existing=result.find(z=>z.identity===identity||!z.invalidated&&z.side===seed.side&&z.low===seed.low&&z.high===seed.high);
+        if(existing){existing.score=seed.score;existing.scoreTime=seed.score_time;continue;}
         if(!Number.isFinite(seed.low)||!Number.isFinite(seed.high)||seed.high<=seed.low)continue;
         const start=higher&&!seed.older?(seed.close_time+1)/1000:seed.time;
-        const zone={key,identity,side:seed.side,source,low:seed.low,high:seed.high,start,end:start,invalidated:false};
+        const zone={key,identity,score:seed.score,scoreTime:seed.score_time,side:seed.side,source,low:seed.low,high:seed.high,start,end:start,invalidated:false};
         result.push(zone);active.set(identity,zone);
     }
     const last=confirmed.at(-1);

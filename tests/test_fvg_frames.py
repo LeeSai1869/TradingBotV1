@@ -32,6 +32,9 @@ class FVGFramesTests(unittest.TestCase):
         self.assertEqual(len(frame['bars']),4)
         expected=list(zip(self.engine.context.persistent['fvgBullLow'],self.engine.context.persistent['fvgBullHigh']))
         self.assertGreater(len(expected),0)
+        scores=self.engine.context.persistent['fvgBullReactionScore']
+        self.assertEqual([z['score'] for z in frame['active'] if z['side']=='bull'],scores)
+        self.assertTrue(all(z['score_time']==self.bars[-1]['open_time']//1000 for z in frame['active']))
         self.assertEqual([(z['low'],z['high']) for z in frame['active'] if z['side']=='bull'],expected)
         self.assertTrue(frame['bars'][2]['features']['qualified_bull_fvg'])
         self.assertNotIn('ema50',frame['bars'][-1]['features'])

@@ -103,6 +103,7 @@ function renderFeature() {
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear only on lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
+    if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly.');
     if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Filled node bars stay on the side, span their full price ranges, and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
     for(const [label,visible] of [['Select all',true],['Deselect all',false]]) {
@@ -186,6 +187,11 @@ function renderFeature() {
         }
     }
     for(const [key,label,,presentation] of feature.outputs)if(['zone','profile'].includes(presentation)) {
+        if(presentation==='zone'){
+            const row=el('label',`${label} show scores `,content,'settings-row');
+            const toggle=el('input','',row);toggle.type='checkbox';toggle.checked=draft.outputs[key].scores;toggle.setAttribute('aria-label',`${label} show scores`);
+            toggle.onchange=()=>{draft.outputs[key].scores=toggle.checked;};
+        }
         const caption=presentation==='profile'?`${label} bar opacity`:`${label} fill opacity`;
         const row=el('label',`${caption} (%) `,content,'settings-row');
         const input=el('input','',row);input.type='number';input.min=0;input.max=100;input.step=1;

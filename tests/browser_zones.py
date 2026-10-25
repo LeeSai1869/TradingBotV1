@@ -39,6 +39,11 @@ async def exercise(base,library):
     with conn:conn.executemany('UPDATE features SET sr_zone_events=? WHERE symbol=? AND interval=? AND open_time=?',[(json.dumps(events.get(r[2],[])),'BTCUSDT','15m',r[2]) for r in rows])
     conn.close()
     engine.context.persistent['srDisplayPrevious']=zones
+    for side,ordinary,institutional in [('support','s1','is1'),('resistance','r1','ir1')]:
+        engine.context.persistent[side+'ZoneIDArray']=[ordinary,institutional]
+        engine.context.persistent[side+'ScoreArray']=[19.25,20]
+        engine.context.persistent['inst'+side.title()+'ZoneIDArray']=[institutional]
+        engine.context.persistent['inst'+side.title()+'ScoreArray']=[33.5]
     conn=features_store.open_db()
     with conn:conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(dump(engine,(0,0)),'BTCUSDT','15m'))
     conn.close()
@@ -69,6 +74,7 @@ async def exercise(base,library):
         await dialog.get_by_label('Low-volume nodes bar opacity',exact=True).fill('75')
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
+        await dialog.get_by_label('Support zones show scores',exact=True).uncheck()
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_label('4H bullish FVG line style',exact=True).select_option('3')
         await dialog.get_by_label('Bullish FVG color',exact=True).fill('#abcdef')
@@ -84,6 +90,8 @@ async def exercise(base,library):
         assert band['start']==rows[0][2]//1000
         assert band['end']==rows[-1][2]//1000
         assert len(band['history'])==2
+        assert band['score']==19.25
+        assert await page.evaluate('Composer.config.featureStyles.support_zones.scores') is False
         assert await page.evaluate('DataCache.srSnapshot.through')==rows[-1][2]//1000
         higher=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='bull_fvg_4h_zones'))")
         assert higher['start']==(source[0]['close_time']+1)//1000
@@ -107,6 +115,7 @@ async def exercise(base,library):
         assert await page.evaluate('Composer.config.featureStyles.vp_histogram.lengthPercent')==55
         assert await page.evaluate("import('/overlays/volume_profile/index.js').then(x=>x.getProfile().levels.vp_poc)")==profiles[rows[-1][2]]['vp_poc']
         assert await page.evaluate('Composer.config.featureStyles.support_zones.opacity')==45
+        assert await page.evaluate('Composer.config.featureStyles.support_zones.scores') is False
         assert await page.evaluate('Composer.config.featureStyles.bull_fvg_zones.color')=='#abcdef'
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')

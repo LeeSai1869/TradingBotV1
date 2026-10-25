@@ -3,6 +3,10 @@ import {getSeries} from '../candles/index.js';
 import {fvgSegments} from './fvg.js';
 import {srSegments} from './sr.js';
 export const name='zones';
+export function zoneScoreLabel(item){
+    const name=item.key.includes('fvg')?'FVG reaction':'S/R score';
+    return `${name}: ${Number.isFinite(item.score)?item.score.toFixed(2):'unavailable'}`;
+}
 const definitions={
     support_zones:['support_zone_low','support_zone_high','nearest_support_zone_id'],
     resistance_zones:['resistance_zone_low','resistance_zone_high','nearest_resistance_zone_id'],
@@ -54,7 +58,20 @@ class Zones {
                 for(const e of [...edges].reverse()){context.lineTo(e.right,e.bottom);context.lineTo(e.left,e.bottom);}
                 context.closePath();context.fill();context.globalAlpha=1;
                 context.strokeStyle=style.color;context.lineWidth=style.width||2;context.setLineDash(style.style===1?[2,3]:style.style===2?[6,4]:[]);
-                if(style.style!==3)context.stroke();context.restore();
+                if(style.style!==3)context.stroke();
+                if(style.scores!==false){
+                    context.font='12px sans-serif';
+                    const text=zoneScoreLabel(item);
+                    const x=Math.max(2,Math.min(mediaSize.width-context.measureText(text).width-12,x2-4));
+                    const y=this.series.priceToCoordinate((item.low+item.high)/2);
+                    if(y!==null&&y>=0&&y<=mediaSize.height){
+                        context.font='12px sans-serif';context.textBaseline='middle';
+                        const width=context.measureText(text).width+8;
+                        context.fillStyle='#101820';context.globalAlpha=.9;context.fillRect(x-4,y-9,width,18);
+                        context.globalAlpha=1;context.fillStyle=style.color;context.fillText(text,x,y);
+                    }
+                }
+                context.restore();
             }
         });
     }

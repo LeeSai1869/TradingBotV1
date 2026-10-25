@@ -469,7 +469,7 @@ def read_previous_decision_candidate(symbol,interval,before):
 
 FVG_COLUMNS=tuple([f'qualified_{side}_fvg' for side in ('bull','bear')]+
                   [f'{side}_fvg_{edge}' for side in ('bull','bear') for edge in ('low','high')]+
-                  [f'nearest_{side}_fvg_{field}' for side in ('bull','bear') for field in ('low','high','created_bar','age')])
+                  [f'nearest_{side}_fvg_{field}' for side in ('bull','bear') for field in ('low','high','created_bar','age')]+[f'nearest{side}_fvg_reaction_score' for side in ('bull','bear')])
 
 
 def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
@@ -511,7 +511,7 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
                     saved=json.loads(state[1]);s=saved['state'];arrays=s['persistent']
                     if saved.get('version')==3 and saved.get('epoch')==[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:
                         for side,label in [('bull','Bull'),('bear','Bear')]:
-                            for low,high,created in zip(arrays.get('fvg'+label+'Low',[]),arrays.get('fvg'+label+'High',[]),arrays.get('fvg'+label+'CreatedBar',[])):
+                            for zone_index,(low,high,created) in enumerate(zip(arrays.get('fvg'+label+'Low',[]),arrays.get('fvg'+label+'High',[]),arrays.get('fvg'+label+'CreatedBar',[]))):
                                 age=s['index']-created
                                 if not isinstance(age,int) or age<0:continue
                                 birth=rows[position-age] if age<=position else rows[0]
@@ -522,7 +522,9 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
                                     if subsequent[2]!=previous[8]+1 or touched and (subsequent[6]<low if side=='bull' else subsequent[6]>high):valid=False;break
                                     previous=subsequent
                                 if not valid:continue
-                                active.append({'side':side,'low':low,'high':high,'created':created,'time':birth[2]//1000,'close_time':birth[8],'older':age>position})
+                                scores=arrays.get('fvg'+label+'ReactionScore',[])
+                                score=scores[zone_index] if zone_index<len(scores) else None
+                                active.append({'score':score,'score_time':state[0]//1000,'side':side,'low':low,'high':high,'created':created,'time':birth[2]//1000,'close_time':birth[8],'older':age>position})
                 except (KeyError,TypeError,ValueError):pass
         return {'version':version,'active':active,'bars':[{'time':r[2]//1000,'open_time':r[2],
                  'client':dict(zip(_KLINE_COLUMNS,r)),'features':by_time.get(r[2])} for r in rows] if include_bars else []}
@@ -566,5 +568,14 @@ def read_sr_snapshot(symbol, interval):
         epochs=data_policy.read()['epochs']
         if saved.get('epoch')!=[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:return None
         zones=saved['state']['persistent'].get('srDisplayPrevious')
-        return dict(through=row[0]//1000,zones=zones) if zones is not None else None
+        if zones is None:return None
+        # Scores are read from already calculated parallel arrays. Keeping them
+        # out of lifecycle exports avoids a new historical formula replay.
+        arrays=saved['state']['persistent'];scored={};lookup={}
+        for prefix in ('support','resistance','instSupport','instResistance'):
+            lookup[prefix]=dict(zip(arrays.get(prefix+'ZoneIDArray',[]),arrays.get(prefix+'ScoreArray',[])))
+        for identity,zone in zones.items():
+            side=zone['side'];prefix=('inst'+side.title()) if zone.get('institutional') else side
+            scored[identity]={**zone,'score':lookup[prefix].get(identity),'score_time':row[0]//1000}
+        return dict(through=row[0]//1000,zones=scored)
     finally:conn.close()

@@ -300,6 +300,7 @@ def _compute_and_write_one(symbol,interval,bar_open_ms):
 def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     """Patch affected columns and partial state atomically; never replace rows."""
     import json
+    started=time.monotonic()
     conn=features_store.open_db()
     try:job=selective.read_job(conn,symbol,interval)
     finally:conn.close()
@@ -354,7 +355,7 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     if complete:
         key=(str(features_store.DB_PATH),symbol,interval,epoch)
         merged._repair_pending=False;merged._prepared_signature=current_signature();_ENGINES[key]=merged
-    print(f'[processor] {symbol} {interval}: targeted +{len(output)} rows, {len(columns)} columns; through={last}; complete={complete}',flush=True)
+    print(f'[processor] {symbol} {interval}: targeted +{len(output)} rows, {len(columns)} columns; through={last}; complete={complete}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s',flush=True)
     return len(output)
 
 

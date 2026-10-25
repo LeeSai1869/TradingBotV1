@@ -55,6 +55,7 @@ export function normalizeStyles(value = {}) {
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
             };
+            if(presentation==='zone')result[key].scores=typeof input.scores==='boolean'?input.scores:true;
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(key==='vp_histogram'){
                 result[key].lengthPercent=Number.isFinite(input.lengthPercent)?Math.max(10,Math.min(80,input.lengthPercent)):45;

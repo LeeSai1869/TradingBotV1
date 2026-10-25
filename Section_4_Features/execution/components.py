@@ -239,6 +239,10 @@ class Catalog:
             changed=expanded
 
     def plan(self,changed):
+        return self._plan(frozenset(changed))
+
+    @lru_cache(maxsize=32)
+    def _plan(self,changed):
         execute=set(changed)
         # Internal arrays/intermediates absent from stored rows require their
         # producing calculations; exported prerequisites are hydrated instead.

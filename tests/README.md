@@ -728,3 +728,10 @@ institutional style changes, checkpoint seeding and missing-data boundaries.
 `test_selective_features.py` exercises S/R-only historical export migration while
 prohibiting EMA, DMI and VP calculations. `browser_zones.py` also renders stored
 S/R lifecycle events and a bound change through the actual combined bars API.
+
+`zone_scores.test.mjs` checks independent score-label preferences, metric labels,
+missing values, stable S/R identity matching and FVG seed enrichment without
+extra boxes. The browser fixture checks the saved score toggle and a calculated
+S/R score through the combined API. FVG frame tests validate checkpoint reaction
+scores. The selective-plan cache regression ensures repeated jobs reuse a plan
+while separate Catalog instances and formula sources remain independent.

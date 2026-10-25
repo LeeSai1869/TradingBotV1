@@ -107,3 +107,15 @@ different valid identities; the UI does not silently combine them or impose a
 new maximum zone count. The source's reverse removal loops, parallel arrays and
 NA propagation are covered by regression checks. Arrays are initialized by
 `execution.memory.update`, before numbered feature functions run.
+
+## Reusing selective plans
+
+A Catalog caches at most 32 compiled selective plans by the set of changed
+calculation-unit IDs. The same plan can read different per-pair parameters from
+its Context; no indicator state or calculated outputs are shared between pairs.
+A new Catalog has a separate cache key. Formula fingerprints and checkpoint
+signatures are unchanged by this optimization, so installing it creates no new
+historical replay. In a six-run local setup benchmark, median compilation was
+48 ms uncached versus 0.004 ms for cached lookup. This measures plan setup only,
+not production database throughput or total catch-up time. Targeted replay log
+lines now include measured batch rows/s, including checkpoint/SQL overhead.

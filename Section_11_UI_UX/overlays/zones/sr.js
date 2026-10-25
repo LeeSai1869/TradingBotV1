@@ -45,9 +45,20 @@ export function srSegments(bars,config,snapshot=null){
             active.clear();state.clear();previous=bar;continue;
         }
         for(const event of events){if(event.removed)state.delete(event.id);else state.set(event.id,event);}
-        sync(bar.time);previous=bar;
+        sync(bar.time);
+        const f=bar.features||{};
+        for(const side of ['support','resistance','inst_support','inst_resistance']){
+            const key=side+'_zones',id=f['nearest_'+side+'_zone_id'],score=f['nearest_'+side+'_score'];
+            const item=active.get(key+':'+id);
+            if(item&&Number.isFinite(score)){item.score=score;item.scoreTime=bar.time;}
+        }
+        previous=bar;
     }
     for(const item of active.values())item.until=previous?.client?.close_time!==undefined?(previous.client.close_time+1)/1000:item.end;
+    for(const item of result){
+        const identity=item.identity.slice(item.key.length+1),zone=snapshot?.zones?.[identity];
+        if(zone&&Number.isFinite(zone.score)&&!item.invalidated&&!item.truncated&&(item.scoreTime??-Infinity)<=snapshot.through){item.score=zone.score;item.scoreTime=zone.score_time;}
+    }
     return result;
 }
 
@@ -65,6 +76,7 @@ function legacySegments(bars,config){
             if(!item){item={key,identity,low,high,start:bar.time,end:bar.time};result.push(item);seen.set(identity,item);}
             if(item.low!==low||item.high!==high){item.history??=[{time:item.start,low:item.low,high:item.high}];item.history.push({time:bar.time,low,high});item.low=low;item.high=high;}
             item.end=bar.time;
+            if(Number.isFinite(f['nearest_'+side+'_score'])){item.score=f['nearest_'+side+'_score'];item.scoreTime=bar.time;}
         }
     }
     return result;

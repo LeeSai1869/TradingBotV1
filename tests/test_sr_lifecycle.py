@@ -69,3 +69,11 @@ class SRLifecycleTests(unittest.TestCase):
         for side in ('Support','Resistance'):
             self.assertEqual(e['inst'+side+'WTNormalized'],.5)
             self.assertEqual(e['inst'+side+'STNormalized'],.5)
+
+    def test_selective_plan_compilation_is_reused_without_changing_formula_sources(self):
+        c=Catalog();sources=dict(c.source)
+        dirty={u.id for u in c.units if u.module.endswith('.zone_lifecycle')}
+        first=c.plan(dirty);second=c.plan(set(dirty))
+        self.assertIs(first,second)
+        self.assertIsNot(first,Catalog().plan(dirty))
+        self.assertEqual(sources,c.source)
