@@ -295,7 +295,9 @@ class Catalog:
                             body.append(ast.Expr(value=ast.Call(func=ast.Name(id='_hydrate',ctx=ast.Load()),args=[ast.Name(id='e',ctx=ast.Load()),ast.Constant(field),ast.Constant(self.export[field])],keywords=[])))
             if not body:continue
             function=ast.FunctionDef(name='_selective_update',args=ast.arguments(posonlyargs=[],args=[ast.arg(arg='e')],kwonlyargs=[],kw_defaults=[],defaults=[]),body=body,decorator_list=[])
-            tree=ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[]));namespace=dict(module.__dict__);namespace['_hydrate']=hydrate
+            from . import fast
+            function.body=fast.optimize(function.body,name)
+            tree=ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[]));namespace={**module.__dict__,**fast.HELPERS};namespace['_hydrate']=hydrate
             exec(compile(tree,module.__file__,'exec'),namespace)
             functions.append(namespace['_selective_update'])
         return SimpleNamespace(changed=changed,execute=execute,shadowed=shadowed,writes=writes,columns=columns,functions=functions,

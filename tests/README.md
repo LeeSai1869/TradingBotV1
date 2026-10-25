@@ -746,3 +746,12 @@ Closest-symbol priority tests use different checkpoint lags and verify empty
 symbols wait until existing work is finished. FVG tests include source-equals-
 target behavior, and browser settings checks cover independent Display score
 bulk controls and institutional scores.
+
+`test_fast_execution.py` compares original and accelerated full packets, scratch
+values and checkpoints; randomized liquidity histories and VP bins include NA,
+zero denominators, short windows and ties. Changed loop/runtime fingerprints
+must fall back to original execution, and module helpers stay replaceable.
+A scheduling regression verifies normal maintenance can consume a 1,000-bar page
+without the previous 200-row ceiling. `benchmark_features.py --compare` times the
+full calculation path independently of network/database/scheduler waits, checks
+all measured packets, and never writes production memory.

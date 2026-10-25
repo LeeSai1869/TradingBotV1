@@ -56,6 +56,7 @@ def _backup_legacy():
 
 
 def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
+    started=time.monotonic()
     epoch=_epoch(symbol,interval)
     if not data_policy.enabled(symbol,interval):return 0
     engine=_load(symbol,interval,epoch)
@@ -68,7 +69,7 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
         if cursor is not None:rows=[row for row in rows if row[2]<cursor]
     finally:conn.close()
     if not rows:return 0
-    _backup_legacy();output=[]
+    _backup_legacy();output=[];compute_started=time.monotonic()
     for row in rows:
         if output and deadline is not None and time.monotonic()>=deadline:break
         client=dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),row))
@@ -83,6 +84,7 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
         packet.features['daily_source_ready']=daily_ready
         output.append(packet.features)
     if not output:return 0
+    compute_seconds=time.monotonic()-compute_started;write_started=time.monotonic()
     with data_policy.locked():
         if not data_policy.enabled(symbol,interval) or epoch!=_epoch(symbol,interval):
             reset_pair(symbol,interval);raise RuntimeError('Feature replay cancelled after data policy changed')
@@ -96,7 +98,7 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
         except Exception:
             reset_pair(symbol,interval);raise
         finally:conn.close()
-    print(f'[processor] {symbol} {interval}: +{len(output)} complete feature packets; replay through {engine.context.last_time}',flush=True)
+    print(f'[processor] {symbol} {interval}: +{len(output)} complete feature packets; replay through {engine.context.last_time}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s; compute={1000*compute_seconds/len(output):.3f} ms/bar; commit={time.monotonic()-write_started:.3f}s',flush=True)
     return len(output)
 
 
@@ -107,7 +109,7 @@ def catch_up(symbol,interval):
             reset_pair(symbol,interval);raise
 
 
-def maintenance(symbols,intervals,*,max_bars=200,time_budget=1.):
+def maintenance(symbols,intervals,*,max_bars=1000,time_budget=1.):
     """Keep bulk symbol priority while reserving progress for other active pairs."""
     global _cursor
     _recover_runtime_format_job(symbols,intervals)

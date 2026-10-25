@@ -68,7 +68,7 @@ class FairService(unittest.TestCase):
         calls=[]
         def advance(s,t,*args):calls.append((s,args[0]));return 250 if s=='ENA' else 10
         with patch.object(processor,'_recover_runtime_format_job'),patch.object(processor,'_advance',side_effect=advance),patch.object(processor,'_repair_daily'),patch.object(work_priority,'work_symbol',return_value='BTC'):
-            count=processor.maintenance(['BTC','ENA','SUI'],['1m'],time_budget=10)
+            count=processor.maintenance(['BTC','ENA','SUI'],['1m'],max_bars=200,time_budget=10)
         self.assertEqual(calls,[('ENA',50),('BTC',150)]);self.assertEqual(count,260)
 
     def test_slow_history_requests_cannot_starve_bulk_or_background(self):
@@ -81,3 +81,10 @@ class FairService(unittest.TestCase):
         with patch.object(updater,'DB_PATH',self.raw),patch.object(updater,'_HISTORY_PHASE',0),patch.object(updater,'_open_db',return_value=MagicMock()),patch.object(updater,'_audit_runner',None),patch.object(updater.data_policy,'active_symbols',return_value=['BTC','ENA']),patch.object(updater.data_policy,'active_intervals',return_value=['1m']),patch.object(updater,'update_one',side_effect=update),patch.object(updater.time,'monotonic',side_effect=lambda:clock[0]):
             for _ in range(4):updater.update_all(time_budget=1)
         self.assertEqual(history,['ENA','BTC','ENA','BTC'])
+
+    def test_normal_maintenance_can_consume_a_full_download_page(self):
+        def advance(symbol,interval,cap,deadline):return min(1000,cap)
+        with patch.object(processor,'_recover_runtime_format_job'),patch.object(processor,'_advance',side_effect=advance) as work,patch.object(processor,'_repair_daily'),patch.object(work_priority,'work_symbol',return_value='BTC'):
+            count=processor.maintenance(['BTC'],['1m'],time_budget=10)
+        self.assertEqual(count,1000)
+        self.assertEqual(work.call_count,1)
