@@ -150,3 +150,7 @@ The gutter is drawn above the price ray so it cannot merge into the live candle.
 Historical heatmap cells keep their true fractional-pixel time width, rather than
 stacking many five-second samples into forced one-pixel strips on higher frames.
 The provisional candle's own pixel interval stays clear of heatmap shading.
+
+Current bid and ask bars share one right-hand edge and extend left like a
+volume profile. Colour identifies side; width uses the same USDT-notional scale
+for both sides. They do not diverge around a central axis.

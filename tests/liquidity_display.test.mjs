@@ -47,8 +47,8 @@ test('an expired cached live packet is labelled stale rather than live',()=>{
 test('current-book geometry never covers the last candle or its wick',()=>{
     const gutter=bookGutter(1000,940,6);
     assert.ok(gutter.left>940+6/2);assert.ok(gutter.right<1000);
-    assert.ok(gutter.origin-2-gutter.maxWidth>=gutter.left);
-    assert.ok(gutter.origin+2+gutter.maxWidth<=gutter.right);
+    assert.equal(gutter.origin,gutter.right);
+    assert.equal(gutter.origin-gutter.maxWidth,gutter.left);
     assert.equal(bookGutter(1000,990,6),null);
 });
 test('subpixel heatmap time widths stay exact and leave the live candle clear',()=>{

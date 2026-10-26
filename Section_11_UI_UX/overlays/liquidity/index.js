@@ -24,7 +24,7 @@ export function currentBookVisible(sample,bars,following=true,range=null){
 export function bookGutter(paneWidth,candleX,spacing){
     if(!Number.isFinite(candleX)||!Number.isFinite(spacing))return null;
     const left=Math.max(8,candleX+spacing/2+8),right=paneWidth-8;
-    return right-left>=20?{left,right,origin:(left+right)/2,maxWidth:(right-left-4)/2}:null;
+    return right-left>=20?{left,right,origin:right,maxWidth:right-left}:null;
 }
 export function heatmapSpans(x,width,candleX,spacing){
     if(!(width>0))return [];
@@ -106,7 +106,7 @@ class Liquidity {
                     const vertical=bounds(latest,band);if(!vertical)continue;
                     if(!gutter)continue;
                     const width=gutter.maxWidth*band.notional_usdt/maximum;
-                    if(paint(band,{x:band.side==='bid'?gutter.origin-2-width:gutter.origin+2,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
+                    if(paint(band,{x:gutter.origin-width,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
                 }
             }
             if(layer==='profile'){
