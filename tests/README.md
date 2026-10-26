@@ -784,3 +784,7 @@ notional labels and independent toggles; cache tests verify one combined poll.
 `browser_liquidity.py` exercises chart/settings/price-band table and stale hiding
 with disposable observations and no exchange calls. Live connectivity remains
 an explicit deployment check; fixture tests cannot establish exchange access.
+
+Liquidity display regressions also cover current-book projection across a
+missing/expired provisional candle, historical viewport exclusion, genuinely old
+candle data, and expiration of a cached packet whose server label was live.

@@ -2,13 +2,24 @@
 // Draw only on actual chart times; no synthetic pre-collection heatmap/history.
 import {getSeries} from '../candles/index.js';
 export const name='liquidity';
-let primitive,status,tooltip,bookTable,snapshot=null;
+let primitive,status,tooltip,bookTable,snapshot=null,expiryTimer=null;
 const keys=['liquidity_bids','liquidity_asks','liquidity_heatmap'];
 const styles=()=>window.Composer?.config.featureStyles||{};
 const staleMs=10000;
 export function fresh(snapshot,now=Date.now()){
     const latest=snapshot?.latest;
     return snapshot?.status==='live'&&latest&&now>=latest.book_received_ms&&now-latest.book_received_ms<=staleMs&&now>=latest.available_ms&&now-latest.available_ms<=staleMs?latest:null;
+}
+export function currentBookVisible(sample,bars,following=true,range=null){
+    const last=bars.at(-1);if(!sample||following===false||!last)return false;
+    if(range&&typeof range.from==='number'&&(last.time<range.from||last.time>range.to))return false;
+    const duration=last.client?.close_time+1-last.open_time;
+    const time=sample.sampled_ms??sample.available_ms;
+    // A fresh book belongs at the latest edge throughout the next forming
+    // interval, even if that provisional candle is disabled/unavailable.
+    // Historical heatmap cells still require exact candle-time alignment.
+    return Number.isFinite(duration)&&duration>0&&time>=last.open_time&&
+        time<last.client.close_time+1+duration;
 }
 export function bandRows(sample,config){
     if(!sample?.observed||sample.market!=='usdt_perpetual')return [];
@@ -33,10 +44,11 @@ class Liquidity {
             const config=styles(),latest=fresh(snapshot);this.hitboxes=[];
             const history=snapshot.history||[],max=Math.max(1,...history.flatMap(s=>bandRows(s,config).map(b=>b.notional_usdt)));
             const paint=(band,box,opacity,observed_ms)=>{
-                if(box.x+box.width<0||box.x>mediaSize.width||box.y+box.height<0||box.y>mediaSize.height)return;
+                if(box.x+box.width<0||box.x>mediaSize.width||box.y+box.height<0||box.y>mediaSize.height)return false;
                 context.fillStyle=config[`liquidity_${band.side==='bid'?'bids':'asks'}`].color;
                 context.globalAlpha=opacity;context.fillRect(box.x,box.y,Math.max(1,box.width),Math.max(.5,box.height));
                 this.hitboxes.push({...box,width:Math.max(1,box.width),height:Math.max(.5,box.height),band:{...band,observed_ms}});
+                return true;
             };
             const bounds=(sample,band)=>{
                 // Near the spread, one logarithmic band may contain both sides.
@@ -55,15 +67,19 @@ class Liquidity {
                     paint(band,{x,width:end-x,...vertical},(config.liquidity_heatmap.opacity??40)/100*Math.sqrt(band.notional_usdt/max),sample.book_received_ms);
                 }
             }
-            const currentX=latest?this.xAt(latest.sampled_ms??latest.available_ms):null;
-            if(latest&&currentX!==null&&currentX>=0&&currentX<=mediaSize.width){
-                const rows=bandRows(latest,config),maximum=Math.max(1,...rows.map(b=>b.notional_usdt)),origin=mediaSize.width*.78;
+            const projected=currentBookVisible(latest,this.bars,this.following,this.chart.timeScale().getVisibleRange());
+            let painted=0,currentRows=0;
+            if(projected){
+                const rows=bandRows(latest,config);currentRows=rows.length;
+                const maximum=Math.max(1,...rows.map(b=>b.notional_usdt)),origin=mediaSize.width*.78;
                 for(const band of rows){
                     const vertical=bounds(latest,band);if(!vertical)continue;
                     const width=mediaSize.width*.18*band.notional_usdt/maximum;
-                    paint(band,{x:band.side==='bid'?origin-width:origin,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms);
+                    if(paint(band,{x:band.side==='bid'?origin-width:origin,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
                 }
             }
+            this.projectionHint=latest&&!projected?' · current book in table; go to latest candles':projected&&currentRows&&!painted?' · depth outside visible price range':'';
+            statusText();
             context.restore();
         });
     }
@@ -103,15 +119,23 @@ function updateTable(current){
     }
     bookTable.append(table);
 }
+export function feedState(snapshot,now=Date.now()){return fresh(snapshot,now)?'live':snapshot?.status==='live'?'stale':snapshot?.status||'not recording';}
 function statusText(){
-    const current=fresh(snapshot);
-    status.textContent=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps`:
-        `Perpetual liquidity: ${snapshot?.status||'not recording'} · ${snapshot?.reason||'Start the liquidity recorder'}`;
+    const current=fresh(snapshot),state=feedState(snapshot);
+    const text=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps${primitive.projectionHint||''}`:
+        `Perpetual liquidity: ${state} · ${snapshot?.reason||(state==='stale'?'Waiting for a fresh synchronized update':'Start the liquidity recorder')}`;
+    if(status.textContent!==text)status.textContent=text;
+    if(!current)bookTable.hidden=true;
 }
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);
-    snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];status.hidden=!enabled;tooltip.hidden=true;
+    snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];primitive.following=data.atLiveEdge!==false;primitive.projectionHint='';status.hidden=!enabled;tooltip.hidden=true;
+    clearTimeout(expiryTimer);
     if(enabled)statusText();updateTable(enabled?fresh(snapshot):null);primitive.requestUpdate?.();
+    if(enabled&&snapshot?.latest){
+        const deadline=Math.min(snapshot.latest.book_received_ms,snapshot.latest.available_ms)+staleMs+1;
+        expiryTimer=setTimeout(()=>{statusText();primitive.requestUpdate?.();},Math.max(0,deadline-Date.now()));
+    }
 }
 export function updateLive(){if(snapshot){statusText();if(!fresh(snapshot))bookTable.hidden=true;primitive.requestUpdate?.();}}
 export function getSnapshot(){return snapshot;}

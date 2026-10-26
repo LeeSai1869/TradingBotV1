@@ -136,3 +136,9 @@ requests share a one-per-second start limit, honor 418/429 cooldowns, and do not
 block WebSocket reads. None of these workers runs in the UI request path or
 shares the candle runner's writer lock. Validate CPU/disk/network usage before
 assuming 50 busy instruments can be retained without gaps on a laptop.
+
+Current depth bars remain visible at the latest chart edge through the next
+forming interval even when that provisional candle is disabled or unavailable.
+This projection does not extend historical heatmap cells or permit a stale book.
+Historical viewports and prices outside the visible scale have explicit display
+notices; cached packets expire to a stale label even if polling has stopped.
