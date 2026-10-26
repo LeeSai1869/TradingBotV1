@@ -154,6 +154,12 @@ async def exercise(base,library):
         await settle(page)
         own=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().filter(z=>z.key==='bull_fvg_4h_zones'))")
         assert len(own)==1,own
+        conn=features_store.open_db()
+        with conn:conn.execute('INSERT OR REPLACE INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',('BTCUSDT','4h','test-wait',source[-1]['open_time'],source[0]['open_time'],'[]',None,json.dumps(['sr_zone_events','nearest_bull_fvg_low'])))
+        conn.close()
+        await page.evaluate('DataCache.refreshStored()');await settle(page)
+        assert 'Zone coverage pending feature repair' in await page.locator('#status').inner_text()
+        assert await page.evaluate('DataCache.bars.length')==3
         assert not errors,errors
         print('PASS: institutional scores and Display controls, source-chart FVG, structure ranges, VP and combined-stream reuse',flush=True)
         await browser.close()

@@ -167,25 +167,29 @@ _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))
 def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
-    conn.executescript(_SCHEMA)
-    existing = {row[1] for row in conn.execute('PRAGMA table_info(features)')}
-    for column in COLUMNS:
-        if column not in existing:
-            kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if _translated_fields.get(column)=='string' or column.endswith('_type') else 'REAL'
-            try:
-                conn.execute(f'ALTER TABLE features ADD COLUMN {column} {kind}')
-            except sqlite3.OperationalError:
-                # UI and runner may open the previous schema concurrently.
-                if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
-                    conn.close()
-                    raise
-    conn.execute('CREATE TABLE IF NOT EXISTS feature_replay_jobs (symbol TEXT, interval TEXT, signature TEXT, target INTEGER, last_time INTEGER, changed TEXT, state TEXT, columns TEXT, PRIMARY KEY(symbol,interval))')
-    conn.execute("CREATE TABLE IF NOT EXISTS feature_calculation_versions (symbol TEXT, interval TEXT, signature TEXT, generation INTEGER NOT NULL DEFAULT 0, invalidated_columns TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(symbol,interval))")
-    if 'invalidated_columns' not in {row[1] for row in conn.execute('PRAGMA table_info(feature_calculation_versions)')}:
-        conn.execute("ALTER TABLE feature_calculation_versions ADD COLUMN invalidated_columns TEXT NOT NULL DEFAULT '[]'")
-    conn.execute('CREATE TABLE IF NOT EXISTS feature_engine_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))')
-    conn.commit()
-    return conn
+    try:
+        conn.executescript(_SCHEMA)
+        existing = {row[1] for row in conn.execute('PRAGMA table_info(features)')}
+        for column in COLUMNS:
+            if column not in existing:
+                kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if _translated_fields.get(column)=='string' or column.endswith('_type') else 'REAL'
+                try:
+                    conn.execute(f'ALTER TABLE features ADD COLUMN {column} {kind}')
+                except sqlite3.OperationalError:
+                    # UI and runner may open the previous schema concurrently.
+                    if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
+                        conn.close()
+                        raise
+        conn.execute('CREATE TABLE IF NOT EXISTS feature_replay_jobs (symbol TEXT, interval TEXT, signature TEXT, target INTEGER, last_time INTEGER, changed TEXT, state TEXT, columns TEXT, PRIMARY KEY(symbol,interval))')
+        conn.execute("CREATE TABLE IF NOT EXISTS feature_calculation_versions (symbol TEXT, interval TEXT, signature TEXT, generation INTEGER NOT NULL DEFAULT 0, invalidated_columns TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(symbol,interval))")
+        if 'invalidated_columns' not in {row[1] for row in conn.execute('PRAGMA table_info(feature_calculation_versions)')}:
+            conn.execute("ALTER TABLE feature_calculation_versions ADD COLUMN invalidated_columns TEXT NOT NULL DEFAULT '[]'")
+        conn.execute('CREATE TABLE IF NOT EXISTS feature_engine_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))')
+        conn.commit()
+        return conn
+    except BaseException:
+        conn.close()
+        raise
 
 
 def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:

@@ -166,6 +166,9 @@ def update_one(symbol, interval, conn, *, latest_only=False):
         return 0
     klines_store.ensure_history_progress(conn)
     stored = _last_stored_open_time(conn, symbol, interval)
+    wait=klines_store.first_close_waits(conn,now_ms).get(key) if stored is None else None
+    if stored is None and wait is not None:return 0
+    if stored is not None:klines_store.clear_first_close_wait(conn,symbol,interval)
     if stored is None:_LATEST_UPDATE_MS.pop(key,None)
     cursor=klines_store.history_cursor(conn,symbol,interval)
     last_ms = _LAST_UPDATE_MS.get(key) if stored is not None else None
@@ -211,6 +214,10 @@ def update_one(symbol, interval, conn, *, latest_only=False):
             return total
         n = _insert(conn, symbol, interval, page, now_ms)
         closed=[row for row in page if int(row[6])<now_ms]
+        if stored is None and len(page)==1 and not closed and int(page[0][0])<=now_ms<=int(page[0][6]):
+            klines_store.record_first_close_wait(conn,symbol,interval,int(page[0][0]),int(page[0][6]),now_ms)
+            print(f'[update_klines] {symbol} {interval}: source has only its first forming candle; waiting until {int(page[0][6])+1}')
+        if closed:klines_store.clear_first_close_wait(conn,symbol,interval)
         if cursor is not None and not closed and page and int(page[0][6])>=now_ms:
             with conn:conn.execute('DELETE FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval))
         if cursor is not None and closed:
@@ -291,13 +298,6 @@ def update_all(*, max_pairs=512, time_budget=2.0):
             print("[audit] recent-row audit starting",flush=True)
             manifest = _audit_runner.run_fast(sample_rows_per_pair=10)
             LAST_AUDIT = manifest.get('summary') or _audit_runner.summarize(manifest)
-            audit_conn=_open_db()
-            try:
-                pending=audit_conn.execute('SELECT symbol,interval FROM history_progress').fetchall() if audit_conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else []
-                active=set(pairs)
-                LAST_AUDIT['history_backfill_pairs']=sum(tuple(pair) in active for pair in pending)
-                if LAST_AUDIT['history_backfill_pairs']:LAST_AUDIT['pass']=False
-            finally:audit_conn.close()
             print('[audit] '+_json.dumps(LAST_AUDIT,sort_keys=True),flush=True)
         except Exception as e:
             LAST_AUDIT = {"pass":None,"error":str(e)}

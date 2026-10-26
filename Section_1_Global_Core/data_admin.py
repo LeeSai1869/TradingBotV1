@@ -93,6 +93,8 @@ def delete_data(*, interval=None, symbol=None):
                     conn.execute(f'DELETE FROM features_memory.{table} WHERE {column}=?',(value,))
                 conn.execute(f'DELETE FROM features_memory.feature_engine_state WHERE {column}=?', (value,))
                 conn.execute(f'DELETE FROM decisions_memory.decision_rule_state WHERE {column}=?',(value,))
+                if conn.execute("SELECT 1 FROM sqlite_master WHERE name='first_close_waits'").fetchone():
+                    conn.execute(f'DELETE FROM first_close_waits WHERE {column}=?',(value,))
                 if conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():
                     conn.execute(f'DELETE FROM history_progress WHERE {column}=?',(value,))
             return counts

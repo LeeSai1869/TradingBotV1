@@ -122,7 +122,7 @@ class ChartGatewayTests(unittest.TestCase):
             self.assertEqual(status,400)
 
     def test_real_feature_builder_reaches_the_joined_gateway(self):
-        from Section_4_Features.processor import _compute_and_write_one
+        from Section_4_Features.processor import catch_up
         rows = []
         for i in range(510):
             candle = self.candle('SUIUSDT', 1700000000000 + i * 60000)
@@ -131,7 +131,7 @@ class ChartGatewayTests(unittest.TestCase):
             rows.append(candle)
         db.write_klines(rows)
         t = rows[-1]['open_time']
-        self.assertEqual(_compute_and_write_one('SUIUSDT', '1m', t), 1)
+        self.assertEqual(sum(catch_up('SUIUSDT','1m') for _ in range(3)),len(rows))
         state = db.read_state_range('SUIUSDT', '1m', t, t+1)
         self.assertIsNotNone(state[0]['features']['ema50'])
         self.assertIsNone(state[0]['adcn'])

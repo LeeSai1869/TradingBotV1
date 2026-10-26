@@ -389,3 +389,29 @@ sticky until its history/features complete, then the remaining symbols are
 ranked again. Pausing/removing it releases ownership. Current candle refreshes
 and bounded non-owner service turns continue, preventing complete starvation.
 This changes scheduling only and never resets feature checkpoints.
+
+### Runtime health and zone availability
+
+Run `python3 audit_status.py` for a read-only report naming active missing/stale
+pairs and unfinished historical downloads. It samples recent rows; it does not
+verify exchange values or full-history continuity, repair data, or write audit
+records. `--symbol ETHUSDT` narrows the report. A source-confirmed first forming
+candle is reported as awaiting its first close, not as a missing closed candle;
+empty exchange responses remain failures. The downloader retries after that
+close and never inserts a forming candle as closed history.
+
+Current candles do not imply current features. Pending selective repairs mask
+affected outputs until committed; enabled higher-timeframe FVG/S/R displays now
+show a waiting/repair notice. Disabled timeframes remain paused. Existing replay
+jobs resume without resetting checkpoints or recalculating unrelated columns.
+
+SQLite initialization and multi-store acquisition failures close already-open
+handles. The runner records its PID, project and precise start timestamp so
+`check_coin.py` can distinguish earlier appended errors from this run. This does
+not erase logs or establish that every historical error has been resolved.
+
+The obsolete hard-coded `_section1_audit.py`, unused single-row compatibility
+loop, and exceptions for deleted diagnostics were removed. Reviewed internal
+integration imports are listed in `tools/integration_imports.json`; the import
+check rejects retired Section 6/7 imports. Stored-data compatibility adapters and
+migration signatures remain necessary and are retained.

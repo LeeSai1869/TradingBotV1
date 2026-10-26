@@ -5,6 +5,7 @@ import * as timeframeControl from "../controls/timeframe/index.js";
 import * as reloadControl from "../controls/reload/index.js";
 import * as latestControl from "../controls/latest/index.js";
 import * as storedPoll from "./stored_poll.js";
+import {zoneReadiness} from '../overlays/zones/readiness.js';
 import {HTF,intervalMs} from "../overlays/zones/fvg.js";
 
 const PREFETCH_BARS = 500;
@@ -45,13 +46,15 @@ async function loadAll() {
         const historyNotice=DataCache.historyPending ? ' | Earlier history pending' : behind ? ` | Historical data through ${new Date(client.close_time).toLocaleString()} — not current price` : '';
         const progress=DataCache.featureProgress;
         const stamp=t=>t==null?'not started':new Date(t).toLocaleString();
+        const zonesPending=zoneReadiness(progress,DataCache.fvgFrames,Composer.config.featureStyles||{},DataCache.timeframe);
+        const zoneNotice=zonesPending?` | ${zonesPending}`:'';
         const featureNotice=progress?progress.repair?` | Feature repair${progress.active===false?' paused':''}: ${progress.repair.columns} columns through ${stamp(progress.repair.through)}; target ${stamp(progress.repair.target)}`:
             progress.active===false?` | Features paused at ${stamp(progress.through)}`:progress.status==='features current'?' | Features current':` | Features through ${stamp(progress.through)} (${progress.status})`:'';
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
-              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice + featureNotice;
+              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
     }
 
     function checkBoundary() {

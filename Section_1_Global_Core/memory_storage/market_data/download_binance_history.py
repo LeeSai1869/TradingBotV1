@@ -96,22 +96,26 @@ class AbortAllError(Exception):
 
 def open_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS klines (
-            symbol      TEXT NOT NULL,
-            interval    TEXT NOT NULL,
-            open_time   INTEGER NOT NULL,
-            open        REAL NOT NULL,
-            high        REAL NOT NULL,
-            low         REAL NOT NULL,
-            close       REAL NOT NULL,
-            volume      REAL NOT NULL,
-            close_time  INTEGER NOT NULL,
-            PRIMARY KEY (symbol, interval, open_time)
-        )
-    """)
-    conn.commit()
-    return conn
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS klines (
+                symbol      TEXT NOT NULL,
+                interval    TEXT NOT NULL,
+                open_time   INTEGER NOT NULL,
+                open        REAL NOT NULL,
+                high        REAL NOT NULL,
+                low         REAL NOT NULL,
+                close       REAL NOT NULL,
+                volume      REAL NOT NULL,
+                close_time  INTEGER NOT NULL,
+                PRIMARY KEY (symbol, interval, open_time)
+            )
+        """)
+        conn.commit()
+        return conn
+    except BaseException:
+        conn.close()
+        raise
 
 
 def last_stored_open_time(conn, symbol: str, interval: str):

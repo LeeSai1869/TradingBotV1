@@ -289,16 +289,6 @@ def preview(symbol,interval,client,*,is_new=True):
     return result
 
 
-def _compute_and_write_one(symbol,interval,bar_open_ms):
-    """Compatibility entry: replay missing predecessors before computing a target."""
-    with _LOCK:
-        engine=_load(symbol,interval,_epoch(symbol,interval))
-        while engine.context.last_time is None or engine.context.last_time<bar_open_ms:
-            if not _advance(symbol,interval):return 0
-        return 1
-
-
-
 def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     """Patch affected columns and partial state atomically; never replace rows."""
     import json

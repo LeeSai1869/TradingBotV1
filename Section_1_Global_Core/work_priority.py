@@ -1,6 +1,7 @@
 """Closest-to-completion bulk priority with bounded service for other pairs."""
 from contextlib import closing
 import sqlite3
+import time
 from .memory_storage.Storage import klines_store,features_store
 
 _selected=None
@@ -21,6 +22,7 @@ def work_symbol(symbols,intervals):
     if not klines_store.DB_PATH.exists():return symbols[0]
     with closing(sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
+        waiting=klines_store.first_close_waits(raw,int(time.time()*1000))
         history_cursors={}
         if history and 'next_open_time' in {r[1] for r in raw.execute('PRAGMA table_info(history_progress)')}:
             history_cursors={(s,t):v for s,t,v in raw.execute('SELECT symbol,interval,next_open_time FROM history_progress')}
@@ -37,6 +39,7 @@ def work_symbol(symbols,intervals):
                     repairs={(s,t):(last,target) for s,t,last,target in features.execute('SELECT symbol,interval,last_time,target FROM feature_replay_jobs')}
         def pending(s):
             for t in intervals:
+                if (s,t) in waiting:continue
                 if (s,t) in history or (s,t) in jobs or versions is not None and versions.get((s,t))!=signature:return True
                 # Indexed point lookup; never scan millions of candles per cycle.
                 latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(s,t)).fetchone()[0]
@@ -46,6 +49,7 @@ def work_symbol(symbols,intervals):
         def backlog(symbol):
             remaining=0.;populated=False
             for interval in intervals:
+                if (symbol,interval) in waiting:continue
                 first=raw.execute('SELECT MIN(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
                 latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
                 if latest is None:remaining+=float('inf');continue
@@ -95,6 +99,7 @@ def service_pair(symbols,intervals,owner,kind):
     with ExitStack() as stack:
         raw=stack.enter_context(closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)))
         history={}
+        waiting=klines_store.first_close_waits(raw,int(time.time()*1000))
         if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():
             cols={r[1] for r in raw.execute('PRAGMA table_info(history_progress)')}
             history={(s,t):v for s,t,v in raw.execute('SELECT symbol,interval,next_open_time FROM history_progress')} if 'next_open_time' in cols else {tuple(r):None for r in raw.execute('SELECT symbol,interval FROM history_progress')}
@@ -109,6 +114,7 @@ def service_pair(symbols,intervals,owner,kind):
         for _ in pairs:
             pair=pairs[cursor%len(pairs)];cursor+=1;_service_cursors[identity]=cursor
             s,t=pair
+            if pair in waiting:continue
             if kind=='downloads':
                 if pair in history or not raw.execute('SELECT 1 FROM klines WHERE symbol=? AND interval=? LIMIT 1',pair).fetchone():return pair
             else:

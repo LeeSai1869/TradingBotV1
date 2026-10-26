@@ -180,3 +180,21 @@ def history_cursor(conn,symbol,interval):
     if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():return None
     row=conn.execute('SELECT next_open_time FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
     return row[0] if row else None
+
+
+def first_close_waits(conn,now_ms=None):
+    """Source-confirmed first forming candles; metadata only, never fake OHLCV."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='first_close_waits'").fetchone():return {}
+    rows=conn.execute('SELECT symbol,interval,close_time FROM first_close_waits').fetchall()
+    return {(s,t):close for s,t,close in rows if now_ms is None or close>=now_ms}
+
+
+def record_first_close_wait(conn,symbol,interval,open_time,close_time,observed_at):
+    conn.execute('CREATE TABLE IF NOT EXISTS first_close_waits (symbol TEXT,interval TEXT,open_time INTEGER,close_time INTEGER,observed_at INTEGER,PRIMARY KEY(symbol,interval))')
+    conn.execute('INSERT OR REPLACE INTO first_close_waits VALUES (?,?,?,?,?)',(symbol,interval,open_time,close_time,observed_at))
+    conn.commit()
+
+
+def clear_first_close_wait(conn,symbol,interval):
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='first_close_waits'").fetchone() and conn.execute('SELECT 1 FROM first_close_waits WHERE symbol=? AND interval=?',(symbol,interval)).fetchone():
+        conn.execute('DELETE FROM first_close_waits WHERE symbol=? AND interval=?',(symbol,interval));conn.commit()

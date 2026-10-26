@@ -1,0 +1,64 @@
+{
+  "description": "Reviewed current worker, UI and diagnostic bridge imports. Exact file/module grants; downstream strategy consumers must use public packets. Tests may exercise Core internals.",
+  "integrations": {
+    "check_coin.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_8_Decision_Engine/processor.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_5_Market_Regime/Market_Regime.py": [
+      "Section_1_Global_Core.Data_Contracts_Legacy"
+    ],
+    "Section_4_Features/processor.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_4_Features/feature_builder.py": [
+      "Section_1_Global_Core.memory_storage.market_data.update_klines"
+    ],
+    "Section_11_UI_UX/server/volume_profile.py": [
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_11_UI_UX/server/alerts.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage",
+      "Section_1_Global_Core.memory_storage.market_data.update_klines"
+    ],
+    "Section_11_UI_UX/server/queries.py": [
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_11_UI_UX/server/drawing_routes.py": [
+      "Section_1_Global_Core.data_policy"
+    ],
+    "Section_11_UI_UX/server/alert_routes.py": [
+      "Section_1_Global_Core"
+    ],
+    "Section_11_UI_UX/server/settings_catalog.py": [
+      "Section_1_Global_Core"
+    ],
+    "Section_11_UI_UX/server/admin_routes.py": [
+      "Section_1_Global_Core"
+    ],
+    "Section_11_UI_UX/server/hud.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage",
+      "Section_1_Global_Core.memory_storage.market_data.update_klines"
+    ],
+    "Section_11_UI_UX/server/routes.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_4_Features/execution/selective.py": [
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_4_Features/execution/context.py": [
+      "Section_1_Global_Core.Data_Contracts_Legacy"
+    ],
+    "Section_4_Features/conversion/validate_export.py": [
+      "Section_1_Global_Core.memory_storage.market_data.update_klines"
+    ]
+  }
+}

@@ -90,3 +90,14 @@ class LogFreshnessTests(unittest.TestCase):
             os.utime(path,(30,30));output=io.StringIO()
             with contextlib.redirect_stdout(output):check_coin.print_log_tail(path,60,runner_started=20)
             self.assertIn('old descriptor failure',output.getvalue())
+
+
+class StartupIdentityTests(unittest.TestCase):
+    def test_saved_precise_start_requires_same_pid_and_project(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'Section_1_Global_Core').mkdir()
+            path=root/'Section_1_Global_Core/section_1_9_state.json'
+            path.write_text(json.dumps({'__runner__':{'pid':123,'project':str(root),'started':'2026-10-26T05:05:52.300000+00:00'}}))
+            self.assertAlmostEqual(check_coin.recorded_runner_start(root,123)%1,.3,places=5)
+            self.assertIsNone(check_coin.recorded_runner_start(root,124))

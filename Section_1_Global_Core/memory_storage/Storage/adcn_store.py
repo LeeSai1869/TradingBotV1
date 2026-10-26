@@ -5,9 +5,8 @@ ADCN STORE — Engine decisions (DB 3)
 
 Holds:
     Section 4 interpretations (swing_* fields)
-    Section 6.1 output
-    Section 7.1 output
-    Section 8.1 output
+    Current Section 8 decisions
+    Archived Section 6/7 columns retained for stored-data compatibility
 
 One row per (symbol, interval, open_time).
 
@@ -93,10 +92,14 @@ _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))
 def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
-    conn.executescript(_SCHEMA)
-    conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
-    conn.commit()
-    return conn
+    try:
+        conn.executescript(_SCHEMA)
+        conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
+        conn.commit()
+        return conn
+    except BaseException:
+        conn.close()
+        raise
 
 
 def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:

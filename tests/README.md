@@ -755,3 +755,11 @@ A scheduling regression verifies normal maintenance can consume a 1,000-bar page
 without the previous 200-row ceiling. `benchmark_features.py --compare` times the
 full calculation path independently of network/database/scheduler waits, checks
 all measured packets, and never writes production memory.
+
+Runtime-health coverage: `test_audit_availability.py` checks first-forming-monthly
+availability, expiry/retry, genuinely missing pairs, and read-only diagnostics;
+`test_connection_cleanup.py` retains failed handles to verify explicit closure;
+`test_import_boundary.py` checks exact integration grants and retired imports.
+`zone_readiness.test.mjs` and the browser smoke test verify pending zone repairs
+are explained while candles remain visible. Runner diagnostics cover precise
+PID/project-matched start timestamps. These changes do not alter feature formulas.

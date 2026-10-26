@@ -23,6 +23,7 @@ directly. Everything goes through db.py.
 from __future__ import annotations
 from pathlib import Path
 import sqlite3
+from contextlib import ExitStack,closing
 
 from . import klines_store
 from . import features_store
@@ -174,11 +175,10 @@ def read_state_range(symbol, interval, start_ms, end_ms):
     The three physical stores remain an implementation detail of this
     public Central Core contract.
     """
-    k_conn = klines_store.open_db()
-    f_conn = features_store.open_db()
-    a_conn = adcn_store.open_db()
-
-    try:
+    with ExitStack() as stack:
+        k_conn=stack.enter_context(closing(klines_store.open_db()))
+        f_conn=stack.enter_context(closing(features_store.open_db()))
+        a_conn=stack.enter_context(closing(adcn_store.open_db()))
         kline_rows = klines_store.read_range(
             k_conn, symbol, interval, start_ms, end_ms
         )
@@ -188,10 +188,6 @@ def read_state_range(symbol, interval, start_ms, end_ms):
         adcn_rows = adcn_store.read_range(
             a_conn, symbol, interval, start_ms, end_ms
         )
-    finally:
-        k_conn.close()
-        f_conn.close()
-        a_conn.close()
 
     features_by_time = {
         int(row["open_time"]): row
@@ -370,35 +366,33 @@ def read_decision_inputs(symbol,interval,after,limit=200):
     """Small closed-bar/DI projection, capped by committed feature replay state."""
     if not features_store.DB_PATH.exists() or not klines_store.DB_PATH.exists():return []
     from Section_1_Global_Core import data_policy
-    with data_policy.snapshot_guard():
-        features=_read_connection(features_store.DB_PATH)
-        raw=_read_connection(klines_store.DB_PATH)
-        try:
-            features.execute('BEGIN')
-            through=features_store.replay_through(features,symbol,interval)
-            if through is None:return []
-            rows=[row for row in klines_store.read_after_page(raw,symbol,interval,after,limit) if row[2]<=through]
-            if not rows:return []
-            values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
-            return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
-        finally:features.close();raw.close()
+    with data_policy.snapshot_guard(), ExitStack() as stack:
+        features=stack.enter_context(closing(_read_connection(features_store.DB_PATH)))
+        raw=stack.enter_context(closing(_read_connection(klines_store.DB_PATH)))
+        features.execute('BEGIN')
+        through=features_store.replay_through(features,symbol,interval)
+        if through is None:return []
+        rows=[row for row in klines_store.read_after_page(raw,symbol,interval,after,limit) if row[2]<=through]
+        if not rows:return []
+        values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
+        return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
+
 
 
 def read_decision_seed(symbol,interval):
     """Latest three raw candles at the committed feature prefix; never a live tail."""
     if not features_store.DB_PATH.exists() or not klines_store.DB_PATH.exists():return []
     from Section_1_Global_Core import data_policy
-    with data_policy.snapshot_guard():
-        features=_read_connection(features_store.DB_PATH);raw=_read_connection(klines_store.DB_PATH)
-        try:
-            features.execute('BEGIN')
-            through=features_store.replay_through(features,symbol,interval)
-            if through is None:return []
-            rows=klines_store.read_page(raw,symbol,interval,3,before=through+1)
-            if not rows:return []
-            values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
-            return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
-        finally:features.close();raw.close()
+    with data_policy.snapshot_guard(), ExitStack() as stack:
+        features=stack.enter_context(closing(_read_connection(features_store.DB_PATH)));raw=stack.enter_context(closing(_read_connection(klines_store.DB_PATH)))
+        features.execute('BEGIN')
+        through=features_store.replay_through(features,symbol,interval)
+        if through is None:return []
+        rows=klines_store.read_page(raw,symbol,interval,3,before=through+1)
+        if not rows:return []
+        values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
+        return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
+
 
 
 def iter_decision_history(symbols=None,intervals=None):
@@ -480,12 +474,13 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
     if raw is None:return {'version':'empty','bars':[]}
     try:
         latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()[0]
+        first_close=klines_store.first_close_waits(raw,int(time.time()*1000)).get((symbol,interval))
     finally:raw.close()
     features=_read_connection(features_store.DB_PATH) if features_store.DB_PATH.exists() else None
     try:
         from Section_1_Global_Core import data_policy
         epochs=data_policy.read()['epochs']
-        version=[latest,epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]
+        version=[latest,epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0),first_close]
         if features:
             for table,columns in [('feature_engine_state','last_open_time'),('feature_calculation_versions','signature'),('feature_replay_jobs','last_time')]:
                 row=features.execute(f'SELECT {columns} FROM {table} WHERE symbol=? AND interval=?',(symbol,interval)).fetchone() if features.execute('SELECT 1 FROM sqlite_master WHERE name=?',(table,)).fetchone() else None
@@ -501,7 +496,7 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
             values=features_store.read_replay_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1,FVG_COLUMNS)
             features_store.mask_replays(features,symbol,interval,values)
         by_time={r['open_time']:r for r in values}
-        active=[]
+        active=[];task=None;calculated=False
         if features and rows:
             state=features.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone() if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone() else None
             task=features_store.pending_replay(features,symbol,interval)
@@ -510,6 +505,7 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
                 try:
                     saved=json.loads(state[1]);s=saved['state'];arrays=s['persistent']
                     if saved.get('version')==3 and saved.get('epoch')==[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:
+                        calculated=True
                         for side,label in [('bull','Bull'),('bear','Bear')]:
                             for zone_index,(low,high,created) in enumerate(zip(arrays.get('fvg'+label+'Low',[]),arrays.get('fvg'+label+'High',[]),arrays.get('fvg'+label+'CreatedBar',[]))):
                                 age=s['index']-created
@@ -526,7 +522,8 @@ def read_fvg_frame(symbol,interval,known_version=None,*,include_bars=True):
                                 score=scores[zone_index] if zone_index<len(scores) else None
                                 active.append({'score':score,'score_time':state[0]//1000,'side':side,'low':low,'high':high,'created':created,'time':birth[2]//1000,'close_time':birth[8],'older':age>position})
                 except (KeyError,TypeError,ValueError):pass
-        return {'version':version,'active':active,'bars':[{'time':r[2]//1000,'open_time':r[2],
+        readiness='awaiting first closed candle' if first_close is not None and latest is None else 'feature repair pending' if task and any('fvg' in c for c in task[2]) else 'ready' if calculated or any(r.get('qualified_bull_fvg') is not None or r.get('qualified_bear_fvg') is not None for r in values) else 'waiting for features'
+        return {'version':version,'status':readiness,'active':active,'bars':[{'time':r[2]//1000,'open_time':r[2],
                  'client':dict(zip(_KLINE_COLUMNS,r)),'features':by_time.get(r[2])} for r in rows] if include_bars else []}
     finally:
         if features:features.close()
@@ -545,6 +542,7 @@ def read_feature_progress(symbol,interval,latest=None,*,history_pending=False):
         if repair:
             result['repair']={'through':repair[0] if repair[0]>=0 else None,'target':repair[1],'columns':len(repair[2])}
             result['status']='updating affected features'
+            result['zone_repairs']=(["FVG"] if any('fvg' in c for c in repair[2]) else [])+(["Support / Resistance"] if any('support' in c or 'resistance' in c or c=='sr_zone_events' for c in repair[2]) else [])
         elif row and latest is not None and row[0]>=latest:result['status']='features current'
         elif row:result['status']='historical feature replay'
         if history_pending and result['status']!='features current':result['history_pending']=True

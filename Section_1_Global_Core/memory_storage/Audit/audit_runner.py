@@ -52,8 +52,12 @@ CREATE TABLE IF NOT EXISTS compromised_pairs (
 
 def _open_metadata():
     conn = sqlite3.connect(str(cfg.METADATA_DB))
-    conn.executescript(_METADATA_SCHEMA)
-    return conn
+    try:
+        conn.executescript(_METADATA_SCHEMA)
+        return conn
+    except BaseException:
+        conn.close()
+        raise
 
 
 def is_compromised(symbol: str, interval: str) -> bool:
@@ -184,10 +188,14 @@ def summarize(manifest):
         'consistency_pass': None if manifest.get('A4_ran') is False else not any(pair.get('mismatch_count',0) for item in manifest.get('A4') or [] for pair in item.get('pairs',[])),
         'stale_count': (manifest.get('A5') or {}).get('stale_count',0),
         'missing_count': (manifest.get('A5') or {}).get('missing',0),
+        'missing_pairs': (manifest.get('A5') or {}).get('missing_pairs',[]),
+        'stale_pairs': (manifest.get('A5') or {}).get('stale',[]),
+        'awaiting_first_close': (manifest.get('A5') or {}).get('awaiting_first_close',[]),
+        'history_backfill_pairs': manifest.get('history_backfill_pairs',0),
     }
     result['freshness_pass'] = result['stale_count']==0 and result['missing_count']==0
     result['pass'] = (result['schema_pass'] and result['continuity_pass'] and source!='failed'
-                      and result['consistency_pass'] is not False and result['freshness_pass'])
+                      and result['consistency_pass'] is not False and result['freshness_pass'] and not result['history_backfill_pairs'])
     return result
 
 
@@ -274,7 +282,7 @@ def run(*, sample_rows_per_pair: int = 200,
     manifest["A4"] = a4_results
 
     # -------- A5: freshness --------
-    manifest["A5"] = audit_freshness.run([pair for pair in pairs if data_policy.enabled(*pair)])
+    manifest['A5']=audit_freshness.run([(s,t) for s in data_policy.active_symbols() for t in data_policy.active_intervals()])
 
     finished_iso = _now()
     duration_ms = int((time.time() - started) * 1000)
@@ -296,28 +304,30 @@ def run(*, sample_rows_per_pair: int = 200,
     # -------- Record in metadata DB --------
     try:
         conn = _open_metadata()
-        conn.execute(
-            "INSERT INTO audit_runs "
-            "(started_at, finished_at, duration_ms, klines_sha256, pass, summary) "
-            "VALUES (?,?,?,?,?,?)",
-            (started_iso, finished_iso, duration_ms, klines_sha,
-             1 if passed else 0,
-             json.dumps({
-                 "A1_failed": manifest["A1"]["failed"],
-                 "A2_issues": len(manifest["A2"]),
-                 "A3_ran": manifest["A3"]["ran"] if manifest["A3"] else False,
-                 "A5_stale": manifest["A5"]["stale_count"],
-             })),
-        )
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
+        try:
+            conn.execute(
+                "INSERT INTO audit_runs "
+                "(started_at, finished_at, duration_ms, klines_sha256, pass, summary) "
+                "VALUES (?,?,?,?,?,?)",
+                (started_iso, finished_iso, duration_ms, klines_sha,
+                 1 if passed else 0,
+                 json.dumps({
+                     "A1_failed": manifest["A1"]["failed"],
+                     "A2_issues": len(manifest["A2"]),
+                     "A3_ran": manifest["A3"]["ran"] if manifest["A3"] else False,
+                     "A5_stale": manifest["A5"]["stale_count"],
+                 })),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as error:
+        print(f"[audit] metadata record failed: {error}")
 
     return manifest
 
 
-def run_fast(*, sample_rows_per_pair: int = 200) -> dict:
+def run_fast(*, sample_rows_per_pair: int = 200, pairs=None, persist=True) -> dict:
     """Bounded recent-row A1/A2 plus A5. No full scan, hash or inline repair.
 
     Full-history continuity, source comparison, consistency and repairs remain in
@@ -325,12 +335,18 @@ def run_fast(*, sample_rows_per_pair: int = 200) -> dict:
     """
     limit = max(2, min(int(sample_rows_per_pair), 1000))
     started = time.time()
-    pairs = [(symbol, interval) for symbol in data_policy.active_symbols()
-             for interval in data_policy.active_intervals()]
+    pairs = ([(symbol, interval) for symbol in data_policy.active_symbols()
+             for interval in data_policy.active_intervals()] if pairs is None else list(pairs))
     failures, issues, checked = [], [], 0
+    history=[]
     conn = (sqlite3.connect(cfg.KLINES_DB.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)
             if cfg.KLINES_DB.exists() else None)
     try:
+        if conn and conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():
+            columns={r[1] for r in conn.execute('PRAGMA table_info(history_progress)')}
+            projection='symbol,interval,next_open_time' if 'next_open_time' in columns else 'symbol,interval,NULL'
+            active=set(pairs)
+            history=[{'symbol':s,'interval':t,'next_open_time':v} for s,t,v in conn.execute('SELECT '+projection+' FROM history_progress') if (s,t) in active]
         for symbol, interval in pairs:
             rows = conn.execute(
                 'SELECT symbol,interval,open_time,open,high,low,close,volume,close_time '
@@ -355,9 +371,10 @@ def run_fast(*, sample_rows_per_pair: int = 200) -> dict:
                 'sample_rows_per_pair':limit,'klines_sha256':None,'pairs':len(pairs),
                 'A1':{'checked':checked,'failed':len(failures),'failures':failures[:cfg.A1_MAX_FAILURES_REPORTED]},
                 'A2':issues,'A3':{'ran':False},'A4':[],'A4_ran':False,
-                'A5':audit_freshness.run(pairs)}
+                'A5':audit_freshness.run(pairs),'historical_downloads':history,'history_backfill_pairs':len(history)}
     manifest['duration_ms']=int((time.time()-started)*1000)
     manifest['summary']=summarize(manifest);manifest['pass']=manifest['summary']['pass']
+    if not persist:return manifest
     cfg.LOG_DIR.mkdir(parents=True,exist_ok=True)
     (cfg.LOG_DIR/f"{time.time_ns()}_fast.json").write_text(json.dumps(manifest,indent=2)+'\n')
     metadata = _open_metadata()

@@ -54,6 +54,14 @@ def verify_latest(symbol, interval, path=None, fetch=None):
     return label, f'{stamp(t)} | local close={row[4]:g} | '+('; '.join(differences) if differences else 'OHLCV matches exchange for this timestamp')
 
 
+def recorded_runner_start(project,pid):
+    try:
+        info=json.loads((Path(project)/'Section_1_Global_Core/section_1_9_state.json').read_text()).get('__runner__',{})
+        if info.get('pid')!=int(pid) or Path(info.get('project','')).resolve()!=Path(project).resolve():return None
+        return datetime.fromisoformat(info['started']).timestamp()
+    except (OSError,ValueError,KeyError,TypeError):return None
+
+
 def print_log_tail(path,count,*,runner_started=None):
     """Read a bounded tail and distinguish old stderr from this runner's errors."""
     try:
@@ -92,6 +100,8 @@ def main():
             started=subprocess.run(['ps','-p',rows[0][0],'-o','lstart='],capture_output=True,text=True).stdout.strip()
             try:runner_started=datetime.strptime(started,'%a %b %d %H:%M:%S %Y').timestamp()
             except ValueError:pass
+            runner_started=recorded_runner_start(project,rows[0][0]) or runner_started
+            if runner_started is not None:print('Runner started UTC:',datetime.fromtimestamp(runner_started,timezone.utc).isoformat())
             cwd=subprocess.run(['lsof','-a','-p',rows[0][0],'-d','cwd','-Fn'],capture_output=True,text=True)
             paths=[line[1:] for line in cwd.stdout.splitlines() if line.startswith('n')]
             print('Runner working folder:',paths[0] if paths else 'unknown')
@@ -166,6 +176,8 @@ def main():
     if Path(klines_store.DB_PATH).exists():
         conn=sqlite3.connect(Path(klines_store.DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
         try:
+            for (s,t),close in klines_store.first_close_waits(conn,int(time.time()*1000)).items():
+                if s==symbol:print(f'{t}: source has only its first forming candle; first closed candle expected at {stamp(close+1)}')
             print('Latest stored prices (compare dates before interpreting these as current prices):')
             for iv in args.verify or ['1m','5m','15m','1h','2h','4h']:
                 row=conn.execute('SELECT open_time,close,close_time FROM klines WHERE symbol=? AND interval=? ORDER BY open_time DESC LIMIT 1',(symbol,iv)).fetchone()
