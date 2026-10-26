@@ -21,15 +21,32 @@ export function currentBookVisible(sample,bars,following=true,range=null){
     return Number.isFinite(duration)&&duration>0&&time>=last.open_time&&
         time<last.client.close_time+1+duration;
 }
+export function bookGutter(paneWidth,candleX,spacing){
+    if(!Number.isFinite(candleX)||!Number.isFinite(spacing))return null;
+    const left=Math.max(8,candleX+spacing/2+8),right=paneWidth-8;
+    return right-left>=20?{left,right,origin:(left+right)/2,maxWidth:(right-left-4)/2}:null;
+}
+export function heatmapSpans(x,width,candleX,spacing){
+    if(!(width>0))return [];
+    if(!Number.isFinite(candleX))return [{x,width}];
+    const left=candleX-spacing/2-1,right=candleX+spacing/2+1,end=x+width,result=[];
+    if(x<left)result.push({x,width:Math.min(end,left)-x});
+    if(end>right)result.push({x:Math.max(x,right),width:end-Math.max(x,right)});
+    return result.filter(span=>span.width>0);
+}
 export function bandRows(sample,config){
     if(!sample?.observed||sample.market!=='usdt_perpetual')return [];
     return (sample.bands||[]).filter(b=>Number.isFinite(b.notional_usdt)&&b.notional_usdt>0&&b.high>b.low&&config[`liquidity_${b.side==='bid'?'bids':'asks'}`]?.visible);
 }
 export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Resting asks'} · ${band.low.toPrecision(7)}–${band.high.toPrecision(7)} · ${band.notional_usdt.toLocaleString(undefined,{maximumFractionDigits:0})} USDT · Binance perpetual${band.observed_ms?' · '+new Date(band.observed_ms).toLocaleTimeString():''}`;}
 class Liquidity {
-    attached({chart,series,requestUpdate}){Object.assign(this,{chart,series,requestUpdate});}
+    attached({chart,series,requestUpdate}){
+        Object.assign(this,{chart,series,requestUpdate});
+        this.views=['heatmap','profile'].map(layer=>({zOrder:()=>layer==='heatmap'?'bottom':'top',renderer:()=>({draw:target=>this.draw(target,layer)})}));
+    }
     detached(){this.chart=this.series=this.requestUpdate=null;}
-    paneViews(){return [this];}renderer(){return this;}zOrder(){return 'bottom';}
+    paneViews(){return this.views||[];}
+    get hitboxes(){return [...(this.heatmapBoxes||[]),...(this.profileBoxes||[])];}
     xAt(ms){
         let lo=0,hi=this.bars.length;
         while(lo<hi){const mid=(lo+hi)>>1;if(this.bars[mid].open_time<=ms)lo=mid+1;else hi=mid;}
@@ -38,16 +55,20 @@ class Liquidity {
         const spacing=this.chart.timeScale().options().barSpacing;
         return x-spacing/2+spacing*(ms-bar.open_time)/(bar.client.close_time+1-bar.open_time);
     }
-    draw(target){
+    draw(target,layer){
         if(!this.series||!snapshot)return;
         target.useMediaCoordinateSpace(({context,mediaSize})=>{
-            const config=styles(),latest=fresh(snapshot);this.hitboxes=[];
+            const config=styles(),latest=fresh(snapshot),boxes=[];
+            this[layer==='heatmap'?'heatmapBoxes':'profileBoxes']=boxes;
+            const spacing=this.chart.timeScale().options().barSpacing,last=this.bars.at(-1);
+            const candleX=last?this.chart.timeScale().timeToCoordinate(last.time):null;
+            const protectedX=last?.provisional?candleX:null;
             const history=snapshot.history||[],max=Math.max(1,...history.flatMap(s=>bandRows(s,config).map(b=>b.notional_usdt)));
             const paint=(band,box,opacity,observed_ms)=>{
                 if(box.x+box.width<0||box.x>mediaSize.width||box.y+box.height<0||box.y>mediaSize.height)return false;
                 context.fillStyle=config[`liquidity_${band.side==='bid'?'bids':'asks'}`].color;
-                context.globalAlpha=opacity;context.fillRect(box.x,box.y,Math.max(1,box.width),Math.max(.5,box.height));
-                this.hitboxes.push({...box,width:Math.max(1,box.width),height:Math.max(.5,box.height),band:{...band,observed_ms}});
+                context.globalAlpha=opacity;context.fillRect(box.x,box.y,box.width,Math.max(.5,box.height));
+                boxes.push({...box,height:Math.max(.5,box.height),band:{...band,observed_ms}});
                 return true;
             };
             const bounds=(sample,band)=>{
@@ -59,27 +80,39 @@ class Liquidity {
                 return top===null||bottom===null?null:{y:Math.min(top,bottom),height:Math.abs(bottom-top)};
             };
             context.save();
-            if(config.liquidity_heatmap?.visible)for(const sample of history){
+            if(layer==='heatmap'&&config.liquidity_heatmap?.visible)for(const sample of history){
                 const t=sample.sampled_ms??sample.available_ms,x=this.xAt(t),end=this.xAt(t+5000);
                 if(x===null||end===null)continue;
                 for(const band of bandRows(sample,config)){
                     const vertical=bounds(sample,band);if(!vertical)continue;
-                    paint(band,{x,width:end-x,...vertical},(config.liquidity_heatmap.opacity??40)/100*Math.sqrt(band.notional_usdt/max),sample.book_received_ms);
+                    for(const span of heatmapSpans(x,end-x,protectedX,spacing))paint(band,{...span,...vertical},(config.liquidity_heatmap.opacity??40)/100*Math.sqrt(band.notional_usdt/max),sample.book_received_ms);
                 }
             }
-            const projected=currentBookVisible(latest,this.bars,this.following,this.chart.timeScale().getVisibleRange());
+            const projected=layer==='profile'&&currentBookVisible(latest,this.bars,this.following,this.chart.timeScale().getVisibleRange());
+            const gutter=bookGutter(mediaSize.width,candleX,spacing);
             let painted=0,currentRows=0;
             if(projected){
                 const rows=bandRows(latest,config);currentRows=rows.length;
-                const maximum=Math.max(1,...rows.map(b=>b.notional_usdt)),origin=mediaSize.width*.78;
+                const maximum=Math.max(1,...rows.map(b=>b.notional_usdt));
+                if(gutter&&rows.length){
+                    // Dedicated current-book gutter, above the live-price ray
+                    // but entirely outside the latest candle body and wick.
+                    context.globalAlpha=1;context.fillStyle='#101820';
+                    context.fillRect(gutter.left,0,gutter.right-gutter.left,mediaSize.height);
+                    context.strokeStyle='#475569';context.lineWidth=1;context.beginPath();
+                    context.moveTo(gutter.left,0);context.lineTo(gutter.left,mediaSize.height);context.stroke();
+                }
                 for(const band of rows){
                     const vertical=bounds(latest,band);if(!vertical)continue;
-                    const width=mediaSize.width*.18*band.notional_usdt/maximum;
-                    if(paint(band,{x:band.side==='bid'?origin-width:origin,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
+                    if(!gutter)continue;
+                    const width=gutter.maxWidth*band.notional_usdt/maximum;
+                    if(paint(band,{x:band.side==='bid'?gutter.origin-2-width:gutter.origin+2,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
                 }
             }
-            this.projectionHint=latest&&!projected?' · current book in table; go to latest candles':projected&&currentRows&&!painted?' · depth outside visible price range':'';
-            statusText();
+            if(layer==='profile'){
+                this.projectionHint=latest&&!projected?' · current book in table; go to latest candles':projected&&currentRows&&!gutter?' · add right-side space for depth bars':projected&&currentRows&&!painted?' · depth outside visible price range':'';
+                statusText();
+            }
             context.restore();
         });
     }
@@ -130,6 +163,7 @@ function statusText(){
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);
     snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];primitive.following=data.atLiveEdge!==false;primitive.projectionHint='';status.hidden=!enabled;tooltip.hidden=true;
+    if(!enabled){primitive.heatmapBoxes=[];primitive.profileBoxes=[];}
     clearTimeout(expiryTimer);
     if(enabled)statusText();updateTable(enabled?fresh(snapshot):null);primitive.requestUpdate?.();
     if(enabled&&snapshot?.latest){

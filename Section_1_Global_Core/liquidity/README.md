@@ -142,3 +142,11 @@ forming interval even when that provisional candle is disabled or unavailable.
 This projection does not extend historical heatmap cells or permit a stale book.
 Historical viewports and prices outside the visible scale have explicit display
 notices; cached packets expire to a stale label even if polling has stopped.
+
+Live depth uses a separated gutter inside the existing space to the right of
+the latest candle. It does not cover candle bodies/wicks or change chart scaling;
+when there is too little space, the status asks for additional right-side space.
+The gutter is drawn above the price ray so it cannot merge into the live candle.
+Historical heatmap cells keep their true fractional-pixel time width, rather than
+stacking many five-second samples into forced one-pixel strips on higher frames.
+The provisional candle's own pixel interval stays clear of heatmap shading.

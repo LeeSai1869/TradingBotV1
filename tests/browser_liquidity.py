@@ -31,6 +31,7 @@ async def exercise(base,library):
             await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
             await page.goto(base);await sign_in(page,'user')
             await page.wait_for_function('window.Composer?.mounted && !DataCache.loading && !DataCache._olderPromise')
+            candle_points=await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")
             await page.get_by_role('button',name='Open settings',exact=True).click()
             dialog=page.get_by_role('dialog',name='Settings',exact=True)
             await dialog.get_by_role('tab',name='Features',exact=True).click()
@@ -40,6 +41,7 @@ async def exercise(base,library):
             await dialog.get_by_label('Resting perpetual bids bar opacity',exact=True).fill('45')
             await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
             await page.wait_for_function("DataCache.liquidity?.status==='live'")
+            assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==candle_points
             assert 'observed orders (USDT)' in await page.locator('.liquidity-status').inner_text()
             assert 'spot candles' in await page.locator('.liquidity-status').inner_text()
             assert await page.evaluate('DataCache.liquidity.history.length')==30

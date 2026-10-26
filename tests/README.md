@@ -788,3 +788,8 @@ an explicit deployment check; fixture tests cannot establish exchange access.
 Liquidity display regressions also cover current-book projection across a
 missing/expired provisional candle, historical viewport exclusion, genuinely old
 candle data, and expiration of a cached packet whose server label was live.
+
+Liquidity/candle isolation tests verify non-overlapping right-gutter geometry,
+exact subpixel heatmap widths and clipping around the provisional candle. The
+browser integration compares all candle time/OHLC points before and after
+Liquidity is enabled; observation overlays must not mutate those values.

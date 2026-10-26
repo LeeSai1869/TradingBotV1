@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fresh,bandRows,bandLabel,currentBookVisible,feedState} from '../Section_11_UI_UX/overlays/liquidity/index.js';
+import {fresh,bandRows,bandLabel,currentBookVisible,feedState,bookGutter,heatmapSpans} from '../Section_11_UI_UX/overlays/liquidity/index.js';
 import {normalizeStyles,FEATURE_STYLES} from '../Section_11_UI_UX/controls/settings/feature_styles.js';
 const latest={observed:true,market:'usdt_perpetual',available_ms:1000,book_received_ms:1000,
     bands:[{side:'bid',low:99,high:100,notional_usdt:200},{side:'ask',low:101,high:102,notional_usdt:400}]};
@@ -42,4 +42,18 @@ test('an expired cached live packet is labelled stale rather than live',()=>{
     assert.equal(feedState({status:'live',latest},1000),'live');
     assert.equal(feedState({status:'live',latest},11001),'stale');
     assert.equal(feedState({status:'resynchronizing',latest:null},1000),'resynchronizing');
+});
+
+test('current-book geometry never covers the last candle or its wick',()=>{
+    const gutter=bookGutter(1000,940,6);
+    assert.ok(gutter.left>940+6/2);assert.ok(gutter.right<1000);
+    assert.ok(gutter.origin-2-gutter.maxWidth>=gutter.left);
+    assert.ok(gutter.origin+2+gutter.maxWidth<=gutter.right);
+    assert.equal(bookGutter(1000,990,6),null);
+});
+test('subpixel heatmap time widths stay exact and leave the live candle clear',()=>{
+    assert.deepEqual(heatmapSpans(10,.025,null,6),[{x:10,width:.025}]);
+    assert.deepEqual(heatmapSpans(100,1,100,6),[]);
+    assert.deepEqual(heatmapSpans(90,20,100,6),[{x:90,width:6},{x:104,width:6}]);
+    assert.deepEqual(heatmapSpans(90,2,100,6),[{x:90,width:2}]);
 });
