@@ -26,7 +26,7 @@ contract, or includes dated/coin-margined futures under the same identity.
 
 Enable **Settings → Features → Liquidity → Select all**. Bids, asks and history
 have separate visibility/opacity controls. The chart shows current side bars,
-a recent heatmap, hover amounts/time and an expandable price-band table. Values
+a recent heatmap and hover amounts/time, without a separate book panel. Values
 are quote **USDT**, not USD conversions. The badge explicitly identifies the
 perpetual feed and the existing spot candles. A missing or stale book is hidden;
 known historical samples can remain at their actual observation times. Current
@@ -143,14 +143,14 @@ This projection does not extend historical heatmap cells or permit a stale book.
 Historical viewports and prices outside the visible scale have explicit display
 notices; cached packets expire to a stale label even if polling has stopped.
 
-Live depth uses a separated gutter inside the existing space to the right of
-the latest candle. It does not cover candle bodies/wicks or change chart scaling;
-when there is too little space, the status asks for additional right-side space.
-The gutter is drawn above the price ray so it cannot merge into the live candle.
+Current depth is a VP-style profile drawn behind candles directly on the chart,
+with no separate gutter, background panel, divider or centre axis. Each price
+band has one stacked bar: green bid notional followed immediately by red ask
+notional at the same height. Combined width is proportional to total notional;
+each colour's width represents its share. An absent side remains empty rather
+than fabricating opposite liquidity. The shared Profile bar length control
+sets the maximum width as a percentage of chart width.
+
 Historical heatmap cells keep their true fractional-pixel time width, rather than
 stacking many five-second samples into forced one-pixel strips on higher frames.
 The provisional candle's own pixel interval stays clear of heatmap shading.
-
-Current bid and ask bars share one right-hand edge and extend left like a
-volume profile. Colour identifies side; width uses the same USDT-notional scale
-for both sides. They do not diverge around a central axis.

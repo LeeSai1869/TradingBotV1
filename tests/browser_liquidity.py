@@ -39,12 +39,16 @@ async def exercise(base,library):
             await dialog.get_by_role('button',name='Select all',exact=True).click()
             assert await dialog.get_by_label('Observed depth heatmap color',exact=True).is_disabled()
             await dialog.get_by_label('Resting perpetual bids bar opacity',exact=True).fill('45')
+            await dialog.get_by_label('Profile bar length (% of chart)',exact=True).fill('35')
             await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
             await page.wait_for_function("DataCache.liquidity?.status==='live'")
             assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==candle_points
             assert 'observed orders (USDT)' in await page.locator('.liquidity-status').inner_text()
             assert 'spot candles' in await page.locator('.liquidity-status').inner_text()
             assert await page.evaluate('DataCache.liquidity.history.length')==30
+            assert await page.locator('.liquidity-book').count()==0
+            assert await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.profileRows(DataCache.liquidity.latest,Composer.config.featureStyles).some(r=>r.bid>0&&r.ask>0))")
+            assert await page.evaluate('Composer.config.featureStyles.liquidity_bids.lengthPercent')==35
             assert await page.evaluate('Composer.config.featureStyles.liquidity_bids.opacity')==45
             assert any('liquidity=1' in url and '/api/bars?' in url for url in requests)
             assert not any('/api/liquidity' in url for url in requests)

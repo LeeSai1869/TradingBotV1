@@ -152,11 +152,12 @@ function renderFeature() {
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
     }
-    if(item==='Volume Profile'){
+    if(item==='Volume Profile'||item==='Liquidity'){
+        const profileKey=item==='Volume Profile'?'vp_histogram':'liquidity_bids';
         for(const [key,label,min,max] of [['lengthPercent','Profile bar length (% of chart)',10,80]]){
             const row=el('label',label+' ',content,'settings-row'),input=el('input','',row);
-            input.type='number';input.min=min;input.max=max;input.step=1;input.value=draft.outputs.vp_histogram[key];input.setAttribute('aria-label',label);
-            input.onchange=()=>{draft.outputs.vp_histogram[key]=Math.max(min,Math.min(max,Number(input.value)||min));};
+            input.type='number';input.min=min;input.max=max;input.step=1;input.value=draft.outputs[profileKey][key];input.setAttribute('aria-label',label);
+            input.onchange=()=>{draft.outputs[profileKey][key]=Math.max(min,Math.min(max,Number(input.value)||min));};
         }
     }
     const table = el("div", "", content, "settings-style-table");

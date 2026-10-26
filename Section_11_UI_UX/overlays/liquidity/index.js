@@ -2,7 +2,7 @@
 // Draw only on actual chart times; no synthetic pre-collection heatmap/history.
 import {getSeries} from '../candles/index.js';
 export const name='liquidity';
-let primitive,status,tooltip,bookTable,snapshot=null,expiryTimer=null;
+let primitive,status,tooltip,snapshot=null,expiryTimer=null;
 const keys=['liquidity_bids','liquidity_asks','liquidity_heatmap'];
 const styles=()=>window.Composer?.config.featureStyles||{};
 const staleMs=10000;
@@ -21,11 +21,6 @@ export function currentBookVisible(sample,bars,following=true,range=null){
     return Number.isFinite(duration)&&duration>0&&time>=last.open_time&&
         time<last.client.close_time+1+duration;
 }
-export function bookGutter(paneWidth,candleX,spacing){
-    if(!Number.isFinite(candleX)||!Number.isFinite(spacing))return null;
-    const left=Math.max(8,candleX+spacing/2+8),right=paneWidth-8;
-    return right-left>=20?{left,right,origin:right,maxWidth:right-left}:null;
-}
 export function heatmapSpans(x,width,candleX,spacing){
     if(!(width>0))return [];
     if(!Number.isFinite(candleX))return [{x,width}];
@@ -38,11 +33,33 @@ export function bandRows(sample,config){
     if(!sample?.observed||sample.market!=='usdt_perpetual')return [];
     return (sample.bands||[]).filter(b=>Number.isFinite(b.notional_usdt)&&b.notional_usdt>0&&b.high>b.low&&config[`liquidity_${b.side==='bid'?'bids':'asks'}`]?.visible);
 }
+export function profileRows(sample,config){
+    const grouped=new Map();
+    for(const band of bandRows(sample,config)){
+        const id=`${band.low}:${band.high}`;
+        if(!grouped.has(id))grouped.set(id,{low:band.low,high:band.high,bid:0,ask:0});
+        const row=grouped.get(id);row[band.side]+=band.notional_usdt;
+        row[band.side+'Band']={...band,notional_usdt:row[band.side]};
+    }
+    return [...grouped.values()].map(row=>({...row,total:row.bid+row.ask}));
+}
+export function stackedSegments(row,maximum,coordinate,paneWidth,lengthPercent=45){
+    const top=coordinate(row.high),bottom=coordinate(row.low);
+    if(top===null||bottom===null||top===bottom||!(maximum>0)||!(row.total>0))return [];
+    const width=paneWidth*lengthPercent/100*row.total/maximum;
+    let x=paneWidth-5-width;const result=[];
+    for(const side of ['bid','ask']){
+        const size=width*row[side]/row.total;
+        if(size>0)result.push({x,width:size,y:Math.min(top,bottom),height:Math.abs(bottom-top),band:row[side+'Band']});
+        x+=size;
+    }
+    return result;
+}
 export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Resting asks'} · ${band.low.toPrecision(7)}–${band.high.toPrecision(7)} · ${band.notional_usdt.toLocaleString(undefined,{maximumFractionDigits:0})} USDT · Binance perpetual${band.observed_ms?' · '+new Date(band.observed_ms).toLocaleTimeString():''}`;}
 class Liquidity {
     attached({chart,series,requestUpdate}){
         Object.assign(this,{chart,series,requestUpdate});
-        this.views=['heatmap','profile'].map(layer=>({zOrder:()=>layer==='heatmap'?'bottom':'top',renderer:()=>({draw:target=>this.draw(target,layer)})}));
+        this.views=['heatmap','profile'].map(layer=>({zOrder:()=>'bottom',renderer:()=>({draw:target=>this.draw(target,layer)})}));
     }
     detached(){this.chart=this.series=this.requestUpdate=null;}
     paneViews(){return this.views||[];}
@@ -67,8 +84,8 @@ class Liquidity {
             const paint=(band,box,opacity,observed_ms)=>{
                 if(box.x+box.width<0||box.x>mediaSize.width||box.y+box.height<0||box.y>mediaSize.height)return false;
                 context.fillStyle=config[`liquidity_${band.side==='bid'?'bids':'asks'}`].color;
-                context.globalAlpha=opacity;context.fillRect(box.x,box.y,box.width,Math.max(.5,box.height));
-                boxes.push({...box,height:Math.max(.5,box.height),band:{...band,observed_ms}});
+                context.globalAlpha=opacity;context.fillRect(box.x,box.y,box.width,box.height);
+                boxes.push({...box,height:box.height,band:{...band,observed_ms}});
                 return true;
             };
             const bounds=(sample,band)=>{
@@ -89,28 +106,17 @@ class Liquidity {
                 }
             }
             const projected=layer==='profile'&&currentBookVisible(latest,this.bars,this.following,this.chart.timeScale().getVisibleRange());
-            const gutter=bookGutter(mediaSize.width,candleX,spacing);
             let painted=0,currentRows=0;
             if(projected){
-                const rows=bandRows(latest,config);currentRows=rows.length;
-                const maximum=Math.max(1,...rows.map(b=>b.notional_usdt));
-                if(gutter&&rows.length){
-                    // Dedicated current-book gutter, above the live-price ray
-                    // but entirely outside the latest candle body and wick.
-                    context.globalAlpha=1;context.fillStyle='#101820';
-                    context.fillRect(gutter.left,0,gutter.right-gutter.left,mediaSize.height);
-                    context.strokeStyle='#475569';context.lineWidth=1;context.beginPath();
-                    context.moveTo(gutter.left,0);context.lineTo(gutter.left,mediaSize.height);context.stroke();
-                }
-                for(const band of rows){
-                    const vertical=bounds(latest,band);if(!vertical)continue;
-                    if(!gutter)continue;
-                    const width=gutter.maxWidth*band.notional_usdt/maximum;
-                    if(paint(band,{x:gutter.origin-width,width,...vertical},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
+                const rows=profileRows(latest,config);currentRows=rows.length;
+                const maximum=Math.max(0,...rows.map(row=>row.total));
+                for(const row of rows)for(const segment of stackedSegments(row,maximum,value=>this.series.priceToCoordinate(value),mediaSize.width,config.liquidity_bids?.lengthPercent??45)){
+                    const {band,...box}=segment;
+                    if(paint(band,box,(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
                 }
             }
             if(layer==='profile'){
-                this.projectionHint=latest&&!projected?' · current book in table; go to latest candles':projected&&currentRows&&!gutter?' · add right-side space for depth bars':projected&&currentRows&&!painted?' · depth outside visible price range':'';
+                this.projectionHint=latest&&!projected?' · go to latest candles for current depth':projected&&currentRows&&!painted?' · depth outside visible price range':'';
                 statusText();
             }
             context.restore();
@@ -123,34 +129,11 @@ export function mount(){
     Object.assign(status.style,{position:'absolute',right:'8px',top:'52px',fontSize:'11px',color:'#c3ccd6',pointerEvents:'none',zIndex:2,background:'#101820cc',padding:'3px'});
     tooltip=document.createElement('div');tooltip.className='liquidity-tooltip';tooltip.hidden=true;
     Object.assign(tooltip.style,{position:'absolute',left:'8px',bottom:'30px',background:'#101820ee',color:'#fff',fontSize:'12px',padding:'6px',pointerEvents:'none',zIndex:3});
-    bookTable=document.createElement('details');bookTable.className='liquidity-book';bookTable.hidden=true;
-    Object.assign(bookTable.style,{position:'absolute',right:'8px',top:'78px',fontSize:'11px',color:'#c3ccd6',zIndex:2,background:'#101820ee',padding:'5px',maxHeight:'280px',overflow:'auto'});
-    document.getElementById('chart').append(status,tooltip,bookTable);
+    document.getElementById('chart').append(status,tooltip);
     primitive.chart?.subscribeCrosshairMove(param=>{
         const hit=param.point?[...(primitive.hitboxes||[])].reverse().find(b=>param.point.x>=b.x&&param.point.x<=b.x+b.width&&param.point.y>=b.y&&param.point.y<=b.y+b.height):null;
         tooltip.hidden=!hit;if(hit)tooltip.textContent=bandLabel(hit.band);
     });
-}
-function updateTable(current){
-    const open=bookTable.open;bookTable.replaceChildren();bookTable.open=open;bookTable.hidden=!current;
-    if(!current)return;
-    const title=document.createElement('summary');title.textContent='Live perpetual price bands · bids / asks (USDT)';bookTable.append(title);
-    const coverage=document.createElement('div');coverage.textContent=`Snapshot coverage: bid ${current.coverage.bid_bps.toFixed(0)} / ask ${current.coverage.ask_bps.toFixed(0)} bps`;bookTable.append(coverage);
-    const table=document.createElement('table'),head=table.createTHead().insertRow();
-    for(const name of ['Price band','Bid USDT','Ask USDT']){const cell=document.createElement('th');cell.textContent=name;head.append(cell);}
-    const grouped=new Map();
-    for(const band of bandRows(current,styles())){
-        const key=band.low;let row=grouped.get(key);
-        if(!row){row={low:band.low,high:band.high};grouped.set(key,row);}row[band.side]=band.notional_usdt;
-    }
-    const body=table.createTBody();
-    for(const band of [...grouped.values()].sort((a,b)=>b.low-a.low)){
-        const row=body.insertRow();
-        for(const value of [`${band.low.toPrecision(6)}–${band.high.toPrecision(6)}`,band.bid,band.ask]){
-            const cell=row.insertCell();cell.textContent=typeof value==='number'?value.toLocaleString(undefined,{maximumFractionDigits:0}):value??'—';cell.style.padding='2px 5px';
-        }
-    }
-    bookTable.append(table);
 }
 export function feedState(snapshot,now=Date.now()){return fresh(snapshot,now)?'live':snapshot?.status==='live'?'stale':snapshot?.status||'not recording';}
 function statusText(){
@@ -158,18 +141,17 @@ function statusText(){
     const text=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps${primitive.projectionHint||''}`:
         `Perpetual liquidity: ${state} · ${snapshot?.reason||(state==='stale'?'Waiting for a fresh synchronized update':'Start the liquidity recorder')}`;
     if(status.textContent!==text)status.textContent=text;
-    if(!current)bookTable.hidden=true;
 }
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);
     snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];primitive.following=data.atLiveEdge!==false;primitive.projectionHint='';status.hidden=!enabled;tooltip.hidden=true;
     if(!enabled){primitive.heatmapBoxes=[];primitive.profileBoxes=[];}
     clearTimeout(expiryTimer);
-    if(enabled)statusText();updateTable(enabled?fresh(snapshot):null);primitive.requestUpdate?.();
+    if(enabled)statusText();primitive.requestUpdate?.();
     if(enabled&&snapshot?.latest){
         const deadline=Math.min(snapshot.latest.book_received_ms,snapshot.latest.available_ms)+staleMs+1;
         expiryTimer=setTimeout(()=>{statusText();primitive.requestUpdate?.();},Math.max(0,deadline-Date.now()));
     }
 }
-export function updateLive(){if(snapshot){statusText();if(!fresh(snapshot))bookTable.hidden=true;primitive.requestUpdate?.();}}
+export function updateLive(){if(snapshot){statusText();primitive.requestUpdate?.();}}
 export function getSnapshot(){return snapshot;}
