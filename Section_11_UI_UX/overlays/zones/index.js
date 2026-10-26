@@ -3,9 +3,10 @@ import {getSeries} from '../candles/index.js';
 import {fvgSegments} from './fvg.js';
 import {structureSegments} from './structure.js';
 import {srSegments} from './sr.js';
+import {obSegments} from './ob.js';
 export const name='zones';
 export function zoneScoreLabel(item){
-    const name=item.key.includes('fvg')?'FVG reaction':'S/R score';
+    const name=item.key.includes('_ob_')||item.key.includes('_breaker_')?'OB formation strength (ATR)':item.key.includes('fvg')?'FVG reaction':'S/R score';
     return `${name}: ${Number.isFinite(item.score)?item.score.toFixed(2):'unavailable'}`;
 }
 const definitions={
@@ -20,7 +21,7 @@ let primitive,axis=[];
 const styles=()=>window.Composer.config.featureStyles||{};
 export function segments(bars,config,frames={},target=''){
     const result=[];
-    result.push(...srSegments(bars,config,frames.sr),...structureSegments(bars,config));
+    result.push(...srSegments(bars,config,frames.sr),...obSegments(bars,config,frames.sr),...structureSegments(bars,config));
     const endTime=bars.at(-1)?.time;
     result.push(...fvgSegments(bars,config,{target,endTime,seeds:frames.current?.active}));
     for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));

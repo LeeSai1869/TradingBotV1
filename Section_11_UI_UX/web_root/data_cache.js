@@ -64,7 +64,7 @@ const DataCache = {
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
-            if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('sr_zones','1');
+            if(Object.entries(window.Composer?.config.featureStyles||{}).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible))qs.set('sr_zones','1');
             const match=/^(\d+)([mhdwM])$/.exec(timeframe),units={m:60000,h:3600000,d:86400000,w:604800000,M:2678400000};
             const duration=match?Number(match[1])*units[match[2]]:Infinity;
             const frames=['4h','1d','1w'].filter(tf=>({ '4h':14400000,'1d':86400000,'1w':604800000 }[tf]>duration)&&['bull','bear'].some(side=>window.Composer?.config.featureStyles?.[`${side}_fvg_${tf}_zones`]?.visible));

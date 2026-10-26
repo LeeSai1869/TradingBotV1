@@ -125,3 +125,36 @@ end of a feature step can affect readers near its beginning on the next candle.
 The catalog includes these feedback edges and closes them when compiling a plan,
 including a resumed repair's saved changed-unit set. Tests compare every affected
 historical value and the next streamed packet after ATR/config/source changes.
+
+### Order-block lifecycle repair
+
+OB mitigation requires a candle strictly later than formation; breaker mitigation
+requires a candle later than promotion. Both bounds must exist. OB ages are
+calculated after promotion so inactive bounds and ages agree on that candle.
+Strict qualification thresholds and same-candle structure confirmation remain
+unchanged. The checked-in Pine reference mirrors these scalar corrections.
+
+`obDisplayZones` checkpoints every still-valid normal/strict OB and breaker with
+stable identities. New detections do not remove older zones. `ob_zone_events`
+stores only formation, first subsequent overlap, promotion and invalidation
+changes, with reversible prior state and terminal history. Promotion preserves
+the originating OB's mitigation history and starts a fresh breaker return clock.
+A candle can touch and invalidate a zone together; OHLC does not establish which
+intrabar event came first. Invalidation is close below a bullish zone's low or
+above a bearish zone's high; equality remains valid. Existing scalar contract
+fields continue to describe the latest selected block for compatibility.
+
+Adding the ledger repairs only its export; scalar corrections also repair their
+OB/breaker dependents. Existing unaffected columns and the main replay cursor are
+preserved. Replay reconstructs state chronologically and merges the repaired
+ledger for subsequent live candles. It must finish before historical OB zones
+are displayed; the UI reports pending coverage. No global formula-version bump,
+second download, or whole-packet replacement is needed.
+
+Settings → Features → Order Blocks has separate normal/strict bullish/bearish OB
+and breaker visibility, Display score toggles/bulk controls, opacity and invisible
+borders. Labels are formation displacement strength in ATR units (inherited by
+the breaker), not a probability or an invented reaction score. Charts use sparse
+events plus the committed checkpoint; missing/masked history is never extended
+as if validity were established. No arbitrary zone cap silently deletes blocks;
+processing cost scales with the number of still-valid zones.

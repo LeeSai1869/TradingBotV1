@@ -1,6 +1,7 @@
 """Verified execution-only kernels; the reviewed feature AST stays authoritative.
 
-Only exact known loop ASTs are replaced. A source edit automatically falls back
+Only exact known loop ASTs are replaced; OB truth wrappers are removed only
+when their argument is proven boolean. A loop source edit automatically falls back
 to the original loop. Outputs, scratch values, NA semantics and checkpoints stay
 identical, so optimization never changes formula fingerprints or replay cursors.
 """
@@ -69,9 +70,12 @@ def compatible(functions):
 
 
 def optimize(body,module_name):
-    if module_name not in ('Section_4_Features.features.liquidity','Section_4_Features.features.volume_profile'):return body
+    if module_name not in ('Section_4_Features.features.liquidity','Section_4_Features.features.volume_profile','Section_4_Features.features.order_blocks'):return body
     if not compatible(semantics()):return body
     from .components import stable_dump
+    if module_name=='Section_4_Features.features.order_blocks':
+        import copy
+        return [BooleanTruth().visit(copy.deepcopy(node)) for node in body]
     class Replace(ast.NodeTransformer):
         def visit_For(self,node):return self.loop(node)
         def visit_While(self,node):return self.loop(node)
@@ -98,7 +102,7 @@ def _compiled(fn,semantics_key):
 
 def resolve(module,name):
     fn=getattr(module,name)
-    if module.__name__ not in ('Section_4_Features.features.liquidity','Section_4_Features.features.volume_profile') or not inspect.isfunction(fn) or fn.__module__!=module.__name__ or fn.__closure__:return fn
+    if module.__name__ not in ('Section_4_Features.features.liquidity','Section_4_Features.features.volume_profile','Section_4_Features.features.order_blocks') or not inspect.isfunction(fn) or fn.__module__!=module.__name__ or fn.__closure__:return fn
     return _compiled(fn,semantics())
 
 
@@ -153,3 +157,26 @@ LOOPS.update({
  'fbfca450100d5808d9bd69cf98e1c621cfbf00fdb25bcaf12ddd4fc24ce42bf2':'_fast_nodes',
 })
 HELPERS.update(_fast_poc=vp_poc,_fast_total=vp_total,_fast_area=vp_area,_fast_nodes=vp_nodes)
+
+
+class BooleanTruth(ast.NodeTransformer):
+    """Remove truth() only around expressions proven to return Python bool.
+
+    Never infer types of context fields, replace NA comparisons, or reorder
+    operands. Runtime compatibility is checked by optimize() before this runs.
+    """
+    @staticmethod
+    def boolean(node):
+        if isinstance(node,ast.Constant):return type(node.value) is bool
+        if isinstance(node,ast.UnaryOp) and isinstance(node.op,ast.Not):return True
+        if isinstance(node,ast.BoolOp):return all(BooleanTruth.boolean(v) for v in node.values)
+        return (isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
+                and isinstance(node.func.value,ast.Name) and node.func.value.id=='rt'
+                and node.func.attr in ('truth','is_na'))
+    def visit_Call(self,node):
+        node=self.generic_visit(node)
+        if (isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Name)
+                and node.func.value.id=='rt' and node.func.attr=='truth'
+                and len(node.args)==1 and not node.keywords and self.boolean(node.args[0])):
+            return ast.copy_location(node.args[0],node)
+        return node

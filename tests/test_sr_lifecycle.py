@@ -25,6 +25,7 @@ class SRLifecycleTests(unittest.TestCase):
             e[side+'HighArray']=[2,12]
             e['inst'+side.title()+'ZoneIDArray']=[side+'-a']
             e['nearestInst'+side.title()+'ZoneID']=side+'-a'
+        e.values.update(bar_index=0,time=0,l=1,h=2,c=1.5,**{k:False for k in ('bullOBEvent','bearOBEvent','strictBullOBEvent','strictBearOBEvent','bullFVG','bearFVG')},**{k:0 for k in ('bullOBLow','bullOBHigh','bearOBLow','bearOBHigh','strictBullOBLow','strictBullOBHigh','strictBearOBLow','strictBearOBHigh','bullOBStrength','bearOBStrength')})
         zones.update(e)
         self.assertEqual(e['instSupportZoneLow'],10)
         self.assertEqual(e['instResistanceZoneHigh'],12)
@@ -51,7 +52,7 @@ class SRLifecycleTests(unittest.TestCase):
     def test_new_display_export_does_not_invalidate_other_formulas(self):
         c=Catalog();old={k:v for k,v in c.source.items() if '.zone_lifecycle:' not in k}
         p=c.plan(c.changed(old,desired_parameters(),desired_parameters()))
-        self.assertEqual(p.columns,{'sr_zone_events','inst_support_zone_low','inst_support_zone_high','inst_resistance_zone_low','inst_resistance_zone_high'})
+        self.assertEqual(p.columns,{'ob_zone_events','sr_zone_events','inst_support_zone_low','inst_support_zone_high','inst_resistance_zone_low','inst_resistance_zone_high'})
         self.assertNotIn('ema50',p.columns);self.assertNotIn('adx',p.columns)
 
     def test_institutional_touch_normalization_uses_selected_institutional_id(self):

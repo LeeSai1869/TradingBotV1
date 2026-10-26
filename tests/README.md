@@ -763,3 +763,13 @@ availability, expiry/retry, genuinely missing pairs, and read-only diagnostics;
 `zone_readiness.test.mjs` and the browser smoke test verify pending zone repairs
 are explained while candles remain visible. Runner diagnostics cover precise
 PID/project-matched start timestamps. These changes do not alter feature formulas.
+
+OB lifecycle coverage (`test_ob_lifecycle.py`, `ob_lifecycle.test.mjs`) checks
+creation/promotion versus subsequent returns, retained older blocks, strict IDs,
+same-candle touch/invalidation, reversible terminal history, checkpoint recovery,
+unknown-history truncation, and independent UI controls. The selective integration
+test prohibits EMA/DMI/VP execution, verifies unchanged unrelated stored values
+and the main cursor, and compares the next live OB events/state with a full replay.
+The browser smoke test also checks continuous OB bands, ATR strength labels,
+Display score bulk controls and invisible borders. The Pine conversion preserves
+the existing line mapping and reproduces the reviewed scalar corrections.

@@ -46,3 +46,11 @@ Run on the target machine without writing production data:
 ```sh
 python3 benchmark_features.py --bars 1000 --warmup 500 --compare
 ```
+
+Order-block execution additionally removes `rt.truth` only around expressions
+proven to return booleans (truth/is_na calls, `not`, and boolean combinations of
+proven booleans). It does not infer context-field types, reorder short-circuits,
+or replace NA comparisons with native comparisons. The runtime semantic guard
+also protects this path. Formula fingerprints use the authoritative function;
+execution-only simplification never schedules an additional replay. Randomized
+OB states and full packets/checkpoints are compared with the reference path.

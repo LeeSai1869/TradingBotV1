@@ -32,6 +32,7 @@ for p in (7,25,50,100,200,300):FIELDS[f'prev_ema{p}']='float'
 FIELDS['prev_atr']='float'
 FIELDS['daily_source_ready']='bool'
 FIELDS['sr_zone_events']='string'
+FIELDS['ob_zone_events']='string'
 for side in ('support','resistance','inst_support','inst_resistance'):
     for edge in ('low','high'):FIELDS[f'{side}_zone_{edge}']='float'
 

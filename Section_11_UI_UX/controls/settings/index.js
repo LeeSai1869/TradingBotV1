@@ -16,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Momentum Indicator"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -103,6 +103,7 @@ function renderFeature() {
     if (item === "EMA") toggle("Show EMA", "ema");
     else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
+    if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
     if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');
     if(item==='Volume Profile')note('POC, VAH and VAL plot each candle’s calculated values, like VWAP. Filled node bars stay on the side, span their full price ranges, and have separate opacity controls.');
     const selection=el('div','',content,'settings-selection');
@@ -133,7 +134,7 @@ function renderFeature() {
             check.disabled = !feature.connected;
             check.onchange = () => { draft.outputs[key].visible = check.checked; };
         }
-        if(['FVG','Support / Resistance'].includes(item)){
+        if(['FVG','Support / Resistance','Order Blocks'].includes(item)){
             el('h4','Score labels',content);
             const selection=el('div','',content,'settings-selection');
             for(const [label,enabled] of [['Select all scores',true],['Deselect all scores',false]]){

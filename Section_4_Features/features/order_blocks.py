@@ -290,13 +290,13 @@ def update(e):
         # Pine 4561
         e['activeStrictBearOBHasBeenMitigated'] = False
     # Pine 4571
-    e['bullOBMitigated'] = (rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBullOBLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBullOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBullOBLow'])))
+    e['bullOBMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBullOBLow'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBullOBHigh'])))))) and rt.truth(rt.binary('>', e['bar_index'], e['activeBullOBBar'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBullOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBullOBLow'])))
     # Pine 4572
-    e['bearOBMitigated'] = (rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBearOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBearOBLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBearOBHigh'])))
+    e['bearOBMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBearOBLow'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBearOBHigh'])))))) and rt.truth(rt.binary('>', e['bar_index'], e['activeBearOBBar'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBearOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBearOBLow'])))
     # Pine 4575
-    e['strictBullOBMitigated'] = (rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBullOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBullOBLow'])))
+    e['strictBullOBMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBLow'])))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBHigh'])))))) and rt.truth(rt.binary('>', e['bar_index'], e['activeStrictBullOBBar'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBullOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBullOBLow'])))
     # Pine 4576
-    e['strictBearOBMitigated'] = (rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBearOBLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBearOBHigh'])))
+    e['strictBearOBMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBLow'])))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBHigh'])))))) and rt.truth(rt.binary('>', e['bar_index'], e['activeStrictBearOBBar'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBearOBHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBearOBLow'])))
     # Pine 4580
     if rt.truth(e['bullOBMitigated']):
         # Pine 4581
@@ -321,14 +321,6 @@ def update(e):
     e['strictBullOBInvalidated'] = (rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBLow'])))) and rt.truth(rt.binary('<', e['c'], e['activeStrictBullOBLow'])))
     # Pine 4600
     e['strictBearOBInvalidated'] = (rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBHigh'])))) and rt.truth(rt.binary('>', e['c'], e['activeStrictBearOBHigh'])))
-    # Pine 4604
-    e['bullOBAge'] = (rt.binary('-', e['bar_index'], e['activeBullOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeBullOBBar'])))) else rt.NA)
-    # Pine 4605
-    e['bearOBAge'] = (rt.binary('-', e['bar_index'], e['activeBearOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeBearOBBar'])))) else rt.NA)
-    # Pine 4608
-    e['strictBullOBAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBullOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBBar'])))) else rt.NA)
-    # Pine 4609
-    e['strictBearOBAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBearOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBBar'])))) else rt.NA)
     # Pine 4613
     if rt.truth((rt.truth((rt.truth(e['bearOBInvalidated']) and rt.truth((not rt.truth(rt.is_na(e['activeBearOBHigh'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBearOBLow'])))))):
         # Pine 4614
@@ -422,13 +414,13 @@ def update(e):
         # Pine 4670
         e['activeStrictBullOBHasBeenMitigated'] = False
     # Pine 4672
-    e['bullBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth(e['bullBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeBullBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBullBreakerHigh'])))))) and rt.truth(rt.binary('<=', e['l'], e['activeBullBreakerHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBullBreakerLow'])))
+    e['bullBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['bullBreakerActive']) and rt.truth(rt.binary('>', e['bar_index'], e['activeBullBreakerBar'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBullBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBullBreakerHigh'])))))) and rt.truth(rt.binary('<=', e['l'], e['activeBullBreakerHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeBullBreakerLow'])))
     # Pine 4675
-    e['bearBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth(e['bearBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeBearBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBearBreakerHigh'])))))) and rt.truth(rt.binary('>=', e['h'], e['activeBearBreakerLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBearBreakerHigh'])))
+    e['bearBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['bearBreakerActive']) and rt.truth(rt.binary('>', e['bar_index'], e['activeBearBreakerBar'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBearBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBearBreakerHigh'])))))) and rt.truth(rt.binary('>=', e['h'], e['activeBearBreakerLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeBearBreakerHigh'])))
     # Pine 4678
-    e['strictBullBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth(e['strictBullBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullBreakerHigh'])))))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBullBreakerHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBullBreakerLow'])))
+    e['strictBullBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['strictBullBreakerActive']) and rt.truth(rt.binary('>', e['bar_index'], e['activeStrictBullBreakerBar'])))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullBreakerHigh'])))))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBullBreakerHigh'])))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBullBreakerLow'])))
     # Pine 4681
-    e['strictBearBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth(e['strictBearBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearBreakerHigh'])))))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBearBreakerLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBearBreakerHigh'])))
+    e['strictBearBreakerMitigated'] = (rt.truth((rt.truth((rt.truth((rt.truth((rt.truth(e['strictBearBreakerActive']) and rt.truth(rt.binary('>', e['bar_index'], e['activeStrictBearBreakerBar'])))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearBreakerLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearBreakerHigh'])))))) and rt.truth(rt.binary('>=', e['h'], e['activeStrictBearBreakerLow'])))) and rt.truth(rt.binary('<=', e['l'], e['activeStrictBearBreakerHigh'])))
     # Pine 4684
     if rt.truth(e['bullBreakerMitigated']):
         # Pine 4685
@@ -477,6 +469,8 @@ def update(e):
     e['strictBearBreakerHigh'] = (e['activeStrictBearBreakerHigh'] if rt.truth(e['strictBearBreakerActive']) else rt.NA)
     # Pine 4717
     e['strictBearBreakerLow'] = (e['activeStrictBearBreakerLow'] if rt.truth(e['strictBearBreakerActive']) else rt.NA)
+    # Pine 4718
+    e['bullOBAge'] = (rt.binary('-', e['bar_index'], e['activeBullOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeBullOBBar'])))) else rt.NA)
     # Pine 4720
     e['bullBreakerAge'] = (rt.binary('-', e['bar_index'], e['activeBullBreakerBar']) if rt.truth((rt.truth(e['bullBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeBullBreakerBar'])))))) else rt.NA)
     # Pine 4721
@@ -485,15 +479,21 @@ def update(e):
     e['strictBullBreakerAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBullBreakerBar']) if rt.truth((rt.truth(e['strictBullBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBullBreakerBar'])))))) else rt.NA)
     # Pine 4723
     e['strictBearBreakerAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBearBreakerBar']) if rt.truth((rt.truth(e['strictBearBreakerActive']) and rt.truth((not rt.truth(rt.is_na(e['activeStrictBearBreakerBar'])))))) else rt.NA)
+    # Pine 4724
+    e['bearOBAge'] = (rt.binary('-', e['bar_index'], e['activeBearOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeBearOBBar'])))) else rt.NA)
     # Pine 4727
     if rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBullOBHigh'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBullOBLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBullOBATR'])))))) and rt.truth(rt.binary('>', e['activeBullOBATR'], 0)))):
         # Pine 4728
         e['bullOBDistance'] = (rt.binary('-', e['c'], e['activeBullOBHigh']) if rt.truth(rt.binary('>', e['c'], e['activeBullOBHigh'])) else (rt.binary('-', e['activeBullOBLow'], e['c']) if rt.truth(rt.binary('<', e['c'], e['activeBullOBLow'])) else 0.0))
         # Pine 4729
         e['bullOBDistanceATR'] = rt.binary('/', e['bullOBDistance'], e['activeBullOBATR'])
+    # Pine 4730
+    e['strictBullOBAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBullOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeStrictBullOBBar'])))) else rt.NA)
     # Pine 4732
     if rt.truth((rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['activeBearOBHigh'])))) and rt.truth((not rt.truth(rt.is_na(e['activeBearOBLow'])))))) and rt.truth((not rt.truth(rt.is_na(e['activeBearOBATR'])))))) and rt.truth(rt.binary('>', e['activeBearOBATR'], 0)))):
         # Pine 4733
         e['bearOBDistance'] = (rt.binary('-', e['c'], e['activeBearOBHigh']) if rt.truth(rt.binary('>', e['c'], e['activeBearOBHigh'])) else (rt.binary('-', e['activeBearOBLow'], e['c']) if rt.truth(rt.binary('<', e['c'], e['activeBearOBLow'])) else 0.0))
         # Pine 4734
         e['bearOBDistanceATR'] = rt.binary('/', e['bearOBDistance'], e['activeBearOBATR'])
+    # Pine 4735
+    e['strictBearOBAge'] = (rt.binary('-', e['bar_index'], e['activeStrictBearOBBar']) if rt.truth((not rt.truth(rt.is_na(e['activeStrictBearOBBar'])))) else rt.NA)

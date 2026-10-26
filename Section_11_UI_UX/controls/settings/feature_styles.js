@@ -7,6 +7,9 @@ export const FEATURE_STYLES = {
         ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
+    'Order Blocks': {connected:true,outputs:[
+        ...['normal','strict'].flatMap(level=>['ob','breaker'].flatMap(kind=>['bull','bear'].map(side=>[`${level}_${side}_${kind}_zones`,`${level==='strict'?'Strict ':''}${side==='bull'?'Bullish':'Bearish'} ${kind==='ob'?'order blocks':'breakers'}`,side==='bull'?'#26a69a':'#ef5350','zone']))),
+    ]},
     'Market Structure': {connected:true,outputs:[
         ['structure_range_zones','Structure range','#748298','zone'],
         ['protected_high','Protected high','#ef5350'],['protected_low','Protected low','#26a69a'],

@@ -1,13 +1,13 @@
 // Zone lifetimes come from committed engine events, after its merge/invalidation
 // rules. Nearest selection is a price label, never evidence of zone destruction.
-export function srSegments(bars,config,snapshot=null){
+export function srSegments(bars,config,snapshot=null,options={}){
     const result=[],active=new Map(),state=new Map();
     const rows=bars.filter(b=>!b.provisional);
     const decoded=rows.map(bar=>{
-        try{const events=JSON.parse(bar.features?.sr_zone_events??'null');return Array.isArray(events)?events:null;}
+        try{const events=JSON.parse(bar.features?.[options.field||'sr_zone_events']??'null');return Array.isArray(events)?events:null;}
         catch{return null;}
     });
-    if(!decoded.some(Boolean))return legacySegments(rows,config);
+    if(!decoded.some(Boolean))return options.field?[]:legacySegments(rows,config);
     // Undo events to recover zones born before the loaded window. Removals
     // retain their prior bounds, so retired zones can also be reconstructed.
     if(snapshot){
@@ -19,7 +19,7 @@ export function srSegments(bars,config,snapshot=null){
             }
         }
     }
-    const keys=z=>[`${z.institutional?'inst_':''}${z.side}_zones`];
+    const keys=options.keys||(z=>[`${z.institutional?'inst_':''}${z.side}_zones`]);
     function sync(time){
         const seen=new Set();
         for(const [id,z] of state){
@@ -31,6 +31,7 @@ export function srSegments(bars,config,snapshot=null){
                 if(!item){item={key,identity,low:z.low,high:z.high,start:time,end:time,history:[{time,low:z.low,high:z.high}]};result.push(item);active.set(identity,item);}
                 if(item.low!==z.low||item.high!==z.high){item.history.push({time,low:z.low,high:z.high});item.low=z.low;item.high=z.high;}
                 item.end=time;
+                if(options.score){item.score=options.score(z);item.scoreTime=time;}
             }
         }
         for(const [id,item] of active)if(!seen.has(id)){item.end=time;item.invalidated=true;active.delete(id);}
@@ -47,7 +48,7 @@ export function srSegments(bars,config,snapshot=null){
         for(const event of events){if(event.removed)state.delete(event.id);else state.set(event.id,event);}
         sync(bar.time);
         const f=bar.features||{};
-        for(const side of ['support','resistance','inst_support','inst_resistance']){
+        for(const side of (options.field?[]:['support','resistance','inst_support','inst_resistance'])){
             const key=side+'_zones',id=f['nearest_'+side+'_zone_id'],score=f['nearest_'+side+'_score'];
             const item=active.get(key+':'+id);
             if(item&&Number.isFinite(score)){item.score=score;item.scoreTime=bar.time;}

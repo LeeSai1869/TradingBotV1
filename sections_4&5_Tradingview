@@ -4568,12 +4568,12 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     // - memory
     // Price has interacted with the active Order Block.
     // Pure OB
-    bullOBMitigated := not na(activeBullOBLow) and l <= activeBullOBHigh and h >= activeBullOBLow
-    bearOBMitigated := not na(activeBearOBHigh) and h >= activeBearOBLow and l <= activeBearOBHigh
+    bullOBMitigated := not na(activeBullOBLow) and not na(activeBullOBHigh) and bar_index > activeBullOBBar and l <= activeBullOBHigh and h >= activeBullOBLow
+    bearOBMitigated := not na(activeBearOBLow) and not na(activeBearOBHigh) and bar_index > activeBearOBBar and l <= activeBearOBHigh and h >= activeBearOBLow
 
     //Strict OB
-    strictBullOBMitigated := not na(activeStrictBullOBLow) and l <= activeStrictBullOBHigh and h >= activeStrictBullOBLow
-    strictBearOBMitigated := not na(activeStrictBearOBHigh) and h >= activeStrictBearOBLow and l <= activeStrictBearOBHigh
+    strictBullOBMitigated := not na(activeStrictBullOBLow) and not na(activeStrictBullOBHigh) and bar_index > activeStrictBullOBBar and l <= activeStrictBullOBHigh and h >= activeStrictBullOBLow
+    strictBearOBMitigated := not na(activeStrictBearOBLow) and not na(activeStrictBearOBHigh) and bar_index > activeStrictBearOBBar and l <= activeStrictBearOBHigh and h >= activeStrictBearOBLow
 
     // Persistent mitigation state
     // Pure OB
@@ -4601,12 +4601,12 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
 
     // age
     // Pure OB
-    int bullOBAge = not na(activeBullOBBar) ? bar_index - activeBullOBBar : na
-    int bearOBAge = not na(activeBearOBBar) ? bar_index - activeBearOBBar : na
+    // Age is calculated after OB invalidation/promotion below.
+    // Age is calculated after OB invalidation/promotion below.
 
     // Strict OB
-    int strictBullOBAge = not na(activeStrictBullOBBar) ? bar_index - activeStrictBullOBBar : na
-    int strictBearOBAge = not na(activeStrictBearOBBar) ? bar_index - activeStrictBearOBBar : na
+    // Age is calculated after OB invalidation/promotion below.
+    // Age is calculated after OB invalidation/promotion below.
 
     // BREAKER
     // Pure OB
@@ -4669,16 +4669,16 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
         activeStrictBullOBHasFVG := false
         activeStrictBullOBHasBeenMitigated := false
 
-    bool bullBreakerMitigated = bullBreakerActive and not na(activeBullBreakerLow) and not na(activeBullBreakerHigh) and
+    bool bullBreakerMitigated = bullBreakerActive and bar_index > activeBullBreakerBar and not na(activeBullBreakerLow) and not na(activeBullBreakerHigh) and
          l <= activeBullBreakerHigh and h >= activeBullBreakerLow
 
-    bool bearBreakerMitigated = bearBreakerActive and not na(activeBearBreakerLow) and not na(activeBearBreakerHigh) and
+    bool bearBreakerMitigated = bearBreakerActive and bar_index > activeBearBreakerBar and not na(activeBearBreakerLow) and not na(activeBearBreakerHigh) and
          h >= activeBearBreakerLow and l <= activeBearBreakerHigh
 
-    bool strictBullBreakerMitigated = strictBullBreakerActive and not na(activeStrictBullBreakerLow) and not na(activeStrictBullBreakerHigh) and
+    bool strictBullBreakerMitigated = strictBullBreakerActive and bar_index > activeStrictBullBreakerBar and not na(activeStrictBullBreakerLow) and not na(activeStrictBullBreakerHigh) and
          l <= activeStrictBullBreakerHigh and h >= activeStrictBullBreakerLow
 
-    bool strictBearBreakerMitigated = strictBearBreakerActive and not na(activeStrictBearBreakerLow) and not na(activeStrictBearBreakerHigh) and
+    bool strictBearBreakerMitigated = strictBearBreakerActive and bar_index > activeStrictBearBreakerBar and not na(activeStrictBearBreakerLow) and not na(activeStrictBearBreakerHigh) and
          h >= activeStrictBearBreakerLow and l <= activeStrictBearBreakerHigh
 
     if bullBreakerMitigated
@@ -4715,24 +4715,24 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     float strictBullBreakerLow = strictBullBreakerActive ? activeStrictBullBreakerLow : na
     float strictBearBreakerHigh = strictBearBreakerActive ? activeStrictBearBreakerHigh : na
     float strictBearBreakerLow = strictBearBreakerActive ? activeStrictBearBreakerLow : na
-
+    int bullOBAge = not na(activeBullOBBar) ? bar_index - activeBullOBBar : na
     // Breaker Age
     int bullBreakerAge = bullBreakerActive and not na(activeBullBreakerBar) ? bar_index - activeBullBreakerBar : na
     int bearBreakerAge = bearBreakerActive and not na(activeBearBreakerBar) ? bar_index - activeBearBreakerBar : na
     int strictBullBreakerAge = strictBullBreakerActive and not na(activeStrictBullBreakerBar) ? bar_index - activeStrictBullBreakerBar : na
     int strictBearBreakerAge = strictBearBreakerActive and not na(activeStrictBearBreakerBar) ? bar_index - activeStrictBearBreakerBar : na
-
+    int bearOBAge = not na(activeBearOBBar) ? bar_index - activeBearOBBar : na
     // OB LOCATION — PROXIMITY
     // BUY-side OB proximity
     if not na(activeBullOBHigh) and not na(activeBullOBLow) and not na(activeBullOBATR) and activeBullOBATR > 0
         bullOBDistance := c > activeBullOBHigh ? c - activeBullOBHigh : c < activeBullOBLow  ? activeBullOBLow - c : 0.0
         bullOBDistanceATR := bullOBDistance / activeBullOBATR
-
+    int strictBullOBAge = not na(activeStrictBullOBBar) ? bar_index - activeStrictBullOBBar : na
     // SELL-side OB proximity
     if not na(activeBearOBHigh) and not na(activeBearOBLow) and not na(activeBearOBATR) and activeBearOBATR > 0
         bearOBDistance := c > activeBearOBHigh ? c - activeBearOBHigh : c < activeBearOBLow  ? activeBearOBLow - c : 0.0
         bearOBDistanceATR := bearOBDistance / activeBearOBATR
-
+    int strictBearOBAge = not na(activeStrictBearOBBar) ? bar_index - activeStrictBearOBBar : na
     // ==================================================
     // 4.2.18 VOLUME PROFILE SETTINGS
     // ==================================================

@@ -9,7 +9,7 @@ STEPS=tuple((importlib.import_module(step['module'] if '.' in step['module'] els
 
 EXTRA_STEP={'module':'Section_4_Features.execution.zone_lifecycle','function':'update'}
 STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['function']))
-EXTRA_FIELDS=('srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh')
+EXTRA_FIELDS=('obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh')
 
 class Engine:
     def __init__(self,symbol,timeframe,parameters=None):

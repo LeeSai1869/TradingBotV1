@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { logicalShift } from '../Section_11_UI_UX/web_root/window_state.js';
 
-function cache(fetcher) {
+function cache(fetcher, styles={}) {
     const context = vm.createContext({window:{}, URLSearchParams, AbortController, setTimeout, clearTimeout,
         fetch: fetcher || (() => { throw Error('unexpected network request'); })});
     vm.runInContext(fs.readFileSync(new URL('../Section_11_UI_UX/web_root/data_cache.js',import.meta.url),'utf8'),context);
+    context.window.Composer={config:{featureStyles:styles}};
     return context.window.DataCache;
 }
 const deferred = () => {let resolve; const promise=new Promise(r=>resolve=r); return {promise,resolve};};
@@ -236,4 +237,14 @@ test('feature checkpoint progress redraws status even when candle data is unchan
     assert.equal(await c.refreshStored(),true);
     assert.equal(c.featureProgress.through,60000);assert.deepEqual(events,['stored-refresh']);
     assert.equal(c.bars.length,1);assert.equal(await c.refreshStored(),false);
+});
+
+
+test('OB-only display fetches its checkpoint in the shared bars request',async()=>{
+    const calls=[];
+    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({bars:[]})};}, {normal_bull_ob_zones:{visible:true}});
+    await c._fetchPage('ETHUSDT','4h',1000);
+    assert.equal(calls.length,1);assert.equal(new URL(calls[0],'http://local').searchParams.get('sr_zones'),'1');
+    await c._fetchPage('ETHUSDT','4h',1000,123);
+    assert.equal(new URL(calls[1],'http://local').searchParams.has('sr_zones'),false);
 });

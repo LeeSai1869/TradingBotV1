@@ -4,6 +4,7 @@ Only births, changed bounds/classification, and removals are stored per candle.
 No display-side price heuristics or additional zone limits change the strategy.
 """
 import json
+from . import ob_lifecycle
 
 
 def changes(previous, current):
@@ -37,3 +38,14 @@ def update(e):
     e['instSupportZoneHigh'] = bounds(e['srDisplayCurrent'], e['nearestInstSupportZoneID'], 'support', 'high')
     e['instResistanceZoneLow'] = bounds(e['srDisplayCurrent'], e['nearestInstResistanceZoneID'], 'resistance', 'low')
     e['instResistanceZoneHigh'] = bounds(e['srDisplayCurrent'], e['nearestInstResistanceZoneID'], 'resistance', 'high')
+
+    # Explicit inputs let selective replay trace only OB dependencies.
+    if 'obDisplayZones' not in e.persistent:
+        e.initialize('obDisplayZones', {})
+    e['obDisplayZones'], e['obZoneEvents'] = ob_lifecycle.advance(
+        e['obDisplayZones'], e['bar_index'], e['time'], e['l'], e['h'], e['c'], [
+            (False,'bull',e['bullOBEvent'],e['bullOBLow'],e['bullOBHigh'],e['bullFVG'],e['bullOBStrength']),
+            (False,'bear',e['bearOBEvent'],e['bearOBLow'],e['bearOBHigh'],e['bearFVG'],e['bearOBStrength']),
+            (True,'bull',e['strictBullOBEvent'],e['strictBullOBLow'],e['strictBullOBHigh'],e['bullFVG'],e['bullOBStrength']),
+            (True,'bear',e['strictBearOBEvent'],e['strictBearOBLow'],e['strictBearOBHigh'],e['bearFVG'],e['bearOBStrength']),
+        ])

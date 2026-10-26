@@ -542,7 +542,7 @@ def read_feature_progress(symbol,interval,latest=None,*,history_pending=False):
         if repair:
             result['repair']={'through':repair[0] if repair[0]>=0 else None,'target':repair[1],'columns':len(repair[2])}
             result['status']='updating affected features'
-            result['zone_repairs']=(["FVG"] if any('fvg' in c for c in repair[2]) else [])+(["Support / Resistance"] if any('support' in c or 'resistance' in c or c=='sr_zone_events' for c in repair[2]) else [])
+            result['zone_repairs']=(["FVG"] if any('fvg' in c for c in repair[2]) else [])+(["Support / Resistance"] if any('support' in c or 'resistance' in c or c=='sr_zone_events' for c in repair[2]) else [])+(['Order Blocks'] if 'ob_zone_events' in repair[2] else [])
         elif row and latest is not None and row[0]>=latest:result['status']='features current'
         elif row:result['status']='historical feature replay'
         if history_pending and result['status']!='features current':result['history_pending']=True
@@ -551,7 +551,7 @@ def read_feature_progress(symbol,interval,latest=None,*,history_pending=False):
 
 
 def read_sr_snapshot(symbol, interval):
-    """Read committed zone identities; never infer invalidation from nearest prices."""
+    """Read committed S/R and OB identities, independently masked during repair."""
     import json
     if not features_store.DB_PATH.exists():return None
     conn=_read_connection(features_store.DB_PATH)
@@ -560,13 +560,14 @@ def read_sr_snapshot(symbol, interval):
         row=conn.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
         if not row:return None
         task=features_store.pending_replay(conn,symbol,interval)
-        if task and 'sr_zone_events' in task[2]:return None
+        sr_pending=bool(task and 'sr_zone_events' in task[2])
+        ob_pending=bool(task and 'ob_zone_events' in task[2])
         saved=json.loads(row[1])
         from Section_1_Global_Core import data_policy
         epochs=data_policy.read()['epochs']
         if saved.get('epoch')!=[epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)]:return None
-        zones=saved['state']['persistent'].get('srDisplayPrevious')
-        if zones is None:return None
+        zones={} if sr_pending else saved['state']['persistent'].get('srDisplayPrevious',{})
+        ob_zones={} if ob_pending else saved['state']['persistent'].get('obDisplayZones',{})
         # Scores are read from already calculated parallel arrays. Keeping them
         # out of lifecycle exports avoids a new historical formula replay.
         arrays=saved['state']['persistent'];scored={};lookup={}
@@ -575,5 +576,5 @@ def read_sr_snapshot(symbol, interval):
         for identity,zone in zones.items():
             side=zone['side'];prefix=('inst'+side.title()) if zone.get('institutional') else side
             scored[identity]={**zone,'score':lookup[prefix].get(identity),'score_time':row[0]//1000}
-        return dict(through=row[0]//1000,zones=scored)
+        return dict(through=row[0]//1000,zones=scored,ob_zones=ob_zones)
     finally:conn.close()

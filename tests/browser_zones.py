@@ -40,6 +40,11 @@ async def exercise(base,library):
     conn=features_store.open_db()
     with conn:conn.executemany('UPDATE features SET sr_zone_events=? WHERE symbol=? AND interval=? AND open_time=?',[(json.dumps(events.get(r[2],[])),'BTCUSDT','15m',r[2]) for r in rows])
     conn.close()
+    ob=dict(side='bull',kind='ob',strict=False,low=price-12,high=price-11,strength=1.75,created_bar=0,created_time=rows[0][2],mitigated=False)
+    engine.context.persistent['obDisplayZones']={'normal:bull:0':ob}
+    conn=features_store.open_db()
+    with conn:conn.executemany('UPDATE features SET ob_zone_events=? WHERE symbol=? AND interval=? AND open_time=?',[(json.dumps([dict(id='normal:bull:0',**ob,before=None)] if i==0 else []),'BTCUSDT','15m',r[2]) for i,r in enumerate(rows)])
+    conn.close()
     engine.context.persistent['srDisplayPrevious']=zones
     for side,ordinary,institutional in [('support','s1','is1'),('resistance','r1','ir1')]:
         engine.context.persistent[side+'ZoneIDArray']=[ordinary,institutional]
@@ -65,7 +70,7 @@ async def exercise(base,library):
         await page.get_by_role('button',name='Open settings',exact=True).click()
         dialog=page.get_by_role('dialog',name='Settings',exact=True)
         await dialog.get_by_role('tab',name='Features',exact=True).click()
-        for name in ('Market Structure','Support / Resistance','FVG','Volume Profile'):
+        for name in ('Market Structure','Support / Resistance','FVG','Order Blocks','Volume Profile'):
             await dialog.get_by_role('button',name=name,exact=True).click()
             await dialog.get_by_role('button',name='Select all',exact=True).click()
         await dialog.get_by_label('Point of control (POC) color',exact=True).fill('#fedcba')
@@ -74,6 +79,14 @@ async def exercise(base,library):
         await dialog.get_by_label('Profile bar length (% of chart)',exact=True).fill('55')
         await dialog.get_by_label('High-volume nodes bar opacity',exact=True).fill('25')
         await dialog.get_by_label('Low-volume nodes bar opacity',exact=True).fill('75')
+        await dialog.get_by_role('button',name='Order Blocks',exact=True).click()
+        await dialog.get_by_label('Bullish order blocks line style',exact=True).select_option('3')
+        await dialog.get_by_role('button',name='Display',exact=True).click()
+        await dialog.get_by_role('button',name='Deselect all scores',exact=True).click()
+        assert not await dialog.get_by_label('Bullish order blocks show scores',exact=True).is_checked()
+        await dialog.get_by_role('button',name='Select all scores',exact=True).click()
+        assert await dialog.get_by_label('Bullish order blocks show scores',exact=True).is_checked()
+        await dialog.get_by_role('button',name='Style',exact=True).click()
         await dialog.get_by_role('button',name='Support / Resistance',exact=True).click()
         await dialog.get_by_label('Support zones fill opacity',exact=True).fill('45')
         await dialog.get_by_role('button',name='Display',exact=True).click()
@@ -94,7 +107,10 @@ async def exercise(base,library):
         await page.wait_for_function("DataCache.fvgFrames['4h']?.bars.length===3")
         await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
-        assert count==8,count
+        assert count==9,count
+        ob_band=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='normal_bull_ob_zones'))")
+        assert ob_band['start']==rows[0][2]//1000 and ob_band['end']==rows[-1][2]//1000
+        assert ob_band['score']==1.75
         band=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='support_zones:s1'))")
         assert band['start']==rows[0][2]//1000
         assert band['end']==rows[-1][2]//1000
@@ -134,7 +150,7 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==8
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==9
         assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
         assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
         await page.get_by_role('button',name='Open settings',exact=True).click()
@@ -142,7 +158,7 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_role('button',name='Deselect all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==5
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==6
         assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
         await page.get_by_role('button',name='Open settings',exact=True).click()
@@ -161,7 +177,7 @@ async def exercise(base,library):
         assert 'Zone coverage pending feature repair' in await page.locator('#status').inner_text()
         assert await page.evaluate('DataCache.bars.length')==3
         assert not errors,errors
-        print('PASS: institutional scores and Display controls, source-chart FVG, structure ranges, VP and combined-stream reuse',flush=True)
+        print('PASS: continuous OB lifecycle and Display controls, institutional scores, source-chart FVG, structure ranges, VP and combined-stream reuse',flush=True)
         await browser.close()
 
 

@@ -237,8 +237,8 @@ class SelectiveFeatures(unittest.TestCase):
             current=components.Catalog()
         changed={uid for uid in current.source if current.source[uid]!=baseline.get(uid)}
         self.assertTrue(changed)
-        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure')) for uid in changed))
-        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle'))}).columns)
+        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure','.order_blocks')) for uid in changed))
+        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle','.order_blocks'))}).columns)
         self.assertLessEqual(current.plan(current.changed(baseline,{},{})).columns,allowed)
         self.assertFalse({'ema50','adx','rsi','vp_poc'} & current.plan(current.changed(baseline,{},{})).columns)
 
@@ -326,6 +326,32 @@ class SelectiveFeatures(unittest.TestCase):
         actual=db.read_features('ETHUSDT','1m',next_bar['open_time'])
         self.assertEqual(actual['sr_zone_events'],expected['sr_zone_events'])
         self.assertEqual(actual['inst_support_zone_low'],expected['inst_support_zone_low'])
+
+    def test_ob_repair_preserves_unrelated_columns_and_resumes_ledger(self):
+        c=components.catalog()
+        self.engine.component_sources={k:('old-order-block-rule' if c.by_id[k].module.endswith('.order_blocks') else v) for k,v in c.source.items() if 'obDisplayZones' not in k}
+        self.engine.context.persistent.pop('obDisplayZones',None)
+        changed=c.changed(self.engine.component_sources,self.engine.context.parameters,self.engine.context.parameters)
+        columns=c.plan(changed).columns
+        self.assertIn('ob_zone_events',columns)
+        self.assertFalse({'ema50','adx','rsi','vp_poc','sr_zone_events','nearest_bull_fvg_high'} & columns)
+        conn=features_store.open_db()
+        with conn:
+            conn.execute('UPDATE features SET ob_zone_events=NULL')
+            conn.execute('UPDATE feature_engine_state SET state=?',(checkpoint.dump(self.engine,(0,0)),))
+        conn.close()
+        with patch.object(momentum,'calculate_dmi',side_effect=AssertionError('DMI must not run')),patch.object(trend,'calculate_ema',side_effect=AssertionError('EMA must not run')),patch.object(volume_profile,'accumulate_histogram',side_effect=AssertionError('VP must not run')):
+            self.finish()
+        self.assertEqual(self.raw_features(),self.before)
+        loaded=processor._load('ETHUSDT','1m',(0,0))
+        self.assertEqual(loaded.context.last_time,self.clients[-1]['open_time'])
+        reference=Engine('ETHUSDT','1m')
+        for client in self.clients:reference.step(client)
+        next_bar=bar(220,114);expected=reference.step(next_bar)
+        db.write_klines([next_bar]);processor._ENGINES.clear();processor.catch_up('ETHUSDT','1m')
+        actual=db.read_features('ETHUSDT','1m',next_bar['open_time'])
+        self.assertEqual(actual['ob_zone_events'],expected['ob_zone_events'])
+        self.assertEqual(processor._load('ETHUSDT','1m',(0,0)).context.persistent['obDisplayZones'],reference.context.persistent['obDisplayZones'])
 
     def test_structure_repair_preserves_core_indicators_and_future_state(self):
         c=components.catalog()
