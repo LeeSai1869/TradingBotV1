@@ -552,3 +552,19 @@ def read_decision_history(symbols=None,intervals=None):
     """Stream committed closed-bar strategy inputs through the public gateway."""
     from .memory_storage.Storage.db import iter_decision_history
     return iter_decision_history(symbols,intervals)
+
+
+def read_liquidity(symbol,available_before_ms):
+    """Observed Binance USDT perpetual features available by decision time.
+
+    Independent venue/market identity; never a replacement for spot candle
+    indicators or an estimate of hidden orders/liquidation positions.
+    """
+    from .liquidity.store import features_at
+    return features_at(symbol.upper(),int(available_before_ms))
+
+
+def read_liquidity_candle(symbol,open_ms,available_before_ms):
+    """Closed one-minute perpetual summary; inspect coverage before training."""
+    from .liquidity.store import candle_features_at
+    return candle_features_at(symbol.upper(),int(open_ms),int(available_before_ms))

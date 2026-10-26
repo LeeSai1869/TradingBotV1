@@ -132,7 +132,8 @@ async function loadAll() {
         const needCurrent=!DataCache.fvgFrames.current&&['bull_fvg_zones','bear_fvg_zones',`bull_fvg_${DataCache.timeframe}_zones`,`bear_fvg_${DataCache.timeframe}_zones`].some(k=>outputs[k]?.visible);
         const needHigher=Object.entries(HTF).some(([tf,duration])=>duration>intervalMs(DataCache.timeframe)&&!DataCache.fvgFrames[tf]&&['bull','bear'].some(side=>outputs[`${side}_fvg_${tf}_zones`]?.visible));
         const needSR=!DataCache.srSnapshot&&Object.entries(outputs).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible);
-        if(needProfile||needCurrent||needHigher||needSR){
+        const needLiquidity=!DataCache.liquidity&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>outputs[k]?.visible);
+        if(needProfile||needCurrent||needHigher||needSR||needLiquidity){
             void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
         }
     });

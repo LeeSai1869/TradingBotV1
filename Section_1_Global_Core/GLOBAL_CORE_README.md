@@ -415,3 +415,14 @@ loop, and exceptions for deleted diagnostics were removed. Reviewed internal
 integration imports are listed in `tools/integration_imports.json`; the import
 check rejects retired Section 6/7 imports. Stored-data compatibility adapters and
 migration signatures remain necessary and are retained.
+
+### Observed perpetual liquidity
+
+The independent [liquidity recorder](liquidity/README.md) collects public Binance
+USDT perpetual depth, aggregate trades and reported liquidations, with mark,
+funding and OI context. It has its own login service, archive and WAL database;
+it does not reset or append to historical candle feature packets. The UI attaches
+bounded observed snapshots to its existing bars poll only when Liquidity is
+selected. The public gateway exposes time-safe `read_liquidity` and
+`read_liquidity_candle` reads. Candle-derived liquidity levels remain compatible
+internal formulas and are never used as fallback order-book data.

@@ -36,3 +36,6 @@ Section_1_Global_Core/.data-policy.lock.snapshot
 Section_1_Global_Core/Symbols/daily_refresh_state.json
 Section_1_Global_Core/Symbols/daily_refresh_state.tmp
 /strategy_report.json
+
+# Owned live perpetual-liquidity archive/runtime metadata
+Section_1_Global_Core/memory_storage/Storage/liquidity/

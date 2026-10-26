@@ -7,6 +7,11 @@ export const FEATURE_STYLES = {
         ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
+    Liquidity: {connected:true,outputs:[
+        ['liquidity_bids','Resting perpetual bids','#26a69a','profile'],
+        ['liquidity_asks','Resting perpetual asks','#ef5350','profile'],
+        ['liquidity_heatmap','Observed depth heatmap','#748298','profile'],
+    ]},
     'Order Blocks': {connected:true,outputs:[
         ...['normal','strict'].flatMap(level=>['ob','breaker'].flatMap(kind=>['bull','bear'].map(side=>[`${level}_${side}_${kind}_zones`,`${level==='strict'?'Strict ':''}${side==='bull'?'Bullish':'Bearish'} ${kind==='ob'?'order blocks':'breakers'}`,side==='bull'?'#26a69a':'#ef5350','zone']))),
     ]},

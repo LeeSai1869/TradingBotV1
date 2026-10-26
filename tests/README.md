@@ -773,3 +773,14 @@ and the main cursor, and compares the next live OB events/state with a full repl
 The browser smoke test also checks continuous OB bands, ATR strength labels,
 Display score bulk controls and invisible borders. The Pine conversion preserves
 the existing line mapping and reproduces the reviewed scalar corrections.
+
+Observed perpetual liquidity: `test_liquidity.py` covers snapshot-before-bridge,
+absolute size replacements/deletions, duplicates/sequence gaps, invalid/crossed
+books, delayed exchange messages, coverage-limited depth, slippage, market
+identity, read-only/as-of joins, delayed-write gaps, raw archive retention,
+recorded trade/liquidation directions, backpressure, disk failure and REST
+cooldown. `liquidity_display.test.mjs` covers freshness, observed market identity,
+notional labels and independent toggles; cache tests verify one combined poll.
+`browser_liquidity.py` exercises chart/settings/price-band table and stale hiding
+with disposable observations and no exchange calls. Live connectivity remains
+an explicit deployment check; fixture tests cannot establish exchange access.

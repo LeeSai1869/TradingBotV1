@@ -59,6 +59,12 @@
     ],
     "Section_4_Features/conversion/validate_export.py": [
       "Section_1_Global_Core.memory_storage.market_data.update_klines"
+    ],
+    "Section_11_UI_UX/server/liquidity.py": [
+      "Section_1_Global_Core.liquidity"
+    ],
+    "liquidity_status.py": [
+      "Section_1_Global_Core.liquidity.store"
     ]
   }
 }

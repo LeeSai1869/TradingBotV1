@@ -248,3 +248,12 @@ test('OB-only display fetches its checkpoint in the shared bars request',async()
     await c._fetchPage('ETHUSDT','4h',1000,123);
     assert.equal(new URL(calls[1],'http://local').searchParams.has('sr_zones'),false);
 });
+
+test('liquidity uses the combined poll and never attaches history to old-page requests',async()=>{
+    const calls=[];
+    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({bars:[]})};},{liquidity_bids:{visible:true}});
+    await c._fetchPage('BTCUSDT','1m',1000);
+    assert.equal(new URL(calls[0],'http://local').searchParams.get('liquidity'),'1');
+    await c._fetchPage('BTCUSDT','1m',1000,123);
+    assert.equal(new URL(calls[1],'http://local').searchParams.has('liquidity'),false);
+});

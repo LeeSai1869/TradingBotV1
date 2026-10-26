@@ -12,6 +12,7 @@ const DataCache = {
     formingBar: null,
     featureProgress: null,
     volumeProfile: null,
+    liquidity:null,
     fvgFrames: {},
     srSnapshot:null,
     liveStatus: "loading",
@@ -72,6 +73,7 @@ const DataCache = {
             if(['bull_fvg_zones','bear_fvg_zones',`bull_fvg_${timeframe}_zones`,`bear_fvg_${timeframe}_zones`].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('fvg_current','1');
             qs.set('fvg_versions',JSON.stringify(Object.fromEntries(Object.entries(this.fvgFrames).map(([tf,frame])=>[tf,frame.version]))));
         }
+        if(before===null&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('liquidity','1');
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);
         else if (this.liveEnabled) qs.set("live", "1");
@@ -127,7 +129,7 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
@@ -136,6 +138,7 @@ const DataCache = {
             this.srSnapshot=packet.sr_snapshot??null;
             this._applyFVG(packet);
             this.volumeProfile=packet.volume_profile??null;
+            this.liquidity=packet.liquidity??null;
             this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
             this.bars = packet.bars;
@@ -208,10 +211,12 @@ const DataCache = {
             const srChanged=JSON.stringify(this.srSnapshot)!==JSON.stringify(packet.sr_snapshot??null);
             this.srSnapshot=packet.sr_snapshot??null;
             const fvgChanged=this._applyFVG(packet);
+            const liquidityChanged=JSON.stringify(this.liquidity)!==JSON.stringify(packet.liquidity??null);
+            this.liquidity=packet.liquidity??null;
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged;
+            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

@@ -16,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Momentum Indicator"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -101,7 +101,8 @@ function renderFeature() {
         enable.onclick=async()=>{try{await enableSignalSound();note('Signal sounds enabled for this session and the open symbol/timeframe.');}catch(error){note(error.message);}};
     }
     if (item === "EMA") toggle("Show EMA", "ema");
-    else note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
+    if(item==='Liquidity')note('Observed Binance USDT perpetual orders in USDT, shown against spot candles. The independent recorder must be running. Depth is cancellable and snapshot-limited; stale books are hidden. Hover bands for amounts. This is not a liquidation-position estimate. Collection starts now; no candle-derived history is substituted.');
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
     if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');
@@ -172,6 +173,7 @@ function renderFeature() {
         const color = el("input", "", row); color.type = "color";
         color.value = state.color; color.setAttribute("aria-label", `${label} color`);
         color.oninput = () => { state.color = color.value; };
+        if(key==='liquidity_heatmap'){color.disabled=true;color.title='Heatmap uses the bid and ask colors above';}
         if(presentation==='marker') {
             const size=el('select','',row);size.setAttribute('aria-label',`${label} size`);
             for(const n of [1,2,3,4]){const o=el('option',String(n),size);o.value=n;}
@@ -184,7 +186,7 @@ function renderFeature() {
             continue;
         }
         if(presentation==='profile'){
-            el('span','Profile layout',row);el('span','—',row);continue;
+            el('span',key==='liquidity_heatmap'?'Time × price':'Profile layout',row);el('span','—',row);continue;
         }
         for (const [field, title, options] of [
             ["width", "width", [[1,"1 px"],[2,"2 px"],[3,"3 px"],[4,"4 px"]]],

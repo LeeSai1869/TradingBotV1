@@ -7,7 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core import data_policy
 
-from . import queries, hud, drawing_routes, volume_profile
+from . import queries, hud, drawing_routes, volume_profile, liquidity
 from . import live_candle, admin_routes, alert_routes
 from .settings_catalog import read_coin_catalog
 
@@ -89,6 +89,8 @@ def handle_get(path, raw_qs, server):
                 packet['fvg_frames']={tf:_fvg_frame(symbol,tf,known.get(tf)) for tf in frames}
             if before is None and qs.get('fvg_current',['0'])[0]=='1':
                 packet.setdefault('fvg_frames',{})['current']=_fvg_frame(symbol,interval,known.get('current'),include_bars=False)
+            if before is None and qs.get('liquidity',['0'])[0]=='1':
+                packet['liquidity']=liquidity.snapshot(symbol)
             if before is None and qs.get('volume_profile',['0'])[0]=='1':
                 packet['volume_profile']=volume_profile.snapshot(symbol,interval,packet['bars'][-1] if packet['bars'] else None,packet['storage_epoch'])
         if before is None and qs.get("live", ["0"])[0] == "1":

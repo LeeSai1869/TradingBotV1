@@ -1,0 +1,2 @@
+# Public market-data WebSocket client; no exchange account/API key required.
+websocket-client>=1.8,<2
