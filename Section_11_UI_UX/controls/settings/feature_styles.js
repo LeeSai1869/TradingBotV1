@@ -7,6 +7,8 @@ export const FEATURE_STYLES = {
         ['support_zones','Support zones','#26a69a','zone'],['resistance_zones','Resistance zones','#ef5350','zone'],
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
+    Confidence: {connected:true,outputs:[['confidence_buy','BUY confidence score','#26a69a','evidence'],['confidence_sell','SELL confidence score','#ef5350','evidence']]},
+    Opportunity: {connected:true,outputs:[...['buy','sell'].flatMap(side=>[1,2,3].map(layer=>[`opportunity_${side}_${layer}`,`${side.toUpperCase()} target ${layer}`,side==='buy'?'#26a69a':'#ef5350','target']))]},
     Liquidity: {connected:true,outputs:[
         ['liquidity_bids','Resting perpetual bids','#26a69a','profile'],
         ['liquidity_asks','Resting perpetual asks','#ef5350','profile'],
@@ -63,7 +65,7 @@ export function normalizeStyles(value = {}) {
             const legacy=key==='vp_hvn_nodes'?(value?.vp_hvn_high?.visible?value.vp_hvn_high:value?.vp_hvn_low||value?.vp_hvn_high):key==='vp_lvn_nodes'?(value?.vp_lvn_high?.visible?value.vp_lvn_high:value?.vp_lvn_low||value?.vp_lvn_high):null;
             const input = value?.[key] || legacy || {};
             result[key] = {
-                visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell"].includes(key),
+                visible: typeof input.visible === "boolean" ? input.visible : ["ema50","momentum_buy","momentum_sell","confidence_buy","confidence_sell"].includes(key),
                 color: /^#[0-9a-f]{6}$/i.test(input.color) ? input.color : color,
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
@@ -72,6 +74,10 @@ export function normalizeStyles(value = {}) {
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(['inst_support_zones','inst_resistance_zones'].includes(key))result[key].higher=typeof input.higher==='boolean'?input.higher:true;
             if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key))result[key].dualColor=/^#[0-9a-f]{6}$/i.test(input.dualColor)?input.dualColor:'#eab308';
+            if(key.startsWith('opportunity_')){
+                result[key].feeBps=Number.isFinite(input.feeBps)?Math.max(0,Math.min(100,input.feeBps)):4;
+                result[key].slippageBps=Number.isFinite(input.slippageBps)?Math.max(0,Math.min(100,input.slippageBps)):2;
+            }
             if(key==='liquidity_bids')result[key].details=typeof input.details==='boolean'?input.details:true;
             if(key==='vp_histogram'||key==='liquidity_bids'){
                 result[key].lengthPercent=Number.isFinite(input.lengthPercent)?Math.max(10,Math.min(80,input.lengthPercent)):45;

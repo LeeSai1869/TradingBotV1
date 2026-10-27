@@ -807,3 +807,12 @@ coverage validates original pivot time, score and tests by identity (including
 numeric IDs). `browser_zones.py` projects a committed 4H institution onto 15m and
 checks its origin, score, count and persistence alongside existing overlays.
 `browser_liquidity.py` checks the new Data tab against recorded observations.
+
+Confidence/opportunity: `python3 -m unittest discover -s tests -p
+ 'test_evidence_engines.py'` verifies coverage, directional symmetry, family caps,
+input-sensitive caching, barrier ordering/deduplication, near-edge targets,
+short-side invalidation without three layers, missing targets, costs and closed
+bar gating. `tests/evidence_display.test.mjs` checks labels, toggles and assumptions.
+`PYTHONPATH=. python3 tests/browser_evidence.py /path/to/lightweight-charts.standalone.production.js`
+checks the actual chart, Data breakdown, three targets, cost updates, unchanged
+candles and persistence with disposable stores and no exchange requests.

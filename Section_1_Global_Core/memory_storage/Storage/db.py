@@ -231,7 +231,7 @@ def _read_derived(store, symbol, interval, start_ms, end_ms):
         conn.close()
 
 
-def read_state_page(symbol, interval, limit=1000, *, before=None):
+def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slippage_bps=2.):
     """One combined record per stored candle, with an exclusive older cursor.
 
     Keep the selected kline keys authoritative even while the ingestion
@@ -277,6 +277,8 @@ def read_state_page(symbol, interval, limit=1000, *, before=None):
         last_signal=read_previous_decision_candidate(symbol,interval,first_evaluated)
         bars=annotate(bars,last_signal)
     bars=bars[-limit:]
+    from Section_9_Confidence_Engine.presentation import annotate as evidence
+    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps)
     return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
 
 

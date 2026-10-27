@@ -134,7 +134,7 @@ async function loadAll() {
         const needSR=!DataCache.srSnapshot&&Object.entries(outputs).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible);
         const needLiquidity=!DataCache.liquidity&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>outputs[k]?.visible);
         const needInstitutional=Object.entries(outputs).some(([k,v])=>['inst_support_zones','inst_resistance_zones'].includes(k)&&v.visible&&v.higher!==false);
-        if(needProfile||needCurrent||needHigher||needSR||needLiquidity||needInstitutional){
+        if(needProfile||needCurrent||needHigher||needSR||needLiquidity||needInstitutional||Object.entries(outputs).some(([key,v])=>key.startsWith('opportunity_')&&v.visible)){
             void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
         }
     });

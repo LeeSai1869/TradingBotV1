@@ -79,6 +79,8 @@ const DataCache = {
             if(['bull_fvg_zones','bear_fvg_zones',`bull_fvg_${timeframe}_zones`,`bear_fvg_${timeframe}_zones`].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('fvg_current','1');
             qs.set('fvg_versions',JSON.stringify(Object.fromEntries(Object.entries(this.fvgFrames).map(([tf,frame])=>[tf,frame.version]))));
         }
+        const costs=window.Composer?.config.featureStyles?.opportunity_buy_1;
+        if(costs){qs.set('fee_bps',String(costs.feeBps??4));qs.set('slippage_bps',String(costs.slippageBps??2));}
         if(before===null&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('liquidity','1');
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);

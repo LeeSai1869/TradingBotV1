@@ -16,7 +16,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Momentum Indicator"],
+    features: ["EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Confidence", "Opportunity", "Momentum Indicator"],
     hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -72,17 +72,43 @@ function reserved(label, explanation) {
     note(explanation);
 }
 function renderFeature() {
-    if(featureTab==='Data'&&item!=='Liquidity')featureTab='Display';
+    if(featureTab==='Data'&&!['Liquidity','Confidence','Opportunity'].includes(item))featureTab='Display';
+    if(item==='Confidence'&&featureTab==='Style')featureTab='Display';
     const feature = FEATURE_STYLES[item];
     const subnav = el("nav", "", content, "settings-subtabs");
     subnav.setAttribute("aria-label", `${item} options`);
-    for (const title of (item==='Liquidity'?["Display", "Style", "Data"]:["Display", "Style"])) {
+    for (const title of (item==='Confidence'?["Display","Data"]:['Liquidity','Opportunity'].includes(item)?["Display", "Style", "Data"]:["Display", "Style"])) {
         const button = el("button", title, subnav);
         button.setAttribute("aria-pressed", String(featureTab === title));
         button.onclick = () => {
             featureTab = title; render();
             content.querySelector(`[aria-pressed="true"]`).focus();
         };
+    }
+    if(['Confidence','Opportunity'].includes(item)&&featureTab==='Data'){
+        const bar=window.DataCache?.bars?.filter(b=>!b.provisional).at(-1);
+        const packet=item==='Confidence'?bar?.confidence:bar?.opportunity;
+        note(`${item}: ${packet?.status||'awaiting closed features'}. These are conditional scores/scenarios, not probabilities or executed trades.`);
+        if(!packet)return;
+        const table=el('table','',content);
+        if(item==='Confidence'){
+            for(const group of packet.groups||[]){
+                const row=el('tr','',table);el('th',group.name,row);
+                el('td',`BUY ${group.buy_points.toFixed(1)} / SELL ${group.sell_points.toFixed(1)} · cap ${group.weight} · coverage ${Math.round(group.coverage*100)}%`,row);
+            }
+            note(packet.scope);
+        }else{
+            for(const side of ['buy','sell']){
+                const plan=packet[side];if(!plan)continue;
+                let row=el('tr','',table);el('th',side.toUpperCase(),row);el('td',`${plan.status} · entry ${plan.entry} · invalidation ${plan.invalidation} (${plan.invalidation_source}) · risk ${plan.risk_pct.toFixed(2)}%`,row);
+                for(const [index,target] of plan.targets.entries()){
+                    row=el('tr','',table);el('th',`T${index+1}`,row);
+                    el('td',`${target.price} · net ${target.net_reward_pct.toFixed(2)}% · ${target.reward_risk.toFixed(2)}R · ${target.families.join(', ')}`,row);
+                }
+            }
+            note(packet.interpretation);
+        }
+        return;
     }
     if(item==='Liquidity'&&featureTab==='Data'){
         const snapshot=window.DataCache?.liquidity,latest=snapshot?.latest;
@@ -126,6 +152,8 @@ function renderFeature() {
     if (item === "EMA") toggle("Show EMA", "ema");
     else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='Liquidity')note('Observed Binance USDT perpetual orders in USDT, shown against spot candles. The independent recorder must be running. Depth is cancellable and snapshot-limited; stale books are hidden. Hover bands for amounts. This is not a liquidation-position estimate. Collection starts now; no candle-derived history is substituted.');
+    if(item==='Confidence')note('Directional evidence scores /100, not win probabilities. Missing evidence reduces coverage; below 75% coverage is insufficient. Trend, momentum, structure, location and environment have capped weights. Closed chart timeframe only; signals are unchanged.');
+    if(item==='Opportunity')note('Three known price-barrier clusters per side, not promised profit. Targets use the near edge of each barrier. Invalidation and reward/risk are conditional scenarios from the latest closed price; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
     if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');
@@ -187,6 +215,13 @@ function renderFeature() {
         }
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
+    }
+    if(item==='Opportunity'){
+        for(const [key,label] of [['feeBps','Fee per side (bps)'],['slippageBps','Slippage per side (bps)']]){
+            const row=el('label',label,content,'settings-row'),input=el('input','',row);
+            input.type='number';input.min=0;input.max=100;input.step=.1;input.value=draft.outputs.opportunity_buy_1[key];
+            input.onchange=()=>{for(const [output] of feature.outputs)draft.outputs[output][key]=Number(input.value);};
+        }
     }
     if(item==='Support / Resistance'){
         for(const side of ['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones']){
