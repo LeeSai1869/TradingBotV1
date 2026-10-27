@@ -149,6 +149,11 @@ function renderFeature() {
                 input.onchange=()=>{draft.outputs[key].scores=input.checked;};
             }
         }
+        if(item==='Liquidity'){
+            const row=el('label','Show feed health and rolling flow',content,'settings-row');
+            const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs.liquidity_bids.details;
+            input.onchange=()=>{draft.outputs.liquidity_bids.details=input.checked;};
+        }
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
     }

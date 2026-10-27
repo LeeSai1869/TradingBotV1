@@ -793,3 +793,9 @@ Liquidity/candle isolation tests verify joined bid/ask segments with correct com
 exact subpixel heatmap widths and clipping around the provisional candle. The
 browser integration compares all candle time/OHLC points before and after
 Liquidity is enabled; observation overlays must not mutate those values.
+
+Liquidity rolling analytics: `python3 -m unittest discover -s tests -p
+ 'test_liquidity*.py'` covers incomplete windows, continuity resets, absorption
+price response, bounded memory, OI/basis availability, closed-summary retention,
+and causal BTC/ETH alignment with missing benchmarks and recovery gaps. Existing
+recorder, storage and chart tests remain applicable; no exchange access is needed.

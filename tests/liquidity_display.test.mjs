@@ -75,3 +75,9 @@ test('subpixel heatmap time widths stay exact and leave the live candle clear',(
     assert.deepEqual(heatmapSpans(90,20,100,6),[{x:90,width:6},{x:104,width:6}]);
     assert.deepEqual(heatmapSpans(90,2,100,6),[{x:90,width:2}]);
 });
+
+test('health display preference preserves existing liquidity styles',()=>{
+    const defaults=normalizeStyles();assert.equal(defaults.liquidity_bids.details,true);
+    const hidden=normalizeStyles({liquidity_bids:{visible:true,details:false,lengthPercent:35}});
+    assert.equal(hidden.liquidity_bids.details,false);assert.equal(hidden.liquidity_bids.lengthPercent,35);
+});

@@ -154,3 +154,49 @@ sets the maximum width as a percentage of chart width.
 Historical heatmap cells keep their true fractional-pixel time width, rather than
 stacking many five-second samples into forced one-pixel strips on higher frames.
 The provisional candle's own pixel interval stays clear of heatmap shading.
+
+### Rolling observations (analytics version 1)
+
+Each synchronized worker now adds a bounded causal `analytics` object to its
+existing five-second sample. No feature DB migration, candle history replay,
+additional REST request, or order-book geometry change is required. Existing
+stored packets lacking this optional object remain readable.
+
+- Continuous 60/300-second aggressive buy/sell totals, delta and flow imbalance.
+  Incomplete windows return null totals with measured coverage. Totals include
+  the entire boundary sample (no fabricated prorated trades); `observed_window_ms`
+  reports the actual duration, usually slightly over 60/300 seconds. CVD starts from
+  the latest continuous segment and resets after gaps, reconnects or clock reversal.
+- Mean 10-bps book imbalance is unknown if any observation lacks depth coverage.
+- Sampled close-to-close price response, realized 60-second volatility and a
+  heuristic microstructure regime (quiet/directional/two-way). These complement
+  the existing candle-based Section 5 regimes; they do not replace them.
+- Buy/sell absorption *evidence* requires >=60% directional flow imbalance and
+  <=2-bps absolute sampled price change in a complete minute. This is a heuristic,
+  not proof of absorption, hidden orders, or a buy/sell recommendation.
+- Bid/ask notional shares in bands continuously present in successive samples
+  for >=30 seconds. Presence is sampled, not proof that individual orders stayed.
+  Window additions/removals describe displayed book changes, not cancellation
+  identities or proof of replenishment at an individual order level.
+- Mark/index basis and five-minute OI percentage change, only with fresh context
+  and a recorded baseline. Funding retains the exchange rate and funding time;
+  no arbitrary historical funding percentile is invented during warmup.
+
+A `health` object describes source age, trade continuity, context availability
+and finite book coverage. Display > Liquidity > **Show feed health and rolling
+flow** controls the extra chart text independently of the bars. Hovering a band
+also shows sampled presence. Closed-minute summaries retain the final analytics
+and health objects alongside their existing coverage and volume fields.
+
+`global_packet.read_liquidity_market_context(symbol, decision_ms)` optionally
+reads BTC/ETH five-minute relative returns and return correlations from one
+read-only SQLite snapshot. It requires 61 consecutive aligned five-second bins,
+fresh observations, and no recorded gap within the interval. Missing benchmark
+recordings stay unavailable; it never subscribes to symbols implicitly or mixes
+spot candles into perpetual returns. This explicit read is outside the polling
+and recording hot paths. All joins filter availability before the decision time.
+
+Scope: this remains observed Binance USDT perpetual liquidity. Additional venues,
+spot/perpetual comparisons and calibrated predictive models require separate
+market identities and validation; they are not fabricated from the current book.
+Snapshot coverage and archive/heatmap retention limits remain as documented above.

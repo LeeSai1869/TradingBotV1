@@ -16,7 +16,7 @@ class Minutes:
             flow_rows=[r for r in self.rows if r.get('window_start_ms',-1)>=self.open]
             closed=dict(venue='binance',market='usdt_perpetual',symbol=self.symbol,open_ms=self.open,
                         close_ms=self.open+60000-1,available_ms=sample['available_ms'],coverage=min(1,covered/60000),
-                        samples=len(self.rows),metrics_mean=metrics,context_last=self.rows[-1].get('context',{}),
+                        samples=len(self.rows),metrics_mean=metrics,analytics_last=self.rows[-1].get('analytics',{}),health_last=self.rows[-1].get('health',{}),context_last=self.rows[-1].get('context',{}),
                         reported_long_liquidations_usdt=sum(r.get('reported_long_liquidations_usdt',0) for r in flow_rows),
                         reported_short_liquidations_usdt=sum(r.get('reported_short_liquidations_usdt',0) for r in flow_rows),
                         liquidation_coverage='sampled exchange stream, within sampled windows only',

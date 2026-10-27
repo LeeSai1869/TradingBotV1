@@ -7,6 +7,7 @@ from playwright.async_api import async_playwright
 from browser_smoke import run,sign_in,settle,db
 from Section_1_Global_Core.liquidity import store
 from Section_1_Global_Core.liquidity.book import Book
+from Section_1_Global_Core.liquidity.analytics import Analytics
 from Section_11_UI_UX.server import liquidity
 
 
@@ -17,11 +18,13 @@ async def exercise(base,library):
     book.apply(dict(s='BTCUSDT',U=10,u=11,pu=9,E=now,T=now,b=[],a=[]),now)
     packet=book.features(now)
     with tempfile.TemporaryDirectory() as directory,patch.object(store,'DB_PATH',Path(directory)/'liquidity.db'),patch.object(liquidity,'snapshot',side_effect=lambda symbol:store.snapshot(symbol,now_ms=now)):
-        conn=store.open_writer()
+        conn=store.open_writer();analytics=Analytics()
         with conn:
             for i in range(30):
                 stamp=now-(29-i)*5000
-                store.write_sample(conn,{**packet,'available_ms':stamp,'book_received_ms':stamp,'exchange_ms':stamp},stamp)
+                sample={**packet,'available_ms':stamp,'book_received_ms':stamp,'exchange_ms':stamp,
+                        'window_start_ms':stamp-5000,'trade_coverage':'continuous','aggressive_buy_usdt':90.,'aggressive_sell_usdt':10.}
+                store.write_sample(conn,analytics.add(sample),stamp)
         conn.close()
         async with async_playwright() as p:
             browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -45,6 +48,8 @@ async def exercise(base,library):
             assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==candle_points
             assert 'observed orders (USDT)' in await page.locator('.liquidity-status').inner_text()
             assert 'spot candles' in await page.locator('.liquidity-status').inner_text()
+            assert '60s delta' in await page.locator('.liquidity-status').inner_text()
+            assert 'OI unavailable/stale' in await page.locator('.liquidity-status').inner_text()
             assert await page.evaluate('DataCache.liquidity.history.length')==30
             assert await page.locator('.liquidity-book').count()==0
             assert await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.profileRows(DataCache.liquidity.latest,Composer.config.featureStyles).some(r=>r.bid>0&&r.ask>0))")

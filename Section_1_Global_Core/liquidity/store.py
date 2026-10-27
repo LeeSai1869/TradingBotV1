@@ -109,3 +109,41 @@ def candle_features_at(symbol,open_ms,available_before_ms):
         row=conn.execute('SELECT payload FROM candle_features WHERE symbol=? AND open_ms=? AND available_ms<=?',(symbol,open_ms,available_before_ms)).fetchone()
         return unpack(row[0]) if row else None
     finally:conn.close()
+
+
+def market_context_at(symbol,available_before_ms):
+    """Causal same-venue perpetual comparison; never substitutes spot prices.
+
+    Missing/unrecorded benchmarks remain unavailable. Reading three bounded
+    histories uses one SQLite snapshot and never calls an exchange.
+    """
+    import math
+    conn=reader()
+    if conn is None:return None
+    try:
+        conn.execute('BEGIN');series={}
+        for asset in dict.fromkeys((symbol.upper(),'BTCUSDT','ETHUSDT')):
+            rows=conn.execute('SELECT payload FROM samples WHERE symbol=? AND available_ms>? AND available_ms<=? ORDER BY available_ms',
+                (asset,available_before_ms-310000,available_before_ms)).fetchall()
+            samples=[unpack(row[0]) for row in rows]
+            samples=[s for s in samples if 0<=s['available_ms']-s['exchange_ms']<=STALE_MS]
+            gap=conn.execute('SELECT MAX(started_ms) FROM gaps WHERE symbol=? AND started_ms<=?',(asset,available_before_ms)).fetchone()[0]
+            if gap is not None:samples=[s for s in samples if s.get('sampled_ms',s['available_ms'])>=gap]
+            series[asset]={s['exchange_ms']//5000:s['metrics']['mid'] for s in samples}
+        own=series[symbol.upper()];comparisons={}
+        for benchmark in ('BTCUSDT','ETHUSDT'):
+            other=series[benchmark];aligned=sorted(own.keys()&other.keys())
+            fresh=bool(aligned) and 0<=available_before_ms-aligned[-1]*5000<=10000
+            complete=fresh and len(aligned)>=61 and aligned[-1]-aligned[0]>=60 and all(b-a==1 for a,b in zip(aligned,aligned[1:]))
+            result=dict(complete=complete,aligned_samples=len(aligned),correlation_5m=None,relative_return_5m_bps=None)
+            if complete:
+                aligned=aligned[-61:]
+                x=[math.log(own[b]/own[a]) for a,b in zip(aligned,aligned[1:])]
+                y=[math.log(other[b]/other[a]) for a,b in zip(aligned,aligned[1:])]
+                mx=sum(x)/len(x);my=sum(y)/len(y)
+                denominator=math.sqrt(sum((v-mx)**2 for v in x)*sum((v-my)**2 for v in y))
+                result['correlation_5m']=max(-1,min(1,sum((a-mx)*(b-my) for a,b in zip(x,y))/denominator)) if denominator else None
+                result['relative_return_5m_bps']=((own[aligned[-1]]/own[aligned[0]]-1)-(other[aligned[-1]]/other[aligned[0]]-1))*10000
+            comparisons[benchmark]=result
+        return dict(venue='binance',market='usdt_perpetual',symbol=symbol.upper(),available_before_ms=available_before_ms,benchmarks=comparisons)
+    finally:conn.close()

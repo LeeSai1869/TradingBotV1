@@ -546,6 +546,9 @@ __all__ = [
     "GlobalCorePacket",
     "create_global_core_packet",
     "read_decision_history",
+    "read_liquidity",
+    "read_liquidity_candle",
+    "read_liquidity_market_context",
 ]
 
 def read_decision_history(symbols=None,intervals=None):
@@ -568,3 +571,9 @@ def read_liquidity_candle(symbol,open_ms,available_before_ms):
     """Closed one-minute perpetual summary; inspect coverage before training."""
     from .liquidity.store import candle_features_at
     return candle_features_at(symbol.upper(),int(open_ms),int(available_before_ms))
+
+
+def read_liquidity_market_context(symbol,available_before_ms):
+    """Causal BTC/ETH relative returns and correlations from recorded perpetuals."""
+    from .liquidity.store import market_context_at
+    return market_context_at(symbol.upper(),int(available_before_ms))

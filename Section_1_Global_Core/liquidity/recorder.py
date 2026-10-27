@@ -13,6 +13,7 @@ from .book import Book,Gap
 from . import store
 from .archive import Archive
 from .summary import Minutes
+from .analytics import Analytics
 
 REST='https://fapi.binance.com'
 WS='wss://fstream.binance.com/stream?streams='
@@ -144,7 +145,7 @@ class Worker(threading.Thread):
         book=Book(self.symbol);buffer=deque();loaded=False
         last_publish=0;last_book=0;began=time.monotonic();context_future=None;next_context=0
         info={};trade_buy=trade_sell=long_liq=short_liq=0.;last_trade=None;trade_complete=False
-        band_presence={};previous_depth={}
+        band_presence={};previous_depth={};analytics=Analytics()
         liquidations=deque(maxlen=100);last_window=int(time.time()*1000)
         while not self.stopping.is_set() and not self.writer.failed.is_set():
             now=int(time.time()*1000)
@@ -176,6 +177,7 @@ class Worker(threading.Thread):
                         buffer.append((event,received))
                     last_book=received
                 elif kind=='aggTrade':
+                    if abs(received-int(event['E']))>10000:raise Gap('Delayed exchange trade or local clock skew')
                     identity=int(event['a'])
                     if last_trade is None or identity>last_trade:
                         if last_trade is not None and identity!=last_trade+1:trade_complete=False
@@ -191,7 +193,7 @@ class Worker(threading.Thread):
                         if order['S']=='SELL':long_liq+=value
                         else:short_liq+=value
                 elif kind=='markPriceUpdate':
-                    info.update(mark_price=number(event['p']),index_price=number(event['i']),funding_rate=number(event['r'],signed=True),next_funding_ms=int(event['T']),mark_received_ms=received)
+                    info.update(mark_price=number(event['p']),index_price=number(event['i']),funding_rate=number(event['r'],signed=True),next_funding_ms=int(event['T']),mark_received_ms=received,mark_exchange_ms=int(event['E']))
             except websocket.WebSocketTimeoutException:pass
             now=int(time.time()*1000)
             if loaded and book.ready and now-last_publish>=5000:
@@ -205,13 +207,14 @@ class Worker(threading.Thread):
                     key=side+'_depth_10bps_usdt';current=packet['metrics'][key];previous=previous_depth.get(key)
                     packet['metrics'][side+'_depth_10bps_change_usdt']=current-previous if current is not None and previous is not None else None
                     previous_depth[key]=current
-                if info.get('open_interest_received_ms',0)<now-120000:info['open_interest']=None
-                if info.get('mark_received_ms',0)<now-10000:
+                if info.get('open_interest_received_ms',0)<now-120000 or not 0<=now-info.get('open_interest_exchange_ms',0)<=120000:info['open_interest']=None
+                if info.get('mark_received_ms',0)<now-10000 or not 0<=now-info.get('mark_exchange_ms',0)<=10000:
                     for key in ('mark_price','index_price','funding_rate'):info[key]=None
                 packet.update(book_window_start_ms=last_publish or now,context=dict(info),aggressive_buy_usdt=trade_buy,aggressive_sell_usdt=trade_sell,
                     trade_coverage='continuous' if trade_complete else 'partial',window_start_ms=last_window or now,
                     reported_long_liquidations_usdt=long_liq,reported_short_liquidations_usdt=short_liq,
                     liquidation_coverage='sampled exchange forceOrder stream; not all liquidations')
+                analytics.add(packet)
                 json.dumps(packet,allow_nan=False) # Quarantine malformed data per symbol, not in the shared writer.
                 self.writer.sample(packet);last_publish=now;last_window=now
                 trade_buy=trade_sell=long_liq=short_liq=0.;trade_complete=last_trade is not None

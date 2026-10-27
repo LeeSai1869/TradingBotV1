@@ -55,7 +55,7 @@ export function stackedSegments(row,maximum,coordinate,paneWidth,lengthPercent=4
     }
     return result;
 }
-export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Resting asks'} · ${band.low.toPrecision(7)}–${band.high.toPrecision(7)} · ${band.notional_usdt.toLocaleString(undefined,{maximumFractionDigits:0})} USDT · Binance perpetual${band.observed_ms?' · '+new Date(band.observed_ms).toLocaleTimeString():''}`;}
+export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Resting asks'} · ${band.low.toPrecision(7)}–${band.high.toPrecision(7)} · ${band.notional_usdt.toLocaleString(undefined,{maximumFractionDigits:0})} USDT · Binance perpetual · sampled presence ${Math.floor((band.sampled_presence_ms||0)/1000)}s${band.observed_ms?' · '+new Date(band.observed_ms).toLocaleTimeString():''}`;}
 class Liquidity {
     attached({chart,series,requestUpdate}){
         Object.assign(this,{chart,series,requestUpdate});
@@ -126,7 +126,7 @@ class Liquidity {
 export function mount(){
     primitive=new Liquidity();getSeries().attachPrimitive(primitive);
     status=document.createElement('div');status.className='liquidity-status';status.setAttribute('role','status');
-    Object.assign(status.style,{position:'absolute',right:'8px',top:'52px',fontSize:'11px',color:'#c3ccd6',pointerEvents:'none',zIndex:2,background:'#101820cc',padding:'3px'});
+    Object.assign(status.style,{position:'absolute',right:'8px',top:'52px',fontSize:'11px',color:'#c3ccd6',pointerEvents:'none',zIndex:2,background:'#101820cc',padding:'3px',maxWidth:'75%',whiteSpace:'normal'});
     tooltip=document.createElement('div');tooltip.className='liquidity-tooltip';tooltip.hidden=true;
     Object.assign(tooltip.style,{position:'absolute',left:'8px',bottom:'30px',background:'#101820ee',color:'#fff',fontSize:'12px',padding:'6px',pointerEvents:'none',zIndex:3});
     document.getElementById('chart').append(status,tooltip);
@@ -136,9 +136,16 @@ export function mount(){
     });
 }
 export function feedState(snapshot,now=Date.now()){return fresh(snapshot,now)?'live':snapshot?.status==='live'?'stale':snapshot?.status||'not recording';}
+export function healthLabel(current){
+    const coverage=current.coverage||{},health=current.health,flow=current.analytics?.['60s'];
+    const depth=`depth ${Math.floor(coverage.bid_bps||0)}/${Math.floor(coverage.ask_bps||0)} bps`;
+    if(!health)return depth;
+    const delta=flow?.complete?`60s delta ${Math.round(flow.delta_usdt).toLocaleString()} USDT`:'flow warming up / partial';
+    return `${depth} · book ${Math.max(0,Date.now()-current.book_received_ms)} ms old · ${delta} · OI ${health.open_interest_fresh?'fresh':'unavailable/stale'} · mark/funding ${health.mark_context_fresh?'fresh':'unavailable/stale'}`;
+}
 function statusText(){
     const current=fresh(snapshot),state=feedState(snapshot);
-    const text=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps${primitive.projectionHint||''}`:
+    const text=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps${styles().liquidity_bids?.details===false?'':' · '+healthLabel(current)}${primitive.projectionHint||''}`:
         `Perpetual liquidity: ${state} · ${snapshot?.reason||(state==='stale'?'Waiting for a fresh synchronized update':'Start the liquidity recorder')}`;
     if(status.textContent!==text)status.textContent=text;
 }
