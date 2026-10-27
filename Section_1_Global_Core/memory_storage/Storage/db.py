@@ -572,9 +572,27 @@ def read_sr_snapshot(symbol, interval):
         # out of lifecycle exports avoids a new historical formula replay.
         arrays=saved['state']['persistent'];scored={};lookup={}
         for prefix in ('support','resistance','instSupport','instResistance'):
-            lookup[prefix]=dict(zip(arrays.get(prefix+'ZoneIDArray',[]),arrays.get(prefix+'ScoreArray',[])))
+            lookup[prefix]={str(k):v for k,v in zip(arrays.get(prefix+'ZoneIDArray',[]),arrays.get(prefix+'ScoreArray',[]))}
         for identity,zone in zones.items():
             side=zone['side'];prefix=('inst'+side.title()) if zone.get('institutional') else side
-            scored[identity]={**zone,'score':lookup[prefix].get(identity),'score_time':row[0]//1000}
-        return dict(through=row[0]//1000,zones=scored,ob_zones=ob_zones)
+            ids=[str(value) for value in arrays.get(side+'ZoneIDArray',[])]
+            index=ids.index(str(identity)) if str(identity) in ids else -1
+            origins=arrays.get(side+'OriginTimeArray',[])
+            touches=arrays.get(side+'TouchArray',[])
+            strong=arrays.get(side+'StrongRejectArray',[])
+            origin=origins[index] if 0<=index<len(origins) else None
+            scored[identity]={**zone,'score':lookup[prefix].get(str(identity)),'score_time':row[0]//1000,
+                'origin_time':origin//1000 if isinstance(origin,(int,float)) else None,
+                'touches':touches[index] if 0<=index<len(touches) else None,
+                'strong_rejections':strong[index] if 0<=index<len(strong) else None}
+        valid_until=row[0]//1000;current=False
+        if klines_store.DB_PATH.exists():
+            candles=_read_connection(klines_store.DB_PATH)
+            try:
+                close=candles.execute('SELECT close_time FROM klines WHERE symbol=? AND interval=? AND open_time=?',(symbol,interval,row[0])).fetchone()
+                latest=candles.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                if close:valid_until=(close[0]+1)//1000
+                current=bool(latest and latest[0]==row[0] and data_policy.enabled(symbol,interval))
+            finally:candles.close()
+        return dict(through=row[0]//1000,valid_until=valid_until,current=current,zones=scored,ob_zones=ob_zones,status='feature repair pending' if sr_pending else 'ready')
     finally:conn.close()

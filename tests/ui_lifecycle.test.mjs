@@ -257,3 +257,14 @@ test('liquidity uses the combined poll and never attaches history to old-page re
     await c._fetchPage('BTCUSDT','1m',1000,123);
     assert.equal(new URL(calls[1],'http://local').searchParams.has('liquidity'),false);
 });
+
+test('institutional higher projection requests every higher source only when selected',async()=>{
+    const calls=[],styles={inst_support_zones:{visible:true,higher:true}};
+    const data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({bars:[]})};},styles);
+    await data._fetchPage('BTCUSDT','1h',1000);
+    const query=new URL(calls[0],'http://local').searchParams;
+    assert.equal(query.get('sr_frames'),'2h,4h,6h,8h,12h,1d,3d,1w,1M');
+    styles.inst_support_zones.higher=false;
+    await data._fetchPage('BTCUSDT','1h',1000);
+    assert.equal(new URL(calls[1],'http://local').searchParams.has('sr_frames'),false);
+});

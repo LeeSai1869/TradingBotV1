@@ -426,3 +426,27 @@ bounded observed snapshots to its existing bars poll only when Liquidity is
 selected. The public gateway exposes time-safe `read_liquidity` and
 `read_liquidity_candle` reads. Candle-derived liquidity levels remain compatible
 internal formulas and are never used as fallback order-book data.
+
+Institutional chart projections reuse committed source checkpoints from every
+selected higher interval, via `sr_frames` in the combined `/api/bars` response.
+Only institutional identities are sent for those sources. Display switches for
+institutional support/resistance independently enable projection onto lower
+charts; no download policy, scoring formula or feature checkpoint is changed.
+Paused/behind sources stop at their last confirmed coverage; missing/repairing
+sources have an explicit coverage notice. A ready source extends through the
+current lower chart until another source close changes or invalidates it.
+
+The display reads original pivot times, test counts and scores by stable ID from
+existing parallel arrays. Active institutional zones extend retrospectively to
+their dynamic-zone origin; this is a chart annotation, not a claim that the zone
+was already institutional or had its current score at birth. Older merged bounds
+before loaded history cannot be reconstructed from a current checkpoint alone.
+Missing origin evidence is not invented. Scores remain accumulated engine scores
+and do not necessarily change when no new interaction occurs. Labels include
+calculation time, source interval and recorded test count when available.
+
+Gold denotes a displayed S/R zone observed on both sides of closed price, using
+bounds valid in the loaded timeline. Its color is editable under Style. This
+presentation classification does not keep an engine-invalidated zone alive or
+change trading state. Dynamic/institutional classification and identity remain
+owned by the feature engine.

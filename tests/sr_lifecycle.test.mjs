@@ -40,3 +40,11 @@ test('masked features and raw gaps cannot prove continuous validity',()=>{
     rows[1].features={};
     const [z]=srSegments(rows,config);assert.equal(z.end,0);assert.equal(z.truncated,true);
 });
+
+test('promoted active institutional zone uses recorded dynamic origin without a dynamic underlay',()=>{
+    const a=zone(),inst={...a,institutional:true};
+    const rows=[bar(1,[{id:'a',...a,before:null}]),bar(2,[{id:'a',...inst,before:a}]),bar(3,[])];
+    const result=srSegments(rows,config,{through:180,zones:{a:{...inst,origin_time:0,score:56,score_time:180,touches:12}}});
+    assert.equal(result.length,1);assert.equal(result[0].key,'inst_support_zones');
+    assert.equal(result[0].start,0);assert.equal(result[0].score,56);assert.equal(result[0].touches,12);
+});

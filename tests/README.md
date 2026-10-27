@@ -799,3 +799,11 @@ Liquidity rolling analytics: `python3 -m unittest discover -s tests -p
 price response, bounded memory, OI/basis availability, closed-summary retention,
 and causal BTC/ETH alignment with missing benchmarks and recovery gaps. Existing
 recorder, storage and chart tests remain applicable; no exchange access is needed.
+
+Institutional projection display: JS coverage includes source origin, promotion
+without a duplicate dynamic underlay, closed-price dual-role classification,
+higher-frame selection, repair gating, and coverage cutoffs. Python snapshot
+coverage validates original pivot time, score and tests by identity (including
+numeric IDs). `browser_zones.py` projects a committed 4H institution onto 15m and
+checks its origin, score, count and persistence alongside existing overlays.
+`browser_liquidity.py` checks the new Data tab against recorded observations.

@@ -15,6 +15,7 @@ const DataCache = {
     liquidity:null,
     fvgFrames: {},
     srSnapshot:null,
+    srFrames:{},
     liveStatus: "loading",
     activeBars: [],
     latestBar: null,
@@ -66,6 +67,11 @@ const DataCache = {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
             if(Object.entries(window.Composer?.config.featureStyles||{}).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible))qs.set('sr_zones','1');
+            const srOptions=window.Composer?.config.featureStyles||{};
+            if(['support','resistance'].some(side=>srOptions[`inst_${side}_zones`]?.visible&&srOptions[`inst_${side}_zones`]?.higher!==false)){
+                const all=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'];
+                qs.set('sr_frames',all.slice(all.indexOf(timeframe)+1).join(','));
+            }
             const match=/^(\d+)([mhdwM])$/.exec(timeframe),units={m:60000,h:3600000,d:86400000,w:604800000,M:2678400000};
             const duration=match?Number(match[1])*units[match[2]]:Infinity;
             const frames=['4h','1d','1w'].filter(tf=>({ '4h':14400000,'1d':86400000,'1w':604800000 }[tf]>duration)&&['bull','bear'].some(side=>window.Composer?.config.featureStyles?.[`${side}_fvg_${tf}_zones`]?.visible));
@@ -129,13 +135,14 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
             if (generation !== this._reloadGeneration) return false;
             this.featureProgress=packet.feature_progress??null;
             this.srSnapshot=packet.sr_snapshot??null;
+            this.srFrames=packet.sr_frames??{};
             this._applyFVG(packet);
             this.volumeProfile=packet.volume_profile??null;
             this.liquidity=packet.liquidity??null;
@@ -208,8 +215,9 @@ const DataCache = {
             }
             const progressChanged=JSON.stringify(this.featureProgress)!==JSON.stringify(packet.feature_progress??null);
             this.featureProgress=packet.feature_progress??null;
-            const srChanged=JSON.stringify(this.srSnapshot)!==JSON.stringify(packet.sr_snapshot??null);
+            const srChanged=JSON.stringify([this.srSnapshot,this.srFrames])!==JSON.stringify([packet.sr_snapshot??null,packet.sr_frames??{}]);
             this.srSnapshot=packet.sr_snapshot??null;
+            this.srFrames=packet.sr_frames??{};
             const fvgChanged=this._applyFVG(packet);
             const liquidityChanged=JSON.stringify(this.liquidity)!==JSON.stringify(packet.liquidity??null);
             this.liquidity=packet.liquidity??null;

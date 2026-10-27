@@ -200,3 +200,11 @@ Scope: this remains observed Binance USDT perpetual liquidity. Additional venues
 spot/perpetual comparisons and calibrated predictive models require separate
 market identities and validation; they are not fabricated from the current book.
 Snapshot coverage and archive/heatmap retention limits remain as documented above.
+
+Settings > Features > Liquidity now has **Display**, **Style**, and **Data** tabs.
+Data exposes the latest stored source observation: coverage, spread, OI/funding,
+basis, OI change, CVD, rolling delta/coverage, persistence and absorption evidence.
+Stale/synchronizing feeds have no current readings. The refresh button reuses the
+combined chart poll; it does not establish another exchange connection. Enable
+at least one liquidity layer and apply first so that chart polling requests the
+optional packet. This tab does not alter the joined bid/ask profile geometry.

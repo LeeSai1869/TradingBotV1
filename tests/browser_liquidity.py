@@ -57,6 +57,14 @@ async def exercise(base,library):
             assert await page.evaluate('Composer.config.featureStyles.liquidity_bids.opacity')==45
             assert any('liquidity=1' in url and '/api/bars?' in url for url in requests)
             assert not any('/api/liquidity' in url for url in requests)
+            await page.get_by_role('button',name='Open settings',exact=True).click()
+            dialog=page.get_by_role('dialog',name='Settings',exact=True)
+            await dialog.get_by_role('button',name='Liquidity',exact=True).click()
+            await dialog.get_by_role('button',name='Data',exact=True).click()
+            assert await dialog.get_by_role('heading',name='Live liquidity observations',exact=True).count()==1
+            assert 'CVD since continuous recording' in await dialog.inner_text()
+            assert '60s delta (USDT)' in await dialog.inner_text()
+            await dialog.get_by_role('button',name='Apply',exact=True).click()
             await page.screenshot(path='/tmp/tradingbot-liquidity.png')
             with patch.object(liquidity,'snapshot',return_value=dict(status='stale',reason='sequence gap',latest=None,history=[packet])):
                 await page.evaluate('DataCache.refreshStored()');await settle(page)

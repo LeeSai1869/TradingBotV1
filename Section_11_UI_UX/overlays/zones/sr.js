@@ -7,7 +7,12 @@ export function srSegments(bars,config,snapshot=null,options={}){
         try{const events=JSON.parse(bar.features?.[options.field||'sr_zone_events']??'null');return Array.isArray(events)?events:null;}
         catch{return null;}
     });
-    if(!decoded.some(Boolean))return options.field?[]:legacySegments(rows,config);
+    if(!decoded.some(Boolean)){
+        if(options.field)return [];
+        const projected=institutionalProjection(rows,config,snapshot,'');
+        const keys=new Set(projected.map(z=>z.key));
+        return [...legacySegments(rows,config).filter(z=>!keys.has(z.key)),...projected];
+    }
     // Undo events to recover zones born before the loaded window. Removals
     // retain their prior bounds, so retired zones can also be reconstructed.
     if(snapshot){
@@ -58,9 +63,13 @@ export function srSegments(bars,config,snapshot=null,options={}){
     for(const item of active.values())item.until=previous?.client?.close_time!==undefined?(previous.client.close_time+1)/1000:item.end;
     for(const item of result){
         const identity=item.identity.slice(item.key.length+1),zone=snapshot?.zones?.[identity];
-        if(zone&&Number.isFinite(zone.score)&&!item.invalidated&&!item.truncated&&(item.scoreTime??-Infinity)<=snapshot.through){item.score=zone.score;item.scoreTime=zone.score_time;}
+        if(zone&&zone.institutional&&Number.isFinite(zone.origin_time)&&!item.invalidated&&!item.truncated){
+            item.promotedTime=item.start;item.start=Math.min(item.start,zone.origin_time);
+            item.history[0].time=item.start;item.retrospective=true;
+        }
+        if(zone&&Number.isFinite(zone.score)&&!item.invalidated&&!item.truncated&&(item.scoreTime??-Infinity)<=snapshot.through){item.score=zone.score;item.scoreTime=zone.score_time;item.touches=zone.touches;item.strongRejections=zone.strong_rejections;}
     }
-    return result;
+    return result.filter(item=>!result.some(other=>other!==item&&other.retrospective&&other.key.startsWith('inst_')&&!item.key.startsWith('inst_')&&other.identity.slice(other.key.length+1)===item.identity.slice(item.key.length+1)&&other.start<=item.start&&other.end>=item.end));
 }
 
 function legacySegments(bars,config){
@@ -81,4 +90,40 @@ function legacySegments(bars,config){
         }
     }
     return result;
+}
+
+// Active institutional overlays are retrospective chart annotations. Their
+// score is current at scoreTime, not a claim of institutional qualification at birth.
+export function institutionalProjection(bars,config,snapshot,source){
+    if(!snapshot||snapshot.status&&snapshot.status!=='ready')return [];
+    const last=bars.filter(b=>!b.provisional).at(-1);if(!last)return [];
+    const until=snapshot.current?last.time:snapshot.valid_until??snapshot.through;
+    const end=Math.min(last.time,until);
+    const result=[];
+    for(const [id,z] of Object.entries(snapshot.zones||{})){
+        const key=`inst_${z.side}_zones`,style=config[key];
+        if(!z.institutional||!style?.visible||source&&style.higher===false||!Number.isFinite(z.origin_time)||z.origin_time>end)continue;
+        if(!Number.isFinite(z.low)||!Number.isFinite(z.high)||z.high<=z.low)continue;
+        result.push({key,identity:`${source}:${id}`,source,low:z.low,high:z.high,start:z.origin_time,end,
+            until:snapshot.current?(last.client?.close_time+1)/1000:until,score:z.score,scoreTime:z.score_time,
+            touches:z.touches,strongRejections:z.strong_rejections,retrospective:true,side:z.side,
+            history:[{time:z.origin_time,low:z.low,high:z.high}]});
+    }
+    return result;
+}
+
+export function srRole(item,bars){
+    // Presentation only: never resurrect removed engine zones or change scores.
+    let support=item.side==='support'||item.key==='support_zones'||item.key==='inst_support_zones';
+    let resistance=!support;
+    const history=item.history||[];let cursor=0;
+    for(const bar of bars){
+        if(bar.provisional||bar.time<item.start||bar.time>item.end)continue;
+        const close=bar.client?.close;if(!Number.isFinite(close))continue;
+        while(cursor+1<history.length&&history[cursor+1].time<=bar.time)cursor++;
+        const bounds=history[cursor]||item;
+        if(close>bounds.high)support=true;
+        if(close<bounds.low)resistance=true;
+    }
+    return support&&resistance?'both':support?'support':'resistance';
 }

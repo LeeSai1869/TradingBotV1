@@ -46,7 +46,7 @@ async function loadAll() {
         const historyNotice=DataCache.historyPending ? ' | Earlier history pending' : behind ? ` | Historical data through ${new Date(client.close_time).toLocaleString()} — not current price` : '';
         const progress=DataCache.featureProgress;
         const stamp=t=>t==null?'not started':new Date(t).toLocaleString();
-        const zonesPending=zoneReadiness(progress,DataCache.fvgFrames,Composer.config.featureStyles||{},DataCache.timeframe);
+        const zonesPending=zoneReadiness(progress,DataCache.fvgFrames,Composer.config.featureStyles||{},DataCache.timeframe,DataCache.srFrames);
         const zoneNotice=zonesPending?` | ${zonesPending}`:'';
         const featureNotice=progress?progress.repair?` | Feature repair${progress.active===false?' paused':''}: ${progress.repair.columns} columns through ${stamp(progress.repair.through)}; target ${stamp(progress.repair.target)}`:
             progress.active===false?` | Features paused at ${stamp(progress.through)}`:progress.status==='features current'?' | Features current':` | Features through ${stamp(progress.through)} (${progress.status})`:'';
@@ -133,7 +133,8 @@ async function loadAll() {
         const needHigher=Object.entries(HTF).some(([tf,duration])=>duration>intervalMs(DataCache.timeframe)&&!DataCache.fvgFrames[tf]&&['bull','bear'].some(side=>outputs[`${side}_fvg_${tf}_zones`]?.visible));
         const needSR=!DataCache.srSnapshot&&Object.entries(outputs).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible);
         const needLiquidity=!DataCache.liquidity&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>outputs[k]?.visible);
-        if(needProfile||needCurrent||needHigher||needSR||needLiquidity){
+        const needInstitutional=Object.entries(outputs).some(([k,v])=>['inst_support_zones','inst_resistance_zones'].includes(k)&&v.visible&&v.higher!==false);
+        if(needProfile||needCurrent||needHigher||needSR||needLiquidity||needInstitutional){
             void DataCache.refreshStored().catch(error=>{status().textContent=error.message;});
         }
     });

@@ -72,16 +72,39 @@ function reserved(label, explanation) {
     note(explanation);
 }
 function renderFeature() {
+    if(featureTab==='Data'&&item!=='Liquidity')featureTab='Display';
     const feature = FEATURE_STYLES[item];
     const subnav = el("nav", "", content, "settings-subtabs");
     subnav.setAttribute("aria-label", `${item} options`);
-    for (const title of ["Display", "Style"]) {
+    for (const title of (item==='Liquidity'?["Display", "Style", "Data"]:["Display", "Style"])) {
         const button = el("button", title, subnav);
         button.setAttribute("aria-pressed", String(featureTab === title));
         button.onclick = () => {
             featureTab = title; render();
             content.querySelector(`[aria-pressed="true"]`).focus();
         };
+    }
+    if(item==='Liquidity'&&featureTab==='Data'){
+        const snapshot=window.DataCache?.liquidity,latest=snapshot?.latest;
+        const current=snapshot?.status==='live'&&latest&&Date.now()>=latest.available_ms&&Date.now()>=latest.book_received_ms&&Date.now()-latest.book_received_ms<=10000&&Date.now()-latest.available_ms<=10000?latest:null;
+        el('h4','Live liquidity observations',content);
+        note(`Recorder: ${!current&&snapshot?.status==='live'?'stale':snapshot?.status||'not loaded'}${snapshot?.reason?' — '+snapshot.reason:''}. Binance USDT perpetuals; candles remain spot.`);
+        if(!current){note('Enable bids, asks or heatmap in Display, apply, then reopen Data. A stale or synchronizing recorder has no current readings.');return;}
+        const rows=[['Observed at',new Date(current.book_received_ms).toISOString()],['Bid / ask coverage (bps)',`${current.coverage?.bid_bps?.toFixed(1)??'unknown'} / ${current.coverage?.ask_bps?.toFixed(1)??'unknown'}`],
+            ['Spread (bps)',current.metrics?.spread_bps],['Open interest',current.context?.open_interest],['Funding rate',current.context?.funding_rate],
+            ['Mark / index basis (bps)',current.analytics?.mark_index_basis_bps],['OI change 5m (%)',current.analytics?.open_interest_change_5m_pct],
+            ['CVD since continuous recording (USDT)',current.analytics?.cvd_since_continuity_usdt],['Microstructure regime (heuristic)',current.analytics?.microstructure_regime],
+            ['Bid persistence ≥30s (share)',current.analytics?.bid_persistent_30s_share],['Ask persistence ≥30s (share)',current.analytics?.ask_persistent_30s_share]];
+        for(const seconds of [60,300]){
+            const flow=current.analytics?.[seconds+'s'];
+            rows.push([`${seconds}s flow coverage`,flow?`${Math.round(flow.coverage*100)}%${flow.complete?'':' · warming up / partial'}`:null],
+                [`${seconds}s delta (USDT)`,flow?.delta_usdt],[`${seconds}s buy / sell absorption evidence`,flow?.complete?`${flow.buy_absorption_evidence?'yes':'no'} / ${flow.sell_absorption_evidence?'yes':'no'}`:null]);
+        }
+        const table=el('table','',content);
+        for(const [label,value] of rows){const row=el('tr','',table);el('th',label,row);el('td',value===undefined||value===null?'Unavailable':typeof value==='number'?value.toLocaleString(undefined,{maximumFractionDigits:6}):String(value),row);}
+        note('Values are the latest stored observation, not predictions. Sampled persistence is not individual-order lifetime. Missing depth and incomplete flow remain unavailable. Refresh reads the existing combined chart feed.');
+        const refresh=el('button','Refresh liquidity readings',content);refresh.onclick=async()=>{try{await window.DataCache.refreshStored();render();}catch(error){note(error.message);}};
+        return;
     }
     if(item==='Momentum Indicator') {
         toggle('Show Momentum Indicator','markers');
@@ -149,6 +172,14 @@ function renderFeature() {
                 input.onchange=()=>{draft.outputs[key].scores=input.checked;};
             }
         }
+        if(item==='Support / Resistance'){
+            for(const side of ['support','resistance']){
+                const key=`inst_${side}_zones`,row=el('label',`Project institutional ${side} from all higher timeframes`,content,'settings-row');
+                const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs[key].higher;
+                input.onchange=()=>{draft.outputs[key].higher=input.checked;};
+            }
+            note('Institutional overlays retain their original dynamic-zone origin. Scores accumulate recorded tests and need not change without another interaction. Gold means the zone has appeared on both sides of closed price. Origin extension is retrospective; scores are latest calculated values, not scores at birth. Projection reads stored features and does not enable downloads.');
+        }
         if(item==='Liquidity'){
             const row=el('label','Show feed health and rolling flow',content,'settings-row');
             const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs.liquidity_bids.details;
@@ -156,6 +187,13 @@ function renderFeature() {
         }
         note("Display choices use existing stored values; calculation periods and inputs stay unchanged.");
         return;
+    }
+    if(item==='Support / Resistance'){
+        for(const side of ['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones']){
+            const row=el('label',`${side.replaceAll('_',' ')} dual-role color`,content,'settings-row');
+            const input=el('input','',row);input.type='color';input.value=draft.outputs[side].dualColor;
+            input.oninput=()=>{draft.outputs[side].dualColor=input.value;};
+        }
     }
     if(item==='Volume Profile'||item==='Liquidity'){
         const profileKey=item==='Volume Profile'?'vp_histogram':'liquidity_bids';

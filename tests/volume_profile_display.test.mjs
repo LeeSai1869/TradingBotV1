@@ -24,7 +24,7 @@ test('S/R bands retain both bounds and do not invent a range from a single price
         {time:4,features:{support_zone_low:null,support_zone_high:99,nearest_support:99}},
         {time:5,features:{support_zone_low:99,support_zone_high:99}}];
     const bands=segments(bars,{support_zones:{visible:true}});
-    assert.deepEqual(bands,[{key:'support_zones',identity:'s',low:97,high:99,start:2,end:3}]);
+    assert.deepEqual(bands,[{key:'support_zones',identity:'s',role:'support',low:97,high:99,start:2,end:3}]);
     assert.deepEqual(segments(bars,{support_zones:{visible:false}}),[]);
 });
 

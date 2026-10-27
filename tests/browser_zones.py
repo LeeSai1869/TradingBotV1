@@ -60,6 +60,15 @@ async def exercise(base,library):
     db.write_klines(source)
     db.write_features([dict(symbol='BTCUSDT',interval='4h',open_time=b['open_time'],formula_version=3,
                      qualified_bull_fvg=i==0,bull_fvg_low=price-8,bull_fvg_high=price-7) for i,b in enumerate(source)])
+    higher=Engine('BTCUSDT','4h')
+    for b in source:higher.step(b)
+    higher.context.persistent['srDisplayPrevious']={'higher-is1':dict(side='support',low=price-6,high=price-5,institutional=True)}
+    higher.context.persistent.update(supportZoneIDArray=['higher-is1'],supportOriginTimeArray=[source[0]['open_time']],
+        supportTouchArray=[12],supportStrongRejectArray=[5],supportScoreArray=[40],
+        instSupportZoneIDArray=['higher-is1'],instSupportScoreArray=[56])
+    conn=features_store.open_db()
+    with conn:conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',('BTCUSDT','4h',higher.context.last_time,dump(higher,(0,0))))
+    conn.close()
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000});errors=[];requests=[]
@@ -107,7 +116,11 @@ async def exercise(base,library):
         await page.wait_for_function("DataCache.fvgFrames['4h']?.bars.length===3")
         await settle(page)
         count=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")
-        assert count==9,count
+        assert count==10,count
+        projected=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='4h:higher-is1'))")
+        assert projected['start']==source[0]['open_time']//1000
+        assert projected['score']==56 and projected['touches']==12
+        assert projected['end']==rows[-1][2]//1000
         ob_band=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='normal_bull_ob_zones'))")
         assert ob_band['start']==rows[0][2]//1000 and ob_band['end']==rows[-1][2]//1000
         assert ob_band['score']==1.75
@@ -150,7 +163,7 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==9
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==10
         assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
         assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
         await page.get_by_role('button',name='Open settings',exact=True).click()
@@ -158,7 +171,7 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='FVG',exact=True).click()
         await dialog.get_by_role('button',name='Deselect all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==6
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==7
         assert not any('/api/fvg' in url or '/api/support' in url or '/api/volume_profile' in url for url in requests)
         assert not errors,errors
         await page.get_by_role('button',name='Open settings',exact=True).click()

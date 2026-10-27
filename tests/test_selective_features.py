@@ -318,7 +318,7 @@ class SelectiveFeatures(unittest.TestCase):
         self.stack.enter_context(patch.object(processor.data_policy,'read',return_value={'epochs':{}}))
         snapshot=db.read_sr_snapshot('ETHUSDT','1m')
         self.assertEqual(snapshot['through'],self.clients[-1]['open_time']//1000)
-        self.assertEqual({k:{f:v for f,v in z.items() if f not in ('score','score_time')} for k,z in snapshot['zones'].items()},processor._load('ETHUSDT','1m',(0,0)).context.persistent['srDisplayPrevious'])
+        self.assertEqual({k:{f:v for f,v in z.items() if f not in ('score','score_time','origin_time','touches','strong_rejections')} for k,z in snapshot['zones'].items()},processor._load('ETHUSDT','1m',(0,0)).context.persistent['srDisplayPrevious'])
         reference=Engine('ETHUSDT','1m')
         for client in self.clients:reference.step(client)
         next_bar=bar(220,114);expected=reference.step(next_bar)

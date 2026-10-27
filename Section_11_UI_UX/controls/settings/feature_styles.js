@@ -70,6 +70,8 @@ export function normalizeStyles(value = {}) {
             };
             if(presentation==='zone')result[key].scores=typeof input.scores==='boolean'?input.scores:true;
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
+            if(['inst_support_zones','inst_resistance_zones'].includes(key))result[key].higher=typeof input.higher==='boolean'?input.higher:true;
+            if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key))result[key].dualColor=/^#[0-9a-f]{6}$/i.test(input.dualColor)?input.dualColor:'#eab308';
             if(key==='liquidity_bids')result[key].details=typeof input.details==='boolean'?input.details:true;
             if(key==='vp_histogram'||key==='liquidity_bids'){
                 result[key].lengthPercent=Number.isFinite(input.lengthPercent)?Math.max(10,Math.min(80,input.lengthPercent)):45;

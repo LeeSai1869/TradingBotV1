@@ -2,12 +2,13 @@
 import {getSeries} from '../candles/index.js';
 import {fvgSegments} from './fvg.js';
 import {structureSegments} from './structure.js';
-import {srSegments} from './sr.js';
+import {srSegments,institutionalProjection,srRole} from './sr.js';
 import {obSegments} from './ob.js';
 export const name='zones';
 export function zoneScoreLabel(item){
     const name=item.key.includes('_ob_')||item.key.includes('_breaker_')?'OB formation strength (ATR)':item.key.includes('fvg')?'FVG reaction':'S/R score';
-    return `${name}: ${Number.isFinite(item.score)?item.score.toFixed(2):'unavailable'}`;
+    const details=item.key.includes('support')||item.key.includes('resistance')?`${item.source?' · '+item.source.toUpperCase():''}${item.role==='both'?' · S/R':''}${Number.isFinite(item.touches)?' · tests '+item.touches:''}${Number.isFinite(item.scoreTime)?' · as of '+new Date(item.scoreTime*1000).toISOString().slice(0,16).replace('T',' ')+' UTC':''}`:'';
+    return `${name}: ${Number.isFinite(item.score)?item.score.toFixed(2):'unavailable'}${details}`;
 }
 const definitions={
     support_zones:['support_zone_low','support_zone_high','nearest_support_zone_id'],
@@ -22,9 +23,11 @@ const styles=()=>window.Composer.config.featureStyles||{};
 export function segments(bars,config,frames={},target=''){
     const result=[];
     result.push(...srSegments(bars,config,frames.sr),...obSegments(bars,config,frames.sr),...structureSegments(bars,config));
+    for(const [source,frame] of Object.entries(frames.institutional||{}))result.push(...institutionalProjection(bars,config,frame,source));
+    for(const item of result)if(/^(inst_)?(support|resistance)_zones$/.test(item.key))item.role=srRole(item,bars);
     const endTime=bars.at(-1)?.time;
     result.push(...fvgSegments(bars,config,{target,endTime,seeds:frames.current?.active}));
-    for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
+    for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr'&&source!=='institutional')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
     return result;
 }
 class Zones {
@@ -44,7 +47,8 @@ class Zones {
             const range=this.chart.timeScale().getVisibleRange();
             for(const item of this.items||[]){
                 if(range&&typeof range.from==='number'&&(item.end<range.from||item.start>range.to))continue;
-                const style=styles()[item.key];if(!style?.visible)continue;
+                const selected=styles()[item.key];if(!selected?.visible)continue;
+                const style={...selected,color:item.role==='both'?(selected.dualColor||'#eab308'):selected.color};
                 const x1=this.chart.timeScale().timeToCoordinate(this.timeAt(item.start,true)),x2=this.chart.timeScale().timeToCoordinate(this.timeAt(item.end,false));
                 const y1=this.series.priceToCoordinate(item.high),y2=this.series.priceToCoordinate(item.low);
                 if([x1,x2,y1,y2].some(x=>x===null)||x2<x1||x2<0||x1>mediaSize.width)continue;
@@ -81,7 +85,7 @@ class Zones {
 export function mount(){primitive=new Zones();getSeries().attachPrimitive(primitive);}
 export function update(chart,data){
     primitive.times=(data.bars||[]).map(b=>b.time);
-    primitive.items=segments(data.bars||[],styles(),{...data.fvgFrames,sr:data.srSnapshot},data.timeframe);primitive.requestUpdate?.();
+    primitive.items=segments(data.bars||[],styles(),{...data.fvgFrames,sr:data.srSnapshot,institutional:data.srFrames},data.timeframe);primitive.requestUpdate?.();
     // Labels use the last actually calculated closed candle, never fabricated levels.
     const series=getSeries();for(const line of axis)series.removePriceLine(line);axis=[];
     const last=data.bars?.at(-1),f=last?.features||{};

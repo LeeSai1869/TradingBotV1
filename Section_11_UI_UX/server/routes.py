@@ -39,6 +39,14 @@ def _fvg_frame(symbol,interval,version=None,**options):
         return {'unchanged':True,'status':'stored FVG source unavailable'}
 
 
+def _sr_frame(symbol,interval):
+    try:
+        frame=db.read_sr_snapshot(symbol,interval)
+        if frame is None:return None
+        return {**{k:v for k,v in frame.items() if k!='ob_zones'},'zones':{k:z for k,z in frame['zones'].items() if z.get('institutional')}}
+    except (sqlite3.Error,OSError):return None
+
+
 def handle_get(path, raw_qs, server):
     status, payload = drawing_routes.handle_get(path, raw_qs, server)
     if status is not None:
@@ -71,6 +79,11 @@ def handle_get(path, raw_qs, server):
         if frames:
             if interval not in data_policy.INTERVALS:return 400,{'error':'Unsupported target timeframe'}
             frames=[tf for tf in frames if data_policy.INTERVALS.index(tf)>data_policy.INTERVALS.index(interval)]
+        sr_frames=qs.get('sr_frames',[''])[0].split(',') if qs.get('sr_frames',[''])[0] else []
+        if any(tf not in data_policy.INTERVALS for tf in sr_frames) or len(sr_frames)>14:return 400,{'error':'Unsupported institutional source frames'}
+        if sr_frames:
+            if interval not in data_policy.INTERVALS:return 400,{'error':'Unsupported target timeframe'}
+            sr_frames=[tf for tf in dict.fromkeys(sr_frames) if data_policy.INTERVALS.index(tf)>data_policy.INTERVALS.index(interval)]
         try:known=json.loads(qs.get('fvg_versions',['{}'])[0])
         except ValueError:return 400,{'error':'Invalid FVG versions'}
         if not isinstance(known,dict):return 400,{'error':'Invalid FVG versions'}
@@ -85,6 +98,8 @@ def handle_get(path, raw_qs, server):
                 packet['feature_progress']['active']=active
             if before is None and qs.get('sr_zones',['0'])[0]=='1':
                 packet['sr_snapshot']=db.read_sr_snapshot(symbol,interval)
+            if before is None and sr_frames:
+                packet['sr_frames']={tf:_sr_frame(symbol,tf) for tf in sr_frames}
             if before is None and frames:
                 packet['fvg_frames']={tf:_fvg_frame(symbol,tf,known.get(tf)) for tf in frames}
             if before is None and qs.get('fvg_current',['0'])[0]=='1':
