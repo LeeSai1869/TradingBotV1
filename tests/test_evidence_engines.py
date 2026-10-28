@@ -1,6 +1,6 @@
 import copy
 import unittest
-from Section_9_Confidence_Engine.engine import evaluate as confidence,_evaluate as confidence_cache
+from Section_9_Confidence_Engine.engine import evaluate as confidence,_context as confidence_cache
 from Section_10_Opportunity_Engine.engine import evaluate as opportunity
 from Section_9_Confidence_Engine.presentation import annotate
 
@@ -26,7 +26,7 @@ class ConfidenceTests(unittest.TestCase):
     def test_missing_values_never_add_confidence_or_fake_probability(self):
         result=confidence(100.,{'atr':2.})
         self.assertEqual(result['buy_score'],0);self.assertEqual(result['coverage'],0.)
-        self.assertEqual(result['preference'],'WAIT');self.assertIn('not a win probability',result['interpretation'])
+        self.assertEqual(result['preference'],'not a decision');self.assertIn('never from BUY/SELL',result['interpretation'])
         self.assertIsNone(confidence(100.,{'atr':0})['buy_score'])
         self.assertIsNone(confidence(float('nan'),features())['sell_score'])
 

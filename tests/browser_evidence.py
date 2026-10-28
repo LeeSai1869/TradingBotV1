@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 from playwright.async_api import async_playwright
-from browser_smoke import run,sign_in,settle,db
+from browser_smoke import run,sign_in,settle,db,klines_store
 
 
 async def exercise(base,library):
@@ -12,6 +12,23 @@ async def exercise(base,library):
         current_structure='STRUCTURE_BULL',support_zone_low=price-4,support_zone_high=price-2,
         resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,
         protected_high=price+8,atr_ma_ratio=1) for r in rows])
+    # Canonical three-candle SELL gate, with a rejection candle at the anchor.
+    closes=[price-2,price,price-1]
+    for index,r in enumerate(rows[-3:]):
+        c=closes[index]
+        db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
+            atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=88 if index==1 else 80,
+            di_plus=[30,35,27][index],di_minus=[10,11,15][index],di_spread=[20,24,12][index],adx=20+index,
+            current_structure='STRUCTURE_BULL',support_zone_low=price-4,support_zone_high=price-2,
+            resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1)])
+    conn=klines_store.open_db()
+    with conn:
+        for index,r in enumerate(rows[-3:]):
+            c=closes[index]
+            opened,high,low=(price+1,price+3,price-1.5) if index==2 else (c+.1,c+1,c-1)
+            conn.execute('UPDATE klines SET open=?,high=?,low=?,close=? WHERE symbol=? AND interval=? AND open_time=?',
+                (opened,high,low,c,'BTCUSDT','15m',r[2]))
+    conn.close()
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000});errors=[]
@@ -31,6 +48,16 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='Opportunity',exact=True).click()
         await dialog.get_by_role('button',name='Display',exact=True).click()
         await dialog.get_by_role('button',name='Select all',exact=True).click()
+        await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
+        assert await page.evaluate("DataCache.bars.at(-1).momentum.signal_type")=='SELL'
+        assert await page.evaluate('DataCache.bars.at(-1).signal_context.entry')==price-1
+        anchored=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
+        assert anchored and all(row['side']=='sell' and row['price']<price-1 for row in anchored)
+        assert await page.evaluate('DataCache.bars.at(-1).confidence.sell_mode')=='reversal'
+        await page.get_by_role('button',name='Open settings',exact=True).click()
+        await dialog.get_by_role('button',name='Opportunity',exact=True).click()
+        await dialog.get_by_role('button',name='Display',exact=True).click()
+        await dialog.get_by_role('checkbox',name='Preview both directions from the latest close (unanchored)',exact=True).check()
         await dialog.get_by_role('button',name='Style',exact=True).click()
         await dialog.get_by_label('Fee per side (bps)',exact=True).fill('8')
         await dialog.get_by_label('Slippage per side (bps)',exact=True).fill('3')
@@ -44,6 +71,6 @@ async def exercise(base,library):
         assert await page.evaluate('Composer.config.featureStyles.opportunity_buy_1.feeBps')==8
         assert not errors,errors
         await browser.close()
-        print('PASS: confidence breakdown, three targets, editable costs, unchanged candles and persisted settings')
+        print('PASS: independent reversal score, SELL anchor and downward targets, separate preview, costs, unchanged candles and persistence')
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

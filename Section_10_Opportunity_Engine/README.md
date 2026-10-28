@@ -31,10 +31,20 @@ not mixed into the app's spot-candle scenarios.
 Settings > Features > Opportunity has six independent Display controls (T1–T3
 for BUY and SELL), Style controls/cost assumptions and a Data breakdown. Enabled
 scenarios draw horizontal target and invalidation lines without changing chart
-scale or candle data. They describe the latest closed-bar entry, with its UTC
-as-of time. They update on closed candles and are hidden while viewing older
-history. They are not a frozen trade ledger or retrospective profitable trade.
-Historical signal rows also receive their own immutable-input scenario values.
+scale or candle data. By default Core anchors the displayed side to the decision
+price/time, without passing that decision into opportunity mathematics. Entry,
+targets, invalidation, costs and confidence remain fixed from that point. Later
+closed candles only track touches and invalidation. An optional, clearly labeled
+unanchored preview evaluates both directions from the latest closed price.
+
+`context.py` owns immutable scenario tracking; it never produces a decision. If
+a candle reaches a target and invalidation in the same OHLC bar, ordering is
+marked ambiguous rather than crediting a profitable fill. A raw candle gap or
+unavailable features clears unknown context. No anchor is invented before the
+loaded history. This is a scenario record, not proof of executed orders/fills.
+Public independent point evaluation is available through Core's
+`evaluate_price_point(client, features, previous)` interface. Neither engine
+imports the other, and neither is responsible for generating BUY/SELL signals.
 
 Calculations share the existing combined chart response, use bounded caches,
 and never write to OHLCV/features/ADCN or trigger their replay. Cost settings are

@@ -37,7 +37,8 @@ class CompleteConversionTests(unittest.TestCase):
 
     def test_main_feature_consolidation_preserves_all_packets(self):
         # Reviewed 700-bar vector after first-swing bootstrap and foundation fixes.
-        # Compared against 9bdd0cd: only declared structure-dependent outputs changed.
+        # Compared against df2daca: liquidity-side classification and early known
+        # price distances changed; unrelated outputs matched across all 700 bars.
         import hashlib
         digest=hashlib.sha256();engine=Engine('ETHUSDT','15m')
         for i in range(700):
@@ -53,7 +54,7 @@ class CompleteConversionTests(unittest.TestCase):
             for side in ('support','resistance','inst_support','inst_resistance'):
                 for edge in ('low','high'):packet.pop(f'{side}_zone_{edge}')
             digest.update(json.dumps(packet,sort_keys=True,separators=(',',':')).encode())
-        self.assertEqual(digest.hexdigest(),'84171e3257a4da4dee70046fecc52cd6e1730d1ae533da59d03fcc1f92065a32')
+        self.assertEqual(digest.hexdigest(),'08fa2b199a845a9742a9a4c963229e2c4e63458acc83238d53f3d12eb0833ad2')
         from Section_4_Features.features.registry import load
         owners={row['name']:row for row in load()}
         for name in ('liquidity','support_resistance','sessions','order_blocks','trend','momentum','candle','market_structure'):

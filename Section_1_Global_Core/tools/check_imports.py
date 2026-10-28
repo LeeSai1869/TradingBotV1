@@ -49,6 +49,7 @@ def _load_integrations() -> set[tuple[str,str]]:
 
 
 ALLOWED_TOP_LEVEL = {
+    "Section_1_Global_Core.analysis_packet",
     # The socket — every downstream section imports packets through here
     "Section_1_Global_Core.Imports.import_features_packet",
     "Section_1_Global_Core.Imports.import_regime_packet",

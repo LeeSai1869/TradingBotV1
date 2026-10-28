@@ -1,52 +1,49 @@
-# Directional confidence evidence
+# Price-point confidence evidence (v2)
 
-Production entry point: `engine.evaluate(close, features)`. The original
-`section_9_1_scalp_confidence_engine/Scalp_Confidence.py` remains a reference;
-its legacy absolute packet imports are not used by the runtime.
+`engine.evaluate(close, features, previous=..., candle=...)` evaluates the supplied
+price point. It does not accept or inspect a decision label, trade result, later
+candle, order, or account position. Both directional scores are calculated from
+the same point's inputs. These are uncalibrated evidence scores, not probabilities.
 
-Review of the original found missing HTF inputs awarded confidence, fallback
-weights copied from 30m into other frames, unguarded optional arithmetic
-(including `abs(directional_displacement)` before its null check), and mixed
-uncapped correlated contributions before final clipping. The supplied
-`sections_4&5_Tradingview` file contains the feature/regime source rather than
-Sections 9/10. This upgrade uses the existing Section 9/10 Python references.
+Version 1 conflated trend continuation with reversal quality. Version 2 retains
+the continuation breakdown but adds an independent reversal breakdown:
 
-Version 1 produces independent BUY and SELL evidence scores /100. These are
-not probabilities, need not sum to 100, and do not estimate win rates. Components:
-
-| Group | Cap | Evidence |
+| Reversal family | Cap | Close-time evidence |
 | --- | ---: | --- |
-| Trend | 20 | close relative to EMA50, EMA200 and VWAP, scaled by ATR |
-| Momentum | 25 | DI direction attenuated by ADX; RSI directional strength |
-| Structure | 20 | established bullish, bearish or range classification |
-| Location | 25 | nearest available barriers on either side, capped across correlated zone families |
-| Environment | 10 | ATR relative to its baseline; nondirectional suitability |
+| Exhaustion | 25 | RSI extremity and EMA stretch in ATR units |
+| Rejection | 25 | wick proportion and close position within the candle |
+| Turn confirmation | 25 | DI change, price change and RSI change from the preceding candle |
+| Location | 15 | candle interaction with known zones, including inside-zone closes |
+| Environment | 10 | ATR relative to baseline |
 
-Missing inputs contribute zero points and reduce evidence coverage. Missing
-trend/momentum subcomponents reduce their group coverage proportionately.
-A score is ready only with positive close/ATR and at least 75% weighted coverage.
-Directional preference additionally requires a >=10-point margin. Those are
-versioned heuristic thresholds, not calibrated trading recommendations. Adverse
-location reduces the favorable-side allocation rather than counting overlapping
-S/R, FVG and OBs as independent confirmations. Session bonuses are omitted rather
-than asserting that a trading session by itself improves trade quality.
+A direction uses reversal evidence when candle geometry shows a rejection or
+strong close away from that edge, and RSI/EMA context supports exhaustion in that
+direction. Otherwise it uses continuation evidence. Each direction reports its
+selected mode and coverage; the mode is derived from price context, not a BUY or
+SELL flag and not whichever score happens to be higher. The Data tab exposes both
+breakdowns. Missing observations contribute no points; >=75% weighted coverage is
+needed for ready status. No peak receives a forced 80/100 merely because price
+later fell. A weak or ambiguous point may still score low despite a good outcome.
 
-`presentation.annotate` attaches confidence to ready formula-v3 closed bars and
-opportunity scenarios to signal bars plus the latest closed row in the page.
-It does not change DI signals, ADCN rows, alternation, sounds, feature formulas,
-or replay checkpoints. Pure calculations use bounded 8192-entry LRU caches keyed
-by their actual inputs; changed repaired inputs invalidate the cached result
-without touching unrelated stored feature rows. There are no exchange calls,
-DB migrations, historical replay jobs or new runner work. Annotations are
-read-only derived views, not additional stored feature copies.
+Continuation retains caps of trend 20, momentum 25, structure 20, location 25 and
+environment 10. Neither mode emits a trading decision. Historical inputs must
+come from their own closed candle and preceding closed candle; current HTF and
+perpetual observations are not silently joined into a past spot score.
 
-Historical evidence uses only that candle's stored feature row. No current HTF
-snapshot, current liquidity book or later candle is joined into a past score.
-Version 1 explicitly reports chart-timeframe scope. HTF/liquidity integration
-requires market-matched, availability-time joins and is not silently inferred.
-Out-of-sample calibration with fees, label horizons and regime splits is required
-before interpreting these scores as probabilities or using them to gate orders.
+Core owns orchestration in `Section_1_Global_Core.analysis`. Section 8 owns DI
+signals; Section 9 owns confidence; Section 10 owns opportunity geometry and
+scenario tracking. Both engines use the small public `analysis_packet` numeric
+contract. They do not import each other or read/write storage. The former
+`presentation` module is only a compatibility delegate to the public coordinator.
+No BUY/SELL filtering, alternation, sounds or ADCN rows are changed.
 
-Settings > Features > Confidence offers separate BUY/SELL Display switches and
-a Data breakdown. Enabled scores appear beside the corresponding DI marker and
-in the latest evidence readout. Insufficient coverage displays confidence pending.
+Point calculations use bounded input-keyed caches. Only signal/reference points
+and the latest closed point need full display annotations; intermediate candles
+can advance scenario tracking without duplicating their full analysis payload.
+Stored feature repairs may legitimately change the inputs at a historical point;
+future price outcomes cannot. The engine creates no historical feature replay.
+
+The original Section 9 reference remains archived under
+`section_9_1_scalp_confidence_engine/`. It is not an active implementation. Its
+missing-HTF bonuses, copied fallback weights and unsafe optional arithmetic are
+not used. Calibration against unseen outcomes remains separate, unfinished work.

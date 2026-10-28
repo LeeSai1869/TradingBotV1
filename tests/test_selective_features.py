@@ -237,8 +237,8 @@ class SelectiveFeatures(unittest.TestCase):
             current=components.Catalog()
         changed={uid for uid in current.source if current.source[uid]!=baseline.get(uid)}
         self.assertTrue(changed)
-        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure','.order_blocks')) for uid in changed))
-        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle','.order_blocks'))}).columns)
+        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure','.order_blocks','.liquidity')) for uid in changed))
+        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle','.order_blocks','.liquidity'))}).columns)
         self.assertLessEqual(current.plan(current.changed(baseline,{},{})).columns,allowed)
         self.assertFalse({'ema50','adx','rsi','vp_poc'} & current.plan(current.changed(baseline,{},{})).columns)
 

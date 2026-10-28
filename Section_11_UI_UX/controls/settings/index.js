@@ -87,19 +87,22 @@ function renderFeature() {
     }
     if(['Confidence','Opportunity'].includes(item)&&featureTab==='Data'){
         const bar=window.DataCache?.bars?.filter(b=>!b.provisional).at(-1);
-        const packet=item==='Confidence'?bar?.confidence:bar?.opportunity;
+        const anchor=bar?.signal_context;
+        const packet=item==='Confidence'?(anchor?.confidence||bar?.confidence):bar?.opportunity;
+        if(anchor)note(`Anchored ${anchor.side} point: ${anchor.entry} · ${new Date(anchor.available_ms??anchor.open_time).toISOString()} · ${anchor.state}. Targets and scores are fixed at that point.`);
         note(`${item}: ${packet?.status||'awaiting closed features'}. These are conditional scores/scenarios, not probabilities or executed trades.`);
         if(!packet)return;
         const table=el('table','',content);
         if(item==='Confidence'){
-            for(const group of packet.groups||[]){
-                const row=el('tr','',table);el('th',group.name,row);
+            for(const [mode,groups] of [['continuation',packet.continuation?.groups||packet.groups||[]],['reversal',packet.reversal?.groups||[]]])for(const group of groups){
+                const row=el('tr','',table);el('th',mode+' · '+group.name,row);
                 el('td',`BUY ${group.buy_points.toFixed(1)} / SELL ${group.sell_points.toFixed(1)} · cap ${group.weight} · coverage ${Math.round(group.coverage*100)}%`,row);
             }
             note(packet.scope);
         }else{
+            const plans=anchor&&!draft.outputs.opportunity_buy_1.preview?{[anchor.side.toLowerCase()]:anchor.plan}:packet;
             for(const side of ['buy','sell']){
-                const plan=packet[side];if(!plan)continue;
+                const plan=plans[side];if(!plan)continue;
                 let row=el('tr','',table);el('th',side.toUpperCase(),row);el('td',`${plan.status} · entry ${plan.entry} · invalidation ${plan.invalidation} (${plan.invalidation_source}) · risk ${plan.risk_pct.toFixed(2)}%`,row);
                 for(const [index,target] of plan.targets.entries()){
                     row=el('tr','',table);el('th',`T${index+1}`,row);
@@ -152,7 +155,7 @@ function renderFeature() {
     if (item === "EMA") toggle("Show EMA", "ema");
     else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='Liquidity')note('Observed Binance USDT perpetual orders in USDT, shown against spot candles. The independent recorder must be running. Depth is cancellable and snapshot-limited; stale books are hidden. Hover bands for amounts. This is not a liquidation-position estimate. Collection starts now; no candle-derived history is substituted.');
-    if(item==='Confidence')note('Directional evidence scores /100, not win probabilities. Missing evidence reduces coverage; below 75% coverage is insufficient. Trend, momentum, structure, location and environment have capped weights. Closed chart timeframe only; signals are unchanged.');
+    if(item==='Confidence')note('Directional evidence scores /100, not win probabilities. Missing evidence reduces coverage; below 75% coverage is insufficient. Continuation and reversal evidence are separate. Each side selects its setup from candle geometry and price context, not from a BUY/SELL bonus. Closed chart timeframe only; signals are unchanged.');
     if(item==='Opportunity')note('Three known price-barrier clusters per side, not promised profit. Targets use the near edge of each barrier. Invalidation and reward/risk are conditional scenarios from the latest closed price; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
@@ -199,6 +202,12 @@ function renderFeature() {
                 input.setAttribute('aria-label',`${label} show scores`);
                 input.onchange=()=>{draft.outputs[key].scores=input.checked;};
             }
+        }
+        if(item==='Opportunity'){
+            const row=el('label','Preview both directions from the latest close (unanchored)',content,'settings-row');
+            const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs.opportunity_buy_1.preview;
+            input.onchange=()=>{for(const [key] of feature.outputs)draft.outputs[key].preview=input.checked;};
+            note('By default, levels stay fixed at the decision price/time. Subsequent candles only track touches and invalidation; they do not move the entry, targets or confidence. Preview is a separate current-price view.');
         }
         if(item==='Support / Resistance'){
             for(const side of ['support','resistance']){

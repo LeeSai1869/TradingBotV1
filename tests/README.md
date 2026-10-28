@@ -816,3 +816,11 @@ bar gating. `tests/evidence_display.test.mjs` checks labels, toggles and assumpt
 `PYTHONPATH=. python3 tests/browser_evidence.py /path/to/lightweight-charts.standalone.production.js`
 checks the actual chart, Data breakdown, three targets, cost updates, unchanged
 candles and persistence with disposable stores and no exchange requests.
+
+Point-context v2: `test_analysis_context.py` tests independent price-point
+calculations, reversal versus continuation, frozen 81,000-entry context as price
+moves to 85,000, unchanged decisions, gap handling and ambiguous intrabar ordering.
+`test_liquidity_corrections.py` covers comparable units, nearest-side semantics,
+lookback initialization, invalid ATR and replay scope. The public
+`inspect_price_point.py SYMBOL --timeframe 4h --at ISO_TIMESTAMP_WITH_OFFSET`
+reads local stored data; it never contacts an exchange or writes memory.

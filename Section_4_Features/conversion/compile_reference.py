@@ -17,7 +17,7 @@ ROOT=Path(__file__).resolve().parents[2]
 SOURCE=ROOT/'sections_4&5_Tradingview'
 OUT=ROOT/'Section_4_Features/features'
 SUPPORT=ROOT/'Section_4_Features/execution'
-REVIEWED_SHA256='59eb262d6846804651a8eebb6893715cf6701092ee6a55971d5b1668b8cdfa40'
+REVIEWED_SHA256='0bd770b5b36e41ad116a1080401b421305a219fb5b66278d92bedd4f497dbbf5'
 TOKEN=re.compile(r'\s*("(?:\\.|[^"\\])*"|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|[A-Za-z_]\w*|==|!=|>=|<=|:=|\+=|-=|\*=|/=|[+*/%<>=?:.,()\[\]-])')
 HISTORY=set();READS=set();WRITES=set();FEATURE_WRITES=set();CALLS=set();TYPES={};PERSIST=set()
 

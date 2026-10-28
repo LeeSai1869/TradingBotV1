@@ -38,15 +38,15 @@ def update(e):
     # Pine 4151
     e['bullSweepDetected'] = rt.binary('<', e['l'], e['prevLowLiquidity'])
     # Pine 4152
-    e['bullSweepReclaim'] = (rt.truth(e['bullSweepDetected']) and rt.truth(rt.binary('>', e['c'], e.previous('recentLowLiquidity', 1))))
+    e['bullSweepReclaim'] = (rt.truth(e['bullSweepDetected']) and rt.truth(rt.binary('>', e['c'], e['prevLowLiquidity'])))
     # Pine 4156
     e['bearSweepDetected'] = rt.binary('>', e['h'], e['prevHighLiquidity'])
     # Pine 4157
-    e['bearSweepReject'] = (rt.truth(e['bearSweepDetected']) and rt.truth(rt.binary('<', e['c'], e.previous('recentHighLiquidity', 1))))
+    e['bearSweepReject'] = (rt.truth(e['bearSweepDetected']) and rt.truth(rt.binary('<', e['c'], e['prevHighLiquidity'])))
     # Pine 4160
-    e['bullSweepStrength'] = (rt.math_min(rt.binary('/', rt.math_abs(rt.binary('-', e.previous('recentLowLiquidity', 1), e['l'])), e['atr']), 5) if rt.truth(e['bullSweepDetected']) else 0)
+    e['bullSweepStrength'] = ((rt.math_min(rt.binary('/', rt.math_abs(rt.binary('-', e['prevLowLiquidity'], e['l'])), e['atr']), 5) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['atr'])))) and rt.truth(rt.binary('>', e['atr'], 0)))) else rt.NA) if rt.truth(e['bullSweepDetected']) else 0)
     # Pine 4161
-    e['bearSweepStrength'] = (rt.math_min(rt.binary('/', rt.math_abs(rt.binary('-', e['h'], e.previous('recentHighLiquidity', 1))), e['atr']), 5) if rt.truth(e['bearSweepDetected']) else 0)
+    e['bearSweepStrength'] = ((rt.math_min(rt.binary('/', rt.math_abs(rt.binary('-', e['h'], e['prevHighLiquidity'])), e['atr']), 5) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['atr'])))) and rt.truth(rt.binary('>', e['atr'], 0)))) else rt.NA) if rt.truth(e['bearSweepDetected']) else 0)
     # Pine 4164
     e['elevatedVolume'] = (rt.truth((not rt.truth(rt.is_na(e['volumeMA'])))) and rt.truth(rt.binary('>=', e['volume'], rt.binary('*', e['volumeMA'], 1.5))))
     # Pine 4165
@@ -126,7 +126,9 @@ def update(e):
     # Pine 4243
     e['internalHighDistance'] = (rt.math_abs(rt.binary('-', e['internalHighLiquidity'], e['c'])) if rt.truth((not rt.truth(rt.is_na(e['internalHighLiquidity'])))) else rt.NA)
     # Pine 4244
-    e['internalLowDistance'] = (rt.binary('*', rt.binary('/', rt.math_abs(rt.binary('-', e['c'], e['internalLowLiquidity'])), e['c']), 100) if rt.truth((not rt.truth(rt.is_na(e['internalLowLiquidity'])))) else rt.NA)
+    e['internalLowDistancePct'] = (rt.binary('*', rt.binary('/', rt.math_abs(rt.binary('-', e['c'], e['internalLowLiquidity'])), e['c']), 100) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['internalLowLiquidity'])))) and rt.truth(rt.binary('>', e['c'], 0)))) else rt.NA)
+    # Pine 4245
+    e['internalLowDistance'] = e['internalLowDistancePct']
     # Pine 4253
     e['highClusterCount'] = 0
     # Pine 4254
@@ -172,7 +174,7 @@ def update(e):
         # Pine 4294
         e['highLiquidityImportance'] = rt.binary('+', e['highLiquidityImportance'], rt.math_max(0, rt.binary('-', 5, e['externalHighDistancePct'])))
     # Pine 4296
-    if rt.truth((not rt.truth(rt.is_na(e['externalLowDistance'])))):
+    if rt.truth((not rt.truth(rt.is_na(e['externalLowDistancePct'])))):
         # Pine 4297
         e['lowLiquidityImportance'] = rt.binary('+', e['lowLiquidityImportance'], rt.math_max(0, rt.binary('-', 5, e['externalLowDistancePct'])))
     # Pine 4299
@@ -202,7 +204,7 @@ def update(e):
     # Pine 4322
     e['liquidityLocation'] = ('BOTH_CLUSTER' if rt.truth((rt.truth(e['highLiquidityCluster']) and rt.truth(e['lowLiquidityCluster']))) else ('BUY_SIDE_CLUSTER' if rt.truth(e['highLiquidityCluster']) else ('SELL_SIDE_CLUSTER' if rt.truth(e['lowLiquidityCluster']) else 'NO_CLUSTER')))
     # Pine 4331
-    e['liquiditySide'] = ('SELL_SIDE_NEAR' if rt.truth(rt.binary('<', e['c'], e['externalLowLiquidity'])) else ('BUY_SIDE_NEAR' if rt.truth(rt.binary('>', e['c'], e['externalHighLiquidity'])) else 'MID_RANGE'))
+    e['liquiditySide'] = ('UNKNOWN' if rt.truth((rt.truth(rt.is_na(e['externalLowDistancePct'])) or rt.truth(rt.is_na(e['externalHighDistancePct'])))) else ('SELL_SIDE_NEAR' if rt.truth(rt.binary('<', e['externalLowDistancePct'], e['externalHighDistancePct'])) else ('BUY_SIDE_NEAR' if rt.truth(rt.binary('<', e['externalHighDistancePct'], e['externalLowDistancePct'])) else 'MID_RANGE')))
     # Pine 4334
     e['nearestBuyLiquidityPct'] = rt.NA
     # Pine 4335
@@ -224,30 +226,30 @@ def update(e):
         # Pine 4345
         e['nearestBuyLiquidityPct'] = e['externalHighDistancePct']
     # Pine 4347
-    if rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['nearestBuyLiquidityPct'])))) and rt.truth((not rt.truth(rt.is_na(e['atr'])))))) and rt.truth(rt.binary('>', e['c'], 0)))):
+    if rt.truth((rt.truth((not rt.truth(rt.is_na(e['nearestBuyLiquidityPct'])))) and rt.truth(rt.binary('>', e['c'], 0)))):
         # Pine 4348
         e['nearestBuyLiquidityPriceDistance'] = rt.binary('/', rt.binary('*', e['c'], e['nearestBuyLiquidityPct']), 100.0)
         # Pine 4349
         e['nearestBuyLiquidityPrice'] = rt.binary('+', e['c'], e['nearestBuyLiquidityPriceDistance'])
         # Pine 4350
-        e['nearestBuyLiquidityATRDistance'] = rt.binary('/', e['nearestBuyLiquidityPriceDistance'], e['atr'])
+        e['nearestBuyLiquidityATRDistance'] = (rt.binary('/', e['nearestBuyLiquidityPriceDistance'], e['atr']) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['atr'])))) and rt.truth(rt.binary('>', e['atr'], 0)))) else rt.NA)
     # Pine 4353
-    if rt.truth((rt.truth((not rt.truth(rt.is_na(e['internalLowDistance'])))) and rt.truth((not rt.truth(rt.is_na(e['externalLowDistancePct'])))))):
+    if rt.truth((rt.truth((not rt.truth(rt.is_na(e['internalLowDistancePct'])))) and rt.truth((not rt.truth(rt.is_na(e['externalLowDistancePct'])))))):
         # Pine 4354
-        e['nearestSellLiquidityPct'] = rt.math_min(e['internalLowDistance'], e['externalLowDistancePct'])
+        e['nearestSellLiquidityPct'] = rt.math_min(e['internalLowDistancePct'], e['externalLowDistancePct'])
     # Pine 4355
-    elif rt.truth((not rt.truth(rt.is_na(e['internalLowDistance'])))):
+    elif rt.truth((not rt.truth(rt.is_na(e['internalLowDistancePct'])))):
         # Pine 4356
-        e['nearestSellLiquidityPct'] = e['internalLowDistance']
+        e['nearestSellLiquidityPct'] = e['internalLowDistancePct']
     # Pine 4357
     elif rt.truth((not rt.truth(rt.is_na(e['externalLowDistancePct'])))):
         # Pine 4358
         e['nearestSellLiquidityPct'] = e['externalLowDistancePct']
     # Pine 4360
-    if rt.truth((rt.truth((rt.truth((not rt.truth(rt.is_na(e['nearestSellLiquidityPct'])))) and rt.truth((not rt.truth(rt.is_na(e['atr'])))))) and rt.truth(rt.binary('>', e['c'], 0)))):
+    if rt.truth((rt.truth((not rt.truth(rt.is_na(e['nearestSellLiquidityPct'])))) and rt.truth(rt.binary('>', e['c'], 0)))):
         # Pine 4361
         e['nearestSellLiquidityPriceDistance'] = rt.binary('/', rt.binary('*', e['c'], e['nearestSellLiquidityPct']), 100.0)
         # Pine 4362
         e['nearestSellLiquidityPrice'] = rt.binary('-', e['c'], e['nearestSellLiquidityPriceDistance'])
         # Pine 4363
-        e['nearestSellLiquidityATRDistance'] = rt.binary('/', e['nearestSellLiquidityPriceDistance'], e['atr'])
+        e['nearestSellLiquidityATRDistance'] = (rt.binary('/', e['nearestSellLiquidityPriceDistance'], e['atr']) if rt.truth((rt.truth((not rt.truth(rt.is_na(e['atr'])))) and rt.truth(rt.binary('>', e['atr'], 0)))) else rt.NA)

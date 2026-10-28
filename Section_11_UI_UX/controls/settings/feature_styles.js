@@ -75,6 +75,7 @@ export function normalizeStyles(value = {}) {
             if(['inst_support_zones','inst_resistance_zones'].includes(key))result[key].higher=typeof input.higher==='boolean'?input.higher:true;
             if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key))result[key].dualColor=/^#[0-9a-f]{6}$/i.test(input.dualColor)?input.dualColor:'#eab308';
             if(key.startsWith('opportunity_')){
+                result[key].preview=typeof input.preview==='boolean'?input.preview:false;
                 result[key].feeBps=Number.isFinite(input.feeBps)?Math.max(0,Math.min(100,input.feeBps)):4;
                 result[key].slippageBps=Number.isFinite(input.slippageBps)?Math.max(0,Math.min(100,input.slippageBps)):2;
             }

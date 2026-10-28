@@ -276,9 +276,8 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
         first_evaluated=bars[2]['open_time'] if len(bars)>2 else bars[0]['open_time']
         last_signal=read_previous_decision_candidate(symbol,interval,first_evaluated)
         bars=annotate(bars,last_signal)
-    bars=bars[-limit:]
-    from Section_9_Confidence_Engine.presentation import annotate as evidence
-    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps)
+    from ...analysis import annotate as evidence
+    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps)[-limit:]
     return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
 
 

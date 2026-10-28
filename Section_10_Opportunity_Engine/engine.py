@@ -4,7 +4,7 @@ Targets are obstacles, not guaranteed fills/profit or estimated liquidation maps
 No price level is invented to fill an absent opportunity layer.
 """
 from functools import lru_cache
-from Section_9_Confidence_Engine.engine import number,clean
+from Section_1_Global_Core.analysis_packet import number,clean
 
 VERSION='opportunity-v1'
 ZONES={

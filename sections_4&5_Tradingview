@@ -4149,16 +4149,16 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     // Bullish sweep:
     // Takes sell-side liquidity and reclaims level
     bool bullSweepDetected = l < prevLowLiquidity
-    bool bullSweepReclaim = bullSweepDetected and c > recentLowLiquidity[1]
+    bool bullSweepReclaim = bullSweepDetected and c > prevLowLiquidity
 
     // Bearish sweep:
     // Takes buy-side liquidity and rejects level
     bool bearSweepDetected = h > prevHighLiquidity
-    bool bearSweepReject = bearSweepDetected and c < recentHighLiquidity[1]
+    bool bearSweepReject = bearSweepDetected and c < prevHighLiquidity
 
     // SWEEP STRENGTH
-    float bullSweepStrength = bullSweepDetected ? math.min(math.abs(recentLowLiquidity[1] - l) / atr, 5) : 0
-    float bearSweepStrength = bearSweepDetected ? math.min(math.abs(h - recentHighLiquidity[1]) / atr, 5) : 0
+    float bullSweepStrength = bullSweepDetected ? (not na(atr) and atr > 0 ? math.min(math.abs(prevLowLiquidity - l) / atr, 5) : na) : 0
+    float bearSweepStrength = bearSweepDetected ? (not na(atr) and atr > 0 ? math.min(math.abs(h - prevHighLiquidity) / atr, 5) : na) : 0
 
     // ABSORPTION
     bool elevatedVolume = not na(volumeMA) and volume >= volumeMA * 1.5
@@ -4241,8 +4241,8 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     float internalLowLiquidity = ta.lowest(l, internalLiquidityLookback)
     float internalHighDistancePct = not na(internalHighLiquidity) ? math.abs(internalHighLiquidity - c) / c * 100 : na
     float internalHighDistance = not na(internalHighLiquidity) ? math.abs(internalHighLiquidity - c) : na
-    float internalLowDistance = not na(internalLowLiquidity) ? math.abs(c - internalLowLiquidity) / c * 100 : na
-
+    float internalLowDistancePct = not na(internalLowLiquidity) and c > 0 ? math.abs(c - internalLowLiquidity) / c * 100 : na
+    float internalLowDistance = internalLowDistancePct
     // LIQUIDITY CLUSTER DETECTION
     // Multiple highs/lows around same area.
     // Approximation of heatmap liquidity.
@@ -4293,7 +4293,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     if not na(externalHighDistancePct)
         highLiquidityImportance += math.max(0, 5 - externalHighDistancePct)
 
-    if not na(externalLowDistance)
+    if not na(externalLowDistancePct)
         lowLiquidityImportance += math.max(0, 5 - externalLowDistancePct)
 
     float liquidityMaxDistancePct = 5.0
@@ -4328,7 +4328,7 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
          "SELL_SIDE_CLUSTER" :
          "NO_CLUSTER"
 
-    string liquiditySide = c < externalLowLiquidity ? "SELL_SIDE_NEAR" : c > externalHighLiquidity ? "BUY_SIDE_NEAR" : "MID_RANGE"
+    string liquiditySide = na(externalLowDistancePct) or na(externalHighDistancePct) ? "UNKNOWN" : externalLowDistancePct < externalHighDistancePct ? "SELL_SIDE_NEAR" : externalHighDistancePct < externalLowDistancePct ? "BUY_SIDE_NEAR" : "MID_RANGE"
 
     // Nearest Liquidity
     float nearestBuyLiquidityPct = na
@@ -4344,23 +4344,23 @@ f_market_state(string requiredTF, string engine, int rsiLen, int adxLen, int atr
     else if not na(externalHighDistancePct)
         nearestBuyLiquidityPct := externalHighDistancePct
 
-    if not na(nearestBuyLiquidityPct) and not na(atr) and c > 0
+    if not na(nearestBuyLiquidityPct) and c > 0
         nearestBuyLiquidityPriceDistance := c * nearestBuyLiquidityPct / 100.0
         nearestBuyLiquidityPrice := c + nearestBuyLiquidityPriceDistance
-        nearestBuyLiquidityATRDistance := nearestBuyLiquidityPriceDistance / atr
+        nearestBuyLiquidityATRDistance := not na(atr) and atr > 0 ? nearestBuyLiquidityPriceDistance / atr : na
 
     // Sell Side
-    if not na(internalLowDistance) and not na(externalLowDistancePct)
-        nearestSellLiquidityPct := math.min(internalLowDistance, externalLowDistancePct)
-    else if not na(internalLowDistance)
-        nearestSellLiquidityPct := internalLowDistance
+    if not na(internalLowDistancePct) and not na(externalLowDistancePct)
+        nearestSellLiquidityPct := math.min(internalLowDistancePct, externalLowDistancePct)
+    else if not na(internalLowDistancePct)
+        nearestSellLiquidityPct := internalLowDistancePct
     else if not na(externalLowDistancePct)
         nearestSellLiquidityPct := externalLowDistancePct
 
-    if not na(nearestSellLiquidityPct) and not na(atr) and c > 0
+    if not na(nearestSellLiquidityPct) and c > 0
         nearestSellLiquidityPriceDistance := c * nearestSellLiquidityPct / 100.0
         nearestSellLiquidityPrice := c - nearestSellLiquidityPriceDistance
-        nearestSellLiquidityATRDistance := nearestSellLiquidityPriceDistance / atr
+        nearestSellLiquidityATRDistance := not na(atr) and atr > 0 ? nearestSellLiquidityPriceDistance / atr : na
 
     //==================================================
     // 4.2.17 ORDER BLOCK DETECTION

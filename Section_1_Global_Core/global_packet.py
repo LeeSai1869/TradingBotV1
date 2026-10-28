@@ -549,6 +549,9 @@ __all__ = [
     "read_liquidity",
     "read_liquidity_candle",
     "read_liquidity_market_context",
+    "annotate_evidence",
+    "read_analysis_page",
+    "evaluate_price_point",
 ]
 
 def read_decision_history(symbols=None,intervals=None):
@@ -577,3 +580,21 @@ def read_liquidity_market_context(symbol,available_before_ms):
     """Causal BTC/ETH relative returns and correlations from recorded perpetuals."""
     from .liquidity.store import market_context_at
     return market_context_at(symbol.upper(),int(available_before_ms))
+
+
+def annotate_evidence(bars,**options):
+    """Public read-only analysis coordinator, separate from engine ownership."""
+    from .analysis import annotate
+    return annotate(bars,**options)
+
+
+def read_analysis_page(symbol,interval,limit=1000,*,before=None):
+    """Public closed-bar analysis view for local diagnostics and consumers."""
+    from .memory_storage.Storage.db import read_state_page
+    return read_state_page(symbol.upper(),interval,limit,before=before)
+
+
+def evaluate_price_point(client,features,previous=None):
+    """Pure point-in-time evidence coordinator; not a decision or execution gate."""
+    from .analysis import evaluate_point
+    return evaluate_point(client,features,previous)
