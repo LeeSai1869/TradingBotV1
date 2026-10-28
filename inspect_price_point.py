@@ -42,7 +42,7 @@ def main():
             if args.level is not None:
                 audit=sorted(audit,key=lambda a:min(abs(args.level-a.get('low',args.level)),abs(args.level-a.get('high',args.level))) if not a.get('low',float('inf'))<=args.level<=a.get('high',float('-inf')) else 0)[:12]
             compact.append(dict(open_utc=row['open_utc'],reference_open_time=anchor.get('open_time'),
-                reference_side=anchor.get('side'),entry=packet.get('entry'),inputs=packet.get('inputs'),
+                reference_side=anchor.get('side'),entry=packet.get('entry'),storage=anchor.get('storage'),inputs=packet.get('inputs'),
                 geometry_policy=packet.get('geometry_policy'),areas=packet.get('areas'),source_selection=audit))
         selected=compact
     print(json.dumps(dict(symbol=args.symbol.upper(),timeframe=args.timeframe,requested=args.at,

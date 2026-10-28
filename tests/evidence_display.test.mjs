@@ -66,3 +66,13 @@ test('all six areas use the anchor with favorable and adverse roles on either de
         assert.ok(rows.filter(r=>!r.positive).every(r=>r.net_high<0));
     }
 });
+
+test('signal marker reference is the decision close, not a SELL wick high',async()=>{
+    const {signalReference,signalPlacement}=await import('../Section_11_UI_UX/overlays/markers/preferences.js');
+    const bar={client:{close:79936.43,high:80160,low:79910},momentum:{signal_type:'SELL',signal_price:79936.43}};
+    assert.equal(signalReference(bar),79936.43);
+    assert.deepEqual(signalPlacement(bar,'sell'),{position:'atPriceTop',price:79936.43});
+    assert.deepEqual(signalPlacement({...bar,momentum:{signal_type:'BUY',signal_price:79936.43}},'buy'),{position:'atPriceBottom',price:79936.43});
+    assert.equal(signalReference({client:bar.client}),79936.43);
+    assert.equal(signalReference({}),null);
+});

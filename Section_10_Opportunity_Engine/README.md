@@ -123,6 +123,38 @@ maps stay visible until the next decision, with crossing information. The old
 unanchored-preview chart switch is removed. `inspect_price_point.py` defaults to
 anchored outputs; `--include-point-preview` is a separate opt-in diagnostic only.
 
-No feature formulas, candle data, ADCN rows or trading rules are changed. No new
-feature columns, historical replay, exchange calls or runner work are introduced.
-Only the UI backend needs restarting.
+## Durable decision snapshots and marker price
+
+ADCN's `decision_evidence` table now stores one insert-only snapshot for each
+canonical BUY/SELL, keyed by symbol, timeframe, candle, data epoch/generation and
+side. Its eight primary values are the signal close, directional confidence, three
+resistance-band packets and three support-band packets. Each packet retains both
+bounds, sources and outcomes. Missing slots are SQL NULL. The full confidence,
+opportunity and reference context are retained as JSON with engine versions,
+availability time, actual recording time and provenance.
+
+Core's worker bridge coordinates storage after decision commits. Section 8 keeps
+its decision rules; Sections 9/10 keep their independent calculations and no
+private storage imports. A persistence failure does not undo a decision; bounded
+maintenance retries missing snapshots. A separate 64-candle background scan also
+fills older chart-projected signals that had no original ADCN row, without
+replacing existing decisions or the live decision cursor. Scan progress survives
+restarts; missing feature pages remain pending. Historical records are explicitly
+labelled reconstructions from stored close-time inputs, never live observations.
+No source feature formulas are replayed. Normal chart reads remain read-only.
+
+Historical pages and short reference polls prefer the saved snapshot. Neither
+later feature changes nor missing feature rows can move its geometry. A data
+reset/generation change isolates the prior snapshot; explicit deletion clears
+both evidence and scan records. Current cost settings may reprice the saved
+geometry in a read-only copy; they never rewrite the original snapshot or select
+new levels. Data identifies this cost preview separately.
+
+Previously the arrow used `aboveBar`/`belowBar`, placing SELL visually at the wick
+high while its map used the candle close. Markers now use an explicit price
+position and print that same close. Red areas must lie above the labelled signal
+reference, green below it, for either signal direction. Wick extrema are not
+represented as executable signal prices; the decision is known only at close.
+
+Install by restarting both the runner (for persistence/recovery) and UI backend.
+No candle download reset or feature replay is required.

@@ -88,6 +88,15 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
         try:adcn_store.commit_rule_rows(conn,symbol,interval,rows,last,json.dumps(new_state,allow_nan=False,separators=(',',':')))
         finally:conn.close()
     state.update(new_state)
+    signals=[row['open_time'] for row in rows if row['signal_type'] in ('BUY','SELL')]
+    if signals:
+        try:
+            from Section_1_Global_Core.global_packet import store_decision_evidence
+            store_decision_evidence(symbol,interval,signals,deadline=min(deadline or float('inf'),time.monotonic()+.15))
+        except Exception:
+            # Decision commits are authoritative; failed evidence is retried separately.
+            traceback.print_exc()
+
     buys=sum(row['signal_type']=='BUY' for row in rows)
     print(f'[decision] {symbol} {interval}: +{len(rows)} closed DI decisions, buys={buys}, sells={sum(row['signal_type']=='SELL' for row in rows)}, through={last}',flush=True)
     return len(rows)
@@ -103,6 +112,11 @@ def maintenance(symbols,intervals,*,max_bars=BATCH,time_budget=.25):
             try:count+=_advance(symbol,interval,max_bars-count,deadline)
             except Exception:
                 reset_pair(symbol,interval);traceback.print_exc()
+            if time.monotonic()<deadline:
+                try:
+                    from Section_1_Global_Core.global_packet import recover_decision_evidence
+                    recover_decision_evidence(symbol,interval,deadline=deadline)
+                except Exception:traceback.print_exc()
             if count>=max_bars or time.monotonic()>=deadline:break
     return count
 

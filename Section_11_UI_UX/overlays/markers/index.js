@@ -1,6 +1,6 @@
 // Momentum uses the canonical closed-bar projection of the single Section 8 rule.
 import {getSeries} from '../candles/index.js';
-import {closedSignals,SignalCursor,normalizeMomentum} from './preferences.js';
+import {closedSignals,SignalCursor,normalizeMomentum,signalReference,signalPlacement} from './preferences.js';
 import {confidenceLabel} from '../opportunity/index.js';
 import {playSignalSound} from '../../controls/alerts/index.js';
 export const name='markers';
@@ -12,9 +12,9 @@ export function update(chart,data,options={}) {
     const config=globalThis.window?.Composer?.config||{}, styles=config.featureStyles||{};
     const signals=closedSignals(data.bars||[],styles,options.visible!==false);
     const markers=signals.map(({bar,side})=>{
-        const style=styles[`momentum_${side}`]||{},buy=side==='buy';
-        return {time:bar.time,position:buy?'belowBar':'aboveBar',color:style.color||(buy?'#26a69a':'#ef5350'),
-            shape:style.shape||(buy?'arrowUp':'arrowDown'),text:style.label===false?'':confidenceLabel(bar,side,styles),size:style.width||2};
+        const style=styles[`momentum_${side}`]||{},buy=side==='buy',reference=signalReference(bar);
+        return {time:bar.time,...signalPlacement(bar,side),color:style.color||(buy?'#26a69a':'#ef5350'),
+            shape:style.shape||(buy?'arrowUp':'arrowDown'),text:style.label===false?'':confidenceLabel(bar,side,styles)+(reference!==null?` @ ${reference.toPrecision(7)}`:''),size:style.width||2};
     }).sort((a,b)=>a.time-b.time);
     if(typeof LightweightCharts.createSeriesMarkers==='function') {
         if(!primitive)primitive=LightweightCharts.createSeriesMarkers(series,markers);

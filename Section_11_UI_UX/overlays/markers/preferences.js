@@ -36,3 +36,15 @@ export class SignalCursor {
         return fresh;
     }
 }
+
+// Pin the arrow to the same closed decision price as the opportunity map.
+export function signalReference(bar){
+    const value=bar.momentum?.signal_price??bar.client?.close;
+    return Number.isFinite(value)&&value>0?value:null;
+}
+
+export function signalPlacement(bar,side){
+    const price=signalReference(bar);
+    return price===null?{position:side==='buy'?'belowBar':'aboveBar'}:
+        {position:side==='buy'?'atPriceBottom':'atPriceTop',price};
+}

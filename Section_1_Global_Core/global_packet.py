@@ -598,3 +598,15 @@ def evaluate_price_point(client,features,previous=None):
     """Pure point-in-time evidence coordinator; not a decision or execution gate."""
     from .analysis import evaluate_point
     return evaluate_point(client,features,previous)
+
+
+def store_decision_evidence(symbol,interval,open_times,*,deadline=None):
+    """Worker bridge: retain immutable independent-engine outputs in ADCN memory."""
+    from .decision_evidence import capture
+    return capture(symbol,interval,open_times,deadline=deadline)
+
+
+def recover_decision_evidence(symbol,interval,*,deadline=None):
+    """Worker bridge: bounded recovery of missing historical decision snapshots."""
+    from .decision_evidence import recover_one
+    return recover_one(symbol,interval,deadline=deadline)

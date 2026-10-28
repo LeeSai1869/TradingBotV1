@@ -33,6 +33,9 @@ async def exercise(base,library):
             conn.execute('UPDATE klines SET open=?,high=?,low=?,close=? WHERE symbol=? AND interval=? AND open_time=?',
                 (opened,high,low,c,'BTCUSDT','15m',r[2]))
     conn.close()
+    db.write_adcn([dict(symbol='BTCUSDT',interval='15m',open_time=pulse[-1][2],signal_type='SELL',decision_state='SELL',trigger='DI_TURNING_POINT_V3')])
+    from Section_1_Global_Core.global_packet import store_decision_evidence
+    assert store_decision_evidence('BTCUSDT','15m',[pulse[-1][2]])==1
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000});errors=[]
@@ -58,6 +61,9 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         assert await page.evaluate("time=>DataCache.bars.find(b=>b.open_time===time).momentum.signal_type",pulse[-1][2])=='SELL'
         assert await page.evaluate('DataCache.bars.at(-1).signal_context.entry')==price-1
+        assert await page.evaluate('DataCache.bars.at(-1).signal_context.storage.status')=='persisted'
+        placement=await page.evaluate("time=>import('/overlays/markers/preferences.js').then(m=>m.signalPlacement(DataCache.bars.find(b=>b.open_time===time),'sell'))",pulse[-1][2])
+        assert placement=={'position':'atPriceTop','price':price-1}
         anchored=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
         assert len(anchored)==6
         assert all(row['high']<price-1 for row in anchored if row['role']=='support')

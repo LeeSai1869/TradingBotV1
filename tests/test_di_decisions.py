@@ -85,6 +85,40 @@ class DiMemoryTests(unittest.TestCase):
         conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,times[-1] if cap is None else cap,'{}'));conn.commit();conn.close()
         return times
 
+    def test_background_scan_persists_old_chart_signal_without_an_existing_adcn_row(self):
+        from Section_1_Global_Core.global_packet import recover_decision_evidence
+        self.seed([{**v,'atr':1,'protected_high':110,'protected_low':90} for v in (*SETUP,di(15,27))])
+        adcn_store.open_db().close()
+        self.assertEqual(recover_decision_evidence('ETHUSDT','1m'),1)
+        with sqlite3.connect(adcn_store.DB_PATH) as conn:
+            self.assertEqual(conn.execute('SELECT signal_type,signal_price,provenance FROM decision_evidence').fetchone(),
+                ('BUY',101,'historical reconstruction from stored close-time inputs'))
+            self.assertEqual(conn.execute('SELECT finished FROM decision_evidence_scan').fetchone(),(1,))
+        self.assertEqual(recover_decision_evidence('ETHUSDT','1m'),0)
+        self.assertEqual(db.read_adcn('ETHUSDT','1m',120000)['signal_type'],'BUY')
+
+    def test_worker_saves_all_six_bands_and_reload_uses_immutable_adcn_snapshot(self):
+        values=[di(30,10,adx=20,close=100),di(35,11,adx=21,close=101),di(27,15,adx=22,close=100)]
+        levels=dict(atr=1,resistance_zone_low=101,resistance_zone_high=101.2,
+            inst_resistance_zone_low=102,inst_resistance_zone_high=102.2,nearest_bear_fvg_low=103,nearest_bear_fvg_high=103.2,
+            support_zone_low=98.8,support_zone_high=99,inst_support_zone_low=97.8,inst_support_zone_high=98,
+            nearest_bull_fvg_low=96.8,nearest_bull_fvg_high=97)
+        self.seed([{**v,**levels} for v in values])
+        processor.maintenance(['ETHUSDT'],['1m'],time_budget=2)
+        with sqlite3.connect(adcn_store.DB_PATH) as conn:
+            saved=conn.execute('SELECT signal_price,resistance_1,resistance_2,resistance_3,support_1,support_2,support_3 FROM decision_evidence').fetchone()
+        self.assertIsNotNone(saved);self.assertEqual(saved[0],100);self.assertTrue(all(saved[1:]))
+        page=db.read_state_page('ETHUSDT','1m',1,before=120001)
+        expected=page['bars'][-1]['signal_context']['area_map']
+        db.write_features([dict(symbol='ETHUSDT',interval='1m',open_time=120000,formula_version=3,**values[-1],atr=10,resistance_zone_low=120,resistance_zone_high=121)])
+        processor._CACHE.clear()
+        with patch('Section_1_Global_Core.analysis.opportunity',side_effect=AssertionError('saved geometry must be reused')):
+            reloaded=db.read_state_page('ETHUSDT','1m',1,before=120001)['bars'][-1]
+        self.assertEqual(reloaded['signal_context']['area_map'],expected)
+        self.assertEqual(reloaded['signal_context']['storage']['status'],'persisted')
+        self.assertEqual(reloaded['momentum']['signal_price'],100)
+        self.assertEqual(reloaded['client']['high'],102)
+
     def test_latest_window_seeds_without_a_historical_replay_and_reaches_gateway(self):
         self.seed()
         self.assertEqual(processor.maintenance(['ETHUSDT'],['1m'],time_budget=2),1)

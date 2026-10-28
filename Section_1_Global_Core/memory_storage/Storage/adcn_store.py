@@ -95,6 +95,16 @@ def open_db() -> sqlite3.Connection:
     try:
         conn.executescript(_SCHEMA)
         conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
+        conn.execute("""CREATE TABLE IF NOT EXISTS decision_evidence (
+            symbol TEXT NOT NULL, interval TEXT NOT NULL, open_time INTEGER NOT NULL,
+            epoch TEXT NOT NULL, signal_type TEXT NOT NULL, signal_price REAL NOT NULL,
+            confidence_score REAL, resistance_1 TEXT, resistance_2 TEXT, resistance_3 TEXT,
+            support_1 TEXT, support_2 TEXT, support_3 TEXT, payload TEXT NOT NULL,
+            recorded_ms INTEGER NOT NULL, provenance TEXT NOT NULL,
+            PRIMARY KEY(symbol,interval,open_time,epoch,signal_type))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS decision_evidence_scan (
+            symbol TEXT, interval TEXT, epoch TEXT, before_ms INTEGER, finished INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(symbol,interval,epoch))""")
         conn.commit()
         return conn
     except BaseException:
@@ -260,3 +270,47 @@ def commit_rule_rows(conn,symbol,interval,rows,last_open_time,state):
         conn.executemany('INSERT INTO decisions(symbol,interval,open_time,signal_type,decision_state,trigger,final_score) VALUES (?,?,?,?,?,?,NULL) ON CONFLICT(symbol,interval,open_time) DO UPDATE SET signal_type=excluded.signal_type,decision_state=excluded.decision_state,trigger=excluded.trigger,final_score=NULL',
                          [(symbol,interval,row['open_time'],row['signal_type'],row['decision_state'],row['trigger']) for row in rows])
         conn.execute('INSERT OR REPLACE INTO decision_rule_state VALUES (?,?,?,?)',(symbol,interval,last_open_time,state))
+
+
+def save_evidence(conn,symbol,interval,epoch,context,*,recorded_ms,provenance):
+    """Insert one immutable canonical decision snapshot; never replace prior evidence."""
+    import json
+    side=context['side'];areas=context['area_map']
+    dump=lambda value:json.dumps(value,separators=(',',':'),allow_nan=False)
+    bands=[dump(areas[role][i]) if i<len(areas[role]) else None for role in ('resistance','support') for i in range(3)]
+    payload={**context,'storage':dict(status='persisted',recorded_ms=recorded_ms,provenance=provenance,epoch=epoch)}
+    values=[symbol,interval,context['open_time'],epoch,side,context['entry'],(context.get('confidence') or {}).get(side.lower()+'_score'),*bands,dump(payload),recorded_ms,provenance]
+    with conn:
+        cursor=conn.execute('INSERT OR IGNORE INTO decision_evidence VALUES ('+','.join('?' for _ in values)+')',values)
+    return cursor.rowcount
+
+
+def evidence_range(conn,symbol,interval,start,end,epoch):
+    import json
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='decision_evidence'").fetchone():return {}
+    return {(r[0],r[1]):json.loads(r[2]) for r in conn.execute('SELECT open_time,signal_type,payload FROM decision_evidence WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? AND epoch=?',(symbol,interval,start,end,epoch))}
+
+
+def missing_evidence(conn,symbol,interval,epoch,limit=1,after=-1):
+    return conn.execute("""SELECT d.open_time FROM decisions d WHERE d.symbol=? AND d.interval=?
+        AND d.open_time>? AND d.signal_type IN ('BUY','SELL') AND d.trigger='DI_TURNING_POINT_V3'
+        AND NOT EXISTS (SELECT 1 FROM decision_evidence e WHERE e.symbol=d.symbol AND e.interval=d.interval
+        AND e.open_time=d.open_time AND e.epoch=? AND e.signal_type=d.signal_type)
+        ORDER BY d.open_time LIMIT ?""",(symbol,interval,after,epoch,limit)).fetchall()
+
+
+def evidence_scan_state(conn,symbol,interval,epoch):
+    return conn.execute('SELECT before_ms,finished FROM decision_evidence_scan WHERE symbol=? AND interval=? AND epoch=?',(symbol,interval,epoch)).fetchone()
+
+
+def commit_evidence_scan(conn,symbol,interval,epoch,before,finished):
+    with conn:conn.execute('INSERT OR REPLACE INTO decision_evidence_scan VALUES (?,?,?,?,?)',(symbol,interval,epoch,before,int(finished)))
+
+
+def ensure_historical_decision(conn,symbol,interval,context):
+    """Fill an absent canonical signal row without replacing existing decisions/state."""
+    with conn:
+        conn.execute("INSERT OR IGNORE INTO decisions(symbol,interval,open_time,signal_type,decision_state,trigger) VALUES (?,?,?,?,?,?)",
+            (symbol,interval,context['open_time'],context['side'],context['side'],'DI_TURNING_POINT_V3'))
+    row=read_row(conn,symbol,interval,context['open_time'])
+    return row and row['signal_type']==context['side']

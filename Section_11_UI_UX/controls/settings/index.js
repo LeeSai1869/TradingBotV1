@@ -89,6 +89,8 @@ function renderFeature() {
         const bar=window.DataCache?.bars?.filter(b=>!b.provisional).at(-1);
         const anchor=bar?.signal_context;
         const packet=item==='Confidence'?(anchor?.confidence||bar?.confidence):(anchor?.opportunity||bar?.opportunity);
+        if(anchor?.storage)note(`Decision snapshot: ${anchor.storage.status}${anchor.storage.provenance?' · '+anchor.storage.provenance:''}. Reference: ${anchor.reference_basis||'signal candle close'}.`);
+        if(anchor?.storage?.display_costs_repriced)note('Saved geometry and confidence; returns are repriced using your current cost settings. The stored snapshot is unchanged.');
         if(anchor)note(`Anchored ${anchor.side} point: ${anchor.entry} · ${new Date(anchor.available_ms??anchor.open_time).toISOString()} · ${anchor.state}. Targets and scores are fixed at that point.`);
         note(`${item}: ${packet?.status||'awaiting closed features'}. These are conditional scores/scenarios, not probabilities or executed trades.`);
         if(!packet)return;

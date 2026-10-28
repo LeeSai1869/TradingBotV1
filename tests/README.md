@@ -846,3 +846,10 @@ stored non-nearest zones, frozen decisions, FVG failure/gap handling, reversible
 checkpoint history, replay masking and bounded-history completeness. The real
 browser evidence fixture checks the Data-tab timeframe/source report as well as
 six anchored bands, short refreshes, costs and unchanged candles.
+
+Decision evidence: `test_decision_evidence.py` verifies ADCN's eight primary values,
+insert-only persistence across reopening, epoch isolation, saved geometry despite
+missing features, and cost-only repricing. `test_di_decisions.py` exercises actual
+worker writes, historical recovery of signals with no prior ADCN row, and reloads
+after feature changes. JS tests and the browser evidence fixture check explicit
+marker prices, six saved bands and persistence through cost edits/short polls.

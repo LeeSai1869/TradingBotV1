@@ -105,3 +105,17 @@ as fallback Momentum markers. Current markers use the V3 projection.
 Historical reports generated before this change counted repeated raw candidates.
 Re-run `evaluate_strategy.py` to evaluate the accepted alternating sequence. This
 remains a forward-return study; alternation does not add exits or position sizing.
+
+### Decision evidence memory
+
+Core's public worker bridge now retains independent confidence/opportunity outputs
+in ADCN `decision_evidence`: the signal close, directional confidence, three upper
+resistance bands and three lower support bands, plus complete versioned JSON
+context. Missing bands remain null. Writes are insert-only and isolated by data
+policy epoch/feature generation. Decisions are committed independently; evidence
+failures are retried in bounded maintenance. Historical chart signals without an
+ADCN row are recovered in 64-candle pages without changing the live rule cursor.
+These are labelled historical reconstructions, not previously captured live data.
+Section 8 never imports confidence/opportunity calculation internals. Chart reads
+prefer persisted evidence and never write it. Marker placement uses the stored
+signal close rather than an offset above/below the wick.

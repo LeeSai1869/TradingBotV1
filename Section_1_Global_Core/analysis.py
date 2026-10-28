@@ -2,7 +2,7 @@
 import time
 import copy
 from Section_9_Confidence_Engine.engine import evaluate as confidence
-from Section_10_Opportunity_Engine.engine import evaluate as opportunity
+from Section_10_Opportunity_Engine.engine import evaluate as opportunity,with_costs
 from Section_10_Opportunity_Engine.context import anchor,advance
 from .opportunity_inventory import Inventory
 
@@ -21,26 +21,33 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
             previous=None
             if context:context={**context,'state':'coverage unknown'}
         last_close=client['close_time']
-        if features.get('formula_version')!=3:
+        signal=(bar.get('momentum') or {}).get('signal_type')
+        saved=(bar.get('adcn') or {}).get('analysis_snapshot')
+        if saved and (saved.get('side')!=signal or saved.get('open_time')!=bar['open_time'] or saved.get('entry')!=client['close']):saved=None
+        if features.get('formula_version')!=3 and not saved:
             inventory.zones.clear();inventory.coverage={k:'partial: features unavailable' for k in inventory.coverage}
             previous=None
             if context:context={**context,'state':'coverage unknown'}
             if bar is latest or context_history:bar['signal_context']=context
             if bar is latest and context:bar['opportunity']=context['opportunity'];bar['confidence']=context['confidence']
             continue
-        inventory.advance(client,features)
-        signal=(bar.get('momentum') or {}).get('signal_type')
+        if features.get('formula_version')==3:inventory.advance(client,features)
         if signal in ('BUY','SELL'):
-            bar['confidence']=confidence(client['close'],features,previous=previous,candle=client)
+            bar['confidence']=copy.deepcopy(saved['confidence']) if saved else confidence(client['close'],features,previous=previous,candle=client)
         previous={**features,'close':client['close']}
         context=advance(context,bar)
         if signal in ('BUY','SELL'):
-            bar['opportunity']=opportunity(client['close'],features,fee_bps=fee_bps,slippage_bps=slippage_bps,
+            bar['opportunity']=with_costs(saved['opportunity'],fee_bps,slippage_bps) if saved else opportunity(client['close'],features,fee_bps=fee_bps,slippage_bps=slippage_bps,
                 zones=inventory.packet(bar.get('interval',''),client['close_time']+1),as_of_ms=client['close_time']+1,
                 timeframe=bar.get('interval',''),inventory_status=inventory.coverage)
         if signal in ('BUY','SELL'):
             new=anchor(bar['opportunity'],side=signal,open_time=bar['open_time'],confidence=bar['confidence'],previous=prior)
-            if new:new['available_ms']=client['close_time']+1
+            if new:
+                new['available_ms']=client['close_time']+1
+                new['storage']=copy.deepcopy(saved['storage']) if saved else dict(status='reconstructed; persistence pending')
+                new['storage']['display_costs_repriced']=bool(saved and saved['opportunity'].get('costs')!=bar['opportunity'].get('costs'))
+                new['reference_basis']='signal candle close'
+                new['signal_price']=client['close']
             if new and prior:
                 new['entry_relationship']='above previous entry' if client['close']>prior['entry'] else 'below previous entry' if client['close']<prior['entry'] else 'same as previous entry'
             context=new;prior=dict(side=signal,entry=client['close'],open_time=bar['open_time'])

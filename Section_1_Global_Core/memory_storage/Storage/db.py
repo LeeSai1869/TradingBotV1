@@ -226,7 +226,12 @@ def _read_derived(store, symbol, interval, start_ms, end_ms):
         return []
     conn = _read_connection(store.DB_PATH)
     try:
-        return store.read_range(conn, symbol, interval, start_ms, end_ms)
+        rows=store.read_range(conn, symbol, interval, start_ms, end_ms)
+        if store is adcn_store:
+            from ...decision_evidence import epoch_key
+            snapshots=adcn_store.evidence_range(conn,symbol,interval,start_ms,end_ms,epoch_key(symbol,interval))
+            for row in rows:row['analysis_snapshot']=snapshots.get((row['open_time'],row.get('signal_type')))
+        return rows
     finally:
         conn.close()
 
@@ -281,7 +286,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
     from ...analysis import annotate as evidence
     seed=read_analysis_reference(symbol,interval,analysis_reference,bars[0]['open_time'],fee_bps,slippage_bps) if analysis_reference is not None and analysis_reference<bars[0]['open_time'] else None
     inventory_seed=None
-    if features_store.DB_PATH.exists() and any((b.get('momentum') or {}).get('signal_type') in ('BUY','SELL') for b in bars):
+    if features_store.DB_PATH.exists() and any((b.get('momentum') or {}).get('signal_type') in ('BUY','SELL') and not (b.get('adcn') or {}).get('analysis_snapshot') for b in bars):
         from .opportunity_inventory import read_seed
         from Section_1_Global_Core import data_policy
         epochs=data_policy.read()['epochs']

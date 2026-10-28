@@ -170,3 +170,28 @@ def build_bands(candidates,entry,atr,direction,*,audit=None,context_zones=None):
     for index,core in enumerate(cores):
         for c in core['contributors']:audit.append(dict(c,reason='selected' if index<3 else 'beyond_nearest_three',layer=index+1))
     return cores[:3]
+
+
+def with_costs(packet,fee_bps,slippage_bps):
+    """Reprice saved geometry only; never reread sources or move the anchor."""
+    import copy
+    if not all(number(v) and 0<=v<=100 for v in (fee_bps,slippage_bps)):raise ValueError('Per-side costs must be 0–100 bps')
+    result=copy.deepcopy(packet);entry=result['entry'];cost=fee_bps+slippage_bps
+    result['costs']=dict(fee_bps_per_side=fee_bps,slippage_bps_per_side=slippage_bps,round_trip_bps=2*cost)
+    def net(price,direction):return direction*(price-entry)/entry*100-cost*(1+price/entry)/100
+    for side,direction in (('buy',1),('sell',-1)):
+        plan=result.get(side)
+        if not plan:continue
+        stop=plan.get('invalidation');loss=direction*(entry-stop)/entry*100+cost*(1+stop/entry)/100 if number(stop) else None
+        plan['risk_pct']=loss
+        for area in plan['targets']:
+            target=area['low'] if direction==1 else area['high'];far=area['high'] if direction==1 else area['low']
+            area.update(net_reward_pct=net(target,direction),net_reward_far_pct=net(far,direction),
+                reward_risk=net(target,direction)/loss if loss else None,reward_risk_far=net(far,direction)/loss if loss else None,
+                outcomes={position:dict(net_low=min(net(area['low'],sign),net(area['high'],sign)),net_high=max(net(area['low'],sign),net(area['high'],sign))) for position,sign in (('BUY',1),('SELL',-1))})
+        layers=plan['targets']
+        plan['status']='favorable geometry' if layers and layers[0]['net_reward_pct']>0 and layers[0]['reward_risk'] is not None and layers[0]['reward_risk']>=1.5 else 'limited reward/risk' if layers else 'no known targets'
+    result['areas']=dict(resistance=(result.get('buy') or {}).get('targets',[]),support=(result.get('sell') or {}).get('targets',[]))
+    for side,other in (('buy','sell'),('sell','buy')):
+        if result.get(side):result[side]['opposing_band']=copy.deepcopy(result[other]['targets'][0]) if result.get(other) and result[other]['targets'] else None
+    return result
