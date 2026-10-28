@@ -861,3 +861,8 @@ clearance, fixed entry price, and explicit rejection reasons. Existing snapshot
 and browser fixtures contain genuinely separated source levels; no zones are
 invented or moved to satisfy six slots. Model version is part of evidence identity,
 so pre-change snapshots remain archived rather than silently overwritten.
+
+Strategy baseline diagnostics: `test_strategy_evaluation.py` checks date-window
+gate warmup, directional gross/net returns, end-boundary exclusion, purged splits,
+short-side arithmetic, invalid costs/dates and compact output. See
+`STRATEGY_RESEARCH.md`. These fixtures validate calculations, not profitability.
