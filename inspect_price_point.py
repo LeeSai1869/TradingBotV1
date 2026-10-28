@@ -10,6 +10,8 @@ def main():
     parser.add_argument('symbol');parser.add_argument('--timeframe',default='4h')
     parser.add_argument('--at',required=True,help='ISO timestamp with explicit chart timezone offset, e.g. 2026-10-11T20:00:00+00:00')
     parser.add_argument('--include-point-preview',action='store_true',help='Include a separate unanchored diagnostic; never used by the chart map')
+    parser.add_argument('--opportunity-only',action='store_true',help='Compact frozen opportunity map and source diagnostics')
+    parser.add_argument('--level',type=float,help='Show closest source-selection records to a price such as 0.1748')
     args=parser.parse_args()
     try:
         point=datetime.fromisoformat(args.at.replace('Z','+00:00'))
@@ -32,6 +34,17 @@ def main():
             client=row['client'],decision=row.get('momentum'),confidence=evidence.get('confidence'),
             opportunity=evidence.get('opportunity'),anchor=reference,
             **({'inspection_only_unanchored_preview':preview} if args.include_point_preview else {})))
+    if args.opportunity_only or args.level is not None:
+        compact=[]
+        for row in selected:
+            packet=row.get('opportunity') or {};anchor=row.get('anchor') or {}
+            audit=packet.get('audit',[])
+            if args.level is not None:
+                audit=sorted(audit,key=lambda a:min(abs(args.level-a.get('low',args.level)),abs(args.level-a.get('high',args.level))) if not a.get('low',float('inf'))<=args.level<=a.get('high',float('-inf')) else 0)[:12]
+            compact.append(dict(open_utc=row['open_utc'],reference_open_time=anchor.get('open_time'),
+                reference_side=anchor.get('side'),entry=packet.get('entry'),inputs=packet.get('inputs'),
+                geometry_policy=packet.get('geometry_policy'),areas=packet.get('areas'),source_selection=audit))
+        selected=compact
     print(json.dumps(dict(symbol=args.symbol.upper(),timeframe=args.timeframe,requested=args.at,
         note='Stored data only. Scores use candle-close evidence; timestamp matching does not prove this is the referenced chart candle.',
         status='available' if selected else 'No stored candles in this checkout',rows=selected),indent=2,allow_nan=False))

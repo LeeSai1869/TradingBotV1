@@ -8,8 +8,8 @@ from Section_9_Confidence_Engine.presentation import annotate
 def features():
     return dict(formula_version=3,atr=2.,ema50=98.,ema200=95.,vwap=99.,rsi=65.,
         di_plus=30.,di_minus=10.,adx=32.,current_structure='STRUCTURE_BULL',
-        support_zone_low=96.,support_zone_high=98.,resistance_zone_low=106.,resistance_zone_high=108.,
-        inst_resistance_zone_low=106.,inst_resistance_zone_high=108.,nearest_swing_high=116.,
+        support_zone_low=96.,support_zone_high=98.,resistance_zone_low=106.,resistance_zone_high=106.5,
+        inst_resistance_zone_low=106.,inst_resistance_zone_high=106.5,nearest_swing_high=116.,
         protected_high=125.,atr_ma_ratio=1.)
 
 
@@ -46,7 +46,7 @@ class ConfidenceTests(unittest.TestCase):
 class OpportunityTests(unittest.TestCase):
     def test_three_ordered_targets_costs_and_structural_invalidation(self):
         result=opportunity(100.,features());buy=result['buy'];sell=result['sell']
-        self.assertEqual([t['price'] for t in buy['targets']],[106.,115.8,124.8])
+        self.assertEqual([t['price'] for t in buy['targets']],[106.,115.95,124.95])
         self.assertEqual(buy['invalidation'],95.8);self.assertEqual(buy['invalidation_source'],'support')
         self.assertGreater(buy['risk_pct'],4.2)
         for target in buy['targets']:
@@ -60,7 +60,7 @@ class OpportunityTests(unittest.TestCase):
         targets=opportunity(100.,f)['buy']['targets']
         self.assertEqual(targets[0]['sources'].count('resistance'),1)
         self.assertEqual(targets[0]['families'].count('sr'),1)
-        self.assertEqual(len(targets),1);self.assertEqual(targets[0]['low'],106.);self.assertEqual(targets[0]['high'],108.)
+        self.assertEqual(len(targets),1);self.assertEqual(targets[0]['low'],106.);self.assertEqual(targets[0]['high'],106.5)
 
     def test_missing_layers_and_atr_stop_are_explicit(self):
         result=opportunity(100.,{'atr':2.})

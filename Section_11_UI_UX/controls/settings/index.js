@@ -111,6 +111,13 @@ function renderFeature() {
                     el('td',`${area.low}–${area.high} · net from anchor ${amount} · ${progress?.crossed?'crossed':progress?.touched?'tested':'not yet tested'} · ${area.families.join(', ')}`,row);
                 }
             }
+            if(packet.inputs){
+                note(`Source timeframe: ${packet.inputs.timeframe||'unspecified'} · ${packet.inputs.scope}. Inventory: ${packet.inputs.inventory_status}.`);
+                note('Entry areas keep a narrow source core: at most 0.5 reference ATR and 1% of the anchored price. Wider source zones remain context; nearby distinct levels are retained.');
+                const details=el('details','',content);el('summary','Sources and area selection',details);
+                for(const record of packet.audit||[])el('p',`${record.source}: ${record.low}–${record.high} · ${record.reason.replaceAll('_',' ')}${record.layer?` · layer ${record.layer}`:''}`,details);
+                if(packet.audit_truncated)el('p','Additional source records omitted from this bounded report.',details);
+            }
             note(packet.interpretation);
         }
         return;
@@ -158,7 +165,7 @@ function renderFeature() {
     else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='Liquidity')note('Observed Binance USDT perpetual orders in USDT, shown against spot candles. The independent recorder must be running. Depth is cancellable and snapshot-limited; stale books are hidden. Hover bands for amounts. This is not a liquidation-position estimate. Collection starts now; no candle-derived history is substituted.');
     if(item==='Confidence')note('Directional evidence scores /100, not win probabilities. Missing evidence reduces coverage; below 75% coverage is insufficient. Continuation and reversal evidence are separate. Each side selects its setup from candle geometry and price context, not from a BUY/SELL bonus. Closed chart timeframe only; signals are unchanged.');
-    if(item==='Opportunity')note('Up to three merged opportunity bands per side, not promised profit. Real zones retain bounds; isolated references get explicitly modeled ATR bands. Returns span the near and far edges. Amounts are relative to the fixed decision-candle price; legacy invalidation and reward/risk are auxiliary model estimates; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
+    if(item==='Opportunity')note('Up to three opportunity bands per side, not promised profit. Narrow source cores retain bounds; broad zones remain context. Isolated references get explicitly modeled, price-capped bands. Returns span the near and far edges. Amounts are relative to the fixed decision-candle price; legacy invalidation and reward/risk are auxiliary model estimates; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
     if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');

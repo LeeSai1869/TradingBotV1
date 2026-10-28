@@ -13,7 +13,7 @@ def f(price=100):
     return dict(formula_version=3,atr=2,ema50=price-4,ema200=price-6,vwap=price-2,rsi=80,
         di_plus=20,di_minus=15,adx=30,current_structure='STRUCTURE_BULL',
         atr_ma_ratio=1,support_zone_low=price-6,support_zone_high=price-5,
-        resistance_zone_low=price+4,resistance_zone_high=price+6,protected_high=price+15)
+        resistance_zone_low=price+4,resistance_zone_high=price+4.5,protected_high=price+15)
 
 
 def bar(i,price,signal=None,features=None,**ohlc):
@@ -78,7 +78,7 @@ class PointIndependenceTests(unittest.TestCase):
             rows=[copy.deepcopy(point),bar(1,outcome)]
             annotate(rows,now_ms=200000)
             self.assertEqual(rows[0]['confidence'],expected['confidence'])
-            self.assertEqual(rows[0]['opportunity'],expected['opportunity'])
+            self.assertEqual(rows[0]['opportunity']['areas'],expected['opportunity']['areas'])
 
 class SixAreaContextTests(unittest.TestCase):
     def test_both_sides_freeze_and_no_opportunity_is_calculated_on_wait_bars(self):

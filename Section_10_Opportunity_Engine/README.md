@@ -1,6 +1,6 @@
-# Six anchored opportunity areas (v3)
+# Six anchored opportunity areas (v4)
 
-`engine.evaluate(close, features, fee_bps=4, slippage_bps=2)` calculates a complete
+`engine.evaluate(close, features, fee_bps=4, slippage_bps=2, zones=(), as_of_ms=None, timeframe='')` calculates a complete
 map from one price point. It does not take a BUY/SELL decision as a calculation
 input. Section 8 owns decisions; Core selects the decision-candle reference;
 Section 10 owns area geometry, point outcomes and subsequent crossing tracking.
@@ -26,17 +26,63 @@ predictions that price must turn or executed orders/fills.
 
 ## Geometry
 
-Real zones keep their bounds. Actual overlaps merge. The reviewed selection uses
-the original distance scales: 1 ATR confluence, 2 ATR layer spacing and 3 ATR
-susceptible span. Gap merges are bounded; too-close remaining references can be
-retained as enrichment instead of separate congested layers. This restores the
-original spatial principles without claiming byte-for-byte legacy fidelity.
+The old two-pass selection could merge unlimited actual overlaps, permit gap
+clusters up to 3 ATR, and discard nearby remaining levels with a 2-ATR spacing
+rule. Daily ATR made those effects particularly visible. V4 removes both gap
+merging and minimum spacing. One pass attaches corroboration without expanding
+an authoritative source core. A contributor must overlap at least half the
+smaller band, and each family may contribute only once. Co-located same-family
+alternatives are audited, not counted as extra confluence or duplicate layers.
 
-Isolated price references get modeled +/-0.1 ATR bands, clipped to their side of
-the anchor. They are labeled modeled, not represented as real S/R or observed
-order-book liquidity. Sources/families and both edges remain inspectable. Labels
-use separate layout with leaders; their price geometry never moves to fit text.
-Old numbered source files remain reference material, not active engine imports.
+Actionable cores have an explicit maximum width: min(0.5 reference ATR, 1% of the
+anchor). These are conservative display/model policy values, not empirically
+calibrated trading thresholds. A broad native zone can be legitimate; its
+original bounds are retained in `context_zones`, with `broad_context_only` in the
+selection audit. It is not cropped into a fabricated entry band. A source zone
+containing the entry is reported separately in `at_entry`, not silently lost or
+misrepresented as a forward target. Missing actionable layers remain absent.
+
+Isolated point references get modeled bands with half-width bounded by 0.05 ATR,
+0.05% of the anchor, one quarter of the distance to entry, 5% of the level price,
+and one quarter of the nearest other point distance. This protects against large
+daily ATR, near-zero levels and point-padding bridges. Modeled bands are labeled;
+OHLC-inferred liquidity levels are not observed resting orders. No order-book or
+future liquidation claim is made.
+
+`contributors` records original source geometry/timeframe, `families` counts
+independent families, and `audit` gives selection, duplication, broad-zone,
+at-entry and missing-availability reasons. Reports are bounded (256 audit records,
+64 broad context records), with truncation/count indicators. The pure result
+cache is bounded to 128 distinct inputs. Labels use separate layout with leaders;
+price geometry never moves to fit text.
+
+## Reference inventory and timeframe
+
+The reference is the decision candle's chart timeframe. There is no automatic
+all-timeframe aggregation: a 1D map uses daily source inputs and daily ATR, and
+current HTF overlays cannot be backdated into a historical decision.
+
+Core supplies stored same-timeframe S/R and institutional S/R lifetimes,
+order blocks/breakers and qualified FVG births in addition to scalar nearest-zone,
+profile, swing, trend, session, Fibonacci and candle-liquidity fields. Section 10
+accepts public zone packets; it never imports private storage or feature code.
+Core owns the read-only projection and source completeness labels.
+
+The seed reads at most 10,000 preceding candles. Stored reversible SR/OB events
+can reconstruct older active zones by undoing a committed checkpoint to just
+before the requested page; epochs, replay masking and contiguous raw/event
+coverage must agree. Otherwise bounded history is explicitly partial. FVG
+lifetimes use stored qualified births and the existing close-through failure
+rule; missing fields/candles invalidate continuity rather than retaining stale
+zones. The page then advances stored events to each decision, including only
+inputs available by that candle close. No formula replay or database write is
+performed. Coverage does not claim the inventory includes unavailable history.
+
+Opportunity > Data shows scope, timeframe, coverage and a collapsible source
+selection report. `inspect_price_point.py --opportunity-only --level 0.1748`
+provides a compact local report against the frozen reference. This can explain
+whether a particular source was present, broad, duplicated or outside the first
+three; absence of a source in partial history remains unknown.
 
 ## Frozen calculations and later observations
 

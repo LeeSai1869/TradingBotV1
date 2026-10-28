@@ -9,11 +9,11 @@ async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',100);price=rows[-1][6]
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
         atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=65,di_plus=30,di_minus=10,di_spread=20,adx=32,
-        current_structure='STRUCTURE_BULL',support_zone_low=price-4,support_zone_high=price-2,
-        resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,
-        protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+12,inst_resistance_zone_high=price+13,
-        nearest_bear_fvg_low=price+22,nearest_bear_fvg_high=price+23,inst_support_zone_low=price-14,inst_support_zone_high=price-13,
-        nearest_bull_fvg_low=price-24,nearest_bull_fvg_high=price-23) for r in rows])
+        current_structure='STRUCTURE_BULL',support_zone_low=price-2.5,support_zone_high=price-2,
+        resistance_zone_low=price+2,resistance_zone_high=price+2.5,nearest_swing_high=price+5,
+        protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+12,inst_resistance_zone_high=price+12.5,
+        nearest_bear_fvg_low=price+22,nearest_bear_fvg_high=price+22.5,inst_support_zone_low=price-13.5,inst_support_zone_high=price-13,
+        nearest_bull_fvg_low=price-23.5,nearest_bull_fvg_high=price-23) for r in rows])
     # Canonical three-candle SELL gate, with a rejection candle at the anchor.
     closes=[price-2,price,price-1];pulse=rows[-10:-7]
     for index,r in enumerate(pulse):
@@ -21,10 +21,10 @@ async def exercise(base,library):
         db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
             atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=88 if index==1 else 80,
             di_plus=[30,35,27][index],di_minus=[10,11,15][index],di_spread=[20,24,12][index],adx=20+index,
-            current_structure='STRUCTURE_BULL',support_zone_low=price-4,support_zone_high=price-2,
-            resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+12,inst_resistance_zone_high=price+13,
-        nearest_bear_fvg_low=price+22,nearest_bear_fvg_high=price+23,inst_support_zone_low=price-14,inst_support_zone_high=price-13,
-        nearest_bull_fvg_low=price-24,nearest_bull_fvg_high=price-23)])
+            current_structure='STRUCTURE_BULL',support_zone_low=price-2.5,support_zone_high=price-2,
+            resistance_zone_low=price+2,resistance_zone_high=price+2.5,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+12,inst_resistance_zone_high=price+12.5,
+        nearest_bear_fvg_low=price+22,nearest_bear_fvg_high=price+22.5,inst_support_zone_low=price-13.5,inst_support_zone_high=price-13,
+        nearest_bull_fvg_low=price-23.5,nearest_bull_fvg_high=price-23)])
     conn=klines_store.open_db()
     with conn:
         for index,r in enumerate(pulse):
@@ -50,6 +50,9 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='Data',exact=True).click()
         assert 'momentum' in await dialog.inner_text()
         await dialog.get_by_role('button',name='Opportunity',exact=True).click()
+        await dialog.get_by_role('button',name='Data',exact=True).click()
+        assert 'Source timeframe: 15m' in await dialog.inner_text()
+        assert await dialog.get_by_text('Sources and area selection',exact=True).count()==1
         await dialog.get_by_role('button',name='Display',exact=True).click()
         await dialog.get_by_role('button',name='Select all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)

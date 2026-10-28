@@ -838,3 +838,11 @@ or confidence calculation on WAIT bars, frozen maps despite changed current
 features, and progression through support areas after a legacy risk threshold.
 The browser fixture verifies both sides and unchanged anchor amounts after a
 two-candle poll. No feature database columns or replay jobs are added.
+
+Opportunity v4: `test_opportunity_bands.py` checks non-expanding overlap cores,
+price-capped point bands, daily-ATR nearby levels, same-family alternatives,
+at-entry and future-inventory auditing. `test_opportunity_inventory.py` checks
+stored non-nearest zones, frozen decisions, FVG failure/gap handling, reversible
+checkpoint history, replay masking and bounded-history completeness. The real
+browser evidence fixture checks the Data-tab timeframe/source report as well as
+six anchored bands, short refreshes, costs and unchanged candles.

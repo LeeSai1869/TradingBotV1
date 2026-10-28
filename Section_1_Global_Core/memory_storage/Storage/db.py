@@ -280,7 +280,17 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
         bars=annotate(bars,last_signal)
     from ...analysis import annotate as evidence
     seed=read_analysis_reference(symbol,interval,analysis_reference,bars[0]['open_time'],fee_bps,slippage_bps) if analysis_reference is not None and analysis_reference<bars[0]['open_time'] else None
-    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps,seed=seed,context_history=context_history)[-limit:]
+    inventory_seed=None
+    if features_store.DB_PATH.exists() and any((b.get('momentum') or {}).get('signal_type') in ('BUY','SELL') for b in bars):
+        from .opportunity_inventory import read_seed
+        from Section_1_Global_Core import data_policy
+        epochs=data_policy.read()['epochs']
+        raw=_read_connection(klines_store.DB_PATH);derived=_read_connection(features_store.DB_PATH)
+        try:
+            inventory_seed=read_seed(raw,derived,symbol,interval,bars[0]['open_time'],
+                (epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)))
+        finally:raw.close();derived.close()
+    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps,seed=seed,context_history=context_history,inventory_seed=inventory_seed)[-limit:]
     return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
 
 
