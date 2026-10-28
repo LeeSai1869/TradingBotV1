@@ -8,7 +8,7 @@ export const FEATURE_STYLES = {
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
     Confidence: {connected:true,outputs:[['confidence_buy','BUY confidence score','#26a69a','evidence'],['confidence_sell','SELL confidence score','#ef5350','evidence']]},
-    Opportunity: {connected:true,outputs:[...['buy','sell'].flatMap(side=>[1,2,3].map(layer=>[`opportunity_${side}_${layer}`,`After ${side.toUpperCase()}: ${side==='buy'?'upside':'buy-back'} band ${layer}`,side==='buy'?'#ef5350':'#26a69a','zone']))]},
+    Opportunity: {connected:true,outputs:[...['buy','sell'].flatMap(side=>[1,2,3].map(layer=>[`opportunity_${side}_${layer}`,`${side==='buy'?'Sell / resistance':'Buy / support'} area ${layer}`,side==='buy'?'#ef5350':'#26a69a','zone']))]},
     Liquidity: {connected:true,outputs:[
         ['liquidity_bids','Resting perpetual bids','#26a69a','profile'],
         ['liquidity_asks','Resting perpetual asks','#ef5350','profile'],

@@ -45,7 +45,7 @@ class ContextTests(unittest.TestCase):
         original=copy.deepcopy(rows[0]['signal_context']);context=rows[1]['signal_context']
         self.assertEqual(context['entry'],81000);self.assertEqual(context['plan'],original['plan'])
         self.assertEqual(context['confidence'],original['confidence'])
-        self.assertEqual(rows[1]['opportunity']['entry'],85000)
+        self.assertEqual(rows[1]['opportunity']['entry'],81000)
         self.assertEqual(rows[0]['signal_context'],original)
 
     def test_opposite_signal_above_previous_entry_is_reported_not_suppressed(self):
@@ -79,3 +79,27 @@ class PointIndependenceTests(unittest.TestCase):
             annotate(rows,now_ms=200000)
             self.assertEqual(rows[0]['confidence'],expected['confidence'])
             self.assertEqual(rows[0]['opportunity'],expected['opportunity'])
+
+class SixAreaContextTests(unittest.TestCase):
+    def test_both_sides_freeze_and_no_opportunity_is_calculated_on_wait_bars(self):
+        from unittest.mock import patch
+        from Section_1_Global_Core import analysis
+        from test_opportunity_bands import SixAreaTests
+        entry=SixAreaTests.features()
+        rows=[bar(0,100,'BUY',entry),bar(1,110,features={**entry,'resistance_zone_low':140,'resistance_zone_high':142})]
+        with patch.object(analysis,'opportunity',wraps=analysis.opportunity) as calculate,patch.object(analysis,'confidence',wraps=analysis.confidence) as score:
+            analysis.annotate(rows,now_ms=200000)
+        self.assertEqual(calculate.call_count,1);self.assertEqual(score.call_count,1)
+        self.assertEqual(rows[-1]['signal_context']['area_map'],rows[0]['signal_context']['area_map'])
+        self.assertEqual(rows[-1]['opportunity']['entry'],100)
+        self.assertEqual(rows[-1]['signal_context']['next_area']['resistance'],2)
+        self.assertTrue(rows[-1]['signal_context']['area_progress']['resistance'][0]['crossed'])
+        self.assertEqual(len(rows[-1]['signal_context']['area_map']['support']),3)
+
+    def test_crossing_support_continues_after_a_legacy_risk_threshold(self):
+        from test_opportunity_bands import SixAreaTests
+        rows=[bar(0,100,'BUY',SixAreaTests.features()),bar(1,90),bar(2,80)]
+        annotate(rows,now_ms=300000)
+        context=rows[-1]['signal_context']
+        self.assertEqual(context['next_area']['support'],3)
+        self.assertEqual(context['area_map'],rows[0]['signal_context']['area_map'])

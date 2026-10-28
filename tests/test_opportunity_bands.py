@@ -31,3 +31,33 @@ class BandTests(unittest.TestCase):
         self.assertEqual(len(result['buy']['targets']),1)
         self.assertTrue(result['buy']['targets'][0]['modeled'])
         self.assertEqual(result['sell']['targets'],[])
+
+class SixAreaTests(unittest.TestCase):
+    @staticmethod
+    def features():
+        return dict(formula_version=3,atr=1,support_zone_low=92,support_zone_high=94,
+            inst_support_zone_low=82,inst_support_zone_high=84,nearest_bull_fvg_low=72,nearest_bull_fvg_high=74,
+            resistance_zone_low=106,resistance_zone_high=108,inst_resistance_zone_low=116,inst_resistance_zone_high=118,
+            nearest_bear_fvg_low=126,nearest_bear_fvg_high=128)
+
+    def test_three_support_and_three_resistance_areas_from_one_point(self):
+        result=evaluate(100,self.features());areas=result['areas']
+        self.assertEqual(len(areas['support']),3);self.assertEqual(len(areas['resistance']),3)
+        self.assertEqual([a['high'] for a in areas['support']],[94,84,74])
+        self.assertEqual([a['low'] for a in areas['resistance']],[106,116,126])
+        for a in areas['resistance']:
+            self.assertGreater(a['outcomes']['BUY']['net_low'],0)
+            self.assertLess(a['outcomes']['SELL']['net_high'],0)
+        for a in areas['support']:
+            self.assertGreater(a['outcomes']['SELL']['net_low'],0)
+            self.assertLess(a['outcomes']['BUY']['net_high'],0)
+
+    def test_directional_fvg_features_do_not_enter_the_wrong_side(self):
+        result=evaluate(100,dict(atr=1,nearest_bull_fvg_low=110,nearest_bull_fvg_high=112,
+                                nearest_bear_fvg_low=88,nearest_bear_fvg_high=90))
+        self.assertEqual(result['areas'],{'support':[],'resistance':[]})
+
+    def test_a_missing_risk_model_does_not_erase_known_areas(self):
+        result=evaluate(1,dict(atr=10,protected_high=30))
+        self.assertEqual(len(result['areas']['resistance']),1)
+        self.assertIsNone(result['buy']['invalidation'])

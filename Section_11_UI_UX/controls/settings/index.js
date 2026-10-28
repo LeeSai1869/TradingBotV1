@@ -88,7 +88,7 @@ function renderFeature() {
     if(['Confidence','Opportunity'].includes(item)&&featureTab==='Data'){
         const bar=window.DataCache?.bars?.filter(b=>!b.provisional).at(-1);
         const anchor=bar?.signal_context;
-        const packet=item==='Confidence'?(anchor?.confidence||bar?.confidence):bar?.opportunity;
+        const packet=item==='Confidence'?(anchor?.confidence||bar?.confidence):(anchor?.opportunity||bar?.opportunity);
         if(anchor)note(`Anchored ${anchor.side} point: ${anchor.entry} · ${new Date(anchor.available_ms??anchor.open_time).toISOString()} · ${anchor.state}. Targets and scores are fixed at that point.`);
         note(`${item}: ${packet?.status||'awaiting closed features'}. These are conditional scores/scenarios, not probabilities or executed trades.`);
         if(!packet)return;
@@ -100,13 +100,15 @@ function renderFeature() {
             }
             note(packet.scope);
         }else{
-            const plans=anchor?{[anchor.side.toLowerCase()]:anchor.plan}:packet;
-            for(const side of ['buy','sell']){
-                const plan=plans[side];if(!plan)continue;
-                let row=el('tr','',table);el('th',side.toUpperCase(),row);el('td',`${plan.status} · entry ${plan.entry} · invalidation ${plan.invalidation} (${plan.invalidation_source}) · risk ${plan.risk_pct.toFixed(2)}%`,row);
-                for(const [index,target] of plan.targets.entries()){
-                    row=el('tr','',table);el('th',`T${index+1}`,row);
-                    el('td',`${target.price} · net ${target.net_reward_pct.toFixed(2)}% · ${target.reward_risk.toFixed(2)}R · ${target.families.join(', ')}`,row);
+            for(const [role,areas] of Object.entries(packet.areas||{})){
+                let row=el('tr','',table);el('th',role==='resistance'?'Red sell / resistance areas':'Green buy / support areas',row);
+                el('td',`Frozen anchor ${packet.entry} · ${areas.length} known areas`,row);
+                for(const [index,area] of areas.entries()){
+                    row=el('tr','',table);el('th',`Area ${index+1}`,row);
+                    const outcome=area.outcomes?.[anchor?.side];
+                    const amount=Number.isFinite(outcome?.net_low)&&Number.isFinite(outcome?.net_high)?`${outcome.net_low.toFixed(2)}% to ${outcome.net_high.toFixed(2)}%`:'unavailable';
+                    const progress=anchor?.area_progress?.[role]?.[index];
+                    el('td',`${area.low}–${area.high} · net from anchor ${amount} · ${progress?.crossed?'crossed':progress?.touched?'tested':'not yet tested'} · ${area.families.join(', ')}`,row);
                 }
             }
             note(packet.interpretation);
@@ -156,7 +158,7 @@ function renderFeature() {
     else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
     if(item==='Liquidity')note('Observed Binance USDT perpetual orders in USDT, shown against spot candles. The independent recorder must be running. Depth is cancellable and snapshot-limited; stale books are hidden. Hover bands for amounts. This is not a liquidation-position estimate. Collection starts now; no candle-derived history is substituted.');
     if(item==='Confidence')note('Directional evidence scores /100, not win probabilities. Missing evidence reduces coverage; below 75% coverage is insufficient. Continuation and reversal evidence are separate. Each side selects its setup from candle geometry and price context, not from a BUY/SELL bonus. Closed chart timeframe only; signals are unchanged.');
-    if(item==='Opportunity')note('Up to three merged opportunity bands per side, not promised profit. Real zones retain bounds; isolated references get explicitly modeled ATR bands. Returns span the near and far edges. Invalidation and reward/risk are conditional scenarios from the latest closed price; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
+    if(item==='Opportunity')note('Up to three merged opportunity bands per side, not promised profit. Real zones retain bounds; isolated references get explicitly modeled ATR bands. Returns span the near and far edges. Amounts are relative to the fixed decision-candle price; legacy invalidation and reward/risk are auxiliary model estimates; fees/slippage are assumptions and funding is excluded. Missing targets remain absent.');
     if(item==='FVG')note('Gaps remain visible until their source candle invalidates them. 4H, 1D and 1W overlays appear on their own and lower timeframes, after the source candle closes. They require stored source candles/features; enabling the display does not activate downloads.');
     if(item==='Order Blocks')note('Zones retain their identity until invalidation. Strength is formation displacement in ATR units, not a probability. A return touch must occur after formation or breaker promotion.');
     if(['FVG','Support / Resistance'].includes(item))note('Score labels show the latest available calculated value, not a probability. FVG uses reaction score; support/resistance uses the zone score. Unavailable historical scores are marked explicitly. Enable the corresponding zone as well as its score label.');
@@ -204,12 +206,12 @@ function renderFeature() {
             }
         }
         if(item==='Opportunity'){
-            for(const [key,label] of [['labels','Show band labels'],['reference','Show decision reference and opposing risk area']]){
+            for(const [key,label] of [['labels','Show band labels'],['reference','Show anchored decision price']]){
                 const row=el('label',label,content,'settings-row'),input=el('input','',row);input.type='checkbox';
                 input.checked=draft.outputs.opportunity_buy_1[key];
                 input.onchange=()=>{for(const [output] of feature.outputs)draft.outputs[output][key]=input.checked;};
             }
-            note('The latest decision selects the reference point, not the calculation rules. After BUY: upside areas and downside risk. After SELL: lower buy-back areas and upper risk. Nearby areas merge before three separated bands are selected. Completed or invalidated references remain visible with their status until the next decision.');
+            note('Both sides freeze at the decision candle: three red sell/resistance areas above and three green buy/support areas below, when available. After BUY, above is opportunity and below is adverse; after SELL, below is opportunity and above is adverse. A closed break beyond an area advances its next-area indicator; prices and geometry do not move.');
         }
         if(item==='Support / Resistance'){
             for(const side of ['support','resistance']){

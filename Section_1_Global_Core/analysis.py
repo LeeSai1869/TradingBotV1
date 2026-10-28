@@ -23,13 +23,14 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
             previous=None
             if context:context={**context,'state':'coverage unknown'}
             if bar is latest or context_history:bar['signal_context']=context
+            if bar is latest and context:bar['opportunity']=context['opportunity'];bar['confidence']=context['confidence']
             continue
         signal=(bar.get('momentum') or {}).get('signal_type')
-        if bar is latest or signal in ('BUY','SELL'):
+        if signal in ('BUY','SELL'):
             bar['confidence']=confidence(client['close'],features,previous=previous,candle=client)
         previous={**features,'close':client['close']}
         context=advance(context,bar)
-        if bar is latest or signal in ('BUY','SELL'):
+        if signal in ('BUY','SELL'):
             bar['opportunity']=opportunity(client['close'],features,fee_bps=fee_bps,slippage_bps=slippage_bps)
         if signal in ('BUY','SELL'):
             new=anchor(bar['opportunity'],side=signal,open_time=bar['open_time'],confidence=bar['confidence'],previous=prior)
@@ -38,6 +39,8 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
                 new['entry_relationship']='above previous entry' if client['close']>prior['entry'] else 'below previous entry' if client['close']<prior['entry'] else 'same as previous entry'
             context=new;prior=dict(side=signal,entry=client['close'],open_time=bar['open_time'])
         if context:context={**context,'through_close':client['close_time']}
+        if bar is latest and context:
+            bar['opportunity']=context['opportunity'];bar['confidence']=context['confidence']
         bar['signal_context']=context if context_history or bar is latest or signal in ('BUY','SELL') else None
     return bars
 

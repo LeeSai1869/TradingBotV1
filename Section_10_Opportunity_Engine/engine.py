@@ -6,7 +6,7 @@ No price level is invented to fill an absent opportunity layer.
 from functools import lru_cache
 from Section_1_Global_Core.analysis_packet import number,clean
 
-VERSION='opportunity-v2'
+VERSION='opportunity-v3'
 ZONES={
  'sr':('support','resistance','inst_support','inst_resistance'),
  'fvg':('nearest_bull_fvg','nearest_bear_fvg'),
@@ -39,47 +39,62 @@ def _evaluate(close,values,fee_bps,slippage_bps):
     candidates=[]
     for family,name,low,high in ZONE_FIELDS:
         lo,hi=f[low],f[high]
-        if number(lo) and number(hi) and 0<lo<hi:candidates.append(dict(family=family,name=name,low=lo,high=hi))
+        if number(lo) and number(hi) and 0<lo<hi:
+            role=('support' if 'bull' in name else 'resistance') if family in ('fvg','ob','breaker') else 'dynamic'
+            candidates.append(dict(family=family,name=name,low=lo,high=hi,role=role))
     for family,fields in POINTS.items():
         for key in fields:
             value=f[key]
-            if number(value) and value>0:candidates.append(dict(family=family,name=key,low=value,high=value))
+            if number(value) and value>0:
+                role='dynamic'  # Broken prior highs/lows can change role relative to the anchor.
+                candidates.append(dict(family=family,name=key,low=value,high=value,role=role))
     for side,direction in (('buy',1),('sell',-1)):
-        eligible=[dict(c) for c in candidates if c['low']>close] if direction==1 else [dict(c) for c in candidates if c['high']<close]
+        eligible=[dict(c) for c in candidates if c['low']>close and c['role']!='support'] if direction==1 else [dict(c) for c in candidates if c['high']<close and c['role']!='resistance']
         clusters=build_bands(eligible,close,atr,direction)
-        protective=[c for c in candidates if c['high']<close] if direction==1 else [c for c in candidates if c['low']>close]
+        protective=[c for c in candidates if c['high']<close and c['role']!='resistance'] if direction==1 else [c for c in candidates if c['low']>close and c['role']!='support']
         # Trend averages/VP levels are targets, not structural stop boundaries.
         protective=[c for c in protective if c['family'] in ('sr','fvg','ob','breaker','structure')]
         protective.sort(key=lambda c:close-c['high'] if direction==1 else c['low']-close)
         stop=(protective[0]['low']-.1*atr if direction==1 else protective[0]['high']+.1*atr) if protective else close-direction*1.5*atr
         stop_source=protective[0]['name'] if protective else 'ATR model (1.5 ATR)'
-        if stop<=0 or direction*(close-stop)<=0:continue
-        loss=direction*(close-stop)/close*100+(fee_bps+slippage_bps)*(1+stop/close)/100
-        if not number(loss) or loss<=0:continue
-        boundary=protective[0] if protective else None
-        risk_band=dict(low=boundary['low'] if boundary else stop-.1*atr,high=boundary['high'] if boundary else stop+.1*atr,source=stop_source,modeled=boundary is None)
-        if risk_band['low']==risk_band['high']:
-            risk_band['low']-=.1*atr;risk_band['high']+=.1*atr;risk_band['modeled']=True
-        risk_band['low']=max(0.,risk_band['low'])
+        risk_valid=number(stop) and stop>0 and direction*(close-stop)>0
+        loss=direction*(close-stop)/close*100+(fee_bps+slippage_bps)*(1+stop/close)/100 if risk_valid else None
+        risk_valid=risk_valid and number(loss) and loss>0
+        risk_band=None
+        if risk_valid:
+            boundary=protective[0] if protective else None
+            risk_band=dict(low=boundary['low'] if boundary else stop-.1*atr,high=boundary['high'] if boundary else stop+.1*atr,source=stop_source,modeled=boundary is None)
+            if risk_band['low']==risk_band['high']:
+                risk_band['low']-=.1*atr;risk_band['high']+=.1*atr;risk_band['modeled']=True
+            risk_band['low']=max(0.,risk_band['low'])
+        else:stop=None;loss=None;stop_source='no valid modeled invalidation'
         layers=[]
         for cluster in clusters[:3]:
             target=cluster['low'] if direction==1 else cluster['high'];cluster['price']=target
             gross=direction*(target-close)/close*100
             cost=(fee_bps+slippage_bps)*(1+target/close)/100
             net=gross-cost
-            if not all(number(v) for v in (gross,cost,net,net/loss)):continue
+            if not all(number(v) for v in (gross,cost,net)):continue
             families=sorted(cluster['families'])
             far=cluster['high'] if direction==1 else cluster['low']
             far_net=direction*(far-close)/close*100-(fee_bps+slippage_bps)*(1+far/close)/100
             if not number(far_net):continue
-            layers.append({**cluster,'families':families,'confluence_families':len(families),'gross_reward_pct':gross,
-                'net_reward_pct':net,'net_reward_far_pct':far_net,'reward_risk':net/loss if loss>0 else None,'reward_risk_far':far_net/loss})
+            def net_at(price,position):
+                return position*(price-close)/close*100-(fee_bps+slippage_bps)*(1+price/close)/100
+            outcomes={position:dict(net_low=min(net_at(cluster['low'],sign),net_at(cluster['high'],sign)),
+                                    net_high=max(net_at(cluster['low'],sign),net_at(cluster['high'],sign)))
+                      for position,sign in (('BUY',1),('SELL',-1))}
+            for value in outcomes.values():
+                if not all(number(v) for v in value.values()):value.update(net_low=None,net_high=None)
+            layers.append({**cluster,'outcomes':outcomes,'families':families,'confluence_families':len(families),'gross_reward_pct':gross,
+                'net_reward_pct':net,'net_reward_far_pct':far_net,'reward_risk':net/loss if loss else None,'reward_risk_far':far_net/loss if loss else None})
         result[side]=dict(entry=close,invalidation=stop,invalidation_source=stop_source,risk_band=risk_band,risk_pct=loss,targets=layers,
-            status='favorable geometry' if layers and layers[0]['net_reward_pct']>0 and layers[0]['reward_risk']>=1.5 else 'limited reward/risk' if layers else 'no known targets')
+            status='favorable geometry' if layers and layers[0]['net_reward_pct']>0 and layers[0]['reward_risk'] is not None and layers[0]['reward_risk']>=1.5 else 'limited reward/risk' if layers else 'no known targets')
     for side,opposite in (('buy','sell'),('sell','buy')):
         if result[side] is not None:
             other=result[opposite]
             result[side]['opposing_band']=dict(other['targets'][0]) if other and other['targets'] else None
+    result['areas']={'resistance':result['buy']['targets'] if result['buy'] else [],'support':result['sell']['targets'] if result['sell'] else []}
     result['status']='ready' if result['buy'] or result['sell'] else 'unavailable'
     return result
 

@@ -17,7 +17,7 @@ test('three independent band toggles retain full bounds on the reference plan',(
     const bar={signal_context:{side:'BUY',state:'active',open_time:1000,plan}};
     const config=normalizeStyles({opportunity_buy_1:{visible:true},opportunity_buy_2:{visible:false},opportunity_buy_3:{visible:true}});
     const rows=targetRows(bar,config);assert.equal(rows.length,1);assert.equal(rows[0].low,105);assert.equal(rows[0].high,107);
-    assert.match(targetLabel(rows[0]),/Upside 1.*105.*107.*4.80–6.80%/);
+    assert.match(targetLabel(rows[0]),/Sell \/ resistance 1.*105.*107.*4.80% to \+6.80%/);
     assert.deepEqual(targetRows({...bar,provisional:true},config),[]);
     assert.deepEqual(targetRows({opportunity:{status:'ready',buy:plan}},config),[]);
 });
@@ -50,4 +50,19 @@ test('labels separate without changing the underlying band prices',()=>{
     assert.equal(result[1].textY-result[0].textY,18);
     assert.deepEqual(result.map(v=>v.y),[100,101,102]);
     assert.equal(normalizeStyles({opportunity_buy_1:{preview:true}}).opportunity_buy_1.preview,undefined);
+});
+
+test('all six areas use the anchor with favorable and adverse roles on either decision',()=>{
+    const config=normalizeStyles(Object.fromEntries(['buy','sell'].flatMap(side=>[1,2,3].map(i=>[`opportunity_${side}_${i}`,{visible:true}]))));
+    const band=(low,high)=>({low,high,price:low,outcomes:{BUY:{net_low:low-100-.1,net_high:high-100-.1},SELL:{net_low:100-high-.1,net_high:100-low-.1}}});
+    const map={resistance:[band(110,112),band(120,122),band(130,132)],support:[band(88,90),band(78,80),band(68,70)]};
+    for(const side of ['BUY','SELL']){
+        const context={side,state:'active',open_time:1000,entry:100,area_map:map};
+        const rows=targetRows({signal_context:context,opportunity:{entry:150,areas:{resistance:[]}}},config);
+        assert.equal(rows.length,6);assert.equal(rows.filter(r=>r.positive).length,3);
+        assert.equal(rows.filter(r=>!r.positive).length,3);
+        assert.ok(rows.every(r=>r.entry===100&&r.anchorTime===1000));
+        assert.ok(rows.filter(r=>r.positive).every(r=>r.net_low>0));
+        assert.ok(rows.filter(r=>!r.positive).every(r=>r.net_high<0));
+    }
 });

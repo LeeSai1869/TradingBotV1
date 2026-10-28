@@ -1,60 +1,82 @@
-# Opportunity bands tied to a price point (v2)
+# Six anchored opportunity areas (v3)
 
-Production entry: `engine.evaluate(close, features, fee_bps=4, slippage_bps=2)`.
-The engine calculates above/below areas from price inputs independently of BUY or
-SELL decisions. Section 8 owns decisions. Core selects the latest decision's
-price/time for the chart; Section 10 owns geometry and context tracking.
+`engine.evaluate(close, features, fee_bps=4, slippage_bps=2)` calculates a complete
+map from one price point. It does not take a BUY/SELL decision as a calculation
+input. Section 8 owns decisions; Core selects the decision-candle reference;
+Section 10 owns area geometry, point outcomes and subsequent crossing tracking.
 
-The old numbered reference files remain reference material. Version 2 restores
-band geometry and their distance scales (1 ATR confluence, 2 ATR layer spacing,
-3 ATR susceptible area), rather than treating each nearby point as a target line.
-This is a reviewed implementation, not a claim of byte-for-byte legacy fidelity.
+## One map, both sides
 
-Real S/R, institutional, FVG, OB, breaker and volume-node ranges keep their bounds.
-Overlapping ranges coalesce, including nested or chained real overlaps. Nearby
-ranges merge only within bounded susceptible span. Point references (EMA, VWAP,
-Fibonacci, swings and session levels) get explicitly modeled +/-0.1 ATR bands,
-clipped to the correct side of entry. They are not observed liquidity zones.
-The final selection enforces layer spacing; nearby references beyond the allowed
-span are retained as enrichment metadata instead of separate congested layers.
-Families count once. Up to three separated areas are returned; missing areas
-are never invented simply to fill three slots.
+`areas.resistance` contains up to three red sell/resistance areas above the anchor.
+`areas.support` contains up to three green buy/support areas below it. Both arrays
+use the same decision-candle price, ATR and feature values. Unknown areas remain
+absent rather than filling three slots with invented levels.
 
-Each band retains low/high, source families, whether geometry is modeled, and
-net return/reward-risk at both its near and far edge. The existing `price` and
-`net_reward_pct` fields retain the conservative near-edge values for compatibility.
-The near edge is not an expected fill. The opposing side's nearest known band is
-exposed separately as `opposing_band`: after SELL this is the upper potential
-barrier; after BUY it is the lower potential barrier. It is not a promise that
-price turns there. Scenario invalidation is separate: 0.1 ATR beyond a structural
-opposite barrier, or a labeled 1.5 ATR model fallback. Fees/slippage apply at entry
-and exit notionals; funding, taxes, leverage, sizing and fill probability are not
-modeled. Default per-side assumptions remain 4 bps fee and 2 bps slippage.
+After BUY, upper areas represent potential gains and lower areas adverse moves.
+After SELL, lower areas represent potential gains/buy-back locations and upper
+areas adverse resistance hurdles. All six remain displayed regardless of which
+side the decision selected. Each area carries `outcomes.BUY` and `outcomes.SELL`
+with cost-adjusted return ranges from that one anchor. The renderer selects and
+formats those values; it does not calculate returns from the latest close.
 
-Chart behavior:
+Known directional FVG/OB/breaker inputs cannot enter the wrong side. S/R, profile,
+swings, session and individual references take their role relative to the anchor,
+so previously broken levels may change role. These are potential barriers, not
+predictions that price must turn or executed orders/fills.
 
-- After BUY: upper potential take-profit areas, lower opposing area and risk.
-- After SELL: lower potential buy-back areas, upper opposing area and risk.
-- Filled bands, editable borders/opacity, optional labels and reference line.
-- Labels are spaced with leaders; the underlying prices are never moved for fit.
-- Completed, invalidated and ambiguous references stay displayed with their state
-  until a newer decision replaces them. They are not silently presented as active.
-- A raw/feature gap marks coverage unknown while retaining the known reference.
-- The confusing unanchored-preview chart switch is removed; saved values migrate
-  to anchored display. Data still exposes independent point calculations.
+## Geometry
 
-Two-candle polling sends the known `analysis_reference` timestamp in the existing
-combined chart request. Core verifies it using the canonical DI projection,
-reconstructs its source features, and advances at most 10,000 raw candles. It
-never scans full feature history or stores duplicate feature rows. If coverage
-cannot be established, reference validity is labeled unknown. Two extra seed
-candles handle anchors at a short page's lookback boundary. Neither the browser
-nor opportunity engine invents or filters a decision to obtain an anchor.
+Real zones keep their bounds. Actual overlaps merge. The reviewed selection uses
+the original distance scales: 1 ATR confluence, 2 ATR layer spacing and 3 ATR
+susceptible span. Gap merges are bounded; too-close remaining references can be
+retained as enrichment instead of separate congested layers. This restores the
+original spatial principles without claiming byte-for-byte legacy fidelity.
 
-Core's public `evaluate_price_point(client, features, previous)` remains usable
-without any decision input. `inspect_price_point.py` now requests context history
-explicitly so a WAIT row doesn't misleadingly print a null anchor solely because
-normal chart responses omit intermediate duplicate context payloads.
+Isolated price references get modeled +/-0.1 ATR bands, clipped to their side of
+the anchor. They are labeled modeled, not represented as real S/R or observed
+order-book liquidity. Sources/families and both edges remain inspectable. Labels
+use separate layout with leaders; their price geometry never moves to fit text.
+Old numbered source files remain reference material, not active engine imports.
 
-This update changes no feature formulas, runner work, candle scale/data or ADCN
-records, and schedules no feature replay. Only the UI backend needs restarting.
+## Frozen calculations and later observations
+
+Core calls confidence/opportunity evaluation on decision/reference candles only.
+WAIT candles reuse the frozen snapshot. A new decision replaces the snapshot;
+current price, current ATR and newly formed zones cannot move its existing areas.
+Input-keyed bounded caches avoid recomputing identical reference inputs on polls.
+Explicit public point diagnostics remain available independently.
+
+`context.py` updates tested/crossed/current-location states and `next_area` for
+both sides using later closed OHLC only. A resistance crossing requires a close
+above its far/high edge, support below its far/low edge. A wick is only a test.
+Progress continues after legacy model-risk thresholds or favorable target touches.
+Gaps mark coverage unknown while retaining the known reference. OHLC cannot
+establish target/stop intrabar order or fill sequence; no profitable fill is inferred.
+
+Two-candle chart polls send `analysis_reference` through the existing combined
+request. Core verifies the canonical reference and advances at most 10,000 raw
+candles without reading full feature history. Two additional seed candles handle
+references at the page's lookback boundary. A short page must never silently
+replace the reference with its current close.
+
+## Costs, compatibility and UI
+
+Per-side defaults: fee 4 bps and slippage 2 bps, editable in settings. Costs apply
+to entry and exit notionals. Amounts are conditional potential returns, not
+expected profit; funding, taxes, leverage, sizing and fill probability are absent.
+
+Legacy `buy.targets` means upper areas and `sell.targets` means lower areas.
+Legacy invalidation/risk/reward-risk and single `opposing_band` fields remain
+auxiliary compatibility data. They no longer select or hide the chart's six-area
+map. The main map shows the anchor reference line, not an extra model-stop area.
+A missing modeled stop cannot erase otherwise known areas.
+
+Settings > Features > Opportunity offers six independent area switches, labels,
+anchor reference and per-area style controls. Completed/invalidated reference
+maps stay visible until the next decision, with crossing information. The old
+unanchored-preview chart switch is removed. `inspect_price_point.py` defaults to
+anchored outputs; `--include-point-preview` is a separate opt-in diagnostic only.
+
+No feature formulas, candle data, ADCN rows or trading rules are changed. No new
+feature columns, historical replay, exchange calls or runner work are introduced.
+Only the UI backend needs restarting.

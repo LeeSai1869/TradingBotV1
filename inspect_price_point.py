@@ -9,6 +9,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('symbol');parser.add_argument('--timeframe',default='4h')
     parser.add_argument('--at',required=True,help='ISO timestamp with explicit chart timezone offset, e.g. 2026-10-11T20:00:00+00:00')
+    parser.add_argument('--include-point-preview',action='store_true',help='Include a separate unanchored diagnostic; never used by the chart map')
     args=parser.parse_args()
     try:
         point=datetime.fromisoformat(args.at.replace('Z','+00:00'))
@@ -24,10 +25,13 @@ def main():
     for row in sorted(nearest,key=lambda b:b['open_time']):
         index=bars.index(row);previous=bars[index-1] if index>0 else None
         inputs={**(previous.get('features') or {}),'close':previous['client']['close']} if previous and previous['client']['close_time']+1==row['open_time'] else None
-        evidence=evaluate_price_point(row['client'],row.get('features'),inputs) or {}
+        reference=row.get('signal_context')
+        evidence={'confidence':reference.get('confidence'),'opportunity':reference.get('opportunity')} if reference else {}
+        preview=evaluate_price_point(row['client'],row.get('features'),inputs) if args.include_point_preview else None
         selected.append(dict(open_utc=datetime.fromtimestamp(row['open_time']/1000,timezone.utc).isoformat(),
             client=row['client'],decision=row.get('momentum'),confidence=evidence.get('confidence'),
-            opportunity=evidence.get('opportunity'),anchor=row.get('signal_context')))
+            opportunity=evidence.get('opportunity'),anchor=reference,
+            **({'inspection_only_unanchored_preview':preview} if args.include_point_preview else {})))
     print(json.dumps(dict(symbol=args.symbol.upper(),timeframe=args.timeframe,requested=args.at,
         note='Stored data only. Scores use candle-close evidence; timestamp matching does not prove this is the referenced chart candle.',
         status='available' if selected else 'No stored candles in this checkout',rows=selected),indent=2,allow_nan=False))

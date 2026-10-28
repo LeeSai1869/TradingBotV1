@@ -47,3 +47,8 @@ The original Section 9 reference remains archived under
 `section_9_1_scalp_confidence_engine/`. It is not an active implementation. Its
 missing-HTF bonuses, copied fallback weights and unsafe optional arithmetic are
 not used. Calibration against unseen outcomes remains separate, unfinished work.
+
+The v3 six-area view also reuses the decision-candle confidence snapshot on WAIT
+candles instead of evaluating a new current-bar score. The formula remains v2;
+only the coordinator's evaluation timing and display selection change. Independent
+price-point diagnostics remain explicitly available through the public gateway.

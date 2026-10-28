@@ -831,3 +831,10 @@ the opposing area versus invalidation. `test_di_decisions.py` verifies an older
 canonical anchor survives a two-candle page without changing its levels. The
 browser evidence fixture checks an older SELL point across an actual short poll,
 filled band bounds, removed preview toggle, editable costs and unchanged OHLC.
+
+Six-area v3 tests verify three red resistance and three green support areas from
+one snapshot, side-correct FVGs, both favorable/adverse outcomes, no opportunity
+or confidence calculation on WAIT bars, frozen maps despite changed current
+features, and progression through support areas after a legacy risk threshold.
+The browser fixture verifies both sides and unchanged anchor amounts after a
+two-candle poll. No feature database columns or replay jobs are added.

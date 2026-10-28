@@ -12,18 +12,30 @@ export function confidenceLabel(bar,side,config){
 }
 export function targetRows(bar,config){
     const context=bar?.signal_context;if(!bar||bar.provisional||!context)return [];
-    const side=context.side.toLowerCase(),plan=context.plan;
-    return (plan?.targets||[]).flatMap((target,i)=>{
-        const key=`opportunity_${side}_${i+1}`;
-        return config[key]?.visible&&Number.isFinite(target.price)?[{...target,key,side,layer:i+1,plan,entry:plan.entry,anchorTime:context.open_time,state:context.state}]:[];
-    });
+    const map=context.area_map||context.opportunity?.areas||{
+        resistance:context.opportunity?.buy?.targets||(context.side==='BUY'?context.plan?.targets:[])||[],
+        support:context.opportunity?.sell?.targets||(context.side==='SELL'?context.plan?.targets:[])||[]};
+    const entry=context.entry??context.plan?.entry;
+    return ['resistance','support'].flatMap(role=>(map[role]||[]).flatMap((area,i)=>{
+        const side=role==='resistance'?'buy':'sell',key=`opportunity_${side}_${i+1}`;
+        if(!config[key]?.visible||!Number.isFinite(area.price))return [];
+        const positive=context.side==='BUY'?role==='resistance':role==='support';
+        const outcome=area.outcomes?.[context.side]||(positive?{net_low:area.net_reward_pct,net_high:area.net_reward_far_pct??area.net_reward_pct}:{});
+        return [{...area,key,side,role,layer:i+1,plan:context.plan,entry,anchorSide:context.side,anchorTime:context.open_time,
+            positive,net_low:outcome.net_low,net_high:outcome.net_high,
+            progress:context.area_progress?.[role]?.[i],state:context.state}];
+    }));
 }
 const price=value=>value.toPrecision(7);
+const percent=value=>Number.isFinite(value)?`${value>0?'+':''}${value.toFixed(2)}%`:'unavailable';
 export function targetLabel(row){
     const low=row.low??row.price,high=row.high??row.price;
-    const far=row.net_reward_far_pct??row.net_reward_pct;
-    return `${row.side==='buy'?'Upside':'Buy-back'} ${row.layer} · ${price(low)}–${price(high)} · net ${row.net_reward_pct.toFixed(2)}–${far.toFixed(2)}%${row.modeled?' · modeled':''}`;
+    const role=row.role||(row.side==='buy'?'resistance':'support');
+    const lo=row.net_low,hi=row.net_high;
+    const state=row.progress?.crossed?(row.progress.current==='inside'?' · retest':' · crossed'):row.progress?.touched?' · tested':'';
+    return `${role==='resistance'?'Sell / resistance':'Buy / support'} ${row.layer} · ${price(low)}–${price(high)} · ${row.positive===false?'adverse':'opportunity'} ${percent(lo)} to ${percent(hi)}${state}${row.modeled?' · modeled':''}`;
 }
+
 export function layoutLabels(labels,height){
     const result=labels.filter(l=>l.y>=0&&l.y<=height).sort((a,b)=>a.y-b.y).map(l=>({...l}));
     for(let i=0;i<result.length;i++)result[i].textY=Math.max(result[i].y,i?result[i-1].textY+18:12);
@@ -46,7 +58,7 @@ class Opportunity {
             const labels=[],reference=this.reference,config=styles();
             const at=reference?this.chart.timeScale().timeToCoordinate(reference.open_time/1000):null;
             const left=at===null?0:Math.max(0,Math.min(at,mediaSize.width));
-            const stopped=reference&&reference.state!=='active';
+            const stopped=reference&&reference.state==='coverage unknown';
             context.save();context.font='11px sans-serif';context.textBaseline='middle';
             const band=(low,high,color,opacity,borderStyle,label,width=1)=>{
                 const a=this.series.priceToCoordinate(high),b=this.series.priceToCoordinate(low);
@@ -67,12 +79,10 @@ class Opportunity {
             }
             const visible=(this.rows||[]).length>0&&config.opportunity_buy_1?.reference!==false;
             if(reference&&visible){
-                const risk=reference.plan.opposing_band||reference.plan.risk_band;
-                if(risk)band(risk.low,risk.high,'#f59e0b',.1,2,`${reference.side==='SELL'?'Upper':'Lower'} ${reference.plan.opposing_band?'opposing area':'risk area'} · ${price(risk.low)}–${price(risk.high)}${risk.modeled?' · modeled':''}`);
-                for(const [value,text,color] of [[reference.entry,`${reference.side} reference ${price(reference.entry)}`,'#d6dde5'],[reference.plan.invalidation,`Invalidation ${price(reference.plan.invalidation)}`,'#f59e0b']]){
-                    const y=this.series.priceToCoordinate(value);if(y===null||y<0||y>mediaSize.height)continue;
-                    if(layer==='bands'){context.strokeStyle=color;context.lineWidth=1;context.setLineDash([3,4]);context.beginPath();context.moveTo(left,y);context.lineTo(mediaSize.width,y);context.stroke();}
-                    labels.push({y,text,color});
+                const y=this.series.priceToCoordinate(reference.entry);
+                if(y!==null&&y>=0&&y<=mediaSize.height){
+                    if(layer==='bands'){context.strokeStyle='#d6dde5';context.lineWidth=1;context.setLineDash([3,4]);context.beginPath();context.moveTo(left,y);context.lineTo(mediaSize.width,y);context.stroke();}
+                    labels.push({y,text:`${reference.side} reference ${price(reference.entry)}`,color:'#d6dde5'});
                 }
             }
             if(layer==='labels')for(const label of layoutLabels(labels,mediaSize.height)){
@@ -101,7 +111,8 @@ export function update(chart,data){
     const evidence=reference?.confidence||bar?.confidence;
     const scores=['buy','sell'].filter(side=>config[`confidence_${side}`]?.visible).map(side=>confidenceLabel({...bar,confidence:evidence},side,config)).join(' · ');
     const coverage=evidence?` · evidence ${Math.round(evidence.coverage*100)}%`:' · awaiting closed features';
-    const contextText=reference?`${reference.side} reference ${price(reference.entry)} · ${reference.state}`:'waiting for latest decision reference';
+    const progression=reference?.next_area?` · next support ${reference.next_area.support??'none remaining'} / resistance ${reference.next_area.resistance??'none remaining'}`:'';
+    const contextText=reference?`${reference.side} reference ${price(reference.entry)}${progression}${reference.state==='coverage unknown'?' · coverage unknown':''}`:'waiting for latest decision reference';
     const asOf=reference?.available_ms??(bar?.client?.close_time+1);
     status.textContent=`${confidence?scores+coverage+' · scores, not probabilities':''}${opportunity?`${confidence?' | ':''}${contextText} · ${primitive.rows.length} opportunity bands${data.atLiveEdge===false?' · return to latest candles':''}${Number.isFinite(asOf)?' · '+new Date(asOf).toISOString().slice(0,16).replace('T',' ')+' UTC':''}`:''}`;
     status.title=JSON.stringify({reference,current_evidence:bar?.confidence},null,2);

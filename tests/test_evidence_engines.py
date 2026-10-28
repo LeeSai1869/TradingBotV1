@@ -102,7 +102,9 @@ class EvidencePresentationTests(unittest.TestCase):
         annotate(rows,now_ms=120000)
         self.assertEqual(rows[0]['momentum'],before[0]['momentum'])
         self.assertIsNotNone(rows[0]['confidence']);self.assertIsNotNone(rows[0]['opportunity'])
-        self.assertIsNone(rows[1]['confidence']);self.assertIsNone(rows[2]['opportunity'])
+        self.assertEqual(rows[1]['confidence'],rows[0]['confidence'])
+        self.assertEqual(rows[1]['signal_context']['state'],'coverage unknown')
+        self.assertIsNone(rows[2]['opportunity'])
         for a,b in zip(rows,before):self.assertEqual(a['features'],b['features']);self.assertEqual(a['client'],b['client'])
 
 if __name__=='__main__':unittest.main()
