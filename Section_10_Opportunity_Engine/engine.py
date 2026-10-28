@@ -6,7 +6,7 @@ No price level is invented to fill an absent opportunity layer.
 from functools import lru_cache
 from Section_1_Global_Core.analysis_packet import number,clean
 
-VERSION='opportunity-v1'
+VERSION='opportunity-v2'
 ZONES={
  'sr':('support','resistance','inst_support','inst_resistance'),
  'fvg':('nearest_bull_fvg','nearest_bear_fvg'),
@@ -45,17 +45,8 @@ def _evaluate(close,values,fee_bps,slippage_bps):
             value=f[key]
             if number(value) and value>0:candidates.append(dict(family=family,name=key,low=value,high=value))
     for side,direction in (('buy',1),('sell',-1)):
-        eligible=[c for c in candidates if c['low']>close] if direction==1 else [c for c in candidates if c['high']<close]
-        eligible.sort(key=lambda c: direction*(c['low'] if direction==1 else c['high']))
-        clusters=[]
-        for candidate in eligible:
-            edge=candidate['low'] if direction==1 else candidate['high']
-            # Anchor the merge tolerance at the first barrier: no transitive
-            # chaining across a series of unrelated levels.
-            if clusters and abs(edge-clusters[-1]['price'])<=.15*atr:
-                clusters[-1]['sources'].append(candidate['name']);clusters[-1]['families'].add(candidate['family'])
-                clusters[-1]['low']=min(clusters[-1]['low'],candidate['low']);clusters[-1]['high']=max(clusters[-1]['high'],candidate['high'])
-            else:clusters.append(dict(price=edge,low=candidate['low'],high=candidate['high'],sources=[candidate['name']],families={candidate['family']}))
+        eligible=[dict(c) for c in candidates if c['low']>close] if direction==1 else [dict(c) for c in candidates if c['high']<close]
+        clusters=build_bands(eligible,close,atr,direction)
         protective=[c for c in candidates if c['high']<close] if direction==1 else [c for c in candidates if c['low']>close]
         # Trend averages/VP levels are targets, not structural stop boundaries.
         protective=[c for c in protective if c['family'] in ('sr','fvg','ob','breaker','structure')]
@@ -65,16 +56,69 @@ def _evaluate(close,values,fee_bps,slippage_bps):
         if stop<=0 or direction*(close-stop)<=0:continue
         loss=direction*(close-stop)/close*100+(fee_bps+slippage_bps)*(1+stop/close)/100
         if not number(loss) or loss<=0:continue
+        boundary=protective[0] if protective else None
+        risk_band=dict(low=boundary['low'] if boundary else stop-.1*atr,high=boundary['high'] if boundary else stop+.1*atr,source=stop_source,modeled=boundary is None)
+        if risk_band['low']==risk_band['high']:
+            risk_band['low']-=.1*atr;risk_band['high']+=.1*atr;risk_band['modeled']=True
+        risk_band['low']=max(0.,risk_band['low'])
         layers=[]
         for cluster in clusters[:3]:
-            target=cluster['price'];gross=direction*(target-close)/close*100
+            target=cluster['low'] if direction==1 else cluster['high'];cluster['price']=target
+            gross=direction*(target-close)/close*100
             cost=(fee_bps+slippage_bps)*(1+target/close)/100
             net=gross-cost
             if not all(number(v) for v in (gross,cost,net,net/loss)):continue
-            families=sorted(cluster.pop('families'))
+            families=sorted(cluster['families'])
+            far=cluster['high'] if direction==1 else cluster['low']
+            far_net=direction*(far-close)/close*100-(fee_bps+slippage_bps)*(1+far/close)/100
+            if not number(far_net):continue
             layers.append({**cluster,'families':families,'confluence_families':len(families),'gross_reward_pct':gross,
-                'net_reward_pct':net,'reward_risk':net/loss if loss>0 else None})
-        result[side]=dict(entry=close,invalidation=stop,invalidation_source=stop_source,risk_pct=loss,targets=layers,
+                'net_reward_pct':net,'net_reward_far_pct':far_net,'reward_risk':net/loss if loss>0 else None,'reward_risk_far':far_net/loss})
+        result[side]=dict(entry=close,invalidation=stop,invalidation_source=stop_source,risk_band=risk_band,risk_pct=loss,targets=layers,
             status='favorable geometry' if layers and layers[0]['net_reward_pct']>0 and layers[0]['reward_risk']>=1.5 else 'limited reward/risk' if layers else 'no known targets')
+    for side,opposite in (('buy','sell'),('sell','buy')):
+        if result[side] is not None:
+            other=result[opposite]
+            result[side]['opposing_band']=dict(other['targets'][0]) if other and other['targets'] else None
     result['status']='ready' if result['buy'] or result['sell'] else 'unavailable'
     return result
+
+
+def build_bands(candidates,entry,atr,direction):
+    """Preserve real bounds; model point-reference bands; merge before choosing 3.
+
+    Original distance scales: 1 ATR confluence, 2 ATR layer spacing, 3 ATR
+    susceptible area. Gap merges are bounded; actual overlaps always coalesce.
+    """
+    bands=[];epsilon=entry*1e-12
+    for c in candidates:
+        low,high=c['low'],c['high'];modeled=low==high
+        if modeled:
+            low=max(entry+epsilon,low-.1*atr) if direction==1 else max(epsilon,low-.1*atr)
+            high=high+.1*atr if direction==1 else min(entry-epsilon,high+.1*atr)
+        if not number(low) or not number(high) or not 0<low<high:continue
+        bands.append(dict(low=low,high=high,sources=[c['name']],families={c['family']},
+                          modeled=modeled,nearby_sources=[]))
+    bands.sort(key=lambda c:c['low'])
+    merged=[]
+    for band in bands:
+        previous=merged[-1] if merged else None
+        gap=band['low']-previous['high'] if previous else float('inf')
+        span=max(previous['high'],band['high'])-previous['low'] if previous else 0
+        if previous and (gap<=0 or gap<=atr and span<=3*atr):
+            previous['high']=max(previous['high'],band['high'])
+            previous['sources']=list(dict.fromkeys(previous['sources']+band['sources']))
+            previous['families']|=band['families'];previous['modeled']|=band['modeled']
+        else:merged.append(band)
+    ordered=merged if direction==1 else list(reversed(merged));selected=[]
+    for band in ordered:
+        previous=selected[-1] if selected else None
+        gap=(band['low']-previous['high'] if direction==1 else previous['low']-band['high']) if previous else float('inf')
+        if previous and gap<2*atr:
+            span=max(previous['high'],band['high'])-min(previous['low'],band['low'])
+            if span<=3*atr:
+                previous['low']=min(previous['low'],band['low']);previous['high']=max(previous['high'],band['high'])
+                previous['sources']=list(dict.fromkeys(previous['sources']+band['sources']));previous['families']|=band['families'];previous['modeled']|=band['modeled']
+            else:previous['nearby_sources']+=band['sources']
+        else:selected.append(band)
+    return selected[:3]

@@ -10,7 +10,7 @@ def anchor(packet,*,side,open_time,confidence=None,previous=None):
     plan=packet.get(side.lower())
     if side not in ('BUY','SELL') or not plan:return None
     return dict(side=side,open_time=open_time,entry=packet['entry'],plan=copy.deepcopy(plan),
-        confidence=copy.deepcopy(confidence),costs=packet['costs'],state='active',targets_touched=[],previous=previous)
+        confidence=copy.deepcopy(confidence),opportunity=copy.deepcopy(packet),costs=packet['costs'],state='active',targets_touched=[],previous=previous)
 
 
 def advance(context,bar):

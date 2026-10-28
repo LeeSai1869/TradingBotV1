@@ -70,6 +70,8 @@ def handle_get(path, raw_qs, server):
         try:
             limit = int(qs.get("limit", ["1000"])[0])
             before = int(qs["before"][0]) if "before" in qs else None
+            analysis_reference=int(qs['analysis_reference'][0]) if 'analysis_reference' in qs else None
+            if analysis_reference is not None and analysis_reference<0:raise ValueError('Invalid reference')
             fee_bps=float(qs.get('fee_bps',['4'])[0]);slippage_bps=float(qs.get('slippage_bps',['2'])[0])
             if not 0<=fee_bps<=100 or not 0<=slippage_bps<=100:raise ValueError('Invalid costs')
         except ValueError:
@@ -93,7 +95,7 @@ def handle_get(path, raw_qs, server):
             epochs = data_policy.read()['epochs']
             packet = {"symbol": symbol, "interval": interval,
                       "storage_epoch": f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}",
-                      **db.read_state_page(symbol, interval, limit, before=before,fee_bps=fee_bps,slippage_bps=slippage_bps)}
+                      **db.read_state_page(symbol, interval, limit, before=before,fee_bps=fee_bps,slippage_bps=slippage_bps,analysis_reference=analysis_reference)}
             active = data_policy.enabled(symbol, interval)
             if before is None:
                 packet['feature_progress']=db.read_feature_progress(symbol,interval,packet['bars'][-1]['open_time'] if packet['bars'] else None,history_pending=packet.get('history_pending',False))

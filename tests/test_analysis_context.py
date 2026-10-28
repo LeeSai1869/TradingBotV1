@@ -60,9 +60,9 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(result['state'],'ambiguous intrabar')
         self.assertEqual(result['targets_touched'],[]);self.assertEqual(state['state'],'active')
 
-    def test_missing_candles_clear_context_not_the_decision(self):
+    def test_missing_candles_mark_context_unknown_without_dropping_reference(self):
         rows=[bar(0,100,'BUY'),bar(3,101)];annotate(rows,now_ms=300000)
-        self.assertIsNone(rows[1]['signal_context']);self.assertEqual(rows[0]['momentum']['signal_type'],'BUY')
+        self.assertEqual(rows[1]['signal_context']['state'],'coverage unknown');self.assertEqual(rows[0]['momentum']['signal_type'],'BUY')
 
     def test_engine_boundaries_do_not_import_each_other_or_storage(self):
         for module,forbidden in ((confidence,'Section_10_Opportunity_Engine'),(opportunity,'Section_9_Confidence_Engine')):

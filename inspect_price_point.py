@@ -17,7 +17,7 @@ def main():
     except ValueError as error:parser.error(str(error))
     # A four-day forward cap includes nearby closed candles even on higher frames;
     # the returned score on each row still uses only its own preceding evidence.
-    packet=read_analysis_page(args.symbol,args.timeframe,1000,before=stamp+4*86400000)
+    packet=read_analysis_page(args.symbol,args.timeframe,1000,before=stamp+4*86400000,context_history=True)
     bars=packet['bars']
     nearest=sorted(bars,key=lambda b:abs(b['open_time']-stamp))[:5]
     selected=[]

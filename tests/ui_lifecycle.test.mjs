@@ -268,3 +268,12 @@ test('institutional higher projection requests every higher source only when sel
     await data._fetchPage('BTCUSDT','1h',1000);
     assert.equal(new URL(calls[1],'http://local').searchParams.has('sr_frames'),false);
 });
+
+test('two-candle polls send the known decision reference only for the same pair',async()=>{
+    const calls=[],data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({bars:[]})};});
+    data.symbol='ENAUSDT';data.timeframe='4h';data.bars=[{open_time:1000,signal_context:{open_time:500}}];
+    await data._fetchPage('ENAUSDT','4h',2);
+    assert.equal(new URL(calls[0],'http://local').searchParams.get('analysis_reference'),'500');
+    await data._fetchPage('BTCUSDT','4h',2);
+    assert.equal(new URL(calls[1],'http://local').searchParams.has('analysis_reference'),false);
+});

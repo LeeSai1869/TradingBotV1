@@ -8,7 +8,7 @@ export const FEATURE_STYLES = {
         ['inst_support_zones','Institutional support','#38bdf8','zone'],['inst_resistance_zones','Institutional resistance','#f59e0b','zone'],
     ] },
     Confidence: {connected:true,outputs:[['confidence_buy','BUY confidence score','#26a69a','evidence'],['confidence_sell','SELL confidence score','#ef5350','evidence']]},
-    Opportunity: {connected:true,outputs:[...['buy','sell'].flatMap(side=>[1,2,3].map(layer=>[`opportunity_${side}_${layer}`,`${side.toUpperCase()} target ${layer}`,side==='buy'?'#26a69a':'#ef5350','target']))]},
+    Opportunity: {connected:true,outputs:[...['buy','sell'].flatMap(side=>[1,2,3].map(layer=>[`opportunity_${side}_${layer}`,`After ${side.toUpperCase()}: ${side==='buy'?'upside':'buy-back'} band ${layer}`,side==='buy'?'#ef5350':'#26a69a','zone']))]},
     Liquidity: {connected:true,outputs:[
         ['liquidity_bids','Resting perpetual bids','#26a69a','profile'],
         ['liquidity_asks','Resting perpetual asks','#ef5350','profile'],
@@ -75,7 +75,10 @@ export function normalizeStyles(value = {}) {
             if(['inst_support_zones','inst_resistance_zones'].includes(key))result[key].higher=typeof input.higher==='boolean'?input.higher:true;
             if(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key))result[key].dualColor=/^#[0-9a-f]{6}$/i.test(input.dualColor)?input.dualColor:'#eab308';
             if(key.startsWith('opportunity_')){
-                result[key].preview=typeof input.preview==='boolean'?input.preview:false;
+                const oldColor=key.startsWith('opportunity_buy_')?'#26a69a':'#ef5350';
+                if(input.opacity===undefined&&input.color===oldColor)result[key].color=color;
+                result[key].labels=typeof input.labels==='boolean'?input.labels:true;
+                result[key].reference=typeof input.reference==='boolean'?input.reference:true;
                 result[key].feeBps=Number.isFinite(input.feeBps)?Math.max(0,Math.min(100,input.feeBps)):4;
                 result[key].slippageBps=Number.isFinite(input.slippageBps)?Math.max(0,Math.min(100,input.slippageBps)):2;
             }

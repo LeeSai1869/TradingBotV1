@@ -13,8 +13,8 @@ async def exercise(base,library):
         resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,
         protected_high=price+8,atr_ma_ratio=1) for r in rows])
     # Canonical three-candle SELL gate, with a rejection candle at the anchor.
-    closes=[price-2,price,price-1]
-    for index,r in enumerate(rows[-3:]):
+    closes=[price-2,price,price-1];pulse=rows[-10:-7]
+    for index,r in enumerate(pulse):
         c=closes[index]
         db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
             atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=88 if index==1 else 80,
@@ -23,7 +23,7 @@ async def exercise(base,library):
             resistance_zone_low=price+2,resistance_zone_high=price+3,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1)])
     conn=klines_store.open_db()
     with conn:
-        for index,r in enumerate(rows[-3:]):
+        for index,r in enumerate(pulse):
             c=closes[index]
             opened,high,low=(price+1,price+3,price-1.5) if index==2 else (c+.1,c+1,c-1)
             conn.execute('UPDATE klines SET open=?,high=?,low=?,close=? WHERE symbol=? AND interval=? AND open_time=?',
@@ -49,28 +49,31 @@ async def exercise(base,library):
         await dialog.get_by_role('button',name='Display',exact=True).click()
         await dialog.get_by_role('button',name='Select all',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
-        assert await page.evaluate("DataCache.bars.at(-1).momentum.signal_type")=='SELL'
+        assert await page.evaluate("time=>DataCache.bars.find(b=>b.open_time===time).momentum.signal_type",pulse[-1][2])=='SELL'
         assert await page.evaluate('DataCache.bars.at(-1).signal_context.entry')==price-1
         anchored=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
         assert anchored and all(row['side']=='sell' and row['price']<price-1 for row in anchored)
-        assert await page.evaluate('DataCache.bars.at(-1).confidence.sell_mode')=='reversal'
+        assert await page.evaluate('DataCache.bars.at(-1).signal_context.confidence.sell_mode')=='reversal'
         await page.get_by_role('button',name='Open settings',exact=True).click()
         await dialog.get_by_role('button',name='Opportunity',exact=True).click()
-        await dialog.get_by_role('button',name='Display',exact=True).click()
-        await dialog.get_by_role('checkbox',name='Preview both directions from the latest close (unanchored)',exact=True).check()
+        assert await dialog.get_by_role('checkbox',name='Preview both directions from the latest close (unanchored)',exact=True).count()==0
         await dialog.get_by_role('button',name='Style',exact=True).click()
         await dialog.get_by_label('Fee per side (bps)',exact=True).fill('8')
         await dialog.get_by_label('Slippage per side (bps)',exact=True).fill('3')
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         await page.wait_for_function('DataCache.bars.at(-1)?.opportunity?.costs.round_trip_bps===22')
-        assert await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles).filter(r=>r.side==='buy').length)")==3
+        await page.evaluate('DataCache._refreshCount=0; DataCache.refreshStored()');await settle(page)
+        assert await page.evaluate('DataCache.bars.at(-1).signal_context.open_time')==pulse[-1][2]
+        projected=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
+        assert 1<=len(projected)<=3 and all(row['high']>row['low'] and row['side']=='sell' for row in projected)
         assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==points
-        assert 'assumed round-trip 22 bps' in await page.locator('.evidence-status').inner_text()
+        assert await page.evaluate('DataCache.bars.at(-1).signal_context.costs.round_trip_bps')==22
+        assert 'opportunity bands' in await page.locator('.evidence-status').inner_text()
         await page.screenshot(path='/tmp/tradingbot-evidence.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
         assert await page.evaluate('Composer.config.featureStyles.opportunity_buy_1.feeBps')==8
         assert not errors,errors
         await browser.close()
-        print('PASS: independent reversal score, SELL anchor and downward targets, separate preview, costs, unchanged candles and persistence')
+        print('PASS: independent reversal score, SELL anchor and downward targets, merged bands, two-candle refresh, costs, unchanged candles and persistence')
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

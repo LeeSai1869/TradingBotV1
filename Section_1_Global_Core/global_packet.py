@@ -588,10 +588,10 @@ def annotate_evidence(bars,**options):
     return annotate(bars,**options)
 
 
-def read_analysis_page(symbol,interval,limit=1000,*,before=None):
+def read_analysis_page(symbol,interval,limit=1000,*,before=None,context_history=False):
     """Public closed-bar analysis view for local diagnostics and consumers."""
     from .memory_storage.Storage.db import read_state_page
-    return read_state_page(symbol.upper(),interval,limit,before=before)
+    return read_state_page(symbol.upper(),interval,limit,before=before,context_history=context_history)
 
 
 def evaluate_price_point(client,features,previous=None):

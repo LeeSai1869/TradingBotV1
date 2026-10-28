@@ -66,6 +66,8 @@ const DataCache = {
     async _fetchPage(symbol, timeframe, limit, before = null) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
+            const reference=this.symbol===symbol&&this.timeframe===timeframe?[...this.bars].reverse().find(b=>b.signal_context)?.signal_context:null;
+            if(Number.isFinite(reference?.open_time))qs.set('analysis_reference',String(reference.open_time));
             if(Object.entries(window.Composer?.config.featureStyles||{}).some(([key,value])=>(['support_zones','resistance_zones','inst_support_zones','inst_resistance_zones'].includes(key)||/_(ob|breaker)_zones$/.test(key))&&value?.visible))qs.set('sr_zones','1');
             const srOptions=window.Composer?.config.featureStyles||{};
             if(['support','resistance'].some(side=>srOptions[`inst_${side}_zones`]?.visible&&srOptions[`inst_${side}_zones`]?.higher!==false)){

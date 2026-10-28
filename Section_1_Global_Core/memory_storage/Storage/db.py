@@ -231,7 +231,7 @@ def _read_derived(store, symbol, interval, start_ms, end_ms):
         conn.close()
 
 
-def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slippage_bps=2.):
+def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slippage_bps=2.,analysis_reference=None,context_history=False):
     """One combined record per stored candle, with an exclusive older cursor.
 
     Keep the selected kline keys authoritative even while the ingestion
@@ -244,6 +244,8 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
     conn = _read_connection(klines_store.DB_PATH)
     try:
         rows = klines_store.read_page(conn, symbol, interval, limit + 2, before=before)
+        if analysis_reference is not None and any(row[2]==analysis_reference for row in rows[:2]):
+            rows=klines_store.read_page(conn,symbol,interval,2,before=rows[0][2])+rows
         cursor=klines_store.history_cursor(conn,symbol,interval)
     finally:
         conn.close()
@@ -277,8 +279,33 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
         last_signal=read_previous_decision_candidate(symbol,interval,first_evaluated)
         bars=annotate(bars,last_signal)
     from ...analysis import annotate as evidence
-    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps)[-limit:]
+    seed=read_analysis_reference(symbol,interval,analysis_reference,bars[0]['open_time'],fee_bps,slippage_bps) if analysis_reference is not None and analysis_reference<bars[0]['open_time'] else None
+    bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps,seed=seed,context_history=context_history)[-limit:]
     return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
+
+
+def read_analysis_reference(symbol,interval,reference,before,fee_bps=4.,slippage_bps=2.):
+    """Rebuild a supplied canonical reference, then advance bounded raw OHLC only.
+
+    A short chart poll must not silently replace an older decision point.
+    The nested page has no reference parameter, so this never recurses further.
+    """
+    page=read_state_page(symbol,interval,1,before=reference+1,fee_bps=fee_bps,slippage_bps=slippage_bps)
+    row=page['bars'][-1] if page['bars'] else None
+    if not row or row['open_time']!=reference or (row.get('momentum') or {}).get('signal_type') not in ('BUY','SELL'):return None
+    context=row.get('signal_context')
+    if not context:return None
+    from Section_10_Opportunity_Engine.context import advance
+    raw=_read_connection(klines_store.DB_PATH)
+    try:rows=raw.execute('SELECT '+','.join(_KLINE_COLUMNS)+' FROM klines WHERE symbol=? AND interval=? AND open_time>? AND open_time<? ORDER BY open_time LIMIT 10000',(symbol,interval,reference,before)).fetchall()
+    finally:raw.close()
+    for value in rows:
+        if value[2]<=reference:continue
+        if context.get('through_close') is not None and context['through_close']+1!=value[2]:context={**context,'state':'coverage unknown'}
+        client=dict(zip(_KLINE_COLUMNS,value))
+        context=advance(context,{'open_time':value[2],'client':client})
+        context={**context,'through_close':value[8]}
+    return context
 
 
 # ==============================================================================

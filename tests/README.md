@@ -824,3 +824,10 @@ moves to 85,000, unchanged decisions, gap handling and ambiguous intrabar orderi
 lookback initialization, invalid ATR and replay scope. The public
 `inspect_price_point.py SYMBOL --timeframe 4h --at ISO_TIMESTAMP_WITH_OFFSET`
 reads local stored data; it never contacts an exchange or writes memory.
+
+Opportunity band v2: `test_opportunity_bands.py` covers real-range overlap,
+dense ENA-like point references, modeled band provenance, near/far returns and
+the opposing area versus invalidation. `test_di_decisions.py` verifies an older
+canonical anchor survives a two-candle page without changing its levels. The
+browser evidence fixture checks an older SELL point across an actual short poll,
+filled band bounds, removed preview toggle, editable costs and unchanged OHLC.

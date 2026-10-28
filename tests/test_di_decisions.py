@@ -100,6 +100,20 @@ class DiMemoryTests(unittest.TestCase):
         self.assertTrue(processor.process_bar(SimpleNamespace(symbol='ETHUSDT',timeframe='1m',open_time=180000)))
         self.assertIsNone(db.read_adcn('ETHUSDT','1m',180000)['signal_type'])
 
+    def test_two_candle_poll_carries_the_older_decision_point(self):
+        values=[*SETUP,di(15,27),*[di(16,26,close=101) for _ in range(12)]]
+        times=self.seed(values)
+        db.write_features([dict(symbol='ETHUSDT',interval='1m',open_time=t,formula_version=3,**value,atr=2,ema50=99,ema200=98,vwap=100,
+            support_zone_low=95,support_zone_high=97,resistance_zone_low=110,resistance_zone_high=112) for t,value in zip(times,values)])
+        initial=db.read_state_page('ETHUSDT','1m')
+        reference=initial['bars'][-1]['signal_context']
+        self.assertIsNotNone(reference);self.assertEqual(reference['open_time'],120000)
+        refreshed=db.read_state_page('ETHUSDT','1m',2,analysis_reference=120000)
+        self.assertEqual(len(refreshed['bars']),2)
+        context=refreshed['bars'][-1]['signal_context']
+        self.assertEqual(context['entry'],reference['entry']);self.assertEqual(context['open_time'],120000)
+        self.assertEqual(context['plan'],reference['plan'])
+
     def test_historical_study_reads_canonical_prefix_without_writing_decisions(self):
         from evaluate_strategy import evaluate
         self.seed(cap=60000)
