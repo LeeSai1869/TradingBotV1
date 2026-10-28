@@ -12,10 +12,10 @@ from Section_10_Opportunity_Engine.context import anchor
 
 
 def packet(side='SELL'):
-    fields=dict(atr=1,resistance_zone_low=101,resistance_zone_high=101.2,
-        inst_resistance_zone_low=102,inst_resistance_zone_high=102.2,nearest_bear_fvg_low=103,nearest_bear_fvg_high=103.2,
-        support_zone_low=98.8,support_zone_high=99,inst_support_zone_low=97.8,inst_support_zone_high=98,
-        nearest_bull_fvg_low=96.8,nearest_bull_fvg_high=97)
+    fields=dict(atr=1,resistance_zone_low=106,resistance_zone_high=106.2,
+        inst_resistance_zone_low=109,inst_resistance_zone_high=109.2,nearest_bear_fvg_low=112,nearest_bear_fvg_high=112.2,
+        support_zone_low=93.8,support_zone_high=94,inst_support_zone_low=90.8,inst_support_zone_high=91,
+        nearest_bull_fvg_low=87.8,nearest_bull_fvg_high=88)
     confidence=dict(status='ready',buy_score=30,sell_score=70)
     result=anchor(evaluate(100,fields),side=side,open_time=120000,confidence=confidence)
     result['available_ms']=180000
@@ -28,6 +28,16 @@ class StoredEvidenceTests(unittest.TestCase):
         self.path=Path(self.temp.name)/'ADCN.db'
         self.patch=patch.object(adcn_store,'DB_PATH',self.path);self.patch.start();self.addCleanup(self.patch.stop)
         self.conn=adcn_store.open_db();self.addCleanup(self.conn.close)
+
+    def test_opportunity_version_isolates_new_spacing_without_overwriting_old_snapshots(self):
+        from Section_1_Global_Core.decision_evidence import epoch_key
+        with patch('Section_1_Global_Core.decision_evidence.data_policy.read',return_value={'epochs':{}}),patch('Section_1_Global_Core.decision_evidence.features_store.decision_generation',return_value=0):
+            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v4'):old=epoch_key('X','1m')
+            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v5'):new=epoch_key('X','1m')
+        adcn_store.save_evidence(self.conn,'X','1m',old,packet(),recorded_ms=190000,provenance='old spacing')
+        self.assertNotEqual(old,new)
+        self.assertEqual(adcn_store.evidence_range(self.conn,'X','1m',0,200000,new),{})
+        self.assertTrue(adcn_store.evidence_range(self.conn,'X','1m',0,200000,old))
 
     def test_eight_values_survive_reopen_and_repeated_inserts_cannot_rewrite(self):
         context=packet()

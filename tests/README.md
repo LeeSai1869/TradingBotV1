@@ -853,3 +853,11 @@ missing features, and cost-only repricing. `test_di_decisions.py` exercises actu
 worker writes, historical recovery of signals with no prior ADCN row, and reloads
 after feature changes. JS tests and the browser evidence fixture check explicit
 marker prices, six saved bands and persistence through cost edits/short polls.
+
+Opportunity v5 spacing uses the original 2-ATR separation for both the first
+band's clearance from the entire decision candle and edge-to-edge spacing of
+later bands. `SharedClearanceTests` checks wick changes, symmetric upper/lower
+clearance, fixed entry price, and explicit rejection reasons. Existing snapshot
+and browser fixtures contain genuinely separated source levels; no zones are
+invented or moved to satisfy six slots. Model version is part of evidence identity,
+so pre-change snapshots remain archived rather than silently overwritten.

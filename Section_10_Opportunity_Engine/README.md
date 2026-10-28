@@ -1,9 +1,11 @@
-# Six anchored opportunity areas (v4)
+# Six anchored opportunity areas (v5)
 
-`engine.evaluate(close, features, fee_bps=4, slippage_bps=2, zones=(), as_of_ms=None, timeframe='')` calculates a complete
+`engine.evaluate(close, features, fee_bps=4, slippage_bps=2, zones=(), as_of_ms=None, timeframe='', candle=None)` calculates a complete
 map from one price point. It does not take a BUY/SELL decision as a calculation
 input. Section 8 owns decisions; Core selects the decision-candle reference;
-Section 10 owns area geometry, point outcomes and subsequent crossing tracking.
+Section 10 owns area geometry, point outcomes and subsequent crossing tracking. Core supplies the signal candle
+high/low for clearance. Pure point diagnostics without a candle use the point
+price as both edges.
 
 ## One map, both sides
 
@@ -28,8 +30,12 @@ predictions that price must turn or executed orders/fills.
 
 The old two-pass selection could merge unlimited actual overlaps, permit gap
 clusters up to 3 ATR, and discard nearby remaining levels with a 2-ATR spacing
-rule. Daily ATR made those effects particularly visible. V4 removes both gap
-merging and minimum spacing. One pass attaches corroboration without expanding
+rule. Daily ATR made those effects particularly visible. V5 keeps gap merging removed and applies one explicit clearance rule. The
+minimum separation is 2 ATR from the decision candle high/low to the first band,
+and the same 2 ATR between the far edge of one band and the near edge of the next.
+ATR is frozen at the reference candle. A too-close candidate is audited with its
+measured and required clearance; it is not shifted, widened or merged to fit.
+The nearest candidate that passes becomes the next band. One pass attaches corroboration without expanding
 an authoritative source core. A contributor must overlap at least half the
 smaller band, and each family may contribute only once. Co-located same-family
 alternatives are audited, not counted as extra confluence or duplicate layers.
@@ -127,7 +133,9 @@ anchored outputs; `--include-point-preview` is a separate opt-in diagnostic only
 
 ADCN's `decision_evidence` table now stores one insert-only snapshot for each
 canonical BUY/SELL, keyed by symbol, timeframe, candle, data epoch/generation and
-side. Its eight primary values are the signal close, directional confidence, three
+side, including the opportunity model version. Older model snapshots are retained;
+only the changed evidence map is reconstructed for the new version, without
+replaying source features. Its eight primary values are the signal close, directional confidence, three
 resistance-band packets and three support-band packets. Each packet retains both
 bounds, sources and outcomes. Missing slots are SQL NULL. The full confidence,
 opportunity and reference context are retained as JSON with engine versions,

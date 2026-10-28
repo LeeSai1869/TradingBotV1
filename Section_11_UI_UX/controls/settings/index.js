@@ -115,7 +115,7 @@ function renderFeature() {
             }
             if(packet.inputs){
                 note(`Source timeframe: ${packet.inputs.timeframe||'unspecified'} · ${packet.inputs.scope}. Inventory: ${packet.inputs.inventory_status}.`);
-                note('Entry areas keep a narrow source core: at most 0.5 reference ATR and 1% of the anchored price. Wider source zones remain context; nearby distinct levels are retained.');
+                note('Entry areas keep a narrow source core: at most 0.5 reference ATR and 1% of the anchored price. Wider source zones remain context. The same 2-ATR gap separates band 1 from the decision candle high/low and each later band from the preceding band.');
                 const details=el('details','',content);el('summary','Sources and area selection',details);
                 for(const record of packet.audit||[])el('p',`${record.source}: ${record.low}–${record.high} · ${record.reason.replaceAll('_',' ')}${record.layer?` · layer ${record.layer}`:''}`,details);
                 if(packet.audit_truncated)el('p','Additional source records omitted from this bounded report.',details);

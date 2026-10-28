@@ -18,14 +18,14 @@ def fields(**extra):
 
 class InventoryTests(unittest.TestCase):
     def test_non_nearest_stored_zone_enters_decision_but_later_birth_cannot(self):
-        events=[dict(id='first',side='support',low=94,high=94.2,before=None),
+        events=[dict(id='first',side='support',low=93,high=93.2,before=None),
                 dict(id='second',side='support',low=96,high=96.2,before=None)]
         first=fields();first['sr_zone_events']=json.dumps(events)
         later=fields();later['sr_zone_events']=json.dumps([dict(id='later',side='support',low=98,high=98.2,before=None)])
         rows=[dict(interval='4h',open_time=i*60000,client=candle(i),features=f,momentum={'signal_type':'BUY' if i==0 else None}) for i,f in enumerate((first,later))]
         annotate(rows,now_ms=200000)
         areas=rows[-1]['opportunity']['areas']['support']
-        self.assertEqual([a['low'] for a in areas],[96,94])
+        self.assertEqual([a['low'] for a in areas],[96,93])
         self.assertEqual(rows[0]['opportunity'],rows[-1]['opportunity'])
         self.assertTrue(all(c['timeframe']=='4h' for a in areas for c in a['contributors']))
 

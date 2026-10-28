@@ -12,14 +12,11 @@ class BandTests(unittest.TestCase):
         self.assertEqual((bands[0]['low'],bands[0]['high']),(105,105.4))
         self.assertEqual(set(bands[0]['families']),{'sr','fvg','ob'})
 
-    def test_close_point_references_are_bands_not_three_congested_lines(self):
+    def test_close_references_are_audited_when_inside_the_shared_gap(self):
         f=dict(atr=.0074,nearest_fib_price=.2364948,vwap=.23189008,ema50=.22851471)
-        bands=evaluate(.2375,f)['sell']['targets']
-        self.assertEqual(len(bands),3)
-        self.assertTrue(all(bands[i+1]['high']<bands[i]['low'] for i in range(2)))
-        self.assertTrue(all(b['low']<b['high']<.2375 for b in bands))
-        self.assertTrue(all(b['net_reward_far_pct']>b['net_reward_pct'] for b in bands))
-        self.assertTrue(all(b['modeled'] for b in bands))
+        result=evaluate(.2375,f)
+        self.assertEqual(result['sell']['targets'],[])
+        self.assertTrue(any(a['reason']=='inside_decision_candle_clearance' for a in result['audit']))
 
     def test_opposing_area_is_distinct_from_the_invalidation_rule(self):
         result=evaluate(100,dict(atr=1,support_zone_low=95,support_zone_high=95.4,resistance_zone_low=104,resistance_zone_high=104.4))
@@ -82,12 +79,13 @@ class GeometryAuditTests(unittest.TestCase):
         self.assertEqual([(z['low'],z['high']) for z in result['context_zones']],[(105,108),(107,110)])
         self.assertTrue(all(a['reason']=='broad_context_only' for a in result['audit']))
 
-    def test_daily_atr_cannot_discard_nearby_support_or_inflate_points(self):
-        result=evaluate(.18,dict(atr=.04,protected_low=.1748,nearest_swing_low=.173,vwap=.13))
+    def test_daily_point_padding_is_capped_and_clearance_is_explicit(self):
+        result=evaluate(.18,dict(atr=.04,protected_low=.1748,nearest_swing_low=.173,vwap=.09))
         areas=result['areas']['support']
-        self.assertEqual(len(areas),3)
-        self.assertLess(areas[0]['low'],.1748);self.assertGreater(areas[0]['high'],.1748)
-        self.assertTrue(all(a['high']-a['low']<=.001*.18+1e-12 for a in areas))
+        self.assertEqual(len(areas),1)
+        self.assertLess(areas[0]['low'],.09);self.assertGreater(areas[0]['high'],.09)
+        self.assertLessEqual(areas[0]['high']-areas[0]['low'],.001*.18+1e-12)
+        self.assertTrue(any(a['source']=='protected_low' and a['reason']=='inside_decision_candle_clearance' for a in result['audit']))
 
     def test_same_family_is_never_counted_twice_in_a_core(self):
         areas=evaluate(100,dict(atr=1,active_bear_ob_low=105,active_bear_ob_high=105.2,
@@ -111,3 +109,24 @@ class GeometryAuditTests(unittest.TestCase):
         upper=evaluate(100,dict(atr=2,protected_high=102,ema50=103))['areas']['resistance']
         lower=evaluate(100,dict(atr=2,protected_low=98,ema50=97))['areas']['support']
         self.assertEqual([(a['low'],a['high']) for a in upper],[(200-a['high'],200-a['low']) for a in lower])
+
+class SharedClearanceTests(unittest.TestCase):
+    def test_candle_wicks_and_subsequent_bands_use_the_same_two_atr_gap(self):
+        zones=[dict(id=str(i),family='sr',low=p,high=p+.25) for i,p in enumerate((106,109,111,113.25,117.5,93,90.75,88.5,86.25))]
+        result=evaluate(100,dict(atr=2),zones=zones,candle=dict(high=105,low=98))
+        upper=result['areas']['resistance'];lower=result['areas']['support'];gap=4
+        self.assertEqual([a['low'] for a in upper],[109,113.25,117.5])
+        self.assertGreaterEqual(upper[0]['low']-105,gap)
+        self.assertGreaterEqual(98-lower[0]['high'],gap)
+        for near,far in zip(upper,upper[1:]):self.assertGreaterEqual(far['low']-near['high'],gap)
+        for near,far in zip(lower,lower[1:]):self.assertGreaterEqual(near['low']-far['high'],gap)
+        self.assertTrue(any(a['reason']=='inside_layer_clearance' for a in result['audit']))
+        self.assertEqual(result['geometry_policy']['minimum_candle_clearance_atr'],result['geometry_policy']['minimum_layer_spacing_atr'])
+
+    def test_changing_decision_wick_changes_clearance_without_changing_signal_price(self):
+        f=dict(atr=1,protected_high=105,protected_low=95)
+        a=evaluate(100,f,candle=dict(high=101,low=99))
+        b=evaluate(100,f,candle=dict(high=104,low=96))
+        self.assertTrue(a['areas']['resistance']);self.assertTrue(a['areas']['support'])
+        self.assertEqual(b['areas'],dict(resistance=[],support=[]))
+        self.assertEqual(a['entry'],b['entry'])

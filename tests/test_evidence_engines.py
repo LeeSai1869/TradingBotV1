@@ -77,7 +77,7 @@ class OpportunityTests(unittest.TestCase):
         a=opportunity(100.,features(),fee_bps=0,slippage_bps=0)
         b=opportunity(100.,features(),fee_bps=10,slippage_bps=10)
         self.assertGreater(a['buy']['targets'][0]['net_reward_pct'],b['buy']['targets'][0]['net_reward_pct'])
-        f=features();f['ema50']=100.01
+        f=features();f.update(atr=.001,ema50=100.01)
         self.assertLess(opportunity(100.,f)['buy']['targets'][0]['net_reward_pct'],0)
         self.assertEqual(opportunity(100.,f)['buy']['status'],'limited reward/risk')
         for invalid in (-1,float('nan'),101):

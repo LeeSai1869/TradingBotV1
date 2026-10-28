@@ -13,7 +13,8 @@ _RECOVERY_CURSOR={}
 
 def epoch_key(symbol,interval):
     epochs=data_policy.read()['epochs']
-    return json.dumps([epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0),features_store.decision_generation(symbol,interval)],separators=(',',':'))
+    from Section_10_Opportunity_Engine.engine import VERSION as opportunity_version
+    return json.dumps([epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0),features_store.decision_generation(symbol,interval),opportunity_version],separators=(',',':'))
 
 
 def capture(symbol,interval,open_times,*,provenance='closed decision worker',deadline=None):

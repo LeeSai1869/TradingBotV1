@@ -6,7 +6,8 @@ No price level is invented to fill an absent opportunity layer.
 from functools import lru_cache
 from Section_1_Global_Core.analysis_packet import number,clean
 
-VERSION='opportunity-v4'
+VERSION='opportunity-v5'
+LAYER_SEPARATION_ATR=2.
 ZONES={
  'sr':('support','resistance','inst_support','inst_resistance'),
  'fvg':('nearest_bull_fvg','nearest_bear_fvg'),
@@ -25,21 +26,24 @@ DEFAULT_FEE_BPS=4.
 DEFAULT_SLIPPAGE_BPS=2.
 
 
-def evaluate(close,features,*,fee_bps=DEFAULT_FEE_BPS,slippage_bps=DEFAULT_SLIPPAGE_BPS,zones=(),as_of_ms=None,timeframe='',inventory_status=None):
+def evaluate(close,features,*,fee_bps=DEFAULT_FEE_BPS,slippage_bps=DEFAULT_SLIPPAGE_BPS,zones=(),as_of_ms=None,timeframe='',inventory_status=None,candle=None):
     if not all(number(v) and 0<=v<=100 for v in (fee_bps,slippage_bps)):raise ValueError('Per-side costs must be 0–100 bps')
     extra=tuple((str(z.get('id','')),str(z.get('family','')),str(z.get('name',z.get('id','zone'))),str(z.get('role','dynamic')),clean(z.get('low')),clean(z.get('high')),str(z.get('timeframe',timeframe)),clean(z.get('available_ms'))) for z in zones)
-    return _evaluate(close if number(close) else None,tuple(clean(features.get(k)) for k in FIELDS),fee_bps,slippage_bps,extra,as_of_ms,timeframe,str(inventory_status or 'scalar features only'))
+    candle=candle or {}
+    high=clean(candle.get('high',close));low=clean(candle.get('low',close))
+    return _evaluate(close if number(close) else None,tuple(clean(features.get(k)) for k in FIELDS),fee_bps,slippage_bps,extra,as_of_ms,timeframe,str(inventory_status or 'scalar features only'),high,low)
 
 
 @lru_cache(maxsize=128)
-def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe='',inventory_status='scalar features only'):
+def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe='',inventory_status='scalar features only',candle_high=None,candle_low=None):
     f=dict(zip(FIELDS,values));atr=f['atr']
+    candle_high=close if candle_high is None else candle_high;candle_low=close if candle_low is None else candle_low
     result=dict(version=VERSION,entry=close,buy=None,sell=None,status='unavailable',
         costs=dict(fee_bps_per_side=fee_bps,slippage_bps_per_side=slippage_bps,round_trip_bps=2*(fee_bps+slippage_bps)),
         interpretation='conditional price scenarios; not expected earnings; excludes funding and taxes',
         inputs=dict(timeframe=timeframe,as_of_ms=as_of_ms,inventory_status=inventory_status,scope='same-timeframe zones at the reference candle; no current HTF or live perpetual book'),
-        audit=[],context_zones=[],at_entry=[],geometry_policy=dict(max_entry_band_atr=.5,max_entry_band_pct=1.,point_half_width_atr=.05,point_half_width_pct=.05,minimum_layer_spacing_atr=0))
-    if not number(close) or close<=0 or not number(atr) or atr<=0:return result
+        audit=[],context_zones=[],at_entry=[],geometry_policy=dict(max_entry_band_atr=.5,max_entry_band_pct=1.,point_half_width_atr=.05,point_half_width_pct=.05,minimum_layer_spacing_atr=LAYER_SEPARATION_ATR,minimum_candle_clearance_atr=LAYER_SEPARATION_ATR,decision_high=candle_high,decision_low=candle_low))
+    if not number(close) or close<=0 or not number(atr) or atr<=0 or not number(LAYER_SEPARATION_ATR*atr) or not number(candle_high) or not number(candle_low) or not 0<candle_low<=close<=candle_high:return result
     candidates=[]
     for identity,family,name,role,low,high,frame,available in extra:
         if family not in ('sr','fvg','ob','breaker','volume_profile') or not number(low) or not number(high) or not 0<low<high:continue
@@ -67,7 +71,7 @@ def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe
             result['at_entry'].append(dict(c));result['audit'].append(dict(source=c['name'],id=c['id'],low=c['low'],high=c['high'],reason='contains_reference_price'))
     for side,direction in (('buy',1),('sell',-1)):
         eligible=[dict(c) for c in candidates if c['low']>close and c['role']!='support'] if direction==1 else [dict(c) for c in candidates if c['high']<close and c['role']!='resistance']
-        clusters=build_bands(eligible,close,atr,direction,audit=result['audit'],context_zones=result['context_zones'])
+        clusters=build_bands(eligible,close,atr,direction,audit=result['audit'],context_zones=result['context_zones'],boundary=candle_high if direction==1 else candle_low)
         protective=[c for c in candidates if c['high']<close and c['role']!='resistance'] if direction==1 else [c for c in candidates if c['low']>close and c['role']!='support']
         # Trend averages/VP levels are targets, not structural stop boundaries.
         protective=[c for c in protective if c['family'] in ('sr','fvg','ob','breaker','structure')]
@@ -118,8 +122,8 @@ def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe
     return result
 
 
-def build_bands(candidates,entry,atr,direction,*,audit=None,context_zones=None):
-    """One non-expanding grouping pass; distinct nearby levels are never discarded.
+def build_bands(candidates,entry,atr,direction,*,audit=None,context_zones=None,boundary=None):
+    """Non-expanding groups followed by shared candle/layer clearance checks.
 
     Native geometry is authoritative. Broad sources are context-only, not cropped
     into invented entry zones. One representative per family may corroborate a
@@ -167,9 +171,20 @@ def build_bands(candidates,entry,atr,direction,*,audit=None,context_zones=None):
             for c in band['contributors']:audit.append(dict(c,reason='corroborates_core',core_low=matched['low'],core_high=matched['high']))
         else:cores.append(band)
     cores.sort(key=lambda b:direction*(b['low'] if direction==1 else b['high']))
-    for index,core in enumerate(cores):
-        for c in core['contributors']:audit.append(dict(c,reason='selected' if index<3 else 'beyond_nearest_three',layer=index+1))
-    return cores[:3]
+    selected=[];edge=entry if boundary is None else boundary;gap=LAYER_SEPARATION_ATR*atr
+    for core in cores:
+        if len(selected)>=3:
+            for c in core['contributors']:audit.append(dict(c,reason='beyond_nearest_three'))
+            continue
+        clearance=core['low']-edge if direction==1 else edge-core['high']
+        if clearance<gap:
+            reason='inside_layer_clearance' if selected else 'inside_decision_candle_clearance'
+            for c in core['contributors']:audit.append(dict(c,reason=reason,clearance=clearance,required_gap=gap))
+            continue
+        selected.append(core);edge=core['high'] if direction==1 else core['low']
+        for c in core['contributors']:audit.append(dict(c,reason='selected',layer=len(selected)))
+    return selected
+
 
 
 def with_costs(packet,fee_bps,slippage_bps):

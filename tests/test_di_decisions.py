@@ -99,10 +99,10 @@ class DiMemoryTests(unittest.TestCase):
 
     def test_worker_saves_all_six_bands_and_reload_uses_immutable_adcn_snapshot(self):
         values=[di(30,10,adx=20,close=100),di(35,11,adx=21,close=101),di(27,15,adx=22,close=100)]
-        levels=dict(atr=1,resistance_zone_low=101,resistance_zone_high=101.2,
-            inst_resistance_zone_low=102,inst_resistance_zone_high=102.2,nearest_bear_fvg_low=103,nearest_bear_fvg_high=103.2,
-            support_zone_low=98.8,support_zone_high=99,inst_support_zone_low=97.8,inst_support_zone_high=98,
-            nearest_bull_fvg_low=96.8,nearest_bull_fvg_high=97)
+        levels=dict(atr=1,resistance_zone_low=106,resistance_zone_high=106.2,
+            inst_resistance_zone_low=109,inst_resistance_zone_high=109.2,nearest_bear_fvg_low=112,nearest_bear_fvg_high=112.2,
+            support_zone_low=93.8,support_zone_high=94,inst_support_zone_low=90.8,inst_support_zone_high=91,
+            nearest_bull_fvg_low=87.8,nearest_bull_fvg_high=88)
         self.seed([{**v,**levels} for v in values])
         processor.maintenance(['ETHUSDT'],['1m'],time_budget=2)
         with sqlite3.connect(adcn_store.DB_PATH) as conn:

@@ -39,7 +39,7 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
         if signal in ('BUY','SELL'):
             bar['opportunity']=with_costs(saved['opportunity'],fee_bps,slippage_bps) if saved else opportunity(client['close'],features,fee_bps=fee_bps,slippage_bps=slippage_bps,
                 zones=inventory.packet(bar.get('interval',''),client['close_time']+1),as_of_ms=client['close_time']+1,
-                timeframe=bar.get('interval',''),inventory_status=inventory.coverage)
+                timeframe=bar.get('interval',''),inventory_status=inventory.coverage,candle=client)
         if signal in ('BUY','SELL'):
             new=anchor(bar['opportunity'],side=signal,open_time=bar['open_time'],confidence=bar['confidence'],previous=prior)
             if new:
@@ -62,4 +62,4 @@ def evaluate_point(client,features,previous=None):
     """Independent point snapshot. A decision label is neither accepted nor read."""
     if not features or features.get('formula_version')!=3:return None
     return dict(confidence=confidence(client['close'],features,previous=previous,candle=client),
-                opportunity=opportunity(client['close'],features))
+                opportunity=opportunity(client['close'],features,candle=client))
