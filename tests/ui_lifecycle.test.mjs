@@ -108,16 +108,15 @@ test('prepend and gaps preserve the position of a shared candle',()=>{
     assert.equal(logicalShift(old,[50,60,80].map(time=>({time}))),-2);
 });
 
-test('markers update one wrapper in place over repeated redraws',async()=>{
-    let created=0,updates=0,detached=0;
-    globalThis.LightweightCharts={CandlestickSeries:{},createSeriesMarkers:()=>{
-        created++;return {setMarkers:()=>updates++,detach:()=>detached++};
-    }};
+test('signal flags reuse one primitive over repeated redraws',async()=>{
+    let attached=0,updates=0;
+    globalThis.LightweightCharts={CandlestickSeries:{}};
     const candles=await import('../Section_11_UI_UX/overlays/candles/index.js');
     const markers=await import('../Section_11_UI_UX/overlays/markers/index.js');
-    candles.mount({addSeries:()=>({attachPrimitive(){}})});
-    for(let i=0;i<100;i++) markers.update(null,{bars:[bar(60,{adcn:{signal_type:'BUY',final_score:70}})]});
-    assert.equal(created,1);assert.equal(updates,99);assert.equal(detached,0);
+    candles.mount({addSeries:()=>({attachPrimitive:primitive=>{attached++;primitive.requestUpdate=()=>updates++;}})});
+    attached=0;updates=0;markers.mount();
+    for(let i=0;i<100;i++)markers.update(null,{bars:[bar(60,{momentum:{signal_type:'BUY'}})]});
+    assert.equal(attached,1);assert.equal(updates,100);
 });
 
 test('stored polling is serial and uses only the cache local-store refresh',async()=>{

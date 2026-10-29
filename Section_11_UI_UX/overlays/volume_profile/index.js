@@ -52,7 +52,8 @@ export function update(chart,data){
     const latest=(data.bars||[]).findLast(b=>!b.provisional),candidate=data.volumeProfile;
     profile=enabled&&candidate?.status==='ready'&&candidate.as_of===latest?.open_time?candidate:null;
     status.hidden=!enabled;
-    status.textContent=profile?`Volume profile · ${profile.lookback} closed candles`:'Waiting for closed-candle volume profile';
+    status.title=profile?`Volume profile · ${profile.lookback} closed candles`:'Waiting for closed-candle volume profile';
+    status.textContent=profile?`VP · ${profile.lookback}`:'VP · —';
     primitive.requestUpdate?.();
 }
 export function updateLive(){/* Current profile changes on committed closed candles only. */}

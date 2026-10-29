@@ -78,7 +78,9 @@ export function normalizeStyles(value = {}) {
                 const oldColor=key.startsWith('opportunity_buy_')?'#26a69a':'#ef5350';
                 if(input.opacity===undefined&&input.color===oldColor)result[key].color=color;
                 result[key].labels=typeof input.labels==='boolean'?input.labels:true;
-                result[key].reference=typeof input.reference==='boolean'?input.reference:true;
+                result[key].compactVersion=1;
+                result[key].reference=input.compactVersion===1&&typeof input.reference==='boolean'?input.reference:false;
+                result[key].returns=typeof input.returns==='boolean'?input.returns:false;
                 result[key].feeBps=Number.isFinite(input.feeBps)?Math.max(0,Math.min(100,input.feeBps)):4;
                 result[key].slippageBps=Number.isFinite(input.slippageBps)?Math.max(0,Math.min(100,input.slippageBps)):2;
             }

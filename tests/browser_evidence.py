@@ -45,7 +45,7 @@ async def exercise(base,library):
         await page.wait_for_function('window.Composer?.mounted && !DataCache.loading && !DataCache._olderPromise')
         await page.wait_for_function("DataCache.bars.at(-1)?.confidence?.status==='ready'")
         points=await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")
-        assert 'scores, not probabilities' in await page.locator('.evidence-status').inner_text()
+        assert 'not win probabilities' in await page.locator('.evidence-status').get_attribute('title')
         await page.get_by_role('button',name='Open settings',exact=True).click()
         dialog=page.get_by_role('dialog',name='Settings',exact=True)
         await dialog.get_by_role('tab',name='Features',exact=True).click()
@@ -58,12 +58,25 @@ async def exercise(base,library):
         assert await dialog.get_by_text('Sources and area selection',exact=True).count()==1
         await dialog.get_by_role('button',name='Display',exact=True).click()
         await dialog.get_by_role('button',name='Select all',exact=True).click()
+        await dialog.get_by_role('button',name='Deselect all scores',exact=True).click()
         await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
+        assert await page.evaluate("Object.entries(Composer.config.featureStyles).filter(([k])=>k.startsWith('opportunity_')).every(([,v])=>v.scores===false)")
+        assert await page.evaluate("import('/overlays/opportunity/index.js').then(m=>{const row=m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles)[0];return m.targetLabel(row,Composer.config.featureStyles[row.key]);})")=='OZ1'
+        await page.get_by_role('button',name='Open settings',exact=True).click()
+        await dialog.get_by_role('button',name='Opportunity',exact=True).click()
+        await dialog.get_by_role('button',name='Display',exact=True).click()
+        await dialog.get_by_role('button',name='Select all scores',exact=True).click()
+        await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
+        assert await page.evaluate("import('/overlays/opportunity/index.js').then(m=>{const row=m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles)[0];return /F$/.test(m.targetLabel(row,Composer.config.featureStyles[row.key]));})")
+        assert await page.evaluate('Composer.config.featureStyles.opportunity_buy_1.reference') is False
         assert await page.evaluate("time=>DataCache.bars.find(b=>b.open_time===time).momentum.signal_type",pulse[-1][2])=='SELL'
         assert await page.evaluate('DataCache.bars.at(-1).signal_context.entry')==price-1
         assert await page.evaluate('DataCache.bars.at(-1).signal_context.storage.status')=='persisted'
         placement=await page.evaluate("time=>import('/overlays/markers/preferences.js').then(m=>m.signalPlacement(DataCache.bars.find(b=>b.open_time===time),'sell'))",pulse[-1][2])
-        assert placement=={'position':'atPriceTop','price':price-1}
+        assert placement=={'position':'aboveBar'}
+        label=await page.evaluate("time=>import('/overlays/markers/labels.js').then(m=>m.confidenceLabel(DataCache.bars.find(b=>b.open_time===time),'sell',Composer.config.featureStyles))",pulse[-1][2])
+        assert label.split('\n')[0]=='SELL' and label.split('\n')[1].endswith('%')
+        assert '@' not in label and 'reversal' not in label
         anchored=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
         assert len(anchored)==6
         upper=[row for row in anchored if row['role']=='resistance'];lower=[row for row in anchored if row['role']=='support']
@@ -90,7 +103,19 @@ async def exercise(base,library):
         assert await page.evaluate('DataCache.bars.at(-1).opportunity.entry')==price-1
         assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==points
         assert await page.evaluate('DataCache.bars.at(-1).signal_context.costs.round_trip_bps')==22
-        assert 'opportunity bands' in await page.locator('.evidence-status').inner_text()
+        assert 'OZ 6' in await page.locator('.evidence-status').inner_text()
+        # Zoom the fixture out explicitly; the product never distorts candle autoscale to fit OZs.
+        await page.evaluate("""price=>{
+            window.ozTexts=[];
+            const original=CanvasRenderingContext2D.prototype.fillText;
+            CanvasRenderingContext2D.prototype.fillText=function(text,...args){
+                if(/^OZ[123]/.test(text)){window.ozTexts.push(text);if(window.ozTexts.length>100)window.ozTexts.shift();}
+                return original.call(this,text,...args);
+            };
+            return import('/overlays/candles/index.js').then(m=>m.getSeries().applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:price-30,maxValue:price+30}})}));
+        }""",price)
+        await page.wait_for_function('window.ozTexts.some(text=>text.startsWith("OZ3"))')
+        assert await page.evaluate('window.ozTexts.every(text=>/^OZ[123] · [0-9]+F$/.test(text))')
         await page.screenshot(path='/tmp/tradingbot-evidence.png')
         await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
         assert await page.evaluate('Composer.config.featureStyles.opportunity_buy_1.feeBps')==8

@@ -46,10 +46,11 @@ async def exercise(base,library):
             await dialog.get_by_role('button',name='Apply',exact=True).click();await settle(page)
             await page.wait_for_function("DataCache.liquidity?.status==='live'")
             assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==candle_points
-            assert 'observed orders (USDT)' in await page.locator('.liquidity-status').inner_text()
-            assert 'spot candles' in await page.locator('.liquidity-status').inner_text()
-            assert '60s delta' in await page.locator('.liquidity-status').inner_text()
-            assert 'OI unavailable/stale' in await page.locator('.liquidity-status').inner_text()
+            assert 'LQ · PERP' in await page.locator('.liquidity-status').inner_text()
+            assert 'observed orders (USDT)' in await page.locator('.liquidity-status').get_attribute('title')
+            assert 'spot candles' in await page.locator('.liquidity-status').get_attribute('title')
+            assert '60s delta' in await page.locator('.liquidity-status').get_attribute('title')
+            assert 'OI unavailable/stale' in await page.locator('.liquidity-status').get_attribute('title')
             assert await page.evaluate('DataCache.liquidity.history.length')==30
             assert await page.locator('.liquidity-book').count()==0
             assert await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.profileRows(DataCache.liquidity.latest,Composer.config.featureStyles).some(r=>r.bid>0&&r.ask>0))")
@@ -68,7 +69,7 @@ async def exercise(base,library):
             await page.screenshot(path='/tmp/tradingbot-liquidity.png')
             with patch.object(liquidity,'snapshot',return_value=dict(status='stale',reason='sequence gap',latest=None,history=[packet])):
                 await page.evaluate('DataCache.refreshStored()');await settle(page)
-                assert 'stale' in await page.locator('.liquidity-status').inner_text()
+                assert 'STALE' in await page.locator('.liquidity-status').inner_text()
                 assert await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.fresh(m.getSnapshot()))") is None
             await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
             assert await page.evaluate('Composer.config.featureStyles.liquidity_bids.opacity')==45

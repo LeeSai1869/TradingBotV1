@@ -133,7 +133,7 @@ async def exercise(base,library):
         assert structure['low']==price-9 and structure['high']==price-8
         inst=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.identity==='inst_support_zones:is1'))")
         assert inst['score']==33.5
-        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.zoneScoreLabel({key:'inst_support_zones',score:33.5}))")=='S/R score: 33.50'
+        assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.zoneScoreLabel({key:'inst_support_zones',score:33.5}))")=='I-S/R 33.50'
         assert await page.evaluate('Composer.config.featureStyles.support_zones.scores') is False
         assert await page.evaluate('DataCache.srSnapshot.through')==rows[-1][2]//1000
         higher=await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().find(z=>z.key==='bull_fvg_4h_zones'))")

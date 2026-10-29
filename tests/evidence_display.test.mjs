@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {confidenceLabel,targetRows,targetLabel,layoutLabels} from '../Section_11_UI_UX/overlays/opportunity/index.js';
+import {confidenceLabel,targetRows,targetLabel,layoutLabels,bandSpan} from '../Section_11_UI_UX/overlays/opportunity/index.js';
 import {normalizeStyles} from '../Section_11_UI_UX/controls/settings/feature_styles.js';
 
 test('confidence is an optional evidence score beside its own signal',()=>{
     const config=normalizeStyles();
     const bar={confidence:{status:'ready',buy_score:71.2,sell_score:24.5}};
-    assert.equal(confidenceLabel(bar,'buy',config),'BUY · 71/100');
-    assert.equal(confidenceLabel(bar,'sell',config),'SELL · 25/100');
-    assert.equal(confidenceLabel({confidence:{status:'insufficient evidence',buy_score:65}},'buy',config),'BUY · confidence pending');
+    assert.equal(confidenceLabel(bar,'buy',config),'BUY\n71%');
+    assert.equal(confidenceLabel(bar,'sell',config),'SELL\n25%');
+    assert.equal(confidenceLabel({confidence:{status:'insufficient evidence',buy_score:65}},'buy',config),'BUY\n—');
     config.confidence_buy.visible=false;
     assert.equal(confidenceLabel(bar,'buy',config),'BUY');
 });
@@ -17,7 +17,8 @@ test('three independent band toggles retain full bounds on the reference plan',(
     const bar={signal_context:{side:'BUY',state:'active',open_time:1000,plan}};
     const config=normalizeStyles({opportunity_buy_1:{visible:true},opportunity_buy_2:{visible:false},opportunity_buy_3:{visible:true}});
     const rows=targetRows(bar,config);assert.equal(rows.length,1);assert.equal(rows[0].low,105);assert.equal(rows[0].high,107);
-    assert.match(targetLabel(rows[0]),/Sell \/ resistance 1.*105.*107.*4.80% to \+6.80%/);
+    assert.equal(targetLabel(rows[0]),'OZ1 · —F');
+    assert.equal(targetLabel({...rows[0],confluence_families:2},{returns:true}),'OZ1 · 2F · +4.80%…+6.80%');
     assert.deepEqual(targetRows({...bar,provisional:true},config),[]);
     assert.deepEqual(targetRows({opportunity:{status:'ready',buy:plan}},config),[]);
 });
@@ -38,10 +39,10 @@ test('anchored levels use the decision point rather than the latest close',()=>{
     assert.equal(targetRows({...row,signal_context:{...context,state:'invalidated'}},config).length,1);
     assert.deepEqual(targetRows({...row,signal_context:null},config),[]);
 });
-test('directional setup modes are displayed explicitly',()=>{
+test('chart flags show two compact lines while detailed modes stay in the packet',()=>{
     const config=normalizeStyles();
     const row={confidence:{status:'ready',sell_status:'ready',sell_mode:'reversal',sell_score:82}};
-    assert.equal(confidenceLabel(row,'sell',config),'SELL · reversal 82/100');
+    assert.equal(confidenceLabel(row,'sell',config),'SELL\n82%');
 });
 
 test('labels separate without changing the underlying band prices',()=>{
@@ -67,12 +68,42 @@ test('all six areas use the anchor with favorable and adverse roles on either de
     }
 });
 
-test('signal marker reference is the decision close, not a SELL wick high',async()=>{
+test('flag placement follows the candle while stored reference remains the decision close',async()=>{
     const {signalReference,signalPlacement}=await import('../Section_11_UI_UX/overlays/markers/preferences.js');
     const bar={client:{close:79936.43,high:80160,low:79910},momentum:{signal_type:'SELL',signal_price:79936.43}};
     assert.equal(signalReference(bar),79936.43);
-    assert.deepEqual(signalPlacement(bar,'sell'),{position:'atPriceTop',price:79936.43});
-    assert.deepEqual(signalPlacement({...bar,momentum:{signal_type:'BUY',signal_price:79936.43}},'buy'),{position:'atPriceBottom',price:79936.43});
+    assert.deepEqual(signalPlacement(bar,'sell'),{position:'aboveBar'});
+    assert.deepEqual(signalPlacement({...bar,momentum:{signal_type:'BUY',signal_price:79936.43}},'buy'),{position:'belowBar'});
     assert.equal(signalReference({client:bar.client}),79936.43);
     assert.equal(signalReference({}),null);
+});
+
+test('OZ confluence scores and returns can be hidden independently',()=>{
+    const area={layer:2,confluence_families:3,net_low:-1.25,net_high:-1};
+    assert.equal(targetLabel(area),'OZ2 · 3F');
+    assert.equal(targetLabel(area,{scores:false}),'OZ2');
+    assert.equal(targetLabel(area,{scores:false,returns:true}),'OZ2 · -1.25%…-1.00%');
+    const config=normalizeStyles({opportunity_buy_1:{scores:false,reference:true,returns:true}});
+    assert.equal(config.opportunity_buy_1.scores,false);assert.equal(config.opportunity_buy_1.returns,true);
+    assert.equal(config.opportunity_buy_1.reference,false); // one-time compact layout defaults
+    config.opportunity_buy_1.reference=true;
+    assert.equal(normalizeStyles(config).opportunity_buy_1.reference,true);
+});
+test('OZ time extent ends at the current candle, not the empty chart margin',()=>{
+    const scale={options:()=>({barSpacing:10}),timeToCoordinate:t=>({10:100,20:200}[t]??null)};
+    assert.deepEqual(bandSpan({open_time:10000},20,10,scale,500),{left:95,right:205});
+    assert.deepEqual(bandSpan({open_time:0},20,10,scale,500),{left:0,right:205});
+    assert.equal(bandSpan({open_time:30000},20,10,scale,500),null);
+    assert.equal(bandSpan({open_time:10000},30,10,scale,500),null);
+});
+
+test('signal flag renderer draws confidence on its own line without price strings',async()=>{
+    const {SignalFlags}=await import('../Section_11_UI_UX/overlays/markers/flags.js');
+    const flag=new SignalFlags(),text=[],prices=[];
+    const ctx={save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},roundRect(){},measureText:t=>({width:t.length*6}),fillText:(t,x,y)=>text.push({t,x,y})};
+    flag.attached({chart:{timeScale:()=>({timeToCoordinate:()=>100})},series:{priceToCoordinate:p=>{prices.push(p);return 100;}},requestUpdate(){}});
+    flag.signals=[{side:'buy',bar:{time:1,client:{low:90,high:110,close:100},confidence:{status:'ready',buy_score:88}}}];
+    flag.styles={confidence_buy:{visible:true},momentum_buy:{label:true}};
+    flag.draw({useMediaCoordinateSpace:draw=>draw({context:ctx,mediaSize:{width:300,height:300}})});
+    assert.deepEqual(text.map(x=>x.t),['BUY','88%']);assert.ok(text[1].y>text[0].y);assert.deepEqual(prices,[90]);
 });

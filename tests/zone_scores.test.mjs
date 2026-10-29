@@ -11,9 +11,9 @@ test('zone score toggles default on and preserve explicit off for ordinary and h
     assert.equal(styles.ema50.scores,undefined);
 });
 test('score labels identify the metric and never invent zero for missing scores',()=>{
-    assert.equal(zoneScoreLabel({key:'bull_fvg_zones',score:0}),'FVG reaction: 0.00');
-    assert.equal(zoneScoreLabel({key:'support_zones',score:12.345}),'S/R score: 12.35');
-    assert.equal(zoneScoreLabel({key:'support_zones'}),'S/R score: unavailable');
+    assert.equal(zoneScoreLabel({key:'bull_fvg_zones',score:0}),'FVG 0.00');
+    assert.equal(zoneScoreLabel({key:'support_zones',score:12.345}),'S/R 12.35');
+    assert.equal(zoneScoreLabel({key:'support_zones'}),'S/R —');
 });
 test('all active SR scores attach by stable identity without changing lifecycle geometry',()=>{
     const zone={side:'support',low:10,high:12,institutional:false};

@@ -866,3 +866,10 @@ Strategy baseline diagnostics: `test_strategy_evaluation.py` checks date-window
 gate warmup, directional gross/net returns, end-boundary exclusion, purged splits,
 short-side arithmetic, invalid costs/dates and compact output. See
 `STRATEGY_RESEARCH.md`. These fixtures validate calculations, not profitability.
+
+Compact chart UI: JS tests verify two-line flag rendering, one persistent flag
+primitive, OZ label/score/return toggles, preference migration, and decision-to-live
+candle time bounds (excluding future margin). Browser evidence covers score
+Select/Deselect All in Display, actual compact OZ canvas labels, stored anchors,
+cost changes and candle preservation. Zone/liquidity browser suites verify
+abbreviated annotations and retained liquidity health tooltips.

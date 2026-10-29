@@ -147,7 +147,10 @@ function statusText(){
     const current=fresh(snapshot),state=feedState(snapshot);
     const text=current?`Binance USDT perpetual · observed orders (USDT) · spot candles · spread ${current.metrics.spread_bps.toFixed(2)} bps${styles().liquidity_bids?.details===false?'':' · '+healthLabel(current)}${primitive.projectionHint||''}`:
         `Perpetual liquidity: ${state} · ${snapshot?.reason||(state==='stale'?'Waiting for a fresh synchronized update':'Start the liquidity recorder')}`;
-    if(status.textContent!==text)status.textContent=text;
+    status.title=text;
+    const coverage=current?.coverage||{},health=current?.health;
+    const compact=current?`LQ · PERP · ${current.metrics.spread_bps.toFixed(2)}bp${styles().liquidity_bids?.details===false?'':` · D${Math.floor(coverage.bid_bps||0)}/${Math.floor(coverage.ask_bps||0)}bp · OI${health?.open_interest_fresh?'✓':'—'} F${health?.mark_context_fresh?'✓':'—'}`}${primitive.projectionHint?' · ↕':''}`:`LQ · ${state.toUpperCase()}`;
+    if(status.textContent!==compact)status.textContent=compact;
 }
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);

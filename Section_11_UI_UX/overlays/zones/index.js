@@ -6,9 +6,9 @@ import {srSegments,institutionalProjection,srRole} from './sr.js';
 import {obSegments} from './ob.js';
 export const name='zones';
 export function zoneScoreLabel(item){
-    const name=item.key.includes('_ob_')||item.key.includes('_breaker_')?'OB formation strength (ATR)':item.key.includes('fvg')?'FVG reaction':'S/R score';
-    const details=item.key.includes('support')||item.key.includes('resistance')?`${item.source?' · '+item.source.toUpperCase():''}${item.role==='both'?' · S/R':''}${Number.isFinite(item.touches)?' · tests '+item.touches:''}${Number.isFinite(item.scoreTime)?' · as of '+new Date(item.scoreTime*1000).toISOString().slice(0,16).replace('T',' ')+' UTC':''}`:'';
-    return `${name}: ${Number.isFinite(item.score)?item.score.toFixed(2):'unavailable'}${details}`;
+    const name=item.key.includes('breaker')?'BRK':item.key.includes('_ob_')?'OB':item.key.includes('fvg')?'FVG':item.key.startsWith('inst_')?'I-S/R':'S/R';
+    const score=Number.isFinite(item.score)?item.score.toFixed(2):'—';
+    return `${name}${item.source?' '+item.source.toUpperCase():''} ${score}${['OB','BRK'].includes(name)?'A':''}${item.role==='both'?' ↔':''}`;
 }
 const definitions={
     support_zones:['support_zone_low','support_zone_high','nearest_support_zone_id'],

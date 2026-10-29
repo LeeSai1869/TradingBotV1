@@ -158,11 +158,37 @@ both evidence and scan records. Current cost settings may reprice the saved
 geometry in a read-only copy; they never rewrite the original snapshot or select
 new levels. Data identifies this cost preview separately.
 
-Previously the arrow used `aboveBar`/`belowBar`, placing SELL visually at the wick
-high while its map used the candle close. Markers now use an explicit price
-position and print that same close. Red areas must lie above the labelled signal
-reference, green below it, for either signal direction. Wick extrema are not
-represented as executable signal prices; the decision is known only at close.
+Compact arrow flags sit above/below the signal candle, showing BUY/SELL and
+confidence on two lines. The saved signal close remains the reference for all
+return calculations; flag position is presentation only. Zone clearance is
+measured from the full candle high/low, with red above and green below. Wick
+extrema are not represented as executable signal prices; the decision is known
+only at close.
 
 Install by restarting both the runner (for persistence/recovery) and UI backend.
 No candle download reset or feature replay is required.
+
+## Compact chart presentation
+
+OZ rectangles span the decision candle through the current candle only, including
+the forming candle when available. They do not extend across the empty future
+margin or attach to the price axis. Price bounds, the shared 2-ATR separation,
+anchors, scores and stored ADCN records are unchanged by this UI update.
+
+Labels use `OZ1`, `OZ2`, `OZ3`; red/green preserve resistance/support roles.
+The optional `2F` score is the existing number of distinct contributing feature
+families, not a calibrated percentage strength or win probability. Unknown scores
+show a dash. Select/Deselect All Scores and six per-area score switches are in
+Opportunity > Display. Return percentages have a separate switch and are hidden
+by default. Full geometry, outcomes, provenance and source audit remain in Data.
+
+A one-time compact-style preference upgrade hides the decision-price reference
+line. Display can re-enable it, now with a short `REF` label. Existing area
+visibility, bounds, costs, colors and explicit score preferences are retained.
+BUY/SELL flags use two lines (`BUY` / `88%`) and arrows, without mode, price or
+explanation strings; the percentage represents the stored evidence score /100.
+S/R, FVG, OB, liquidity and VP annotations also use abbreviations. Liquidity's full
+health explanation remains in the badge tooltip and its Data tab.
+
+Only restart the UI backend and hard-refresh. No runner restart, recalculation or
+memory migration is needed for these display changes.

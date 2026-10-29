@@ -117,5 +117,6 @@ failures are retried in bounded maintenance. Historical chart signals without an
 ADCN row are recovered in 64-candle pages without changing the live rule cursor.
 These are labelled historical reconstructions, not previously captured live data.
 Section 8 never imports confidence/opportunity calculation internals. Chart reads
-prefer persisted evidence and never write it. Marker placement uses the stored
-signal close rather than an offset above/below the wick.
+prefer persisted evidence and never write it. Stored reference prices remain signal closes. Compact arrow flags are drawn
+above/below the decision candle for readability; BUY/SELL and confidence occupy
+two lines. Visual flag placement never changes the recorded price or decision.

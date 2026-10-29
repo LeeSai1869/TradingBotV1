@@ -110,7 +110,7 @@ function renderFeature() {
                     const outcome=area.outcomes?.[anchor?.side];
                     const amount=Number.isFinite(outcome?.net_low)&&Number.isFinite(outcome?.net_high)?`${outcome.net_low.toFixed(2)}% to ${outcome.net_high.toFixed(2)}%`:'unavailable';
                     const progress=anchor?.area_progress?.[role]?.[index];
-                    el('td',`${area.low}–${area.high} · net from anchor ${amount} · ${progress?.crossed?'crossed':progress?.touched?'tested':'not yet tested'} · ${area.families.join(', ')}`,row);
+                    el('td',`${area.low}–${area.high} · net from anchor ${amount} · ${progress?.crossed?'crossed':progress?.touched?'tested':'not yet tested'} · ${area.families.join(', ')} · score ${area.confluence_families??area.families.length}F`,row);
                 }
             }
             if(packet.inputs){
@@ -200,7 +200,7 @@ function renderFeature() {
             check.disabled = !feature.connected;
             check.onchange = () => { draft.outputs[key].visible = check.checked; };
         }
-        if(['FVG','Support / Resistance','Order Blocks'].includes(item)){
+        if(['FVG','Support / Resistance','Order Blocks','Opportunity'].includes(item)){
             el('h4','Score labels',content);
             const selection=el('div','',content,'settings-selection');
             for(const [label,enabled] of [['Select all scores',true],['Deselect all scores',false]]){
@@ -215,11 +215,12 @@ function renderFeature() {
             }
         }
         if(item==='Opportunity'){
-            for(const [key,label] of [['labels','Show band labels'],['reference','Show anchored decision price']]){
+            for(const [key,label] of [['labels','Show OZ labels'],['returns','Show return percentages'],['reference','Show anchored decision price']]){
                 const row=el('label',label,content,'settings-row'),input=el('input','',row);input.type='checkbox';
                 input.checked=draft.outputs.opportunity_buy_1[key];
                 input.onchange=()=>{for(const [output] of feature.outputs)draft.outputs[output][key]=input.checked;};
             }
+            note('OZ score labels use the saved distinct-family confluence count: 2F means two feature families, not a win probability. Enable Show OZ labels to display them. Score toggles are independent of return percentages.');
             note('Both sides freeze at the decision candle: three red sell/resistance areas above and three green buy/support areas below, when available. After BUY, above is opportunity and below is adverse; after SELL, below is opportunity and above is adverse. A closed break beyond an area advances its next-area indicator; prices and geometry do not move.');
         }
         if(item==='Support / Resistance'){
