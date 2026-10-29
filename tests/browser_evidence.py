@@ -9,11 +9,11 @@ async def exercise(base,library):
     rows=db.read_last_klines('BTCUSDT','15m',100);price=rows[-1][6]
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
         atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=65,di_plus=30,di_minus=10,di_spread=20,adx=32,
-        current_structure='STRUCTURE_BULL',support_zone_low=price-8.5,support_zone_high=price-8,
-        resistance_zone_low=price+8,resistance_zone_high=price+8.5,nearest_swing_high=price+5,
-        protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+16,inst_resistance_zone_high=price+16.5,
-        nearest_bear_fvg_low=price+24,nearest_bear_fvg_high=price+24.5,inst_support_zone_low=price-16.5,inst_support_zone_high=price-16,
-        nearest_bull_fvg_low=price-24.5,nearest_bull_fvg_high=price-24) for r in rows])
+        current_structure='STRUCTURE_BULL',support_zone_low=price-11,support_zone_high=price-8,
+        resistance_zone_low=price+8,resistance_zone_high=price+11,nearest_swing_high=price+5,
+        protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+16,inst_resistance_zone_high=price+19,
+        nearest_bear_fvg_low=price+24,nearest_bear_fvg_high=price+27,inst_support_zone_low=price-19,inst_support_zone_high=price-16,
+        nearest_bull_fvg_low=price-27,nearest_bull_fvg_high=price-24) for r in rows])
     # Canonical three-candle SELL gate, with a rejection candle at the anchor.
     closes=[price-2,price,price-1];pulse=rows[-10:-7]
     for index,r in enumerate(pulse):
@@ -21,10 +21,10 @@ async def exercise(base,library):
         db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=r[2],formula_version=3,
             atr=2,ema50=price-2,ema200=price-5,vwap=price-1,rsi=88 if index==1 else 80,
             di_plus=[30,35,27][index],di_minus=[10,11,15][index],di_spread=[20,24,12][index],adx=20+index,
-            current_structure='STRUCTURE_BULL',support_zone_low=price-8.5,support_zone_high=price-8,
-            resistance_zone_low=price+8,resistance_zone_high=price+8.5,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+16,inst_resistance_zone_high=price+16.5,
-        nearest_bear_fvg_low=price+24,nearest_bear_fvg_high=price+24.5,inst_support_zone_low=price-16.5,inst_support_zone_high=price-16,
-        nearest_bull_fvg_low=price-24.5,nearest_bull_fvg_high=price-24)])
+            current_structure='STRUCTURE_BULL',support_zone_low=price-11,support_zone_high=price-8,
+            resistance_zone_low=price+8,resistance_zone_high=price+11,nearest_swing_high=price+5,protected_high=price+8,atr_ma_ratio=1,inst_resistance_zone_low=price+16,inst_resistance_zone_high=price+19,
+        nearest_bear_fvg_low=price+24,nearest_bear_fvg_high=price+27,inst_support_zone_low=price-19,inst_support_zone_high=price-16,
+        nearest_bull_fvg_low=price-27,nearest_bull_fvg_high=price-24)])
     conn=klines_store.open_db()
     with conn:
         for index,r in enumerate(pulse):
@@ -79,6 +79,9 @@ async def exercise(base,library):
         assert '@' not in label and 'reversal' not in label
         anchored=await page.evaluate("import('/overlays/opportunity/index.js').then(m=>m.targetRows(DataCache.bars.at(-1),Composer.config.featureStyles))")
         assert len(anchored)==6
+        assert all(abs(row['high']-row['low']-3)<1e-9 for row in anchored)
+        assert all(not row['modeled'] for row in anchored)
+        assert anchored[0]['geometry_source']['family']=='sr'
         upper=[row for row in anchored if row['role']=='resistance'];lower=[row for row in anchored if row['role']=='support']
         assert upper[0]['low']-(price+3)>=4
         assert (price-1.5)-lower[0]['high']>=4

@@ -1,4 +1,4 @@
-# Six anchored opportunity areas (v5)
+# Six anchored opportunity areas (v6)
 
 `engine.evaluate(close, features, fee_bps=4, slippage_bps=2, zones=(), as_of_ms=None, timeframe='', candle=None)` calculates a complete
 map from one price point. It does not take a BUY/SELL decision as a calculation
@@ -26,41 +26,49 @@ swings, session and individual references take their role relative to the anchor
 so previously broken levels may change role. These are potential barriers, not
 predictions that price must turn or executed orders/fills.
 
-## Geometry
+## Geometry: native-source hierarchy
 
-The old two-pass selection could merge unlimited actual overlaps, permit gap
-clusters up to 3 ATR, and discard nearby remaining levels with a 2-ATR spacing
-rule. Daily ATR made those effects particularly visible. V5 keeps gap merging removed and applies one explicit clearance rule. The
-minimum separation is 2 ATR from the decision candle high/low to the first band,
-and the same 2 ATR between the far edge of one band and the near edge of the next.
-ATR is frozen at the reference candle. A too-close candidate is audited with its
-measured and required clearance; it is not shifted, widened or merged to fit.
-The nearest candidate that passes becomes the next band. One pass attaches corroboration without expanding
-an authoritative source core. A contributor must overlap at least half the
-smaller band, and each family may contribute only once. Co-located same-family
-alternatives are audited, not counted as extra confluence or duplicate layers.
+Geometry follows the local priority S/R (including institutional), FVG, OB, then
+breaker. An existing higher-priority native zone keeps its **entire original
+bounds**; there is no 0.5-ATR/1%-of-price width cap. The narrowest source no longer
+wins just because it is thin. Priorities apply to the same overlapping region:
+a distant S/R does not displace an unrelated nearer FVG.
 
-Actionable cores have an explicit maximum width: min(0.5 reference ATR, 1% of the
-anchor). These are conservative display/model policy values, not empirically
-calibrated trading thresholds. A broad native zone can be legitimate; its
-original bounds are retained in `context_zones`, with `broad_context_only` in the
-selection audit. It is not cropped into a fabricated entry band. A source zone
-containing the entry is reported separately in `at_entry`, not silently lost or
-misrepresented as a forward target. Missing actionable layers remain absent.
+A point inside a native zone corroborates it. Another zone corroborates it if
+at least half the narrower zone overlaps. Adding evidence never expands, shrinks
+or unions native geometry, so overlap chains cannot create a giant envelope.
+All stored EMA periods, WMA50 and VWAP/band references participate as correlated
+trend evidence, counted as one family. Every attached source is retained in
+`evidence`/`sources`; `contributors` contains
+one representative per family and the family score counts distinct families once.
+`geometry_source` identifies which actual source supplies the boundaries. Another
+same-family source may add provenance, never a second independent family score.
 
-Isolated point references get modeled bands with half-width bounded by 0.05 ATR,
-0.05% of the anchor, one quarter of the distance to entry, 5% of the level price,
-and one quarter of the nearest other point distance. This protects against large
-daily ATR, near-zero levels and point-padding bridges. Modeled bands are labeled;
-OHLC-inferred liquidity levels are not observed resting orders. No order-book or
-future liquidation claim is made.
+Where no native core exists, fallback modeling requires **at least three distinct
+feature families** within a maximum 1-ATR source envelope. A cluster becomes a
+1-ATR-wide band centered on that envelope, retaining all member levels inside.
+No chain can exceed the confluence threshold; one EMA, one VP level, or three
+correlated trend lines cannot independently create an OZ. Modeled padding cannot
+overlap a native core and override its priority. Non-primary profile intervals
+that exceed the confluence width remain context, not fabricated point levels.
+These are modeled reaction regions, not observed resting orders or calibrated
+probabilities.
 
-`contributors` records original source geometry/timeframe, `families` counts
-independent families, and `audit` gives selection, duplication, broad-zone,
-at-entry and missing-availability reasons. Reports are bounded (256 audit records,
-64 broad context records), with truncation/count indicators. The pure result
-cache is bounded to 128 distinct inputs. Labels use separate layout with leaders;
-price geometry never moves to fit text.
+Both native and modeled zones obey the existing **2-ATR clearance** from the
+decision candle's full high/low to band 1, and the same edge-to-edge clearance
+between later bands. ATR is frozen at the decision candle. A native zone that
+fails clearance is reported with its full bounds and reason; a thin FVG inside
+it cannot bypass that check. The engine chooses the nearest three qualifying
+regions per side. It does not label every visible chart zone or invent six slots.
+
+`audit` records source/geometry priority, confluence, clearance and availability
+reasons, bounded to 256 records with count/truncation indicators; context records
+are bounded to 64. The input cache remains bounded to 128 snapshots. Data shows
+the source that supplies each area's geometry. Chart label layout does not move
+price boundaries. New v6 ADCN snapshots are isolated by the existing model-version
+key: old maps remain archived; only Opportunity evidence is rebuilt. Source
+feature formulas, decision rules and historical candle/feature memory are not
+recalculated or replaced.
 
 ## Reference inventory and timeframe
 

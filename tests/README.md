@@ -873,3 +873,10 @@ candle time bounds (excluding future margin). Browser evidence covers score
 Select/Deselect All in Display, actual compact OZ canvas labels, stored anchors,
 cost changes and candle preservation. Zone/liquidity browser suites verify
 abbreviated annotations and retained liquidity health tooltips.
+
+Opportunity v6 hierarchy: `HierarchicalGeometryTests` verifies wide S/R geometry
+and all contained evidence, S/R > FVG > OB precedence, local rather than global
+priority, one representative per family, three-family/one-ATR fallback clusters,
+no chaining, and native clearance that cannot be bypassed by an inner thin zone.
+The browser evidence fixture now uses 1.5-ATR native zones and checks their full
+bounds survive storage, polling and rendering. Source formulas are unchanged.

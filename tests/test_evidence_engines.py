@@ -45,8 +45,9 @@ class ConfidenceTests(unittest.TestCase):
 
 class OpportunityTests(unittest.TestCase):
     def test_three_ordered_targets_costs_and_structural_invalidation(self):
-        result=opportunity(100.,features());buy=result['buy'];sell=result['sell']
-        self.assertEqual([t['price'] for t in buy['targets']],[106.,115.95,124.95])
+        f=features();f.update(nearest_bear_fvg_low=116,nearest_bear_fvg_high=116.5,active_bear_ob_low=125,active_bear_ob_high=125.5)
+        result=opportunity(100.,f);buy=result['buy'];sell=result['sell']
+        self.assertEqual([t['price'] for t in buy['targets']],[106.,116.,125.])
         self.assertEqual(buy['invalidation'],95.8);self.assertEqual(buy['invalidation_source'],'support')
         self.assertGreater(buy['risk_pct'],4.2)
         for target in buy['targets']:
@@ -77,7 +78,7 @@ class OpportunityTests(unittest.TestCase):
         a=opportunity(100.,features(),fee_bps=0,slippage_bps=0)
         b=opportunity(100.,features(),fee_bps=10,slippage_bps=10)
         self.assertGreater(a['buy']['targets'][0]['net_reward_pct'],b['buy']['targets'][0]['net_reward_pct'])
-        f=features();f.update(atr=.001,ema50=100.01)
+        f=features();f.update(atr=.001,resistance_zone_low=100.01,resistance_zone_high=100.011,inst_resistance_zone_low=None,inst_resistance_zone_high=None)
         self.assertLess(opportunity(100.,f)['buy']['targets'][0]['net_reward_pct'],0)
         self.assertEqual(opportunity(100.,f)['buy']['status'],'limited reward/risk')
         for invalid in (-1,float('nan'),101):

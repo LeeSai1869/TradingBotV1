@@ -29,11 +29,11 @@ class StoredEvidenceTests(unittest.TestCase):
         self.patch=patch.object(adcn_store,'DB_PATH',self.path);self.patch.start();self.addCleanup(self.patch.stop)
         self.conn=adcn_store.open_db();self.addCleanup(self.conn.close)
 
-    def test_opportunity_version_isolates_new_spacing_without_overwriting_old_snapshots(self):
+    def test_opportunity_version_isolates_new_geometry_without_overwriting_old_snapshots(self):
         from Section_1_Global_Core.decision_evidence import epoch_key
         with patch('Section_1_Global_Core.decision_evidence.data_policy.read',return_value={'epochs':{}}),patch('Section_1_Global_Core.decision_evidence.features_store.decision_generation',return_value=0):
-            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v4'):old=epoch_key('X','1m')
-            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v5'):new=epoch_key('X','1m')
+            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v5'):old=epoch_key('X','1m')
+            with patch('Section_10_Opportunity_Engine.engine.VERSION','opportunity-v6'):new=epoch_key('X','1m')
         adcn_store.save_evidence(self.conn,'X','1m',old,packet(),recorded_ms=190000,provenance='old spacing')
         self.assertNotEqual(old,new)
         self.assertEqual(adcn_store.evidence_range(self.conn,'X','1m',0,200000,new),{})

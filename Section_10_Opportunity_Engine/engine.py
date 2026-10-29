@@ -6,8 +6,11 @@ No price level is invented to fill an absent opportunity layer.
 from functools import lru_cache
 from Section_1_Global_Core.analysis_packet import number,clean
 
-VERSION='opportunity-v5'
+VERSION='opportunity-v6'
 LAYER_SEPARATION_ATR=2.
+CONFLUENCE_ATR=1.
+FALLBACK_MIN_FAMILIES=3
+NATIVE_PRIORITY={'sr':0,'fvg':1,'ob':2,'breaker':3}
 ZONES={
  'sr':('support','resistance','inst_support','inst_resistance'),
  'fvg':('nearest_bull_fvg','nearest_bear_fvg'),
@@ -16,7 +19,7 @@ ZONES={
  'volume_profile':('vp_hvn','vp_lvn'),
 }
 POINTS={'structure':('protected_high','protected_low','nearest_swing_high','nearest_swing_low','structure_range_high','structure_range_low'),
-        'volume_profile':('vp_poc','vp_va_high','vp_va_low'),'trend':('ema50','ema200','vwap'),
+        'volume_profile':('vp_poc','vp_va_high','vp_va_low'),'trend':('ema7','ema25','ema50','ema100','ema200','ema300','wma50','vwap','vwap_upper1','vwap_upper2','vwap_lower1','vwap_lower2'),
         'session':('previous_day_high','previous_day_low','nearest_high_price_session','nearest_low_price_session'),
         'fibonacci':('nearest_fib_price',),
         'candle_liquidity':('external_high_liquidity','external_low_liquidity','internal_high_liquidity','internal_low_liquidity','nearest_buy_liquidity_price','nearest_sell_liquidity_price')}
@@ -42,7 +45,7 @@ def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe
         costs=dict(fee_bps_per_side=fee_bps,slippage_bps_per_side=slippage_bps,round_trip_bps=2*(fee_bps+slippage_bps)),
         interpretation='conditional price scenarios; not expected earnings; excludes funding and taxes',
         inputs=dict(timeframe=timeframe,as_of_ms=as_of_ms,inventory_status=inventory_status,scope='same-timeframe zones at the reference candle; no current HTF or live perpetual book'),
-        audit=[],context_zones=[],at_entry=[],geometry_policy=dict(max_entry_band_atr=.5,max_entry_band_pct=1.,point_half_width_atr=.05,point_half_width_pct=.05,minimum_layer_spacing_atr=LAYER_SEPARATION_ATR,minimum_candle_clearance_atr=LAYER_SEPARATION_ATR,decision_high=candle_high,decision_low=candle_low))
+        audit=[],context_zones=[],at_entry=[],geometry_policy=dict(native_priority=['sr','fvg','ob','breaker'],native_width='original bounds; no model width cap',fallback_width_atr=1.,fallback_confluence_atr=CONFLUENCE_ATR,fallback_min_families=FALLBACK_MIN_FAMILIES,minimum_layer_spacing_atr=LAYER_SEPARATION_ATR,minimum_candle_clearance_atr=LAYER_SEPARATION_ATR,decision_high=candle_high,decision_low=candle_low))
     if not number(close) or close<=0 or not number(atr) or atr<=0 or not number(LAYER_SEPARATION_ATR*atr) or not number(candle_high) or not number(candle_low) or not 0<candle_low<=close<=candle_high:return result
     candidates=[]
     for identity,family,name,role,low,high,frame,available in extra:
@@ -123,66 +126,85 @@ def _evaluate(close,values,fee_bps,slippage_bps,extra=(),as_of_ms=None,timeframe
 
 
 def build_bands(candidates,entry,atr,direction,*,audit=None,context_zones=None,boundary=None):
-    """Non-expanding groups followed by shared candle/layer clearance checks.
+    """Keep hierarchical native geometry; model only multi-family fallback clusters.
 
-    Native geometry is authoritative. Broad sources are context-only, not cropped
-    into invented entry zones. One representative per family may corroborate a
-    core. Points are padded conservatively and cannot bridge neighboring points.
+    S/R > FVG > OB > breaker governs a local overlapping region, not the ordering
+    of unrelated price levels. Native bounds never shrink, expand or chain-merge.
+    All known evidence is retained; family counts use one representative each.
     """
     audit=[] if audit is None else audit;context_zones=[] if context_zones is None else context_zones
-    cap=min(.5*atr,.01*entry);bands=[];seen=set()
-    point_values=sorted({c['low'] for c in candidates if c['low']==c['high']})
-    def note(c,reason,**details):
-        audit.append(dict(source=c['name'],id=c.get('id',c['name']),family=c['family'],
-            low=c['low'],high=c['high'],timeframe=c.get('timeframe',''),reason=reason,**details))
+    seen=set();native=[];references=[]
+    def record(c):
+        return dict(id=c.get('id',c['name']),source=c['name'],family=c['family'],low=c['low'],high=c['high'],timeframe=c.get('timeframe',''))
+    def note(c,reason,**details):audit.append(dict(record(c),reason=reason,**details))
+    def new_core(c,low,high,modeled=False):
+        item=record(c)
+        return dict(low=low,high=high,sources=[c['name']],families={c['family']},modeled=modeled,
+                    geometry_source=item if not modeled else dict(family='line_cluster',source='multi-family cluster'),
+                    contributors=[item],evidence=[dict(item,relation='geometry' if not modeled else 'cluster')])
+    def attach(core,c,relation):
+        item=record(c);core['sources'].append(c['name']);core['evidence'].append(dict(item,relation=relation))
+        if c['family'] not in core['families']:
+            core['contributors'].append(item);core['families'].add(c['family'])
+        note(c,'corroborates_native' if not core['modeled'] else 'cluster_member',
+             core_source=core['geometry_source']['source'],core_low=core['low'],core_high=core['high'],relation=relation)
+    def overlaps(core,c):
+        if c['low']==c['high']:return core['low']<=c['low']<=core['high']
+        overlap=min(core['high'],c['high'])-max(core['low'],c['low'])
+        return overlap>0 and overlap>=.5*min(core['high']-core['low'],c['high']-c['low'])
     for c in candidates:
-        low,high=c['low'],c['high'];modeled=low==high
+        low,high=c['low'],c['high']
+        if not number(low) or not number(high) or not 0<low<=high:note(c,'invalid_source_geometry');continue
         identity=(c['family'],low,high)
         if identity in seen:note(c,'duplicate_family_geometry');continue
         seen.add(identity)
-        if modeled:
-            neighbors=[abs(low-p) for p in point_values if p!=low]
-            half=min(.05*atr,.0005*entry,.25*abs(low-entry),.05*low)
-            if neighbors:half=min(half,.25*min(neighbors))
-            low,high=low-half,high+half
-        if not number(low) or not number(high) or not 0<low<high:note(c,'invalid_modeled_geometry');continue
-        if high-low>cap:
-            context_zones.append(dict(c,width=high-low,width_pct=clean((high-low)/entry*100)))
-            note(c,'broad_context_only',width=high-low,max_action_width=cap);continue
-        bands.append(dict(low=low,high=high,sources=[c['name']],families={c['family']},modeled=modeled,
-            contributors=[dict(id=c.get('id',c['name']),source=c['name'],family=c['family'],low=c['low'],high=c['high'],timeframe=c.get('timeframe',''))]))
-    # Native narrow cores first. Attaching corroboration never changes a core's bounds.
-    bands.sort(key=lambda b:(b['modeled'],b['high']-b['low'],abs((b['low']+b['high'])/2-entry),b['sources'][0]))
+        (native if low<high and c['family'] in NATIVE_PRIORITY else references).append(c)
+    native.sort(key=lambda c:(NATIVE_PRIORITY[c['family']],direction*(c['low'] if direction==1 else c['high']),-(c['high']-c['low']),c['name']))
     cores=[]
-    for band in bands:
-        matched=None;duplicate=None
-        for core in cores:
-            overlap=min(core['high'],band['high'])-max(core['low'],band['low'])
-            small=min(core['high']-core['low'],band['high']-band['low'])
-            if overlap>=.5*small:
-                if core['families']&band['families']:duplicate=core
-                else:matched=core
-                break
-        if duplicate is not None:
-            for c in band['contributors']:audit.append(dict(c,reason='same_family_alternative',core_low=duplicate['low'],core_high=duplicate['high']))
-            continue
-        if matched is not None:
-            matched['sources']+=band['sources'];matched['families']|=band['families'];matched['contributors']+=band['contributors']
-            for c in band['contributors']:audit.append(dict(c,reason='corroborates_core',core_low=matched['low'],core_high=matched['high']))
-        else:cores.append(band)
-    cores.sort(key=lambda b:direction*(b['low'] if direction==1 else b['high']))
+    for c in native:
+        core=next((core for core in cores if overlaps(core,c)),None)
+        if core is not None:attach(core,c,'contained' if core['low']<=c['low']<=c['high']<=core['high'] else 'overlap')
+        else:cores.append(new_core(c,c['low'],c['high']))
+    free=[]
+    for c in references:
+        core=next((core for core in cores if overlaps(core,c)),None)
+        if core is not None:attach(core,c,'contained' if core['low']<=c['low']<=c['high']<=core['high'] else 'overlap')
+        elif c['high']-c['low']>CONFLUENCE_ATR*atr:
+            context_zones.append(dict(c));note(c,'fallback_source_exceeds_cluster_width')
+        else:free.append(c)
+    free.sort(key=lambda c:direction*(c['low'] if direction==1 else c['high']))
+    while free:
+        cluster=[];low=free[0]['low'];high=free[0]['high']
+        for c in free:
+            new_low=min(low,c['low']);new_high=max(high,c['high'])
+            if new_high-new_low>CONFLUENCE_ATR*atr:break
+            cluster.append(c);low,high=new_low,new_high
+        families={c['family'] for c in cluster}
+        if len(families)<FALLBACK_MIN_FAMILIES:
+            note(free.pop(0),'insufficient_fallback_confluence',families=len(families),required_families=FALLBACK_MIN_FAMILIES);continue
+        center=low+(high-low)/2;bottom=center-.5*atr;top=center+.5*atr
+        if not number(bottom) or not number(top) or not 0<bottom<top:
+            for c in cluster:note(c,'invalid_modeled_geometry')
+        elif any(min(top,c['high'])>max(bottom,c['low']) for c in cores if not c['modeled']):
+            for c in cluster:note(c,'modeled_cluster_overlaps_native')
+        else:
+            core=new_core(cluster[0],bottom,top,True)
+            for c in cluster[1:]:attach(core,c,'cluster')
+            cores.append(core)
+        free=free[len(cluster):]
+    cores.sort(key=lambda c:direction*(c['low'] if direction==1 else c['high']))
     selected=[];edge=entry if boundary is None else boundary;gap=LAYER_SEPARATION_ATR*atr
     for core in cores:
         if len(selected)>=3:
-            for c in core['contributors']:audit.append(dict(c,reason='beyond_nearest_three'))
+            for c in core['evidence']:audit.append(dict(c,reason='beyond_nearest_three'))
             continue
         clearance=core['low']-edge if direction==1 else edge-core['high']
         if clearance<gap:
             reason='inside_layer_clearance' if selected else 'inside_decision_candle_clearance'
-            for c in core['contributors']:audit.append(dict(c,reason=reason,clearance=clearance,required_gap=gap))
+            for c in core['evidence']:audit.append(dict(c,reason=reason,clearance=clearance,required_gap=gap,core_low=core['low'],core_high=core['high'],core_source=core['geometry_source']['source']))
             continue
         selected.append(core);edge=core['high'] if direction==1 else core['low']
-        for c in core['contributors']:audit.append(dict(c,reason='selected',layer=len(selected)))
+        for c in core['evidence']:audit.append(dict(c,reason='selected',layer=len(selected),core_low=core['low'],core_high=core['high'],core_source=core['geometry_source']['source']))
     return selected
 
 

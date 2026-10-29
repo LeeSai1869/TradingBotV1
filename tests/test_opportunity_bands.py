@@ -16,7 +16,7 @@ class BandTests(unittest.TestCase):
         f=dict(atr=.0074,nearest_fib_price=.2364948,vwap=.23189008,ema50=.22851471)
         result=evaluate(.2375,f)
         self.assertEqual(result['sell']['targets'],[])
-        self.assertTrue(any(a['reason']=='inside_decision_candle_clearance' for a in result['audit']))
+        self.assertTrue(any(a['reason']=='insufficient_fallback_confluence' for a in result['audit']))
 
     def test_opposing_area_is_distinct_from_the_invalidation_rule(self):
         result=evaluate(100,dict(atr=1,support_zone_low=95,support_zone_high=95.4,resistance_zone_low=104,resistance_zone_high=104.4))
@@ -26,8 +26,7 @@ class BandTests(unittest.TestCase):
 
     def test_missing_known_levels_are_not_filled_to_force_three_areas(self):
         result=evaluate(100,dict(atr=1,protected_high=110))
-        self.assertEqual(len(result['buy']['targets']),1)
-        self.assertTrue(result['buy']['targets'][0]['modeled'])
+        self.assertEqual(result['buy']['targets'],[])
         self.assertEqual(result['sell']['targets'],[])
 
 class SixAreaTests(unittest.TestCase):
@@ -56,7 +55,7 @@ class SixAreaTests(unittest.TestCase):
         self.assertEqual(result['areas'],{'support':[],'resistance':[]})
 
     def test_a_missing_risk_model_does_not_erase_known_areas(self):
-        result=evaluate(1,dict(atr=10,protected_high=30))
+        result=evaluate(1,dict(atr=10,resistance_zone_low=30,resistance_zone_high=31))
         self.assertEqual(len(result['areas']['resistance']),1)
         self.assertIsNone(result['buy']['invalidation'])
 
@@ -72,20 +71,17 @@ class GeometryAuditTests(unittest.TestCase):
         json.dumps(result,allow_nan=False)
 
 
-    def test_unbounded_overlap_chain_is_context_not_an_enlarged_entry(self):
+    def test_wide_native_geometry_is_preserved_without_overlap_chain_growth(self):
         result=evaluate(100,dict(atr=1,resistance_zone_low=105,resistance_zone_high=108,
             nearest_bear_fvg_low=107,nearest_bear_fvg_high=110))
-        self.assertEqual(result['areas']['resistance'],[])
-        self.assertEqual([(z['low'],z['high']) for z in result['context_zones']],[(105,108),(107,110)])
-        self.assertTrue(all(a['reason']=='broad_context_only' for a in result['audit']))
+        self.assertEqual([(a['low'],a['high']) for a in result['areas']['resistance']],[(105,108)])
+        self.assertFalse(result['areas']['resistance'][0]['modeled'])
+        self.assertTrue(any(a['reason']=='inside_layer_clearance' for a in result['audit']))
 
-    def test_daily_point_padding_is_capped_and_clearance_is_explicit(self):
+    def test_isolated_daily_point_does_not_create_a_thin_opportunity(self):
         result=evaluate(.18,dict(atr=.04,protected_low=.1748,nearest_swing_low=.173,vwap=.09))
-        areas=result['areas']['support']
-        self.assertEqual(len(areas),1)
-        self.assertLess(areas[0]['low'],.09);self.assertGreater(areas[0]['high'],.09)
-        self.assertLessEqual(areas[0]['high']-areas[0]['low'],.001*.18+1e-12)
-        self.assertTrue(any(a['source']=='protected_low' and a['reason']=='inside_decision_candle_clearance' for a in result['audit']))
+        self.assertEqual(result['areas']['support'],[])
+        self.assertTrue(any(a['source']=='vwap' and a['reason']=='insufficient_fallback_confluence' for a in result['audit']))
 
     def test_same_family_is_never_counted_twice_in_a_core(self):
         areas=evaluate(100,dict(atr=1,active_bear_ob_low=105,active_bear_ob_high=105.2,
@@ -106,8 +102,8 @@ class GeometryAuditTests(unittest.TestCase):
         self.assertTrue(any(a['reason']=='not_available_at_reference' for a in result['audit']))
 
     def test_mirrored_geometry_is_symmetric(self):
-        upper=evaluate(100,dict(atr=2,protected_high=102,ema50=103))['areas']['resistance']
-        lower=evaluate(100,dict(atr=2,protected_low=98,ema50=97))['areas']['support']
+        upper=evaluate(100,dict(atr=2,resistance_zone_low=106,resistance_zone_high=110,ema50=108))['areas']['resistance']
+        lower=evaluate(100,dict(atr=2,support_zone_low=90,support_zone_high=94,ema50=92))['areas']['support']
         self.assertEqual([(a['low'],a['high']) for a in upper],[(200-a['high'],200-a['low']) for a in lower])
 
 class SharedClearanceTests(unittest.TestCase):
@@ -124,9 +120,54 @@ class SharedClearanceTests(unittest.TestCase):
         self.assertEqual(result['geometry_policy']['minimum_candle_clearance_atr'],result['geometry_policy']['minimum_layer_spacing_atr'])
 
     def test_changing_decision_wick_changes_clearance_without_changing_signal_price(self):
-        f=dict(atr=1,protected_high=105,protected_low=95)
+        f=dict(atr=1,resistance_zone_low=105,resistance_zone_high=105.5,support_zone_low=94.5,support_zone_high=95)
         a=evaluate(100,f,candle=dict(high=101,low=99))
         b=evaluate(100,f,candle=dict(high=104,low=96))
         self.assertTrue(a['areas']['resistance']);self.assertTrue(a['areas']['support'])
         self.assertEqual(b['areas'],dict(resistance=[],support=[]))
         self.assertEqual(a['entry'],b['entry'])
+
+class HierarchicalGeometryTests(unittest.TestCase):
+    def test_sr_keeps_full_width_and_collects_contained_evidence(self):
+        result=evaluate(100,dict(atr=1,resistance_zone_low=105,resistance_zone_high=111,
+            nearest_bear_fvg_low=106,nearest_bear_fvg_high=106.2,active_bear_ob_low=108,active_bear_ob_high=108.1,
+            ema7=106.5,ema50=107,wma50=108.5,vwap=109,vp_poc=110))
+        area=result['areas']['resistance'][0]
+        self.assertEqual((area['low'],area['high']),(105,111))
+        self.assertEqual(area['geometry_source']['family'],'sr')
+        self.assertEqual(area['confluence_families'],5)
+        self.assertIn('vwap',area['sources']);self.assertIn('ema50',area['sources']);self.assertIn('wma50',area['sources']);self.assertIn('ema7',area['sources'])
+        self.assertEqual(len(area['contributors']),len(area['families']))
+        self.assertGreater(len(area['evidence']),len(area['contributors']))
+
+    def test_fvg_then_ob_supply_their_own_geometry_when_higher_priority_absent(self):
+        common=dict(atr=1,active_bear_ob_low=106,active_bear_ob_high=106.3,ema50=106.1)
+        area=evaluate(100,{**common,'nearest_bear_fvg_low':105,'nearest_bear_fvg_high':109})['areas']['resistance'][0]
+        self.assertEqual((area['low'],area['high'],area['geometry_source']['family']),(105,109,'fvg'))
+        area=evaluate(100,common)['areas']['resistance'][0]
+        self.assertEqual((area['low'],area['high'],area['geometry_source']['family']),(106,106.3,'ob'))
+
+    def test_priority_is_local_not_global_preference_for_distant_sr(self):
+        result=evaluate(100,dict(atr=1,resistance_zone_low=120,resistance_zone_high=124,
+            nearest_bear_fvg_low=105,nearest_bear_fvg_high=108))
+        self.assertEqual([a['geometry_source']['family'] for a in result['areas']['resistance']],['fvg','sr'])
+
+    def test_fallback_needs_three_distinct_families_and_is_one_atr_wide(self):
+        f=dict(atr=2,ema50=110,vwap=110.1,protected_high=110.3,previous_day_high=110.5)
+        result=evaluate(100,f)['areas']['resistance']
+        self.assertEqual(len(result),1);area=result[0]
+        self.assertTrue(area['modeled']);self.assertEqual(area['geometry_source']['family'],'line_cluster')
+        self.assertEqual(area['high']-area['low'],2)
+        self.assertEqual(area['confluence_families'],3)
+        for source in area['evidence']:self.assertLessEqual(area['low'],source['low']);self.assertGreaterEqual(area['high'],source['high'])
+        self.assertEqual(evaluate(100,dict(atr=2,ema50=110,vwap=110.1,ema200=110.3))['areas']['resistance'],[])
+
+    def test_cluster_does_not_chain_across_the_confluence_threshold(self):
+        result=evaluate(100,dict(atr=1,ema50=110,protected_high=110.8,previous_day_high=111.6))
+        self.assertEqual(result['areas']['resistance'],[])
+
+    def test_wide_primary_zone_failing_clearance_is_not_replaced_by_a_thin_inner_source(self):
+        result=evaluate(100,dict(atr=1,resistance_zone_low=101,resistance_zone_high=108,
+            nearest_bear_fvg_low=105,nearest_bear_fvg_high=106))
+        self.assertEqual(result['areas']['resistance'],[])
+        self.assertTrue(any(a['reason']=='inside_decision_candle_clearance' and a['core_low']==101 and a['core_high']==108 for a in result['audit']))
