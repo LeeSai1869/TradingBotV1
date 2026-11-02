@@ -895,7 +895,7 @@ pause/re-arm without history replay, account isolation and API origin checks.
 BUY on an unviewed symbol, plus searchable fields and the simple SELL preset.
 Run with `PYTHONPATH=. python3 tests/browser_signal_alerts.py /path/to/lightweight-charts.js`.
 
-Notifications now opens Features / Notifications; Features / Sounds owns tones,
+Notifications and Sounds are top-level Settings tabs; Sounds owns tones,
 volume and audio permission. `browser_signal_alerts.py` covers navigation,
 notification permission, unviewed delivery, HUD search/current confidence rows,
 and administrator ADCN previews/protection/confirmation. `test_adcn_maintenance.py`
@@ -904,3 +904,11 @@ preserving current signals/checkpoints/evidence and permanent features.
 `test_server_service_config.py` checks normal-user non-GUI service configurations.
 `current_hud.test.mjs` covers legacy selection migration and closed anchored
 evidence alongside live price.
+
+
+`test_custom_sounds.py` covers private audio upload/assignment/deletion, quotas,
+invalid inputs, origin/auth checks, and independent coin/timeframe desktop filters.
+`browser_custom_sounds.py` tests real WAV decoding/playback, upload persistence,
+assignment and deletion, top-level menus, the toolbar toggle, Desktop scope
+switches and disabled/deferred Mobile controls. Sound assignments and calculation
+status stay unchanged when notification scopes are muted.

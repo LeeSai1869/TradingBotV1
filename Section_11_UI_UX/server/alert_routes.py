@@ -6,9 +6,12 @@ from Section_1_Global_Core import data_admin, data_policy
 
 
 def handle_get(path,query,server):
-    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events','/api/alerts/signals'}: return None,None
+    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events','/api/alerts/signals','/api/alerts/sounds'}: return None,None
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
+    if path=='/api/alerts/sounds':
+        try:return 200,alerts.sounds(identity['username'],parse_qs(query).get('id',[None])[0])
+        except ValueError as error:return 404,{'error':str(error)}
     if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'])
     if path=='/api/alerts/catalog':
         registry=data_admin.catalog()
@@ -24,7 +27,7 @@ def handle_get(path,query,server):
 
 
 def handle_post(path,body,server):
-    if path not in {'/api/alerts','/api/alerts/delete','/api/alerts/signals'}: return None,None
+    if path not in {'/api/alerts','/api/alerts/delete','/api/alerts/signals','/api/alerts/sounds','/api/alerts/sounds/delete'}: return None,None
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
     origin=server.headers.get('Origin')
@@ -32,6 +35,8 @@ def handle_post(path,body,server):
     try:
         data=json.loads(body)
         if not isinstance(data,dict): raise ValueError('JSON object required')
+        if path=='/api/alerts/sounds':return 200,alerts.upload_sound(identity['username'],data)
+        if path=='/api/alerts/sounds/delete':return 200,alerts.delete_sound(identity['username'],data.get('id'))
         if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'],data)
         if path=='/api/alerts/delete': alerts.delete(identity['username'],data.get('id'));return 200,{'ok':True}
         return 200,{'ok':True,'id':alerts.save(identity['username'],data)}

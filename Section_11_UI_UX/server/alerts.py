@@ -1,4 +1,6 @@
 """Per-account stored-candle alerts. No exchange requests and no chart dependency."""
+import base64
+import binascii
 import json
 import math
 import os
@@ -42,6 +44,8 @@ def open_db():
         CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,owner TEXT NOT NULL,rule_id TEXT NOT NULL,
             epoch TEXT NOT NULL,bar_time INTEGER NOT NULL,created INTEGER NOT NULL,packet TEXT NOT NULL,
             UNIQUE(rule_id,epoch,bar_time));
+        CREATE TABLE IF NOT EXISTS custom_sounds(id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL);
+        CREATE INDEX IF NOT EXISTS custom_sounds_owner ON custom_sounds(owner);
         CREATE TABLE IF NOT EXISTS signal_preferences(owner TEXT PRIMARY KEY,spec TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS live_state(rule_id TEXT PRIMARY KEY,value REAL,target REAL,revision TEXT);
         CREATE INDEX IF NOT EXISTS events_owner ON events(owner,seq);
@@ -54,7 +58,7 @@ def epoch(symbol, interval):
     return f"{state.get(f'symbol:{symbol}',0)}:{state.get(f'interval:{interval}',0)}"
 
 
-def validate(data):
+def validate(data,owner=None):
     known={r['symbol'] for key in ('approved','disapproved','staged','pending','top50') for r in data_admin.catalog().get(key,[])}
     if data.get('symbol') not in known or data.get('interval') not in data_policy.INTERVALS:
         raise ValueError('Choose a registered coin and supported timeframe')
@@ -70,7 +74,7 @@ def validate(data):
     value=data.get('value',0)
     if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):
         raise ValueError('Threshold must be a finite number')
-    if data.get('sound') not in SOUNDS or data.get('repeat') not in {'once','per_bar'}:
+    if not valid_sound(owner,data.get('sound')) or data.get('repeat') not in {'once','per_bar'}:
         raise ValueError('Unsupported sound or repeat mode')
     name=data.get('name','')
     if not isinstance(name,str) or not 1 <= len(name.strip()) <= 120:
@@ -88,7 +92,7 @@ def list_rules(owner):
 
 
 def save(owner,data):
-    spec=validate(data); key=data.get('id') or uuid.uuid4().hex
+    spec=validate(data,owner); key=data.get('id') or uuid.uuid4().hex
     if not isinstance(key,str) or key.startswith('auto:'): raise ValueError('Invalid rule ID')
     with data_policy.snapshot_guard():
         last=db.last_kline_time(spec['symbol'],spec['interval']) or 0
@@ -122,12 +126,24 @@ def delete(owner,key):
 def events(owner,after):
     conn=open_db()
     try:
+        row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
+        prefs=dict(SIGNAL_DEFAULTS)|(json.loads(row[0]) if row else {})
+        def packet(row):
+            event=json.loads(row['packet'])|{'seq':row['seq']}
+            timeframe=prefs.get('timeframes',{}).get(event['interval'],{})
+            coin=prefs.get('coins',{}).get(event['symbol'],{})
+            desktop=prefs['notify'] and timeframe.get('desktop',True) and coin.get('desktop',True)
+            side=event.get('field','').removeprefix('decision.')
+            if side in ('buy','sell'):desktop=desktop and prefs[side+'_notify']
+            event['app']=prefs['app'] and desktop
+            event['notify']=event.get('notify',False) and desktop
+            return event
         latest=conn.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE owner=?',(owner,)).fetchone()[0]
         if after is None:
             history=conn.execute('SELECT seq,packet FROM events WHERE owner=? ORDER BY seq DESC LIMIT 20',(owner,)).fetchall()
-            return {'events':[],'cursor':latest,'history':[json.loads(r['packet']) | {'seq':r['seq']} for r in reversed(history)]}
+            return {'events':[],'cursor':latest,'history':[packet(r) for r in reversed(history)]}
         rows=conn.execute('SELECT seq,packet FROM events WHERE owner=? AND seq>? ORDER BY seq LIMIT 100',(owner,after)).fetchall()
-        return {'events':[json.loads(r['packet']) | {'seq':r['seq']} for r in rows],'cursor':rows[-1]['seq'] if rows else max(after,latest)}
+        return {'events':[packet(r) for r in rows],'cursor':rows[-1]['seq'] if rows else max(after,latest)}
     finally: conn.close()
 
 
@@ -280,7 +296,7 @@ def start():
     return stop
 
 
-SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'buy_notify':True,'sell_notify':True}
+SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'app':True,'buy_notify':True,'sell_notify':True,'timeframes':{},'coins':{}}
 
 
 def signal_preferences(owner, changes=None):
@@ -292,8 +308,21 @@ def signal_preferences(owner, changes=None):
             spec=dict(SIGNAL_DEFAULTS) | (json.loads(row[0]) if row else {})
             if changes is not None:
                 if any(key not in SIGNAL_DEFAULTS for key in changes):raise ValueError('Unknown signal preference')
-                spec.update(changes)
-                if any(type(spec[k]) is not bool for k in ('enabled','notify','buy_notify','sell_notify')) or any(spec[k] not in SOUNDS for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
+                updates=dict(changes)
+                for scope in ('timeframes','coins'):
+                    if scope not in updates:continue
+                    patch=updates[scope]
+                    if not isinstance(patch,dict):raise ValueError('Invalid notification scope')
+                    known=set(data_policy.INTERVALS) if scope=='timeframes' else {r['symbol'] for group in ('approved','disapproved','staged','pending','top50') for r in data_admin.catalog().get(group,[])}
+                    if set(patch)-known:raise ValueError('Choose a registered coin or supported timeframe')
+                    merged=dict(spec.get(scope,{}))
+                    for key,flags in patch.items():
+                        if not isinstance(flags,dict) or set(flags)-{'desktop','mobile'} or any(type(value) is not bool for value in flags.values()):raise ValueError('Invalid notification delivery switch')
+                        if flags.get('mobile'):raise ValueError('Mobile notifications are not available yet')
+                        merged[key]={**merged.get(key,{}),**flags}
+                    updates[scope]=merged
+                spec.update(updates)
+                if any(type(spec[k]) is not bool for k in ('enabled','notify','app','buy_notify','sell_notify')) or any(not valid_sound(owner,spec[k],conn) for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
             conn.execute('INSERT OR REPLACE INTO signal_preferences VALUES (?,?)',(owner,json.dumps(spec)))
         return spec
     finally:conn.close()
@@ -331,4 +360,71 @@ def sync_signal_rules():
                         elif enabled:
                             last=db.last_kline_time(symbol,iv) or 0
                             conn.execute('INSERT OR IGNORE INTO rules VALUES (?,?,?,?,?,?,?,?)',(key,owner,json.dumps(spec),last,epoch(symbol,iv),now,uuid.uuid4().hex,'Armed for new decisions'))
+    finally:conn.close()
+
+
+MAX_SOUND_BYTES=2*1024*1024
+
+
+def valid_sound(owner,key,conn=None):
+    if isinstance(key,str) and key in SOUNDS:return True
+    if not owner or not isinstance(key,str) or not key.startswith('custom:'):return False
+    own=conn is None
+    conn=open_db() if own else conn
+    try:return conn.execute('SELECT 1 FROM custom_sounds WHERE id=? AND owner=?',(key,owner)).fetchone() is not None
+    finally:
+        if own:conn.close()
+
+
+def sounds(owner,key=None):
+    conn=open_db()
+    try:
+        if key:
+            row=conn.execute('SELECT * FROM custom_sounds WHERE id=? AND owner=?',(key,owner)).fetchone()
+            if not row:raise ValueError('Unknown custom sound')
+            return dict(id=row['id'],name=row['name'],mime=row['mime'],data=base64.b64encode(row['data']).decode())
+        return {'sounds':[dict(id=r['id'],name=r['name'],mime=r['mime'],bytes=r['bytes']) for r in conn.execute('SELECT id,name,mime,length(data) AS bytes FROM custom_sounds WHERE owner=? ORDER BY name,id',(owner,))]}
+    finally:conn.close()
+
+
+def upload_sound(owner,packet):
+    name=packet.get('name');encoded=packet.get('data')
+    if not isinstance(name,str) or not 1<=len(name.strip())<=120:raise ValueError('Sound name must contain 1..120 characters')
+    if not isinstance(encoded,str) or len(encoded)>4*((MAX_SOUND_BYTES+2)//3):raise ValueError('Audio file must be at most 2 MB')
+    try:raw=base64.b64decode(encoded,validate=True)
+    except (ValueError,binascii.Error):raise ValueError('Invalid audio upload') from None
+    if not raw or len(raw)>MAX_SOUND_BYTES:raise ValueError('Audio file must be at most 2 MB')
+    mime=('audio/wav' if raw.startswith(b'RIFF') and raw[8:12]==b'WAVE' else
+          'audio/ogg' if raw.startswith(b'OggS') else 'audio/flac' if raw.startswith(b'fLaC') else
+          'audio/mp4' if raw[4:8]==b'ftyp' else 'audio/mpeg' if raw.startswith(b'ID3') or len(raw)>1 and raw[0]==255 and raw[1]&224==224 else None)
+    if mime is None:raise ValueError('Use a WAV, MP3, OGG, FLAC or M4A audio file')
+    key='custom:'+uuid.uuid4().hex;conn=open_db()
+    try:
+        with conn:
+            conn.execute('BEGIN IMMEDIATE')
+            count,total=conn.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM custom_sounds WHERE owner=?',(owner,)).fetchone()
+            if count>=10 or total+len(raw)>10*1024*1024:raise ValueError('Custom sound library limit: 10 files / 10 MB')
+            conn.execute('INSERT INTO custom_sounds VALUES (?,?,?,?,?)',(key,owner,name.strip(),mime,raw))
+        return {'id':key,'name':name.strip(),'mime':mime}
+    finally:conn.close()
+
+
+def delete_sound(owner,key):
+    conn=open_db()
+    try:
+        with conn:
+            conn.execute('BEGIN IMMEDIATE')
+            if not conn.execute('DELETE FROM custom_sounds WHERE id=? AND owner=?',(key,owner)).rowcount:raise ValueError('Unknown custom sound')
+            row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
+            if row:
+                spec=json.loads(row[0])
+                for side in ('buy','sell'):
+                    if spec.get(side)==key:spec[side]='none'
+                conn.execute('UPDATE signal_preferences SET spec=? WHERE owner=?',(json.dumps(spec),owner))
+            for row in conn.execute('SELECT id,spec FROM rules WHERE owner=?',(owner,)).fetchall():
+                spec=json.loads(row['spec'])
+                if spec.get('sound')==key:
+                    spec['sound']='none'
+                    conn.execute('UPDATE rules SET spec=?,revision=? WHERE id=?',(json.dumps(spec),uuid.uuid4().hex,row['id']))
+        return {'ok':True}
     finally:conn.close()

@@ -1,3 +1,4 @@
+import {renderTimeframeDelivery} from '../alerts/index.js';
 // Immediate server policy actions are separate from Apply/Cancel chart styles.
 let session = { role: 'guest', configured: false };
 let timeframes = [];
@@ -68,7 +69,7 @@ function deleteControl(parent, scope, disabled, after) {
 }
 export function renderTimeframes(parent, refresh) {
     if (loadError) { message(parent).textContent = loadError; return; }
-    el('p','Policy changes apply immediately to the runner. Inactive retains stored data; deletion also pauses downloads. Administrator settings.',parent).className='settings-note';
+    el('p','Policy changes apply immediately to the runner. Inactive retains stored data; deletion also pauses downloads. Delivery switches are per account and do not pause calculations. Administrator download settings.',parent).className='settings-note';
     for (const row of timeframes) {
         const wrap=el('div','',parent); wrap.className='settings-policy-item';
         const line=el('div','',wrap); line.className='settings-row';
@@ -77,6 +78,7 @@ export function renderTimeframes(parent, refresh) {
         select.setAttribute('aria-label',`${row.interval} download status`);
         for (const value of ['active','inactive']) { const option=el('option',value,select); option.value=value; select.append(option); }
         select.value=row.status; select.disabled=session.role!=='admin';
+        const delivery=el('div','',line);delivery.className='notification-delivery';void renderTimeframeDelivery(delivery,row.interval);
         const status=message(wrap);
         select.onchange=async()=>{
             select.disabled=true;

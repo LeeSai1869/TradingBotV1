@@ -9,13 +9,13 @@ from Section_11_UI_UX.server import alerts
 
 
 async def open_manager(page):
-    await page.get_by_role('button',name='Notifications',exact=True).click()
-    await page.get_by_role('button',name='Add / edit / delete custom notifications',exact=True).click()
+    await page.get_by_role('button',name='Open settings',exact=True).click()
+    await page.get_by_role('dialog',name='Settings',exact=True).get_by_role('tab',name='Notifications',exact=True).click()
 
 async def set_tone(page,name,tone):
-    await page.get_by_role('button',name='Notifications',exact=True).click()
+    await page.get_by_role('button',name='Open settings',exact=True).click()
     settings=page.get_by_role('dialog',name='Settings',exact=True)
-    await settings.get_by_role('button',name='Sounds',exact=True).click()
+    await settings.get_by_role('tab',name='Sounds',exact=True).click()
     await settings.get_by_label(name+' sound',exact=True).select_option(tone)
     await page.wait_for_function("([name,tone])=>fetch('/api/alerts').then(r=>r.json()).then(p=>p.rules.some(r=>r.name===name&&r.sound===tone))",arg=[name,tone])
     await settings.get_by_role('button',name='Close settings',exact=True).click()
@@ -42,15 +42,16 @@ async def exercise(base,library):
         await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'user')
         await page.wait_for_function('DataCache.bars.length===2000&&!DataCache._olderPromise');await settle(page)
-        await page.get_by_role('button',name='Notifications',exact=True).click()
+        await page.get_by_role('button',name='Open settings',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)
+        await settings.get_by_role('tab',name='Notifications',exact=True).click()
         await settings.get_by_role('button',name='Allow desktop notifications',exact=True).click()
-        await settings.get_by_role('button',name='Sounds',exact=True).click()
+        await settings.get_by_role('tab',name='Sounds',exact=True).click()
         await settings.get_by_role('button',name='Enable sound',exact=True).click()
         await settings.get_by_role('button',name='Close settings',exact=True).click()
         await open_manager(page)
-        dialog=page.get_by_role('dialog',name='Alerts',exact=True)
-        await dialog.get_by_role('button',name='New alert',exact=True).click()
+        dialog=page.get_by_role('dialog',name='Settings',exact=True)
+        await dialog.get_by_role('button',name='New notification',exact=True).click()
         manager=dialog
         dialog=page.get_by_role('dialog',name='Create alert',exact=True)
         await dialog.get_by_label('Alert name',exact=True).fill('RSI crossing test')
@@ -61,8 +62,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('70')
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
         dialog=manager
-        await dialog.locator('.alert-rule').get_by_text('RSI crossing test',exact=True).wait_for()
-        await dialog.get_by_role('button',name='Close alerts',exact=True).click()
+        await dialog.locator('.notification-rule').get_by_text('RSI crossing test',exact=True).wait_for()
+        await dialog.get_by_role('button',name='Close settings',exact=True).click()
         await set_tone(page,'RSI crossing test','bell')
         before=await page.evaluate('soundEvents')
         await page.evaluate('Canvas.chart.timeScale().setVisibleLogicalRange({from:700,to:1699})');await settle(page)
@@ -79,7 +80,7 @@ async def exercise(base,library):
         assert await page.evaluate("noticeEvents.some(e=>e.name==='RSI crossing test')")
         assert await page.evaluate('DataCache.atLiveEdge') is False
         await open_manager(page)
-        await dialog.get_by_role('button',name='New alert',exact=True).click()
+        await dialog.get_by_role('button',name='New notification',exact=True).click()
         dialog=page.get_by_role('dialog',name='Create alert',exact=True)
         assert await dialog.get_by_label('Coin',exact=True).input_value()==await page.locator('#symbol').input_value()
         assert await dialog.get_by_label('Timeframe',exact=True).input_value()==await page.locator('#interval').input_value()
@@ -92,8 +93,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('10')
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
         dialog=manager
-        await dialog.locator('.alert-rule').get_by_text('Live SUI alert',exact=True).wait_for()
-        await dialog.get_by_role('button',name='Close alerts',exact=True).click()
+        await dialog.locator('.notification-rule').get_by_text('Live SUI alert',exact=True).wait_for()
+        await dialog.get_by_role('button',name='Close settings',exact=True).click()
         await set_tone(page,'Live SUI alert','alarm')
         bar=dict(symbol='SUIUSDT',interval='1m',open_time=t,time=t//1000,client=dict(close=9,high=9,low=8))
         with patch.object(alerts.live_candle,'get_snapshot',return_value={'bar':bar,'status':'live'}):

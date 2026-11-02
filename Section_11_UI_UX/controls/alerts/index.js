@@ -1,9 +1,11 @@
 // Alert configuration is per account; evaluation happens in the local backend.
 import {formatValue} from '../../web_root/value_format.js';
 export const name = 'alerts';
-let dialog, editor, editorTitle, editorStatus, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
-let signalPrefs=null, deliveryButton;
-let polling=false, timer, editing=null, refreshId=0, saving=false;
+let editor, editorTitle, editorStatus, form, activity, status, catalog, audio, volume=0.35, eventCursor=null;
+let signalPrefs=null, deliveryButton, notificationPanel, newButton;
+const customBuffers=new Map();
+let customLibrary=[];
+let polling=false, timer, editing=null, saving=false;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
 function el(tag,text,parent,className) {
@@ -45,15 +47,15 @@ function sound(key) {
         oscillator.connect(gain);gain.connect(audio.destination);oscillator.start(t);oscillator.stop(t+.32);
     });
 }
-function enqueueSound(key) {
-    if(key==='none'||!audio||audio.state!=='running')return;
+function enqueueSound(key){
+    if(key==='none'||audio?.state!=='running')return;
     if(soundQueue.length<20)soundQueue.push(key);
-    function next() {
-        if(soundBusy||!soundQueue.length)return;
-        soundBusy=true;sound(soundQueue.shift());
-        setTimeout(()=>{soundBusy=false;next();},1100);
+    async function next(){
+        if(soundBusy||!soundQueue.length)return;soundBusy=true;
+        let duration=1.1;try{duration=await play(soundQueue.shift());}catch(error){if(status?.isConnected)status.textContent=error.message;}
+        setTimeout(()=>{soundBusy=false;void next();},Math.max(100,duration*1000+50));
     }
-    next();
+    void next();
 }
 function renderActivity() {
     if(!activity)return;
@@ -72,9 +74,11 @@ function receive(event,deliver=true) {
     recent.push(event);if(recent.length>100)recent.shift();renderActivity();
     if(!deliver)return;
     const text=`${event.message} · Candle: ${new Date(event.bar_time).toLocaleString()}`;
+    if(event.app!==false){
     const toast=el('div',text,document.getElementById('alert-toasts'),'alert-toast');toast.setAttribute('role','status');
     setTimeout(()=>toast.remove(),15000);
     while(document.querySelectorAll('.alert-toast').length>5)document.querySelector('.alert-toast').remove();
+    }
     enqueueSound(event.sound);
     if(event.notify&&'Notification' in window&&Notification.permission==='granted') {
         try {new Notification(event.name,{body:text,tag:`stored-alert-${event.seq}`});}catch{ /* In-app activity remains available. */ }
@@ -87,25 +91,11 @@ async function poll() {
         if(eventCursor===null)for(const event of packet.history||[])receive(event,false);
         for(const event of packet.events)receive(event);
         eventCursor=packet.cursor;
-        if(dialog.open&&form&&!editor.open)await refresh();
         updateDeliveryStatus();
-    } catch(error) {if(dialog.open)status.textContent=error.message;}
+    } catch(error) {if(status?.isConnected)status.textContent=error.message;}
     finally {polling=false;timer=setTimeout(poll,2000);}
 }
-async function refresh() {
-    const id=++refreshId, packet=await request('/api/alerts');if(id!==refreshId)return;rules.replaceChildren();
-    if(!packet.rules.length)el('p','No saved alerts. Use + to create your first alert.',rules,'settings-note');
-    for(const rule of packet.rules) {
-        const row=el('div','',rules,'alert-rule');
-        el('strong',rule.name,row);el('p',`${rule.symbol} ${rule.interval} · ${rule.field} ${rule.operator.replaceAll('_',' ')} ${rule.target_field||formatValue(rule.value,rule.field)} · ${rule.status}`,row,'settings-note');
-        const buttons=el('div','',row,'settings-coin-actions');
-        const edit=el('button','Edit',buttons);edit.onclick=()=>{if(saving)return;fill(rule);editorTitle.textContent='Edit alert';editorStatus.textContent='';editor.showModal();};
-        const toggle=el('button',rule.enabled?'Pause':'Re-arm',buttons);
-        toggle.onclick=async()=>{try{await request('/api/alerts',{...rule,enabled:!rule.enabled});await refresh();}catch(error){status.textContent=error.message;}};
-        const remove=el('button','Delete rule',buttons);
-        remove.onclick=async()=>{try{await request('/api/alerts/delete',{id:rule.id});if(editing===rule.id)reset();await refresh();}catch(error){status.textContent=error.message;}};
-    }
-}
+async function refresh(){if(notificationPanel?.marker.isConnected)await renderNotificationSettings(notificationPanel.parent);}
 function syncMode() {
     const decision=form.elements.field.value.startsWith('decision.');
     for(const key of ['operator','value','target_field','mode'])form.elements[key].parentElement.hidden=decision;
@@ -136,16 +126,11 @@ function reset() {
 async function build() {
     if(form)return;
     catalog=await request('/api/alerts/catalog');
-    el('p','Manage custom notification conditions here. Permission and delivery controls are in Settings → Features → Notifications; tones and volume are in Sounds.',dialog,'settings-note');
-    const savedHeader=el('div','',dialog,'alert-list-header');el('h3','Saved alerts',savedHeader);
-    const add=el('button','＋ New alert',savedHeader);add.setAttribute('aria-label','New alert');
-    add.onclick=()=>{if(saving)return;reset();editorStatus.textContent='';editorTitle.textContent='Create alert';editor.showModal();};
-    rules=el('section','',dialog);rules.setAttribute('aria-label','Saved alerts');
     editor=el('dialog','',document.body,'alerts-dialog alert-editor');editor.setAttribute('aria-labelledby','alert-editor-title');
     const header=el('header','',editor);editorTitle=el('h2','Create alert',header);editorTitle.id='alert-editor-title';
     const close=el('button','Close alert editor',header);close.onclick=()=>{if(!saving)editor.close();};
     editor.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
-    editor.addEventListener('close',()=>{if(!saving)reset();add.focus();});
+    editor.addEventListener('close',()=>{if(!saving)reset();newButton?.focus();});
     editorStatus=el('p','',editor,'settings-note');editorStatus.setAttribute('role','status');
     form=el('form','',editor,'alert-form');
     const title=input('Alert name','name','text',form);title.required=true;title.maxLength=120;
@@ -169,8 +154,6 @@ async function build() {
     form.onsubmit=async event=>{
         event.preventDefault();if(saving)return;saving=true;save.disabled=true;close.disabled=true;cancel.disabled=true;
         editorStatus.textContent='Saving alert…';
-        // Browser audio permission/resume must never block saving another rule.
-        void unlock().catch(()=>{});
         let completed=false;
         try{
             const packet=Object.fromEntries(new FormData(form));delete packet.field_search;packet.value=Number(packet.value);packet.notify=form.elements.notify.checked;packet.enabled=form.elements.enabled.checked;if(editing)packet.id=editing;
@@ -179,33 +162,30 @@ async function build() {
         }catch(error){editorStatus.textContent=error.message;}finally{saving=false;save.disabled=false;close.disabled=false;cancel.disabled=false;}
         if(completed)void refresh().catch(error=>{status.textContent='Alert saved. Could not refresh the list: '+error.message;});
     };
-    const history=el('details','',dialog);el('summary','Recent activity · latest 10',history);
-    const clear=el('button','Clear displayed activity',history);clear.onclick=()=>{recent.length=0;renderActivity();};activity=el('section','',history,'alert-activity');renderActivity();reset();
+    reset();
 }
 export function mount() {
     try {const stored=Number(localStorage.getItem(`alerts.volume.${window.AppSession.username}`));if(Number.isFinite(stored)&&stored>=0&&stored<=1&&localStorage.getItem(`alerts.volume.${window.AppSession.username}`)!==null)volume=stored;}catch{}
     const toolbar=document.getElementById('toolbar'), open=el('button','Notifications',toolbar);open.id='alerts-button';
     const gear=document.getElementById('settings-button');if(gear)gear.before(open);
-    dialog=el('dialog','',document.body,'alerts-dialog');dialog.setAttribute('aria-labelledby','alerts-title');
-    const header=el('header','',dialog);el('h2','Alerts',header).id='alerts-title';const close=el('button','Close alerts',header);close.onclick=()=>dialog.close();
-    status=el('p','',dialog,'settings-note');status.setAttribute('role','status');
     el('div','',document.body).id='alert-toasts';
-    open.onclick=()=>window.dispatchEvent(new Event('open-notification-settings'));
-    dialog.addEventListener('close',()=>open.focus());
+    open.disabled=true;
+    open.onclick=async()=>{open.disabled=true;try{const prefs=await getSignalPreferences();await saveSignalPreferences({notify:!prefs.notify});}catch(error){open.title=error.message;}finally{open.disabled=false;}};
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
     request('/api/alerts/events').then(packet=>{eventCursor=packet.cursor;for(const event of packet.history||[])recent.push(event);renderActivity();timer=setTimeout(poll,2000);}).catch(()=>{timer=setTimeout(poll,5000);});
     deliveryButton=open;
-    void getSignalPreferences().then(updateDeliveryStatus).catch(error=>{open.title=error.message;});
+    void getSignalPreferences().then(updateDeliveryStatus).catch(error=>{open.title=error.message;}).finally(()=>{open.disabled=false;});
     window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
 }
 
 function updateDeliveryStatus(){
     if(!deliveryButton)return;
     const ready=audio?.state==='running';
-    deliveryButton.textContent='Notifications';
-    for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=`Sound: ${ready?'enabled':'click Enable sound'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
-    deliveryButton.title=`Automatic BUY/SELL: ${signalPrefs?.enabled?'on':'off'} · Audio: ${ready?'ready':'click to enable'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
+    deliveryButton.textContent=`Notifications: ${signalPrefs?.notify?'on':'off'}`;
+    deliveryButton.setAttribute('aria-label','Toggle desktop notifications');deliveryButton.setAttribute('aria-pressed',String(signalPrefs?.notify===true));
+    for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=node.dataset.audio==='true'?`Sound: ${ready?'enabled':'click Enable sound'}`:`Desktop permission: ${globalThis.Notification?.permission||'unavailable'}`;
+    deliveryButton.title=`Desktop notification toggle; configure rules in Settings → Notifications. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
 }
 export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
 export async function saveSignalPreferences(value){
@@ -217,14 +197,16 @@ export function setSignalVolume(level){
     try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}
 }
 
-export async function openAlertManager(){
-    document.getElementById('settings-dialog')?.close();
-    dialog.showModal();try{await build();await refresh();}catch(error){status.textContent=error.message;}
+async function openEditor(rule=null){
+    await build();form.elements.field_search.value='';form.elements.field_search.oninput();reset();
+    if(rule)fill(rule);
+    editorTitle.textContent=rule?'Edit alert':'Create alert';editorStatus.textContent='';editor.showModal();
 }
-function deliveryState(parent){const node=el('p','',parent,'settings-note');node.dataset.deliveryStatus='';updateDeliveryStatus();const feedback=el('p','',parent,'settings-note');feedback.setAttribute('role','status');return feedback;}
+function deliveryState(parent,showAudio=false){const node=el('p','',parent,'settings-note');node.dataset.deliveryStatus='';node.dataset.audio=String(showAudio);updateDeliveryStatus();const feedback=el('p','',parent,'settings-note');feedback.setAttribute('role','status');return feedback;}
 export async function renderNotificationSettings(parent){
-    const feedback=deliveryState(parent);
-    el('p','Changes here save immediately. The UI backend monitors committed signals even after app logout. Browser notifications need this app open and signed in; OS logout closes the desktop session.',parent,'settings-note');
+    parent.replaceChildren();const marker=el('div','',parent);notificationPanel={parent,marker};
+    const feedback=deliveryState(parent);status=feedback;
+    el('p','Choose which events notify you. Sound choices are in Settings → Sounds. Changes save immediately.',parent,'settings-note');
     const allow=el('button','Allow desktop notifications',parent);
     allow.onclick=async()=>{try{
         if(!('Notification' in window))throw new Error('Desktop notifications are unavailable in this browser.');
@@ -232,35 +214,93 @@ export async function renderNotificationSettings(parent){
         feedback.textContent=result==='granted'?'Desktop notifications allowed.':`Notifications ${result}. Check browser site permissions and macOS System Settings → Notifications.`;
     }catch(error){feedback.textContent=error.message;}};
     try{
-        const prefs=await getSignalPreferences();if(!parent.isConnected)return;
-        for(const [key,label] of [['enabled','Monitor all active symbols / timeframes'],['notify','Enable desktop signal notifications'],['buy_notify','Notify for BUY'],['sell_notify','Notify for SELL']]){
-            const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;
-            check.onchange=()=>void saveSignalPreferences({[key]:check.checked}).catch(error=>feedback.textContent=error.message);
-        }
-        const custom=el('button','Add / edit / delete custom notifications',parent);custom.onclick=openAlertManager;
-        const packet=await request('/api/alerts');if(!parent.isConnected)return;
+        const prefs=await getSignalPreferences();if(!marker.isConnected)return;
+        function toggle(label,key){const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;check.onchange=async()=>{try{await saveSignalPreferences({[key]:check.checked});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};}
+        toggle('Desktop notifications','notify');
+        const signals=el('fieldset','',parent);el('legend','Automatic signals · active charts',signals);
+        for(const side of ['buy','sell']){const check=input(`Notify ${side.toUpperCase()}`,side+'_notify','checkbox',signals);check.checked=prefs[side+'_notify']!==false;check.onchange=()=>void saveSignalPreferences({[side+'_notify']:check.checked}).catch(error=>feedback.textContent=error.message);}
+        if(!prefs.enabled){const resume=el('button','Resume automatic signal monitoring',signals);resume.onclick=async()=>{await saveSignalPreferences({enabled:true});await refresh();};}
+        el('p','Choose Desktop delivery per timeframe and coin in Settings → Timeframes and Coins. Mobile delivery is not available yet.',signals,'settings-note');
+        const heading=el('div','',parent,'settings-coin-actions');el('h4','Custom notifications',heading);
+        newButton=el('button','New notification',heading);newButton.onclick=()=>void openEditor().catch(error=>feedback.textContent=error.message);
+        const packet=await request('/api/alerts');if(!marker.isConnected)return;
+        if(!packet.rules.length)el('p','No custom notifications.',parent,'settings-note');
         for(const rule of packet.rules){
-            const row=el('div','',parent,'settings-row');el('span',`${rule.name} · ${rule.symbol} ${rule.interval}`,row);
-            const check=input('Desktop notification',rule.id,'checkbox',row);check.checked=rule.notify;
-            check.onchange=()=>void request('/api/alerts',{...rule,notify:check.checked}).catch(error=>feedback.textContent=error.message);
-            const remove=el('button','Delete notification',row);remove.onclick=async()=>{try{await request('/api/alerts/delete',{id:rule.id});row.remove();}catch(error){feedback.textContent=error.message;}};
+            const row=el('div','',parent,'settings-row notification-rule');
+            const check=input(rule.name,rule.id,'checkbox',row);check.checked=rule.enabled;
+            check.onchange=()=>void request('/api/alerts',{...rule,enabled:check.checked}).catch(error=>feedback.textContent=error.message);
+            el('span',`${rule.symbol} · ${rule.interval}`,row);
+            const edit=el('button','Edit',row);edit.setAttribute('aria-label',`Edit ${rule.name}`);edit.onclick=()=>void openEditor(rule);
+            const remove=el('button','Remove',row);remove.setAttribute('aria-label',`Remove ${rule.name}`);remove.onclick=async()=>{try{await request('/api/alerts/delete',{id:rule.id});row.remove();}catch(error){feedback.textContent=error.message;}};
         }
+        const history=el('details','',parent);el('summary','Recent activity',history);activity=el('section','',history,'alert-activity');renderActivity();
     }catch(error){feedback.textContent=error.message;}
 }
 export async function renderSoundSettings(parent){
-    const feedback=deliveryState(parent);
-    el('p','All tones are configured here and save immediately. Choose none to mute an individual signal or custom rule. Audio requires a click after opening the app.',parent,'settings-note');
+    const marker=el('div','',parent),feedback=deliveryState(parent,true);
+    el('p','Upload your own audio or choose a built-in tone. Select Silent to mute an event. Changes save immediately.',parent,'settings-note');
     const enable=el('button','Enable sound',parent);enable.onclick=async()=>{try{await unlock();sound('chime');updateDeliveryStatus();}catch(error){feedback.textContent=error.message;}};
     const slider=input('Sound volume','volume','range',parent);slider.min=0;slider.max=1;slider.step=.05;slider.value=volume;slider.oninput=()=>setSignalVolume(slider.value);
-    function tone(label,value,save){
-        const row=el('div','',parent,'settings-row');const choice=select(label,'tone',[['none','Silent'],['chime','Chime'],['bell','Bell'],['alarm','Alarm']],row);choice.value=value;
-        choice.onchange=()=>void save(choice.value).catch(error=>feedback.textContent=error.message);
-        const test=el('button',`Test ${label}`,row);test.onclick=async()=>{try{await unlock();sound(choice.value);feedback.textContent=choice.value==='none'?'This sound is disabled.':'Test sound played.';}catch(error){feedback.textContent=error.message;}};
-    }
     try{
-        const prefs=await getSignalPreferences();if(!parent.isConnected)return;
+        const [prefs,library,packet]=await Promise.all([getSignalPreferences(),request('/api/alerts/sounds'),request('/api/alerts')]);if(!marker.isConnected)return;
+        customLibrary=library.sounds;
+        const options=[['none','Silent'],['chime','Chime'],['bell','Bell'],['alarm','Alarm'],...customLibrary.map(row=>[row.id,row.name])];
+        function tone(label,value,save){
+            const row=el('div','',parent,'settings-row'),choice=select(label,'tone',options,row);choice.value=value;
+            choice.onchange=()=>void save(choice.value).catch(error=>feedback.textContent=error.message);
+            const test=el('button',`Preview ${label}`,row);test.onclick=async()=>{try{await unlock();await play(choice.value);feedback.textContent=choice.value==='none'?'This event is silent.':'Preview played.';}catch(error){feedback.textContent=error.message;}};
+        }
         for(const side of ['buy','sell'])tone(`${side.toUpperCase()} sound`,prefs[side],value=>saveSignalPreferences({[side]:value}));
-        const packet=await request('/api/alerts');if(!parent.isConnected)return;
         for(const rule of packet.rules)tone(`${rule.name} sound`,rule.sound,value=>request('/api/alerts',{...rule,sound:value}));
+        const libraryBox=el('fieldset','',parent);el('legend','Your sounds',libraryBox);
+        const file=input('Choose audio file','audio_file','file',libraryBox);file.accept='.wav,.mp3,.ogg,.flac,.m4a,audio/*';
+        el('p','Up to 30 seconds and 2 MB per file; 10 files / 10 MB total.',libraryBox,'settings-note');
+        const name=input('Sound name','audio_name','text',libraryBox);name.maxLength=120;
+        const preview=el('button','Preview new sound',libraryBox),upload=el('button','Add sound',libraryBox);preview.disabled=upload.disabled=true;
+        let selected=null;
+        file.onchange=async()=>{
+            selected=null;preview.disabled=upload.disabled=true;
+            try{const chosen=file.files[0];if(!chosen)return;if(chosen.size>2*1024*1024)throw new Error('Audio file must be at most 2 MB.');
+                const bytes=await chosen.arrayBuffer(),buffer=await audioContext().decodeAudioData(bytes.slice(0));
+                if(buffer.duration>30)throw new Error('Choose an audio clip of 30 seconds or less.');
+                selected={bytes,buffer};name.value=chosen.name.replace(/\.[^.]+$/,'').slice(0,120);preview.disabled=upload.disabled=false;feedback.textContent='Ready to preview or add.';
+            }catch(error){feedback.textContent=error.message||'This audio file could not be decoded.';}
+        };
+        preview.onclick=async()=>{try{await unlock();playBuffer(selected.buffer);}catch(error){feedback.textContent=error.message;}};
+        upload.onclick=async()=>{upload.disabled=true;try{
+            const bytes=new Uint8Array(selected.bytes);let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+            await request('/api/alerts/sounds',{name:name.value,data:btoa(binary)});parent.replaceChildren();await renderSoundSettings(parent);
+        }catch(error){feedback.textContent=error.message;upload.disabled=false;}};
+        for(const item of customLibrary){
+            const row=el('div','',libraryBox,'settings-row');el('span',item.name,row);
+            const test=el('button',`Preview ${item.name}`,row);test.onclick=async()=>{try{await unlock();await play(item.id);}catch(error){feedback.textContent=error.message;}};
+            const remove=el('button',`Delete ${item.name}`,row);remove.onclick=async()=>{try{await request('/api/alerts/sounds/delete',{id:item.id});customBuffers.delete(item.id);parent.replaceChildren();await renderSoundSettings(parent);}catch(error){feedback.textContent=error.message;}};
+        }
     }catch(error){feedback.textContent=error.message;}
 }
+
+function audioContext(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw new Error('Audio is unavailable in this browser.');if(!audio){audio=new Audio();audio.onstatechange=updateDeliveryStatus;}return audio;}
+function playBuffer(buffer){const source=audio.createBufferSource(),gain=audio.createGain();source.buffer=buffer;gain.gain.value=volume;source.connect(gain);gain.connect(audio.destination);source.start();return buffer.duration;}
+async function play(key){
+    if(key==='none'||audio?.state!=='running')return 0;
+    if(!key.startsWith('custom:')){sound(key);return 1.1;}
+    if(!customBuffers.has(key)){
+        const packet=await request('/api/alerts/sounds?id='+encodeURIComponent(key)),bytes=Uint8Array.from(atob(packet.data),value=>value.charCodeAt(0));
+        customBuffers.set(key,await audio.decodeAudioData(bytes.buffer));
+    }
+    return playBuffer(customBuffers.get(key));
+}
+
+async function renderNotificationDelivery(parent,scope,key){
+    const marker=el('span','',parent),feedback=el('span','',parent,'settings-note');
+    try{const prefs=signalPrefs||await getSignalPreferences();if(!marker.isConnected)return;
+        for(const [channel,label] of [['desktop','Desktop'],['mobile','Mobile']]){
+            const check=input(label,channel,'checkbox',parent);check.setAttribute('aria-label',`${key} ${label} notifications`);
+            check.checked=channel==='desktop'?prefs[scope]?.[key]?.desktop!==false:false;
+            check.disabled=channel==='mobile';if(check.disabled)check.title='Mobile notifications are not available yet';
+            check.onchange=async()=>{try{await saveSignalPreferences({[scope]:{[key]:{[channel]:check.checked}}});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};
+        }
+    }catch(error){feedback.textContent=error.message;}
+}
+export function renderTimeframeDelivery(parent,interval){return renderNotificationDelivery(parent,'timeframes',interval);}
+export function renderCoinDelivery(parent,symbol){return renderNotificationDelivery(parent,'coins',symbol);}

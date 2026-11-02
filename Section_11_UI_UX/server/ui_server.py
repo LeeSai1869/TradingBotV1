@@ -93,7 +93,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= length <= 16384:
+            limit=3*1024*1024 if parsed.path=='/api/alerts/sounds' else 16384
+            if not 0 <= length <= limit:
                 raise ValueError()
         except ValueError:
             self._json({"error": "Invalid request size"}, 413)

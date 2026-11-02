@@ -4,7 +4,7 @@ import {normalizeHud} from "../workspace/preferences.js";
 import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
 import {normalizeMomentum,SOUNDS} from '../../overlays/markers/preferences.js';
-import {renderNotificationSettings,renderSoundSettings} from '../alerts/index.js';
+import {renderNotificationSettings,renderSoundSettings,renderCoinDelivery} from '../alerts/index.js';
 import {renderAdcnMemory} from './adcn.js';
 import {normalizeCandleStyle} from './candle_style.js';
 export const name = "settings";
@@ -17,12 +17,12 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: ["Notifications", "Sounds", "ADCN Memory", "EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Confidence", "Opportunity", "Momentum Indicator"],
-    hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
+    features: [ "ADCN Memory", "EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Confidence", "Opportunity", "Momentum Indicator"],
+    notifications:["Delivery"], sounds:["Audio"], hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
 const titles = { general: "General", inputs: "Inputs", features: "Features",
-    hud: "HUD", candles: "Candles", timeframes: "Timeframes", coins: "Coins" };
+    notifications:"Notifications", sounds:"Sounds", hud: "HUD", candles: "Candles", timeframes: "Timeframes", coins: "Coins" };
 
 function validated(value) {
     const result = { ...defaults };
@@ -74,8 +74,6 @@ function reserved(label, explanation) {
 }
 function renderFeature() {
     if(item==='ADCN Memory'){void renderAdcnMemory(content);return;}
-    if(item==='Notifications'){void renderNotificationSettings(content);return;}
-    if(item==='Sounds'){void renderSoundSettings(content);return;}
     if(featureTab==='Data'&&!['Liquidity','Confidence','Opportunity'].includes(item))featureTab='Display';
     if(item==='Confidence'&&featureTab==='Style')featureTab='Display';
     const feature = FEATURE_STYLES[item];
@@ -345,6 +343,10 @@ function render() {
             input.onchange=()=>{draft.candleStyle[key]=check?input.checked:input.value;};
         }
         note("Candles and features come from the combined bar stream.");
+    } else if(section==="notifications"){
+        void renderNotificationSettings(content);
+    } else if(section==="sounds"){
+        void renderSoundSettings(content);
     } else if (section === "features") {
         renderFeature();
     } else if (section === "hud") {
@@ -375,7 +377,8 @@ function render() {
             };
             if (!rows.length) note("No coins in this category.");
             for (const coin of rows) {
-                const row = el("label", "", content, "settings-coin");
+                const wrap=el("div","",content,"coin-delivery-row");
+                const row = el("label", "", wrap, "settings-coin");
                 const check = el("input", "", row); check.type = "checkbox";
                 check.setAttribute("aria-label", `Select ${coin.symbol}`);
                 check.checked = selectedCoins.has(coin.symbol);
@@ -386,6 +389,7 @@ function render() {
                 };
                 el("strong", coin.symbol, row);
                 el("span", coin.reason || coin.note || (coin.rank ? `Rank ${coin.rank}` : ""), row);
+                const delivery=el("div","",wrap,"notification-delivery");void renderCoinDelivery(delivery,coin.symbol);
             }
         }
         admin.coinActions(content, selectedCoins, loadRegistry);
@@ -463,7 +467,6 @@ export async function mount() {
         catch { message.textContent = "Could not save preferences in this browser."; return; }
         saved = next; apply(); window.dispatchEvent(new Event("chart-settings-change")); dialog.close();
     };
-    window.addEventListener('open-notification-settings',()=>{section='features';item='Notifications';gear.onclick();});
     gear.onclick = () => {
         draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
         tabs.querySelector('[aria-selected="true"]').focus();

@@ -19,32 +19,32 @@ async def exercise(base,library):
             await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
             await page.goto(base);await sign_in(page,'user')
             await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000')
-            await page.get_by_role('button',name='Notifications',exact=True).click()
-            await page.get_by_role('button',name='Add / edit / delete custom notifications',exact=True).click()
-            manager=page.get_by_role('dialog',name='Alerts',exact=True)
-            await manager.get_by_role('button',name='New alert',exact=True).wait_for()
+            await page.get_by_role('button',name='Open settings',exact=True).click()
+            manager=page.get_by_role('dialog',name='Settings',exact=True)
+            await manager.get_by_role('tab',name='Notifications',exact=True).click()
+            await manager.get_by_role('button',name='New notification',exact=True).wait_for()
             assert await manager.locator('form').count()==0
             for name in ['First alert','Second alert','Third alert']:
-                await manager.get_by_role('button',name='New alert',exact=True).click()
+                await manager.get_by_role('button',name='New notification',exact=True).click()
                 editor=page.get_by_role('dialog',name='Create alert',exact=True)
                 await editor.get_by_label('Alert name',exact=True).fill(name)
                 await editor.get_by_role('button',name='Create alert',exact=True).click()
                 await editor.wait_for(state='hidden')
-                await manager.locator('.alert-rule').get_by_text(name,exact=True).wait_for()
+                await manager.locator('.notification-rule').get_by_text(name,exact=True).wait_for()
             rows=alerts.list_rules('user');assert len(rows)==3
             first=next(rule for rule in rows if rule['name']=='First alert')['id']
-            row=manager.locator('.alert-rule').filter(has_text='First alert')
-            await row.get_by_role('button',name='Edit',exact=True).click()
+            row=manager.locator('.notification-rule').filter(has_text='First alert')
+            await row.get_by_role('button',name='Edit First alert',exact=True).click()
             editor=page.get_by_role('dialog',name='Edit alert',exact=True)
             await editor.get_by_label('Alert name',exact=True).fill('First edited')
             await editor.get_by_role('button',name='Save changes',exact=True).click()
             await editor.wait_for(state='hidden')
-            await manager.locator('.alert-rule').get_by_text('First edited',exact=True).wait_for()
+            await manager.locator('.notification-rule').get_by_text('First edited',exact=True).wait_for()
             assert len(alerts.list_rules('user'))==3
             assert next(rule for rule in alerts.list_rules('user') if rule['name']=='First edited')['id']==first
-            await manager.locator('.alert-rule').filter(has_text='Second alert').get_by_role('button',name='Delete rule',exact=True).click()
-            await manager.locator('.alert-rule').filter(has_text='Second alert').wait_for(state='hidden')
-            await manager.get_by_role('button',name='New alert',exact=True).click()
+            await manager.locator('.notification-rule').filter(has_text='Second alert').get_by_role('button',name='Remove Second alert',exact=True).click()
+            await manager.locator('.notification-rule').filter(has_text='Second alert').wait_for(state='hidden')
+            await manager.get_by_role('button',name='New notification',exact=True).click()
             editor=page.get_by_role('dialog',name='Create alert',exact=True)
             await editor.get_by_label('Alert name',exact=True).fill('Retry alert')
             async def fail(route):
@@ -57,7 +57,7 @@ async def exercise(base,library):
             await page.unroute('**/api/alerts',fail)
             await editor.get_by_role('button',name='Create alert',exact=True).click()
             await editor.wait_for(state='hidden')
-            await manager.locator('.alert-rule').get_by_text('Retry alert',exact=True).wait_for()
+            await manager.locator('.notification-rule').get_by_text('Retry alert',exact=True).wait_for()
             assert len(alerts.list_rules('user'))==3
             assert not errors,errors
             print('PASS: separate saved list and + editor; three consecutive alerts during runner lock and indefinitely suspended audio; edit preserves ID; delete; failed save can retry',flush=True)
