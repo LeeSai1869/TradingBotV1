@@ -1,98 +1,38 @@
-# Alerts
+# Notifications and sounds
 
-The toolbar Alerts button opens an account-owned rule editor and recent activity.
-Both normal users and administrators can manage their own alerts. Other users'
-rules/events cannot be read, edited or deleted through the API.
+The toolbar **Notifications** button opens **Settings → Features → Notifications**.
+Use **Allow desktop notifications** there. Permission state and errors are visible.
+If permission was denied, change the browser site permission and macOS System
+Settings → Notifications. Browser delivery requires an open, signed-in app;
+it cannot show notifications in a closed macOS session.
 
-Choose a registered coin, timeframe, field, condition, numeric threshold or
-comparison field, frequency, notification flag and sound. Supported conditions
-are above, at/above, below, at/below, exact equality and crossings in either
-direction. Signed thresholds and comparisons such as +DI > -DI are supported.
+**Features → Sounds** owns all tones and local volume. Click **Enable sound**
+after opening the app, then test BUY, SELL or a custom rule. Choose **Silent**
+to mute an item. Sound controls no longer appear in Momentum or the custom-rule
+editor. Delivery settings save immediately; Apply remains for chart preferences.
+New custom rules start silent until assigned a tone on Sounds.
 
-Two evaluation modes:
-- Live candle: high, low and close from the existing shared backend live feed.
-  Provisional EMA and RSI are also supported. A crossing needs two observed
-  snapshots; a level condition can trigger on the first available snapshot.
-- Closed candle / stored features: candle fields and every numeric permanent
-  features-store field, including ADX, DI direction/spread, RSI, EMA, ATR, etc.
-  Feature-dependent rules wait for stored features. BUY/SELL presets expose the current committed Decision Engine signal only;
-  arbitrary decision-memory fields are not exposed. Unsupported/null feature values do not create alerts.
+Automatic monitoring follows every active symbol/timeframe regardless of chart
+visibility. Notifications has monitoring, desktop signal and individual BUY/SELL
+notification switches. Muting a notification does not mute its sound. Disabling
+monitoring stops both automatic delivery types. Evaluation reads current committed
+DI_TURNING_POINT_V3 decisions; missing rows wait, WAIT rows advance. New pairs and
+re-armed subscriptions do not announce old downloaded history. Durable event IDs
+deduplicate each rule/dataset epoch/candle.
 
-Examples:
-- ETHUSDT / 1m / live / candle high / crosses above / a chosen price.
-- BTCUSDT / 15m / closed / +DI / crosses above / comparison field -DI.
-- BTCUSDT / 1h / closed / RSI / below / 30.
+**Add / edit / delete custom notifications** opens the rule manager. It supports
+searchable fields, BUY/SELL presets, numeric comparisons/crossings and repeat
+frequency. Each custom notification toggle/deletion is also available directly on
+Notifications; its tone is on Sounds. Activity is collapsed, with ten compact
+entries and expandable details. Clearing displayed activity leaves stored events.
 
-The local UI backend evaluates enabled rules on a worker thread independently of
-chart selection, historical navigation and browser polling. Keep that backend
-and the runner running. Events persist in ~/.tradingbot/alerts.sqlite3, separate
-from all three market memories. A restarted backend resumes rules/cursors.
-Closed rules start with newly closed candles after creation or edit; historical
-bootstrap does not trigger new alerts. Dataset deletion/rebuild and resuming an
-inactive scope re-arm closed rules from the current time rather than replaying
-paused history. Inactive coins/timeframes suspend evaluation.
+App logout does not stop the independent runner, recorder or backend alert worker.
+The backend must remain running to record events. Reopening the app shows history
+without replaying old sounds. Existing macOS login agents stop at macOS logout;
+see SERVER_MODE.md for system-service exports. No system jobs or phone-push
+services are installed by a repository update.
 
-Once pauses a rule after its first match. Re-arm/edit seeds a new baseline.
-Per candle allows at most one event per rule, dataset epoch and candle; repeated
-polls and crossings within the same candle do not duplicate an alert. Editing a
-live rule does not allow another event on a candle that already fired. Events
-retain the fired rule description even after the rule is edited/deleted.
-
-Live evaluation uses approximately one-second sampled snapshots, not a tick
-stream: a brief close-price excursion between samples can be missed. High/low
-rules are useful for detecting retained candle extremes. Closed rules are
-checked after local ingestion/feature calculation, so download/compute lag also
-means alert lag. No old EMA, RSI, DI or ADX value is substituted for missing data.
-
-Delivery uses in-app toasts/activity and optional browser/system notifications.
-Click Enable notifications and sound to grant permission and unlock Web Audio.
-Three built-in tones (Chime, Bell, Alarm) and None are selectable per rule; a
-per-account volume control and Test selected sound are provided. Simultaneous
-tones are queued (up to 20); at most five toasts appear at once, while activity
-keeps the events. Sound also
-unlocks when saving a rule. User audio-file imports can be added to the sound
-catalog later; this version does not upload/download external sound files.
-
-Keep the app open and signed into the owning account for sound/notification
-delivery. Background tabs still poll, subject to OS/browser suspension. System
-notifications depend on WebView/browser support and permission; in-app activity
-works without them. Backend events continue while the backend runs, but reopening
-the app loads recent activity without replaying stale alarms. The sound catalog
-is extensible; oscillator presets are in index.js and the backend validates IDs.
-
-The API enforces account ownership, JSON validation, a 50-rule/account limit,
-finite numeric thresholds, supported fields, mode compatibility and same-origin
-writes. Evaluation uses revision checks inside a SQLite write transaction so an
-old worker snapshot cannot fire an edited/deleted rule. Data-policy locking and
-storage epochs prevent stale post-deletion closed-bar evaluation.
-
-## Automatic desktop signal alerts
-
-Automatic BUY/SELL monitoring subscribes the signed-in account to every active
-symbol/timeframe on first app load. It reads committed ADCN decisions from the
-current `DI_TURNING_POINT_V3` rule, never chart visibility or inferred feature
-thresholds. Missing decisions wait; WAIT rows advance the cursor. New pairs,
-re-armed subscriptions and data deletion epochs start at the current boundary,
-so old downloaded history is not announced. Cursors and per-candle event IDs are
-durable in the account alert store; automatic rules are separate from the 50
-manual-rule allowance. No decision or feature calculation is changed.
-
-Use **Enable sound / notifications** after opening the app. Browsers require a
-user gesture to unlock audio and separate OS permission for notifications. The
-toolbar reports audio readiness. The app must remain open for browser delivery;
-its UI backend must remain running for evaluation and activity recording. Sleep,
-shutdown, browser suspension and denied OS permissions can prevent delivery.
-This is desktop delivery, not phone push or a native OS background alarm.
-
-Alerts offers all-active-chart monitoring, separate BUY/SELL tones and desktop
-notification controls. Momentum settings use the same account sound preferences.
-Choosing sounds does not require enabling chart markers. Saving a preference
-never waits for browser audio permission. Volume remains a local setting.
-
-Manual rules have BUY/SELL shortcuts plus searchable fields. Signal shortcuts
-hide numeric conditions and follow current stored decisions, with repeat-per-bar
-as the default. Other price/feature rules retain their existing evaluation.
-Activity is collapsed by default, shows the latest ten rows with expandable
-information, and can be cleared locally without deleting stored event history.
-Phone push is intentionally deferred; no third-party delivery credentials or
-network destinations are configured.
+Live rules use sampled price/EMA/RSI; brief excursions may be missed. Other rules
+wait for stored closed features/decisions, so calculation/download lag means alert
+lag. Rules/preferences/events are account-owned in ~/.tradingbot/alerts.sqlite3,
+separate from all market memories. Cross-account access is rejected.

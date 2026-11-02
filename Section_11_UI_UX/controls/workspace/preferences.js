@@ -23,5 +23,5 @@ export function normalizeHud(value = {}) {
         position: POSITIONS.includes(value?.position) ? value.position : 'top-left',
         symbol: value?.symbol === 'BTCUSDT' ? 'BTCUSDT' : '',
         intervals: unique(value?.intervals,DEFAULT_HUD.intervals,x=>INTERVALS.includes(x),8),
-        fields: unique(value?.fields,DEFAULT_HUD.fields,x=>typeof x==='string' && /^(client|features|adcn)\.[a-z0-9_]+$/.test(x),20)};
+        fields: unique(Array.isArray(value?.fields)?value.fields.map(field=>field==='adcn.final_score'?'confidence.signal_score':field==='adcn.signal_type'?'signal_context.side':field):value?.fields,DEFAULT_HUD.fields,x=>typeof x==='string' && /^(client|features|adcn|confidence|opportunity|signal_context)\.[a-z0-9_]+$/.test(x),20)};
 }

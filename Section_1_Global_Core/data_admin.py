@@ -102,3 +102,12 @@ def delete_data(*, interval=None, symbol=None):
             return counts
         finally:
             conn.close()
+
+
+def adcn_maintenance(action='catalog',data=None):
+    from . import adcn_maintenance as maintenance
+    if action=='catalog':return maintenance.catalog()
+    if action=='preview':return maintenance.preview(data or {})
+    if action=='apply':return maintenance.apply(data or {})
+    if action=='restore':return maintenance.restore((data or {}).get('field'))
+    raise ValueError('Unknown ADCN maintenance action')

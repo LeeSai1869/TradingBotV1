@@ -94,6 +94,7 @@ def open_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     try:
         conn.executescript(_SCHEMA)
+        conn.execute('CREATE TABLE IF NOT EXISTS retired_fields(field TEXT PRIMARY KEY)')
         conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
         conn.execute("""CREATE TABLE IF NOT EXISTS decision_evidence (
             symbol TEXT NOT NULL, interval TEXT NOT NULL, open_time INTEGER NOT NULL,
@@ -115,7 +116,8 @@ def open_db() -> sqlite3.Connection:
 def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:
     if not rows:
         return 0
-    values = [[r.get(c) for c in COLUMNS] for r in rows]
+    retired={row[0] for row in conn.execute('SELECT field FROM retired_fields')}
+    values = [[None if c in retired else r.get(c) for c in COLUMNS] for r in rows]
     cur = conn.executemany(
         f"""
         INSERT OR REPLACE INTO decisions

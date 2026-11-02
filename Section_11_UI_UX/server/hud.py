@@ -12,7 +12,32 @@ from . import live_candle
 FIELDS = {f'client.{key}': key.capitalize() for key in ('open','high','low','close','volume')}
 FIELDS.update({f'features.{key}': key.replace('_',' ').upper()
                for key in features_store.COLUMNS if key not in {'symbol','interval','open_time'}})
-FIELDS.update({'adcn.signal_type':'Signal','adcn.final_score':'Signal score'})
+FIELDS.update({'adcn.signal_type':'Candle decision (stored)','adcn.final_score':'Legacy signal score',
+    'signal_context.side':'Latest decision','signal_context.entry':'Decision price',
+    'confidence.buy_score':'BUY confidence /100','confidence.sell_score':'SELL confidence /100',
+    'confidence.signal_score':'Decision confidence /100','confidence.coverage':'Confidence coverage (fraction)'})
+for side,title in (('sell','Sell / resistance'),('buy','Buy / support')):
+    for level in range(1,4):
+        for metric,label in (('families','contributing families'),('low','low'),('high','high'),('net_reward_pct','net opportunity %')):
+            FIELDS[f'opportunity.{side}_{level}_{metric}']=f'{title} OZ{level} {label}'
+
+
+def field_value(bar,field):
+    if not bar:return None
+    context=bar.get('signal_context') or {}
+    confidence=bar.get('confidence') or context.get('confidence') or {}
+    group,key=field.split('.',1)
+    if group=='signal_context':return context.get(key)
+    if group=='confidence':
+        if key=='signal_score':return confidence.get(str(context.get('side','')).lower()+'_score')
+        return confidence.get(key)
+    if group=='opportunity':
+        side,level,metric=key.split('_',2)
+        areas=(bar.get('opportunity') or context.get('opportunity') or {}).get('areas',{})
+        rows=areas.get('resistance' if side=='sell' else 'support',[])
+        if int(level)>len(rows):return None
+        return rows[int(level)-1].get('confluence_families' if metric=='families' else metric)
+    return (bar.get(group) or {}).get(key)
 
 
 def handle_get(path, raw_qs):
@@ -36,6 +61,7 @@ def handle_get(path, raw_qs):
         for interval in intervals:
             bars = db.read_state_page(symbol,interval,1)['bars']
             bar = bars[-1] if bars else None
+            closed_bar=bar
             active = data_policy.enabled(symbol,interval)
             if qs.get('live',['0'])[0] == '1' and active:
                 snapshot = live_candle.get_snapshot(symbol,interval)
@@ -45,8 +71,8 @@ def handle_get(path, raw_qs):
                     bar = candidate
             values = {}
             for field in fields:
-                group, key = field.split('.',1)
-                value = (bar.get(group) or {}).get(key) if bar else None
+                source=closed_bar if field.split('.')[0] in {'confidence','signal_context','opportunity'} else bar
+                value=field_value(source,field)
                 values[field] = None if isinstance(value,float) and not math.isfinite(value) else value
             close_time = bar['client']['close_time'] if bar else None
             columns.append({'interval':interval,'open_time':bar['open_time'] if bar else None,

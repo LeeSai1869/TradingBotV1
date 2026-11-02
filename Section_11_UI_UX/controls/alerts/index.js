@@ -2,7 +2,7 @@
 import {formatValue} from '../../web_root/value_format.js';
 export const name = 'alerts';
 let dialog, editor, editorTitle, editorStatus, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
-let signalPrefs=null, signalControls, deliveryButton;
+let signalPrefs=null, deliveryButton;
 let polling=false, timer, editing=null, refreshId=0, saving=false;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
@@ -128,7 +128,7 @@ function reset() {
     form.reset();editing=null;
     form.elements.symbol.value=document.getElementById('symbol').value;
     form.elements.interval.value=document.getElementById('interval').value;
-    form.elements.field.value='client.close';form.elements.sound.value='chime';
+    form.elements.field.value='client.close';form.elements.sound.value='none';
     form.elements.enabled.checked=true;form.elements.notify.checked=true;
     form.elements.repeat.value='per_bar';form.elements.value.value='0';form.elements.mode.value='live';syncMode();
     form.querySelector('button[type=submit]').textContent='Create alert';
@@ -136,19 +136,7 @@ function reset() {
 async function build() {
     if(form)return;
     catalog=await request('/api/alerts/catalog');
-    el('p','Live rules watch price and provisional EMA/RSI. Other feature rules use newly stored closed candles and wait for their calculation. Rules run independently of your chart. Keep the app open for sound/notifications; use Enable notifications and sound after opening the app. Old downloaded history does not trigger new closed-feature alerts.',dialog,'settings-note');
-    const enable=el('button','Enable notifications and sound',dialog);
-    enable.onclick=async()=>{
-        const messages=[];
-        try{await unlock();sound('chime');messages.push('Sound enabled for this app session.');}catch(error){messages.push(error.message);}
-        if('Notification' in window) {
-            try{messages.push(`System notifications: ${await Notification.requestPermission()}.`);}catch{messages.push('System notifications unavailable.');}
-        } else messages.push('System notifications unavailable here; in-app alerts still work.');
-        status.textContent=messages.join(' ');
-    };
-    const slider=input('Sound volume','volume','range',dialog);slider.min=0;slider.max=100;slider.value=Math.round(volume*100);
-    slider.oninput=()=>{volume=Number(slider.value)/100;try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}};
-    await renderSignalControls(dialog);
+    el('p','Manage custom notification conditions here. Permission and delivery controls are in Settings → Features → Notifications; tones and volume are in Sounds.',dialog,'settings-note');
     const savedHeader=el('div','',dialog,'alert-list-header');el('h3','Saved alerts',savedHeader);
     const add=el('button','＋ New alert',savedHeader);add.setAttribute('aria-label','New alert');
     add.onclick=()=>{if(saving)return;reset();editorStatus.textContent='';editorTitle.textContent='Create alert';editor.showModal();};
@@ -173,8 +161,7 @@ async function build() {
     const threshold=input('Threshold (signed numbers allowed)','value','number',form);threshold.step='any';threshold.required=true;
     select('Or compare with field','target_field',[['','Use numeric threshold'],...Object.entries(catalog.fields)],form).onchange=syncMode;
     select('Frequency','repeat',[['once','Once, then pause'],['per_bar','Once per matching candle']],form);
-    const sounds=select('Sound','sound',catalog.sounds.map(value=>[value,value]),form);
-    const test=el('button','Test selected sound',form);test.type='button';test.onclick=async()=>{try{await unlock();sound(sounds.value);editorStatus.textContent='Sound test played.';}catch(error){editorStatus.textContent=error.message;}};
+    const tone=input('Sound','sound','hidden',form);tone.value='none';
     input('System notification','notify','checkbox',form);
     input('Alert enabled','enabled','checkbox',form);
     const save=el('button','Create alert',form);save.type='submit';
@@ -197,63 +184,83 @@ async function build() {
 }
 export function mount() {
     try {const stored=Number(localStorage.getItem(`alerts.volume.${window.AppSession.username}`));if(Number.isFinite(stored)&&stored>=0&&stored<=1&&localStorage.getItem(`alerts.volume.${window.AppSession.username}`)!==null)volume=stored;}catch{}
-    const toolbar=document.getElementById('toolbar'), open=el('button','Alerts',toolbar);open.id='alerts-button';
+    const toolbar=document.getElementById('toolbar'), open=el('button','Notifications',toolbar);open.id='alerts-button';
     const gear=document.getElementById('settings-button');if(gear)gear.before(open);
     dialog=el('dialog','',document.body,'alerts-dialog');dialog.setAttribute('aria-labelledby','alerts-title');
     const header=el('header','',dialog);el('h2','Alerts',header).id='alerts-title';const close=el('button','Close alerts',header);close.onclick=()=>dialog.close();
     status=el('p','',dialog,'settings-note');status.setAttribute('role','status');
     el('div','',document.body).id='alert-toasts';
-    open.onclick=async()=>{dialog.showModal();try{await build();await refresh();}catch(error){status.textContent=error.message+' Restart the updated UI backend if this API is missing.';}};
+    open.onclick=()=>window.dispatchEvent(new Event('open-notification-settings'));
     dialog.addEventListener('close',()=>open.focus());
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
     request('/api/alerts/events').then(packet=>{eventCursor=packet.cursor;for(const event of packet.history||[])recent.push(event);renderActivity();timer=setTimeout(poll,2000);}).catch(()=>{timer=setTimeout(poll,5000);});
-    deliveryButton=el('button','Enable sound / notifications',toolbar);deliveryButton.id='alert-delivery-button';
-    deliveryButton.onclick=enableDesktopDelivery;
-    void request('/api/alerts/signals').then(value=>{signalPrefs=value;updateDeliveryStatus();}).catch(error=>{deliveryButton.textContent='Alerts unavailable';deliveryButton.title=error.message;});
+    deliveryButton=open;
+    void getSignalPreferences().then(updateDeliveryStatus).catch(error=>{open.title=error.message;});
     window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
 }
-
-export async function enableSignalSound(){await unlock();}
-export function playSignalSound(key,level=.35){
-    const previous=volume;volume=level;sound(key);volume=previous;
-}
-
 
 function updateDeliveryStatus(){
     if(!deliveryButton)return;
     const ready=audio?.state==='running';
-    deliveryButton.textContent=ready?'Sound on':'Enable sound / notifications';
+    deliveryButton.textContent='Notifications';
+    for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=`Sound: ${ready?'enabled':'click Enable sound'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
     deliveryButton.title=`Automatic BUY/SELL: ${signalPrefs?.enabled?'on':'off'} · Audio: ${ready?'ready':'click to enable'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
-}
-async function enableDesktopDelivery(){
-    const messages=[];
-    try{await unlock();sound('chime');messages.push('Sound enabled.');}catch(error){messages.push(error.message);}
-    if('Notification' in window){try{messages.push(`Notifications: ${await Notification.requestPermission()}.`);}catch{messages.push('System notifications unavailable.');}}
-    status.textContent=messages.join(' ');updateDeliveryStatus();
 }
 export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
 export async function saveSignalPreferences(value){
     signalPrefs=await request('/api/alerts/signals',value);updateDeliveryStatus();return signalPrefs;
 }
-async function renderSignalControls(parent){
-    signalPrefs=await getSignalPreferences();
-    el('h3','Automatic BUY / SELL notifications',parent);
-    el('p','Watches current Decision Engine signals on every active coin and timeframe, even when that chart is not open. The UI backend must be running. Keep this app open for desktop sound. Click Enable sound after opening the app. Existing history is not announced.',parent,'settings-note');
-    signalControls=el('div','',parent);
-    const enabled=input('Watch all active charts','automatic_signals','checkbox',signalControls);enabled.checked=signalPrefs.enabled;
-    enabled.onchange=()=>void saveSignalPreferences({enabled:enabled.checked}).catch(error=>status.textContent=error.message);
-    const notify=input('Desktop notifications','automatic_notify','checkbox',signalControls);notify.checked=signalPrefs.notify;
-    notify.onchange=()=>void saveSignalPreferences({notify:notify.checked}).catch(error=>status.textContent=error.message);
-    for(const side of ['buy','sell']){
-        const choice=select(`${side.toUpperCase()} sound`,side,catalog.sounds.map(x=>[x,x]),signalControls);choice.value=signalPrefs[side];
-        choice.onchange=()=>void saveSignalPreferences({[side]:choice.value}).catch(error=>status.textContent=error.message);
-        const test=el('button',`Test automatic ${side.toUpperCase()}`,signalControls);test.onclick=async()=>{try{await unlock();sound(choice.value);}catch(error){status.textContent=error.message;}};
-    }
-}
-
 export function getSignalVolume(){return volume;}
 export function setSignalVolume(level){
     volume=Math.max(0,Math.min(1,Number(level)));
     try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}
+}
+
+export async function openAlertManager(){
+    document.getElementById('settings-dialog')?.close();
+    dialog.showModal();try{await build();await refresh();}catch(error){status.textContent=error.message;}
+}
+function deliveryState(parent){const node=el('p','',parent,'settings-note');node.dataset.deliveryStatus='';updateDeliveryStatus();const feedback=el('p','',parent,'settings-note');feedback.setAttribute('role','status');return feedback;}
+export async function renderNotificationSettings(parent){
+    const feedback=deliveryState(parent);
+    el('p','Changes here save immediately. The UI backend monitors committed signals even after app logout. Browser notifications need this app open and signed in; OS logout closes the desktop session.',parent,'settings-note');
+    const allow=el('button','Allow desktop notifications',parent);
+    allow.onclick=async()=>{try{
+        if(!('Notification' in window))throw new Error('Desktop notifications are unavailable in this browser.');
+        const result=await Notification.requestPermission();updateDeliveryStatus();
+        feedback.textContent=result==='granted'?'Desktop notifications allowed.':`Notifications ${result}. Check browser site permissions and macOS System Settings → Notifications.`;
+    }catch(error){feedback.textContent=error.message;}};
+    try{
+        const prefs=await getSignalPreferences();if(!parent.isConnected)return;
+        for(const [key,label] of [['enabled','Monitor all active symbols / timeframes'],['notify','Enable desktop signal notifications'],['buy_notify','Notify for BUY'],['sell_notify','Notify for SELL']]){
+            const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;
+            check.onchange=()=>void saveSignalPreferences({[key]:check.checked}).catch(error=>feedback.textContent=error.message);
+        }
+        const custom=el('button','Add / edit / delete custom notifications',parent);custom.onclick=openAlertManager;
+        const packet=await request('/api/alerts');if(!parent.isConnected)return;
+        for(const rule of packet.rules){
+            const row=el('div','',parent,'settings-row');el('span',`${rule.name} · ${rule.symbol} ${rule.interval}`,row);
+            const check=input('Desktop notification',rule.id,'checkbox',row);check.checked=rule.notify;
+            check.onchange=()=>void request('/api/alerts',{...rule,notify:check.checked}).catch(error=>feedback.textContent=error.message);
+            const remove=el('button','Delete notification',row);remove.onclick=async()=>{try{await request('/api/alerts/delete',{id:rule.id});row.remove();}catch(error){feedback.textContent=error.message;}};
+        }
+    }catch(error){feedback.textContent=error.message;}
+}
+export async function renderSoundSettings(parent){
+    const feedback=deliveryState(parent);
+    el('p','All tones are configured here and save immediately. Choose none to mute an individual signal or custom rule. Audio requires a click after opening the app.',parent,'settings-note');
+    const enable=el('button','Enable sound',parent);enable.onclick=async()=>{try{await unlock();sound('chime');updateDeliveryStatus();}catch(error){feedback.textContent=error.message;}};
+    const slider=input('Sound volume','volume','range',parent);slider.min=0;slider.max=1;slider.step=.05;slider.value=volume;slider.oninput=()=>setSignalVolume(slider.value);
+    function tone(label,value,save){
+        const row=el('div','',parent,'settings-row');const choice=select(label,'tone',[['none','Silent'],['chime','Chime'],['bell','Bell'],['alarm','Alarm']],row);choice.value=value;
+        choice.onchange=()=>void save(choice.value).catch(error=>feedback.textContent=error.message);
+        const test=el('button',`Test ${label}`,row);test.onclick=async()=>{try{await unlock();sound(choice.value);feedback.textContent=choice.value==='none'?'This sound is disabled.':'Test sound played.';}catch(error){feedback.textContent=error.message;}};
+    }
+    try{
+        const prefs=await getSignalPreferences();if(!parent.isConnected)return;
+        for(const side of ['buy','sell'])tone(`${side.toUpperCase()} sound`,prefs[side],value=>saveSignalPreferences({[side]:value}));
+        const packet=await request('/api/alerts');if(!parent.isConnected)return;
+        for(const rule of packet.rules)tone(`${rule.name} sound`,rule.sound,value=>request('/api/alerts',{...rule,sound:value}));
+    }catch(error){feedback.textContent=error.message;}
 }

@@ -53,3 +53,13 @@ class HudTests(unittest.TestCase):
         self.assertEqual(packet['columns'][0]['values'],{'client.close':13,'features.rsi':82})
         self.assertEqual(packet['columns'][0]['status'],'live provisional candle')
         snapshot.assert_called_once_with('BTCUSDT','1m')
+
+class CurrentHudEvidence(unittest.TestCase):
+    def test_current_confidence_and_opportunity_are_selected_from_same_anchor(self):
+        bar={'signal_context':{'side':'SELL','entry':100,'confidence':{'buy_score':25,'sell_score':80}},
+             'opportunity':{'areas':{'resistance':[{'low':105,'high':106,'confluence_families':3,'net_reward_pct':5}], 'support':[{'low':94,'high':95,'confluence_families':2}]}}}
+        self.assertEqual(hud.field_value(bar,'confidence.signal_score'),80)
+        self.assertEqual(hud.field_value(bar,'opportunity.sell_1_families'),3)
+        self.assertEqual(hud.field_value(bar,'opportunity.buy_1_low'),94)
+        self.assertIsNone(hud.field_value(bar,'opportunity.buy_2_low'))
+        self.assertIn('confidence.buy_score',hud.FIELDS)

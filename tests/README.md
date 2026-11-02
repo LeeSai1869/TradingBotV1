@@ -894,3 +894,13 @@ pause/re-arm without history replay, account isolation and API origin checks.
 `browser_signal_alerts.py` verifies one audible desktop notification for a stored
 BUY on an unviewed symbol, plus searchable fields and the simple SELL preset.
 Run with `PYTHONPATH=. python3 tests/browser_signal_alerts.py /path/to/lightweight-charts.js`.
+
+Notifications now opens Features / Notifications; Features / Sounds owns tones,
+volume and audio permission. `browser_signal_alerts.py` covers navigation,
+notification permission, unviewed delivery, HUD search/current confidence rows,
+and administrator ADCN previews/protection/confirmation. `test_adcn_maintenance.py`
+covers retirement/restore, stale-preview rejection and legacy-only cleanup while
+preserving current signals/checkpoints/evidence and permanent features.
+`test_server_service_config.py` checks normal-user non-GUI service configurations.
+`current_hud.test.mjs` covers legacy selection migration and closed anchored
+evidence alongside live price.

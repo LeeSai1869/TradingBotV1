@@ -23,17 +23,18 @@ def user(server):
 def handle_get(path, server):
     if path == '/api/session':
         return 200, user(server)
-    if path == '/api/settings/timeframes':
+    if path in {'/api/settings/timeframes','/api/settings/adcn'}:
         identity = user(server)
         if identity['role'] != 'admin':
             return (401 if identity['role'] == 'guest' else 403), {'error': 'Administrator access required'}
+        if path=='/api/settings/adcn':return 200,data_admin.adcn_maintenance()
         state = data_policy.read()
         return 200, {'timeframes': [{'interval': iv, 'status': state['timeframes'].get(iv, 'active')} for iv in data_policy.INTERVALS]}
     return None, None
 
 
 def handle_post(path, body, server):
-    if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/coins/batch','/api/settings/delete'}:
+    if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/coins/batch','/api/settings/delete','/api/settings/adcn'}:
         return None, None
     origin = server.headers.get('Origin')
     if origin and urlparse(origin).netloc != server.headers.get('Host'):
@@ -62,6 +63,7 @@ def handle_post(path, body, server):
             return 401, {'error': 'Sign in to change download policy'}
         if identity['role'] != 'admin':
             return 403, {'error': 'Administrator access required'}
+        if path=='/api/settings/adcn':return 200,data_admin.adcn_maintenance(data.get('action'),data)
         if path == '/api/settings/timeframes':
             data_admin.set_timeframe(data.get('interval'), data.get('status'))
         elif path == '/api/settings/coins/batch':

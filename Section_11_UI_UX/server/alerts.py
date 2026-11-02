@@ -280,7 +280,7 @@ def start():
     return stop
 
 
-SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True}
+SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'buy_notify':True,'sell_notify':True}
 
 
 def signal_preferences(owner, changes=None):
@@ -289,11 +289,11 @@ def signal_preferences(owner, changes=None):
         with conn:
             conn.execute('BEGIN IMMEDIATE')
             row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
-            spec=json.loads(row[0]) if row else dict(SIGNAL_DEFAULTS)
+            spec=dict(SIGNAL_DEFAULTS) | (json.loads(row[0]) if row else {})
             if changes is not None:
                 if any(key not in SIGNAL_DEFAULTS for key in changes):raise ValueError('Unknown signal preference')
                 spec.update(changes)
-                if any(type(spec[k]) is not bool for k in ('enabled','notify')) or any(spec[k] not in SOUNDS for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
+                if any(type(spec[k]) is not bool for k in ('enabled','notify','buy_notify','sell_notify')) or any(spec[k] not in SOUNDS for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
             conn.execute('INSERT OR REPLACE INTO signal_preferences VALUES (?,?)',(owner,json.dumps(spec)))
         return spec
     finally:conn.close()
@@ -313,13 +313,13 @@ def sync_signal_rules():
         pairs=[(s,iv) for s in data_policy.active_symbols() for iv in data_policy.active_intervals()]
         active=set(pairs)
         for account in subscriptions:
-            owner=account['owner'];prefs=json.loads(account['spec'])
+            owner=account['owner'];prefs=dict(SIGNAL_DEFAULTS)|json.loads(account['spec'])
             existing={r['id']:r for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id LIKE 'auto:%'",(owner,))}
             for symbol,iv in active|{(json.loads(r['spec'])['symbol'],json.loads(r['spec'])['interval']) for r in existing.values()}:
                 for side in ('buy','sell'):
                     key='auto:'+uuid.uuid5(uuid.NAMESPACE_URL,owner+'|'+symbol+'|'+iv+'|'+side).hex
                     enabled=prefs['enabled'] and (symbol,iv) in active
-                    spec=dict(name=side.upper(),symbol=symbol,interval=iv,field='decision.'+side,operator='equals',value=1,target_field=None,repeat='per_bar',sound=prefs[side],notify=prefs['notify'],enabled=enabled,mode='closed')
+                    spec=dict(name=side.upper(),symbol=symbol,interval=iv,field='decision.'+side,operator='equals',value=1,target_field=None,repeat='per_bar',sound=prefs[side],notify=prefs['notify'] and prefs[side+'_notify'],enabled=enabled,mode='closed')
                     old=existing.get(key)
                     if old and json.loads(old['spec'])==spec:continue
                     now=int(time.time()*1000)

@@ -63,7 +63,9 @@ export async function renderHudSettings(container,draft) {
     const fields=el('section','',container);el('h4','Feature rows',fields);
     const rows=el('div','',fields), addLabel=el('label','Add feature ',fields), addSelect=el('select','',addLabel);
     addSelect.setAttribute('aria-label','HUD feature to add');
-    for(const [key,title] of Object.entries(choices.fields)){const option=el('option',title,addSelect);option.value=key;}
+    const searchLabel=el('label','Search HUD fields ',fields),search=el('input','',searchLabel);search.type='search';search.setAttribute('aria-label','Search HUD fields');
+    function filterFields(){const selected=addSelect.value,q=search.value.toLowerCase();addSelect.replaceChildren();for(const [key,title] of Object.entries(choices.fields)){if(key.startsWith('adcn.'))continue;if(`${key} ${title}`.toLowerCase().includes(q)){const option=el('option',title,addSelect);option.value=key;}}if([...addSelect.options].some(x=>x.value===selected))addSelect.value=selected;}
+    filterFields();search.oninput=()=>{filterFields();renderRows();};
     const add=el('button','Add feature row',fields);
     function renderRows(){
         rows.replaceChildren();

@@ -19,7 +19,8 @@ async def exercise(base,library):
             await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
             await page.goto(base);await sign_in(page,'user')
             await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000')
-            await page.get_by_role('button',name='Alerts',exact=True).click()
+            await page.get_by_role('button',name='Notifications',exact=True).click()
+            await page.get_by_role('button',name='Add / edit / delete custom notifications',exact=True).click()
             manager=page.get_by_role('dialog',name='Alerts',exact=True)
             await manager.get_by_role('button',name='New alert',exact=True).wait_for()
             assert await manager.locator('form').count()==0
