@@ -77,7 +77,7 @@ async def exercise(base,library):
         with patch.object(alerts.time,'time',return_value=t/1000+61): alerts.evaluate_once()
         await page.locator('.alert-toast').filter(has_text='RSI crossing test').wait_for()
         assert await page.evaluate('soundEvents')>before
-        assert await page.evaluate("noticeEvents.some(e=>e.name==='RSI crossing test')")
+        assert await page.evaluate("noticeEvents.some(e=>e.name.includes('RSI crossing test'))")
         assert await page.evaluate('DataCache.atLiveEdge') is False
         await open_manager(page)
         await dialog.get_by_role('button',name='New notification',exact=True).click()

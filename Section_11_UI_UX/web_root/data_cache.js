@@ -134,7 +134,7 @@ const DataCache = {
         this.atLiveEdge = range.to >= this.bars.length - 2;
     },
 
-    async loadInitial(symbol, timeframe) {
+    async loadInitial(symbol, timeframe, before=null) {
         const generation = ++this._reloadGeneration;
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
@@ -142,7 +142,7 @@ const DataCache = {
             historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
-            const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS);
+            const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
             if (generation !== this._reloadGeneration) return false;
             this.featureProgress=packet.feature_progress??null;
             this.srSnapshot=packet.sr_snapshot??null;
@@ -158,6 +158,7 @@ const DataCache = {
             this.nextBefore = packet.next_before;
             this._latestSignature = JSON.stringify(packet.bars);
             this._applyLive(packet.live);
+            if(before!==null)this.atLiveEdge=false;
             this.loading = false;
             this.emit("reload");
             return true;

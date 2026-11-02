@@ -8,7 +8,7 @@ import sqlite3
 import threading
 import time
 import uuid
-from . import auth, live_candle
+from . import auth, live_candle, notification_payload
 from Section_1_Global_Core import data_policy, data_admin
 from Section_1_Global_Core.memory_storage.Storage import db, features_store
 from Section_1_Global_Core.memory_storage.market_data.update_klines import INTERVAL_MS
@@ -44,6 +44,8 @@ def open_db():
         CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,owner TEXT NOT NULL,rule_id TEXT NOT NULL,
             epoch TEXT NOT NULL,bar_time INTEGER NOT NULL,created INTEGER NOT NULL,packet TEXT NOT NULL,
             UNIQUE(rule_id,epoch,bar_time));
+        CREATE TABLE IF NOT EXISTS push_devices(id TEXT PRIMARY KEY,owner TEXT NOT NULL,subscription TEXT NOT NULL,cursor INTEGER NOT NULL,failures INTEGER NOT NULL,next_try REAL NOT NULL,last_error TEXT NOT NULL,last_sent INTEGER,touched REAL NOT NULL);
+        CREATE INDEX IF NOT EXISTS push_devices_owner ON push_devices(owner);
         CREATE TABLE IF NOT EXISTS custom_sounds(id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL);
         CREATE INDEX IF NOT EXISTS custom_sounds_owner ON custom_sounds(owner);
         CREATE TABLE IF NOT EXISTS signal_preferences(owner TEXT PRIMARY KEY,spec TEXT NOT NULL);
@@ -135,6 +137,9 @@ def events(owner,after):
             desktop=prefs['notify'] and timeframe.get('desktop',True) and coin.get('desktop',True)
             side=event.get('field','').removeprefix('decision.')
             if side in ('buy','sell'):desktop=desktop and prefs[side+'_notify']
+            mobile=prefs['mobile'] and timeframe.get('mobile',True) and coin.get('mobile',True)
+            if side in ('buy','sell'):mobile=mobile and prefs[side+'_notify']
+            event['mobile']=mobile
             event['app']=prefs['app'] and desktop
             event['notify']=event.get('notify',False) and desktop
             return event
@@ -200,7 +205,7 @@ def evaluate_live(rule,spec):
                     status='Watching live price'
                     if fired:
                         message=f"{spec['name']}: {symbol} {iv} live — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {display_value(target, spec.get('target_field') or spec['field'])} (value {display_value(value, spec['field'])})"
-                        event={'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'live'}
+                        event={'details':notification_payload.details(bar),'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'live'}
                         inserted=conn.execute('INSERT OR IGNORE INTO events(owner,rule_id,epoch,bar_time,created,packet) VALUES(?,?,?,?,?,?)',(rule['owner'],rule['id'],version,bar['open_time'],event['created'],json.dumps(event))).rowcount
                         status='Triggered' if inserted else 'Already triggered on this candle'
                         if inserted and spec['repeat']=='once': spec['enabled']=False
@@ -208,7 +213,7 @@ def evaluate_live(rule,spec):
         finally: conn.close()
 
 
-def evaluate_rule(rule):
+def evaluate_rule(rule,details_cache=None):
     spec=json.loads(rule['spec'])
     if not spec['enabled']: return
     if spec.get('mode')=='live':
@@ -228,7 +233,7 @@ def evaluate_rule(rule):
             start=max(cursor,created-2*INTERVAL_MS[iv])
             bars=db.read_state_after(symbol,iv,start,200)
             previous=None
-            if bars:
+            if bars and spec['operator'].startswith('crosses_'):
                 prior=db.read_state_page(symbol,iv,1,before=bars[0]['open_time'])['bars']
                 previous=prior[-1] if prior else None
             for bar in bars:
@@ -253,7 +258,17 @@ def evaluate_rule(rule):
                     message=f"{spec['name']}: {symbol} {iv} — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {display_value(target, spec.get('target_field') or spec['field'])} (value {display_value(value, spec['field'])})"
                     if spec['field'].startswith('decision.'):
                         message=f"{symbol} {iv} {spec['field'].split('.')[1].upper()} · {bar['client']['close']}"
-                    updates.append({'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'closed'})
+                    side=spec['field'].split('.')[1].upper() if spec['field'].startswith('decision.') else None
+                    cache=details_cache if details_cache is not None else {}
+                    key=(symbol,iv,bar['open_time'],side,bar['client']['close'],version)
+                    if key not in cache:
+                        context=None
+                        if side in ('BUY','SELL'):
+                            page=db.read_state_page(symbol,iv,1,before=bar['open_time']+1)
+                            exact=page['bars'][-1] if page['bars'] else None
+                            if exact and exact['open_time']==bar['open_time']:context=exact.get('signal_context')
+                        cache[key]=notification_payload.details(bar,side,context)
+                    updates.append({'details':cache[key],'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'closed'})
                     status='Triggered'
                     if spec['repeat']=='once': spec['enabled']=False; break
         conn=open_db()
@@ -273,8 +288,9 @@ def evaluate_once():
     conn=open_db()
     try: rules=conn.execute('SELECT * FROM rules').fetchall()
     finally: conn.close()
+    details_cache={}
     for rule in rules:
-        try: evaluate_rule(rule)
+        try: evaluate_rule(rule,details_cache)
         except Exception as error:
             print(f'[alerts] evaluation failed for rule {rule["id"]}: {type(error).__name__}',flush=True)
             conn=open_db()
@@ -296,7 +312,7 @@ def start():
     return stop
 
 
-SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'app':True,'buy_notify':True,'sell_notify':True,'timeframes':{},'coins':{}}
+SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'app':True,'buy_notify':True,'sell_notify':True,'timeframes':{},'coins':{},'mobile':False}
 
 
 def signal_preferences(owner, changes=None):
@@ -318,11 +334,16 @@ def signal_preferences(owner, changes=None):
                     merged=dict(spec.get(scope,{}))
                     for key,flags in patch.items():
                         if not isinstance(flags,dict) or set(flags)-{'desktop','mobile'} or any(type(value) is not bool for value in flags.values()):raise ValueError('Invalid notification delivery switch')
-                        if flags.get('mobile'):raise ValueError('Mobile notifications are not available yet')
+                        if flags.get('mobile'):
+                            from . import mobile_push
+                            if not mobile_push.status()['ready']:raise ValueError('Mobile notifications require HTTPS and push setup first')
                         merged[key]={**merged.get(key,{}),**flags}
                     updates[scope]=merged
+                if updates.get('mobile'):
+                    from . import mobile_push
+                    if not mobile_push.status()['ready']:raise ValueError('Mobile notifications require HTTPS and push setup first')
                 spec.update(updates)
-                if any(type(spec[k]) is not bool for k in ('enabled','notify','app','buy_notify','sell_notify')) or any(not valid_sound(owner,spec[k],conn) for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
+                if any(type(spec[k]) is not bool for k in ('enabled','notify','app','mobile','buy_notify','sell_notify')) or any(not valid_sound(owner,spec[k],conn) for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
             conn.execute('INSERT OR REPLACE INTO signal_preferences VALUES (?,?)',(owner,json.dumps(spec)))
         return spec
     finally:conn.close()

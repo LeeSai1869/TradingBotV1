@@ -1,4 +1,5 @@
 """Authenticated account-owned alert operations."""
+from .public_access import same_origin
 import json
 from urllib.parse import parse_qs, urlparse
 from . import alerts, admin_routes
@@ -31,7 +32,7 @@ def handle_post(path,body,server):
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
     origin=server.headers.get('Origin')
-    if origin and urlparse(origin).netloc!=server.headers.get('Host'): return 403,{'error':'Cross-origin changes forbidden'}
+    if not same_origin(server,origin): return 403,{'error':'Cross-origin changes forbidden'}
     try:
         data=json.loads(body)
         if not isinstance(data,dict): raise ValueError('JSON object required')

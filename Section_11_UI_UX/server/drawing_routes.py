@@ -1,4 +1,5 @@
 """Account-owned drawing memory, separate from market data and browser storage."""
+from .public_access import same_origin
 import json
 import math
 import re
@@ -54,7 +55,7 @@ def handle_post(path,body,server):
     user=admin_routes.user(server)
     if user['role']=='guest':return 401,{'error':'Sign in required'}
     origin=server.headers.get('Origin')
-    if origin and urlparse(origin).netloc!=server.headers.get('Host'):return 403,{'error':'Cross-origin changes forbidden'}
+    if not same_origin(server,origin):return 403,{'error':'Cross-origin changes forbidden'}
     try:
         if len(body)>500000:raise ValueError('Drawing memory too large')
         data=json.loads(body)

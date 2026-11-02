@@ -1,0 +1,2 @@
+# Optional: needed only on the server that sends mobile Web Push.
+pywebpush>=2.0,<3

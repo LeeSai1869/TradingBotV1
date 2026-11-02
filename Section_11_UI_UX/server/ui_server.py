@@ -8,9 +8,10 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import logging
 import sqlite3
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse,unquote
+import posixpath
 
-from . import routes
+from . import routes,mobile_push,public_access
 
 HERE = Path(__file__).resolve().parent          # Section_11_UI_UX/server/
 SECTION_11 = HERE.parent                        # Section_11_UI_UX/
@@ -66,9 +67,15 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path in ("", "/"):
             self.path = "/web_root/index.html"
 
+        if parsed.path=='/sw.js':self.path='/web_root/sw.js'
+        if parsed.path=='/manifest.webmanifest':self.path='/web_root/manifest.webmanifest'
+        safe=posixpath.normpath(unquote(urlparse(self.path).path))
+        if not any(safe.startswith('/'+folder+'/') for folder in ('web_root','chart','controls','overlays','panels')):
+            self.send_error(404);return
         return super().do_GET()
 
     def end_headers(self):
+        if urlparse(self.path).path=='/web_root/sw.js':self.send_header('Service-Worker-Allowed','/')
         # Development UI must never execute stale HTML/JS/CSS.
         # This applies to both API responses and static files.
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -77,7 +84,12 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def _local_host(self):
-        return self.headers.get("Host") in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+        allowed={f"127.0.0.1:{self.server.server_port}",f"localhost:{self.server.server_port}"}
+        try:
+            origin=mobile_push.configuration().get('origin')
+            if origin:allowed.add(urlparse(origin).netloc)
+        except (OSError,ValueError):pass
+        return self.headers.get('Host') in allowed
 
     def do_POST(self):
         self._dispatch(self._post)
@@ -112,7 +124,9 @@ class Handler(SimpleHTTPRequestHandler):
         if status == 503:
             self.send_header("Retry-After", "1")
         if getattr(self, "response_cookie", None):
-            self.send_header("Set-Cookie", self.response_cookie)
+            cookie=self.response_cookie
+            if public_access.public_request(self):cookie+='; Secure'
+            self.send_header("Set-Cookie",cookie)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -122,6 +136,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     stop_alerts = routes.alert_routes.alerts.start()
+    stop_push=mobile_push.start()
     print(f"chart server on http://localhost:{PORT}/")
     print(f"root:  {SECTION_11}")
     print(f"web:   {WEB_ROOT}")
@@ -131,6 +146,7 @@ def main():
         print("\nstopped")
     finally:
         stop_alerts.set()
+        stop_push.set()
         server.server_close()
 
 

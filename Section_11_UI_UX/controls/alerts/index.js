@@ -1,10 +1,13 @@
 // Alert configuration is per account; evaluation happens in the local backend.
+import {notificationCard,notificationView,TOAST_LIFETIME_MS} from '../../web_root/notification_view.js';
 import {formatValue} from '../../web_root/value_format.js';
 export const name = 'alerts';
 let editor, editorTitle, editorStatus, form, activity, status, catalog, audio, volume=0.35, eventCursor=null;
 let signalPrefs=null, deliveryButton, notificationPanel, newButton;
 const customBuffers=new Map();
 let customLibrary=[];
+let mobileConfigPromise;
+function mobileConfig(){return mobileConfigPromise??=request('/api/mobile/config').catch(error=>{mobileConfigPromise=null;throw error;});}
 let polling=false, timer, editing=null, saving=false;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
@@ -63,27 +66,29 @@ function renderActivity() {
     if(!recent.length)el('p','No alerts triggered yet.',activity,'settings-note');
     for(const event of recent.slice(-10).reverse()){
         const row=el('div','',activity,'alert-rule');
-        el('strong',`${event.name} · ${event.symbol} ${event.interval}`,row);
+        const link=el('a',`${event.name} · ${event.symbol} ${event.interval}`,row);link.href=notificationView(event).url;link.onclick=click=>{if(click.ctrlKey||click.metaKey)return;click.preventDefault();openEventChart(event);};
         el('span',` · ${new Date(event.created).toLocaleTimeString()}`,row);
         const detail=el('details','',row);el('summary','Details',detail);el('p',event.message,detail);
         el('p',`Candle: ${new Date(event.bar_time).toLocaleString()}`,detail);
     }
 }
+function openEventChart(event){window.focus();if(window.openAlertChart)void window.openAlertChart(event).catch(error=>{const target=document.getElementById('status');if(target)target.textContent=error.message;});else window.location.assign(notificationView(event).url);}
 function receive(event,deliver=true) {
     if(recent.some(row=>row.seq===event.seq))return;
     recent.push(event);if(recent.length>100)recent.shift();renderActivity();
     if(!deliver)return;
-    const text=`${event.message} · Candle: ${new Date(event.bar_time).toLocaleString()}`;
+    const view=notificationView(event);
+    const open=()=>openEventChart(event);
     if(event.app!==false){
-    const toast=el('div',text,document.getElementById('alert-toasts'),'alert-toast');toast.setAttribute('role','status');
-    setTimeout(()=>toast.remove(),15000);
-    while(document.querySelectorAll('.alert-toast').length>5)document.querySelector('.alert-toast').remove();
+        document.getElementById('alert-toasts').append(notificationCard(event,{open,ephemeral:true}));
+        while(document.querySelectorAll('#alert-toasts .alert-toast').length>5)document.querySelector('#alert-toasts .alert-toast').remove();
     }
     enqueueSound(event.sound);
     if(event.notify&&'Notification' in window&&Notification.permission==='granted') {
-        try {new Notification(event.name,{body:text,tag:`stored-alert-${event.seq}`});}catch{ /* In-app activity remains available. */ }
+        try {const notice=new Notification(view.title,{body:view.lines.join('\n'),tag:`stored-alert-${event.seq}`});notice.onclick=()=>{notice.close?.();open();};setTimeout(()=>notice.close?.(),TOAST_LIFETIME_MS);}catch{ /* In-app activity remains available. */ }
     }
 }
+
 async function poll() {
     if(polling)return;polling=true;
     try {
@@ -214,13 +219,16 @@ export async function renderNotificationSettings(parent){
         feedback.textContent=result==='granted'?'Desktop notifications allowed.':`Notifications ${result}. Check browser site permissions and macOS System Settings → Notifications.`;
     }catch(error){feedback.textContent=error.message;}};
     try{
-        const prefs=await getSignalPreferences();if(!marker.isConnected)return;
+        const [prefs,mobile]=await Promise.all([getSignalPreferences(),mobileConfig()]);if(!marker.isConnected)return;
         function toggle(label,key){const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;check.onchange=async()=>{try{await saveSignalPreferences({[key]:check.checked});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};}
         toggle('Desktop notifications','notify');
+        toggle('Mobile notifications','mobile');
+        const mobileToggle=parent.querySelector('[name=mobile]');mobileToggle.disabled=!mobile.ready;mobileToggle.title=mobile.reason;
+        const install=el('a','Open mobile app / installation',parent);install.href=mobile.origin?mobile.origin+'/web_root/mobile.html':'/web_root/mobile.html';install.target='_blank';install.rel='noopener';
         const signals=el('fieldset','',parent);el('legend','Automatic signals · active charts',signals);
         for(const side of ['buy','sell']){const check=input(`Notify ${side.toUpperCase()}`,side+'_notify','checkbox',signals);check.checked=prefs[side+'_notify']!==false;check.onchange=()=>void saveSignalPreferences({[side+'_notify']:check.checked}).catch(error=>feedback.textContent=error.message);}
         if(!prefs.enabled){const resume=el('button','Resume automatic signal monitoring',signals);resume.onclick=async()=>{await saveSignalPreferences({enabled:true});await refresh();};}
-        el('p','Choose Desktop delivery per timeframe and coin in Settings → Timeframes and Coins. Mobile delivery is not available yet.',signals,'settings-note');
+        el('p','Choose Desktop delivery per timeframe and coin in Settings → Timeframes and Coins. Mobile delivery requires connecting your installed phone app.',signals,'settings-note');
         const heading=el('div','',parent,'settings-coin-actions');el('h4','Custom notifications',heading);
         newButton=el('button','New notification',heading);newButton.onclick=()=>void openEditor().catch(error=>feedback.textContent=error.message);
         const packet=await request('/api/alerts');if(!marker.isConnected)return;
@@ -293,11 +301,11 @@ async function play(key){
 
 async function renderNotificationDelivery(parent,scope,key){
     const marker=el('span','',parent),feedback=el('span','',parent,'settings-note');
-    try{const prefs=signalPrefs||await getSignalPreferences();if(!marker.isConnected)return;
+    try{const [prefs,mobile]=await Promise.all([signalPrefs||getSignalPreferences(),mobileConfig()]);if(!marker.isConnected)return;
         for(const [channel,label] of [['desktop','Desktop'],['mobile','Mobile']]){
             const check=input(label,channel,'checkbox',parent);check.setAttribute('aria-label',`${key} ${label} notifications`);
-            check.checked=channel==='desktop'?prefs[scope]?.[key]?.desktop!==false:false;
-            check.disabled=channel==='mobile';if(check.disabled)check.title='Mobile notifications are not available yet';
+            check.checked=channel==='desktop'?prefs[scope]?.[key]?.desktop!==false:mobile.ready&&prefs[scope]?.[key]?.mobile!==false;
+            check.disabled=channel==='mobile'&&!mobile.ready;if(check.disabled)check.title=mobile.reason;
             check.onchange=async()=>{try{await saveSignalPreferences({[scope]:{[key]:{[channel]:check.checked}}});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};
         }
     }catch(error){feedback.textContent=error.message;}

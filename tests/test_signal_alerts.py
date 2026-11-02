@@ -67,6 +67,16 @@ class SignalAlerts(unittest.TestCase):
         self.add('SELL',t=180000);alerts.evaluate_once()
         self.assertEqual(alerts.events('admin',0)['events'][0]['field'],'decision.sell')
 
+    def test_shared_signal_evidence_is_projected_once_per_pass(self):
+        self.arm()
+        with patch.object(alerts.time,'time',return_value=120):
+            alerts.signal_preferences('user');alerts.sync_signal_rules()
+        self.add('BUY')
+        with patch.object(alerts.db,'read_state_page',wraps=alerts.db.read_state_page) as read:
+            alerts.evaluate_once();self.assertEqual(read.call_count,1)
+        self.assertEqual(len(alerts.events('admin',0)['events']),1)
+        self.assertEqual(len(alerts.events('user',0)['events']),1)
+
     def test_preferences_api_is_account_owned_and_origin_checked(self):
         code,_=alert_routes.handle_get('/api/alerts/signals','',self.server())
         self.assertEqual(code,401)

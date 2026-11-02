@@ -912,3 +912,14 @@ invalid inputs, origin/auth checks, and independent coin/timeframe desktop filte
 assignment and deletion, top-level menus, the toolbar toggle, Desktop scope
 switches and disabled/deferred Mobile controls. Sound assignments and calculation
 status stay unchanged when notification scopes are muted.
+
+
+Rich/mobile notifications: `test_mobile_push.py` covers matching evidence,
+private device ownership, scope routing, retries/expiry, configured proxy origin,
+provider validation and real Web Push encryption with a mocked HTTP transport.
+`test_mobile_setup.py` verifies adding a normal user preserves existing accounts.
+`notification_cards.test.mjs` checks content/deep links and service-worker click,
+dismiss and no-API-cache behavior. `browser_notification_cards.py` checks rich
+card content, dismissal, 20-second expiry, historical-candle focus and mobile
+sign-in/setup-needed UI. Real phone receipt requires private HTTPS and device
+enrollment; tests do not send messages to an external push endpoint.

@@ -41,7 +41,7 @@ async def exercise(base,library):
             with patch.object(alerts.time,'time',return_value=t/1000+61):alerts.evaluate_once();alerts.evaluate_once()
             await page.locator('.alert-toast').filter(has_text='SUIUSDT 1m BUY').wait_for()
             assert await page.evaluate('soundEvents')>before
-            assert await page.evaluate("noticeEvents.filter(e=>e.name==='BUY').length")==1
+            assert await page.evaluate("noticeEvents.filter(e=>e.name.includes('BUY')).length")==1
             assert await page.evaluate('DataCache.symbol')=='BTCUSDT'
             await page.get_by_role('button',name='Open settings',exact=True).click()
             await settings.get_by_role('tab',name='Notifications',exact=True).click()

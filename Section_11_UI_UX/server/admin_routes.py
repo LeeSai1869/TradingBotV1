@@ -1,4 +1,5 @@
 """Role checks live here, not in browser controls."""
+from .public_access import same_origin
 import json
 import sqlite3
 from http.cookies import SimpleCookie
@@ -37,7 +38,7 @@ def handle_post(path, body, server):
     if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/coins/batch','/api/settings/delete','/api/settings/adcn'}:
         return None, None
     origin = server.headers.get('Origin')
-    if origin and urlparse(origin).netloc != server.headers.get('Host'):
+    if not same_origin(server,origin):
         return 403, {'error': 'Cross-origin changes are forbidden'}
     try:
         data = json.loads(body or '{}')

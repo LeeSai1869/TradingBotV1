@@ -4,7 +4,7 @@ async function request(data){const response=await fetch('/api/settings/adcn',dat
 export async function renderAdcnMemory(parent){
     const status=el('p','Loading ADCN maintenance…',parent);status.setAttribute('role','status');
     try{
-        const catalog=await request();if(!parent.isConnected)return;status.textContent=catalog.note;
+        const catalog=await request();if(!status.isConnected)return;status.textContent=catalog.note;
         el('p','Nothing is deleted automatically. Review the impact, then type the confirmation. Retirement applies globally to the selected archived fields; history deletion can be limited below. Current decisions, their evidence and checkpoints are protected.',parent);
         const search=el('input','',parent);search.type='search';search.placeholder='Search ADCN fields';search.setAttribute('aria-label','Search ADCN fields');
         const rows=el('div','',parent),checks=[];

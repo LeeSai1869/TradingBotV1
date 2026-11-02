@@ -8,7 +8,7 @@ from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core import data_policy
 
 from . import queries, hud, drawing_routes, volume_profile, liquidity
-from . import live_candle, admin_routes, alert_routes
+from . import live_candle, admin_routes, alert_routes, mobile_routes
 from .settings_catalog import read_coin_catalog
 
 HERE = None
@@ -54,6 +54,8 @@ def handle_get(path, raw_qs, server):
     status, payload = hud.handle_get(path, raw_qs)
     if status is not None:
         return status, payload
+    status,payload=mobile_routes.handle_get(path,server)
+    if status is not None:return status,payload
     status, payload = alert_routes.handle_get(path, raw_qs, server)
     if status is not None:
         return status, payload
@@ -231,6 +233,8 @@ def handle_post(path, body, server):
     status, payload = drawing_routes.handle_post(path, body, server)
     if status is not None:
         return status, payload
+    status,payload=mobile_routes.handle_post(path,body,server)
+    if status is not None:return status,payload
     status, payload = alert_routes.handle_post(path, body, server)
     if status is not None:
         return status, payload

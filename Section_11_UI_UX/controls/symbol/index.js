@@ -107,3 +107,5 @@ export async function mount() {
     window.addEventListener('resize',close);document.getElementById('toolbar').addEventListener('scroll',close);
 }
 export async function refresh() { await populate(true); }
+
+export function syncSelection(){sync();}

@@ -14,6 +14,8 @@ let loadId = 0;
 
 async function loadAll() {
     const id = ++loadId;
+    DataCache.alertReference=null;
+    if(new URLSearchParams(location.search).has('at'))history.replaceState(null,'','/');
     const symbol = symbolControl.value();
     const timeframe = timeframeControl.value();
     status().textContent = `Loading ${symbol} ${timeframe}...`;
@@ -151,6 +153,7 @@ async function loadAll() {
     reloadControl.bind(loadAll);
     latestControl.bind(() => {
         if (DataCache.loading || !DataCache.renderBars.length) return;
+        if(DataCache.alertReference!=null){void loadAll();return;}
         const range = chart.timeScale().getVisibleLogicalRange();
         DataCache.atLiveEdge = true;
         pending = { op: "latest", reset: false, latest: true,
@@ -160,7 +163,30 @@ async function loadAll() {
             status().textContent = `Latest candle refresh failed: ${error.message}`;
         });
     });
-    await loadAll();
+    let navigation=0;
+    window.openAlertChart=async event=>{
+        const sequence=++navigation,symbol=String(event.symbol||''),tf=String(event.interval||''),at=Number(event.bar_time);
+        const symbolSelect=document.getElementById('symbol'),tfSelect=document.getElementById('interval');
+        if(!/^[A-Z0-9]{2,30}$/.test(symbol)||![...tfSelect.options].some(option=>option.value===tf)||!Number.isSafeInteger(at)||at<0||at>Date.now())throw new Error('Invalid notification chart link');
+        if(![...symbolSelect.options].some(option=>option.value===symbol)){const option=new Option(symbol+' (alert history)',symbol);symbolSelect.add(option);}
+        ++loadId;
+        for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
+        symbolSelect.value=symbol;symbolControl.syncSelection();tfSelect.value=tf;timeframeControl.refreshButtons();
+        const before=Math.min(Date.now(),at+100*intervalMs(tf));
+        const loaded=await DataCache.loadInitial(symbol,tf,before);
+        if(!loaded||sequence!==navigation||DataCache.symbol!==symbol||DataCache.timeframe!==tf)return;
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const index=DataCache.renderBars.findIndex(bar=>bar.open_time===at);
+        if(index<0){status().textContent='The notification candle is no longer stored.';return;}
+        DataCache.alertReference=at;DataCache.atLiveEdge=false;chart.timeScale().setVisibleLogicalRange({from:Math.max(0,index-45),to:index+45});
+        history.replaceState(null,'','/?'+new URLSearchParams({symbol,interval:tf,at:String(at)}));
+        document.getElementById('chart').focus();
+    };
+    const target=new URLSearchParams(location.search);
+    if(target.has('at')){
+        try{await window.openAlertChart({symbol:target.get('symbol'),interval:target.get('interval'),bar_time:Number(target.get('at'))});}
+        catch(error){status().textContent=error.message;}
+    }else await loadAll();
     const interval = Composer.config.stored_refresh_ms ?? 5000;
     storedPoll.start(DataCache.liveEnabled && interval > 0 ? Math.min(interval, 1000) : interval);
 })();

@@ -22,7 +22,7 @@ status. **Settings → Coins** has the same switches per coin. Desktop delivery
 requires the master switch AND the timeframe AND the coin to allow it. Switching
 off Desktop suppresses OS popups and in-app toasts for that scope. It does not
 change downloads, calculations, sound choices or durable activity recording.
-Mobile is disabled and explicitly deferred; no mobile push service is installed.
+Mobile stays disabled until the laptop HTTPS/push setup is complete. See MOBILE_SETUP.md for the private 4–5-person setup; no rented server is required.
 Notification switches are per account; download policy retains its admin checks.
 
 ## Sounds
@@ -48,8 +48,8 @@ all active pairs, independently of chart selection. Missing rows wait; WAIT rows
 advance. Durable IDs deduplicate rule/epoch/candle events. Download/calculation
 lag also means alert lag. No old downloaded history is announced as a new signal.
 
-App logout does not stop independent calculation/recording services. Browser
-sound/notifications still require an open, signed-in app. Reopening shows history
+App logout does not stop independent calculation/recording services. Desktop browser
+sound/notifications still require an open, signed-in app. Enrolled mobile Web Push works with the phone app closed. Reopening shows history
 without replaying old sounds. Existing login agents stop at macOS logout; see
 SERVER_MODE.md for reviewed system-service exports. No phone services or system
 jobs are installed by a code update.
@@ -58,3 +58,22 @@ Rules, preferences, uploads and events live in ~/.tradingbot/alerts.sqlite3,
 separate from all market databases. Cross-account access and assignment of another
 account's custom sound are rejected. Only the authenticated sound-upload endpoint
 accepts a larger JSON body; ordinary API requests retain their prior size limit.
+
+
+## Rich cards and mobile companion
+
+In-app cards are dismissible with ×, expire after 20 seconds and link to the
+original symbol/timeframe/signal candle, including older stored history. Desktop
+system notifications also close after 20 seconds when the browser supports it.
+They include signal price, directional confidence /100, nearest resistance upper
+edge and nearest support lower edge. These values are captured from matching
+anchored evidence; missing context is unavailable, never substituted from another
+candle. Recent activity also links to the chart. Phone OS banner lifetime is
+controlled by the phone, rather than an unreliable background JavaScript timer.
+
+The companion is at /web_root/mobile.html. Once the private HTTPS address,
+optional requirements-mobile.txt and VAPID configuration are ready, users install
+it and explicitly enroll their phones. A separate worker performs encrypted Web
+Push without blocking calculations or alert evaluation. Subscription ownership,
+provider endpoint validation, retry/expiry and device removal are tested. Default
+local-only desktop operation needs no mobile setup or additional dependencies.
