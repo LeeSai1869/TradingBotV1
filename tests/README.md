@@ -887,3 +887,10 @@ and delayed confirmations, known-time price/regime association, retests/breaks,
 gaps, previews/duplicate bars, bounded histories, validation, Momentum ownership,
 new-field-only replay and checkpoint equivalence. Legacy packet checksum tests
 exclude only the newly added fields and retain their previous expected digest.
+
+Desktop automatic signals: `test_signal_alerts.py` verifies unviewed pairs,
+WAIT/missing/legacy decisions, persistent deduplication, default and edited tones,
+pause/re-arm without history replay, account isolation and API origin checks.
+`browser_signal_alerts.py` verifies one audible desktop notification for a stored
+BUY on an unviewed symbol, plus searchable fields and the simple SELL preset.
+Run with `PYTHONPATH=. python3 tests/browser_signal_alerts.py /path/to/lightweight-charts.js`.

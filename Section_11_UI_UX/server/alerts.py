@@ -15,6 +15,7 @@ FIELDS = {f'client.{key}': f'Candle {key}' for key in ('high','low','close')}
 FIELDS.update({f'features.{key}': key.replace('_',' ').upper() for key in features_store.COLUMNS if key not in {'symbol','interval','open_time'}})
 LIVE_FIELDS = {f'client.{key}' for key in ('high','low','close')} | {f'features.ema{p}' for p in (7,25,50,100,200,300)} | {'features.rsi','features.prev_rsi','features.rsi_change'}
 FIELDS.update({'features.di_plus':'+DI','features.di_minus':'−DI','features.di_direction':'DI direction (signed)','features.di_spread':'DI spread'})
+FIELDS.update({'decision.buy':'BUY · current Decision Engine','decision.sell':'SELL · current Decision Engine'})
 FIELDS.pop('features.formula_version', None)
 FIELDS['features.change_percent'] = 'Close change (fraction: 0.01 = 1%; formula v2)'
 OPERATORS = {'above','at_or_above','below','at_or_below','equals','crosses_above','crosses_below'}
@@ -41,6 +42,7 @@ def open_db():
         CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,owner TEXT NOT NULL,rule_id TEXT NOT NULL,
             epoch TEXT NOT NULL,bar_time INTEGER NOT NULL,created INTEGER NOT NULL,packet TEXT NOT NULL,
             UNIQUE(rule_id,epoch,bar_time));
+        CREATE TABLE IF NOT EXISTS signal_preferences(owner TEXT PRIMARY KEY,spec TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS live_state(rule_id TEXT PRIMARY KEY,value REAL,target REAL,revision TEXT);
         CREATE INDEX IF NOT EXISTS events_owner ON events(owner,seq);
     ''')
@@ -81,13 +83,13 @@ def validate(data):
 def list_rules(owner):
     conn=open_db()
     try:
-        return [json.loads(r['spec']) | {'id':r['id'],'status':r['status']} for r in conn.execute('SELECT * FROM rules WHERE owner=? ORDER BY created DESC',(owner,))]
+        return [json.loads(r['spec']) | {'id':r['id'],'status':r['status']} for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id NOT LIKE 'auto:%' ORDER BY created DESC",(owner,))]
     finally: conn.close()
 
 
 def save(owner,data):
     spec=validate(data); key=data.get('id') or uuid.uuid4().hex
-    if not isinstance(key,str): raise ValueError('Invalid rule ID')
+    if not isinstance(key,str) or key.startswith('auto:'): raise ValueError('Invalid rule ID')
     with data_policy.snapshot_guard():
         last=db.last_kline_time(spec['symbol'],spec['interval']) or 0
         version=epoch(spec['symbol'],spec['interval'])
@@ -97,7 +99,7 @@ def save(owner,data):
             conn.execute('BEGIN IMMEDIATE')
             old=conn.execute('SELECT owner FROM rules WHERE id=?',(key,)).fetchone()
             if old and old['owner']!=owner: raise ValueError('Unknown alert')
-            if not old and conn.execute('SELECT COUNT(*) FROM rules WHERE owner=?',(owner,)).fetchone()[0]>=50:
+            if not old and conn.execute("SELECT COUNT(*) FROM rules WHERE owner=? AND id NOT LIKE 'auto:%'",(owner,)).fetchone()[0]>=50:
                 raise ValueError('Maximum 50 alert rules per account')
             conn.execute('DELETE FROM live_state WHERE rule_id=?',(key,))
             conn.execute('INSERT OR REPLACE INTO rules VALUES (?,?,?,?,?,?,?,?)',(key,owner,json.dumps(spec),last,version,int(time.time()*1000),uuid.uuid4().hex,('Armed for live price' if spec['mode']=='live' else 'Armed for new closed candles') if spec['enabled'] else 'Paused'))
@@ -106,6 +108,7 @@ def save(owner,data):
 
 
 def delete(owner,key):
+    if not isinstance(key,str) or key.startswith('auto:'):raise ValueError('Invalid rule ID')
     conn=open_db()
     try:
         with conn:
@@ -130,7 +133,14 @@ def events(owner,after):
 
 def number(bar,field):
     if not bar: return None
-    group,key=field.split('.',1); packet=bar.get(group)
+    group,key=field.split('.',1)
+    if group=='decision':
+        decision=bar.get('adcn')
+        if not decision:return None
+        if decision.get('signal_type') is None:return 0
+        if decision.get('trigger')!='DI_TURNING_POINT_V3':return None
+        return int(decision.get('signal_type')==key.upper())
+    packet=bar.get(group)
     value=packet.get(key) if packet else None
     return value if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) else None
 
@@ -208,7 +218,10 @@ def evaluate_rule(rule):
             for bar in bars:
                 if bar['client']['close_time']<created:
                     cursor=bar['open_time']; previous=bar; continue
+                if bar['client']['close_time']>=int(time.time()*1000):break
                 needed=[spec['field'],spec['target_field']]
+                if any(field and field.startswith('decision.') for field in needed) and number(bar,next(field for field in needed if field and field.startswith('decision.'))) is None:
+                    status='Waiting for current Decision Engine'; break
                 if any(field and field.startswith('features.') for field in needed) and bar['features'] is None:
                     status='Waiting for stored features'; break
                 if spec['operator'].startswith('crosses_') and previous and previous['features'] is None and any(field and field.startswith('features.') for field in needed):
@@ -222,6 +235,8 @@ def evaluate_rule(rule):
                 status='Watching new closed candles' if value is not None and target is not None else 'Field has no numeric value on last candle'
                 if fired:
                     message=f"{spec['name']}: {symbol} {iv} — {FIELDS[spec['field']]} {spec['operator'].replace('_',' ')} {display_value(target, spec.get('target_field') or spec['field'])} (value {display_value(value, spec['field'])})"
+                    if spec['field'].startswith('decision.'):
+                        message=f"{symbol} {iv} {spec['field'].split('.')[1].upper()} · {bar['client']['close']}"
                     updates.append({'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'closed'})
                     status='Triggered'
                     if spec['repeat']=='once': spec['enabled']=False; break
@@ -238,6 +253,7 @@ def evaluate_rule(rule):
 
 
 def evaluate_once():
+    sync_signal_rules()
     conn=open_db()
     try: rules=conn.execute('SELECT * FROM rules').fetchall()
     finally: conn.close()
@@ -262,3 +278,57 @@ def start():
             stop.wait(1)
     thread=threading.Thread(target=work,name='stored-alerts',daemon=True);thread.start()
     return stop
+
+
+SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True}
+
+
+def signal_preferences(owner, changes=None):
+    conn=open_db()
+    try:
+        with conn:
+            conn.execute('BEGIN IMMEDIATE')
+            row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
+            spec=json.loads(row[0]) if row else dict(SIGNAL_DEFAULTS)
+            if changes is not None:
+                if any(key not in SIGNAL_DEFAULTS for key in changes):raise ValueError('Unknown signal preference')
+                spec.update(changes)
+                if any(type(spec[k]) is not bool for k in ('enabled','notify')) or any(spec[k] not in SOUNDS for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
+            conn.execute('INSERT OR REPLACE INTO signal_preferences VALUES (?,?)',(owner,json.dumps(spec)))
+        return spec
+    finally:conn.close()
+
+
+def sync_signal_rules():
+    """Account subscriptions follow active pairs, independently of chart selection.
+
+    Each generated rule retains its original watermark across restarts. New pairs
+    start now; no historical signals are announced. Explicit settings edits retain
+    cursors and revise workers atomically. No changes to decisions or features.
+    """
+    conn=open_db()
+    try:
+        subscriptions=conn.execute('SELECT * FROM signal_preferences').fetchall()
+        if not subscriptions:return
+        pairs=[(s,iv) for s in data_policy.active_symbols() for iv in data_policy.active_intervals()]
+        active=set(pairs)
+        for account in subscriptions:
+            owner=account['owner'];prefs=json.loads(account['spec'])
+            existing={r['id']:r for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id LIKE 'auto:%'",(owner,))}
+            for symbol,iv in active|{(json.loads(r['spec'])['symbol'],json.loads(r['spec'])['interval']) for r in existing.values()}:
+                for side in ('buy','sell'):
+                    key='auto:'+uuid.uuid5(uuid.NAMESPACE_URL,owner+'|'+symbol+'|'+iv+'|'+side).hex
+                    enabled=prefs['enabled'] and (symbol,iv) in active
+                    spec=dict(name=side.upper(),symbol=symbol,interval=iv,field='decision.'+side,operator='equals',value=1,target_field=None,repeat='per_bar',sound=prefs[side],notify=prefs['notify'],enabled=enabled,mode='closed')
+                    old=existing.get(key)
+                    if old and json.loads(old['spec'])==spec:continue
+                    now=int(time.time()*1000)
+                    with conn:
+                        if old:
+                            if enabled and not json.loads(old['spec'])['enabled']:
+                                conn.execute('UPDATE rules SET created=?,cursor=? WHERE id=?',(now,db.last_kline_time(symbol,iv) or 0,key))
+                            conn.execute('UPDATE rules SET spec=?,revision=? WHERE id=?',(json.dumps(spec),uuid.uuid4().hex,key))
+                        elif enabled:
+                            last=db.last_kline_time(symbol,iv) or 0
+                            conn.execute('INSERT OR IGNORE INTO rules VALUES (?,?,?,?,?,?,?,?)',(key,owner,json.dumps(spec),last,epoch(symbol,iv),now,uuid.uuid4().hex,'Armed for new decisions'))
+    finally:conn.close()

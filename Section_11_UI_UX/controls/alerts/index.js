@@ -2,6 +2,7 @@
 import {formatValue} from '../../web_root/value_format.js';
 export const name = 'alerts';
 let dialog, editor, editorTitle, editorStatus, form, rules, activity, status, catalog, audio, volume=0.35, eventCursor=null;
+let signalPrefs=null, signalControls, deliveryButton;
 let polling=false, timer, editing=null, refreshId=0, saving=false;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
@@ -30,7 +31,8 @@ function input(label,key,type,parent) {
 async function unlock() {
     const Audio=window.AudioContext||window.webkitAudioContext;
     if(!Audio)throw new Error('Sound is not supported by this browser.');
-    if(!audio)audio=new Audio();await audio.resume();
+    if(!audio){audio=new Audio();audio.onstatechange=updateDeliveryStatus;}await audio.resume();
+    updateDeliveryStatus();
     if(audio.state!=='running')throw new Error('Click Enable sound again to allow audio.');
 }
 function sound(key) {
@@ -57,9 +59,16 @@ function renderActivity() {
     if(!activity)return;
     activity.replaceChildren();
     if(!recent.length)el('p','No alerts triggered yet.',activity,'settings-note');
-    for(const event of recent.slice(-20).reverse())el('p',`${new Date(event.created).toLocaleString()} — ${event.message} · Candle: ${new Date(event.bar_time).toLocaleString()}`,activity);
+    for(const event of recent.slice(-10).reverse()){
+        const row=el('div','',activity,'alert-rule');
+        el('strong',`${event.name} · ${event.symbol} ${event.interval}`,row);
+        el('span',` · ${new Date(event.created).toLocaleTimeString()}`,row);
+        const detail=el('details','',row);el('summary','Details',detail);el('p',event.message,detail);
+        el('p',`Candle: ${new Date(event.bar_time).toLocaleString()}`,detail);
+    }
 }
 function receive(event,deliver=true) {
+    if(recent.some(row=>row.seq===event.seq))return;
     recent.push(event);if(recent.length>100)recent.shift();renderActivity();
     if(!deliver)return;
     const text=`${event.message} · Candle: ${new Date(event.bar_time).toLocaleString()}`;
@@ -78,7 +87,8 @@ async function poll() {
         if(eventCursor===null)for(const event of packet.history||[])receive(event,false);
         for(const event of packet.events)receive(event);
         eventCursor=packet.cursor;
-        if(dialog.open&&form)await refresh();
+        if(dialog.open&&form&&!editor.open)await refresh();
+        updateDeliveryStatus();
     } catch(error) {if(dialog.open)status.textContent=error.message;}
     finally {polling=false;timer=setTimeout(poll,2000);}
 }
@@ -97,6 +107,9 @@ async function refresh() {
     }
 }
 function syncMode() {
+    const decision=form.elements.field.value.startsWith('decision.');
+    for(const key of ['operator','value','target_field','mode'])form.elements[key].parentElement.hidden=decision;
+    if(decision){form.elements.operator.value='equals';form.elements.value.value='1';form.elements.target_field.value='';}
     const features=[form.elements.field.value,form.elements.target_field.value].some(field=>field && !(catalog.live_fields || ['client.high','client.low','client.close']).includes(field));
     form.elements.mode.querySelector('[value="live"]').disabled=features;
     if(features)form.elements.mode.value='closed';
@@ -117,7 +130,7 @@ function reset() {
     form.elements.interval.value=document.getElementById('interval').value;
     form.elements.field.value='client.close';form.elements.sound.value='chime';
     form.elements.enabled.checked=true;form.elements.notify.checked=true;
-    form.elements.repeat.value='once';form.elements.value.value='0';form.elements.mode.value='live';syncMode();
+    form.elements.repeat.value='per_bar';form.elements.value.value='0';form.elements.mode.value='live';syncMode();
     form.querySelector('button[type=submit]').textContent='Create alert';
 }
 async function build() {
@@ -135,6 +148,7 @@ async function build() {
     };
     const slider=input('Sound volume','volume','range',dialog);slider.min=0;slider.max=100;slider.value=Math.round(volume*100);
     slider.oninput=()=>{volume=Number(slider.value)/100;try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}};
+    await renderSignalControls(dialog);
     const savedHeader=el('div','',dialog,'alert-list-header');el('h3','Saved alerts',savedHeader);
     const add=el('button','＋ New alert',savedHeader);add.setAttribute('aria-label','New alert');
     add.onclick=()=>{if(saving)return;reset();editorStatus.textContent='';editorTitle.textContent='Create alert';editor.showModal();};
@@ -150,7 +164,11 @@ async function build() {
     select('Coin','symbol',catalog.symbols.map(value=>[value,value]),form);
     select('Timeframe','interval',catalog.intervals.map(value=>[value,value]),form);
     select('Evaluation','mode',[['live','Live candle / provisional EMA / RSI'],['closed','Closed candle / stored features']],form);
-    select('Field','field',Object.entries(catalog.fields),form).onchange=syncMode;
+    const search=input('Search fields','field_search','search',form);
+    const fields=select('Field','field',Object.entries(catalog.fields),form);fields.onchange=syncMode;
+    search.oninput=()=>{const selected=fields.value,query=search.value.toLowerCase();fields.replaceChildren();for(const [key,label] of Object.entries(catalog.fields)){if(key===selected||`${key} ${label}`.toLowerCase().includes(query)){const option=el('option',label,fields);option.value=key;}}fields.value=selected;};
+    const presets=el('div','',form,'settings-coin-actions');
+    for(const side of ['buy','sell']){const button=el('button',`${side.toUpperCase()} signal`,presets);button.type='button';button.onclick=()=>{search.value='';search.oninput();form.elements.field.value='decision.'+side;form.elements.operator.value='equals';form.elements.value.value='1';form.elements.target_field.value='';form.elements.name.value=`${side.toUpperCase()} ${form.elements.symbol.value}`;form.elements.repeat.value='per_bar';syncMode();};}
     select('Condition','operator',catalog.operators.map(value=>[value,value.replaceAll('_',' ')]),form);
     const threshold=input('Threshold (signed numbers allowed)','value','number',form);threshold.step='any';threshold.required=true;
     select('Or compare with field','target_field',[['','Use numeric threshold'],...Object.entries(catalog.fields)],form).onchange=syncMode;
@@ -168,13 +186,14 @@ async function build() {
         void unlock().catch(()=>{});
         let completed=false;
         try{
-            const packet=Object.fromEntries(new FormData(form));packet.value=Number(packet.value);packet.notify=form.elements.notify.checked;packet.enabled=form.elements.enabled.checked;if(editing)packet.id=editing;
+            const packet=Object.fromEntries(new FormData(form));delete packet.field_search;packet.value=Number(packet.value);packet.notify=form.elements.notify.checked;packet.enabled=form.elements.enabled.checked;if(editing)packet.id=editing;
             await request('/api/alerts',packet);
             completed=true;editor.close();reset();status.textContent='Alert saved. Watching the selected evaluation mode.';
         }catch(error){editorStatus.textContent=error.message;}finally{saving=false;save.disabled=false;close.disabled=false;cancel.disabled=false;}
         if(completed)void refresh().catch(error=>{status.textContent='Alert saved. Could not refresh the list: '+error.message;});
     };
-    el('h3','Recent activity',dialog);activity=el('section','',dialog,'alert-activity');renderActivity();reset();
+    const history=el('details','',dialog);el('summary','Recent activity · latest 10',history);
+    const clear=el('button','Clear displayed activity',history);clear.onclick=()=>{recent.length=0;renderActivity();};activity=el('section','',history,'alert-activity');renderActivity();reset();
 }
 export function mount() {
     try {const stored=Number(localStorage.getItem(`alerts.volume.${window.AppSession.username}`));if(Number.isFinite(stored)&&stored>=0&&stored<=1&&localStorage.getItem(`alerts.volume.${window.AppSession.username}`)!==null)volume=stored;}catch{}
@@ -189,10 +208,52 @@ export function mount() {
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
     request('/api/alerts/events').then(packet=>{eventCursor=packet.cursor;for(const event of packet.history||[])recent.push(event);renderActivity();timer=setTimeout(poll,2000);}).catch(()=>{timer=setTimeout(poll,5000);});
+    deliveryButton=el('button','Enable sound / notifications',toolbar);deliveryButton.id='alert-delivery-button';
+    deliveryButton.onclick=enableDesktopDelivery;
+    void request('/api/alerts/signals').then(value=>{signalPrefs=value;updateDeliveryStatus();}).catch(error=>{deliveryButton.textContent='Alerts unavailable';deliveryButton.title=error.message;});
     window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
 }
 
 export async function enableSignalSound(){await unlock();}
 export function playSignalSound(key,level=.35){
     const previous=volume;volume=level;sound(key);volume=previous;
+}
+
+
+function updateDeliveryStatus(){
+    if(!deliveryButton)return;
+    const ready=audio?.state==='running';
+    deliveryButton.textContent=ready?'Sound on':'Enable sound / notifications';
+    deliveryButton.title=`Automatic BUY/SELL: ${signalPrefs?.enabled?'on':'off'} · Audio: ${ready?'ready':'click to enable'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
+}
+async function enableDesktopDelivery(){
+    const messages=[];
+    try{await unlock();sound('chime');messages.push('Sound enabled.');}catch(error){messages.push(error.message);}
+    if('Notification' in window){try{messages.push(`Notifications: ${await Notification.requestPermission()}.`);}catch{messages.push('System notifications unavailable.');}}
+    status.textContent=messages.join(' ');updateDeliveryStatus();
+}
+export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
+export async function saveSignalPreferences(value){
+    signalPrefs=await request('/api/alerts/signals',value);updateDeliveryStatus();return signalPrefs;
+}
+async function renderSignalControls(parent){
+    signalPrefs=await getSignalPreferences();
+    el('h3','Automatic BUY / SELL notifications',parent);
+    el('p','Watches current Decision Engine signals on every active coin and timeframe, even when that chart is not open. The UI backend must be running. Keep this app open for desktop sound. Click Enable sound after opening the app. Existing history is not announced.',parent,'settings-note');
+    signalControls=el('div','',parent);
+    const enabled=input('Watch all active charts','automatic_signals','checkbox',signalControls);enabled.checked=signalPrefs.enabled;
+    enabled.onchange=()=>void saveSignalPreferences({enabled:enabled.checked}).catch(error=>status.textContent=error.message);
+    const notify=input('Desktop notifications','automatic_notify','checkbox',signalControls);notify.checked=signalPrefs.notify;
+    notify.onchange=()=>void saveSignalPreferences({notify:notify.checked}).catch(error=>status.textContent=error.message);
+    for(const side of ['buy','sell']){
+        const choice=select(`${side.toUpperCase()} sound`,side,catalog.sounds.map(x=>[x,x]),signalControls);choice.value=signalPrefs[side];
+        choice.onchange=()=>void saveSignalPreferences({[side]:choice.value}).catch(error=>status.textContent=error.message);
+        const test=el('button',`Test automatic ${side.toUpperCase()}`,signalControls);test.onclick=async()=>{try{await unlock();sound(choice.value);}catch(error){status.textContent=error.message;}};
+    }
+}
+
+export function getSignalVolume(){return volume;}
+export function setSignalVolume(level){
+    volume=Math.max(0,Math.min(1,Number(level)));
+    try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}
 }

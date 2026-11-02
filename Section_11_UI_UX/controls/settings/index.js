@@ -4,13 +4,14 @@ import {normalizeHud} from "../workspace/preferences.js";
 import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
 import {normalizeMomentum,SOUNDS} from '../../overlays/markers/preferences.js';
-import {enableSignalSound,playSignalSound} from '../alerts/index.js';
+import {enableSignalSound,playSignalSound,getSignalPreferences,saveSignalPreferences,getSignalVolume,setSignalVolume} from '../alerts/index.js';
 import {normalizeCandleStyle} from './candle_style.js';
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
 const PERIODS = [7, 25, 50, 100, 200, 300];
 const defaults = { candles: true, markers: true, ema: true };
 let saved = { ...defaults }, draft, dialog, content, sidebar, tabs;
+let signalSoundChanged=false,signalVolumeChanged=false;
 let featureTab = "Style";
 let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
@@ -147,21 +148,23 @@ function renderFeature() {
         return;
     }
     if(item==='Momentum Indicator') {
+        if(!signalVolumeChanged)draft.momentumSounds.volume=getSignalVolume();
+        void getSignalPreferences().then(value=>{if(signalSoundChanged)return;for(const side of ['buy','sell']){draft.momentumSounds[side]=value[side];const control=content.querySelector(`[aria-label="${side.toUpperCase()} sound"]`);if(control){control.value=value[side];control.disabled=false;}}}).catch(error=>note(error.message));
         toggle('Show Momentum Indicator','markers');
         note('Section 8 BUY/SELL signals use closed candles with complete formula-v3 features. Current signals wait for feature replay; historical markers never play sounds.');
         for(const side of ['buy','sell']) {
             const row=el('label',`${side.toUpperCase()} sound `,content,'settings-row'), select=el('select','',row);
             select.setAttribute('aria-label',`${side.toUpperCase()} sound`);
             for(const value of SOUNDS){const o=el('option',value,select);o.value=value;}
-            select.value=draft.momentumSounds[side];select.onchange=()=>{draft.momentumSounds[side]=select.value;};
+            select.disabled=!signalSoundChanged;select.value=draft.momentumSounds[side];select.onchange=()=>{draft.momentumSounds[side]=select.value;signalSoundChanged=true;};
             const test=el('button',`Test ${side.toUpperCase()} sound`,content);
             test.onclick=async()=>{try{await enableSignalSound();playSignalSound(draft.momentumSounds[side],draft.momentumSounds.volume);}catch(error){note(error.message);}};
         }
         const row=el('label','Signal volume ',content,'settings-row'), volume=el('input','',row);
         volume.type='range';volume.min=0;volume.max=1;volume.step=.05;volume.value=draft.momentumSounds.volume;
-        volume.setAttribute('aria-label','Signal volume');volume.oninput=()=>{draft.momentumSounds.volume=Number(volume.value);};
+        volume.setAttribute('aria-label','Signal volume');volume.oninput=()=>{draft.momentumSounds.volume=Number(volume.value);signalVolumeChanged=true;};
         const enable=el('button','Enable signal sounds',content);
-        enable.onclick=async()=>{try{await enableSignalSound();note('Signal sounds enabled for this session and the open symbol/timeframe.');}catch(error){note(error.message);}};
+        enable.onclick=async()=>{try{await enableSignalSound();note('Signal sounds enabled for this session. Automatic alerts watch all active charts.');}catch(error){note(error.message);}};
     }
     if (item === "EMA") toggle("Show EMA", "ema");
     else if(item!=='Liquidity')note(`${item} reads the same combined stored bars as the chart. Missing values remain blank until calculated.`);
@@ -469,14 +472,16 @@ export async function mount() {
         }
         const next = validated(draft);
         if(next.momentumSounds.buy!=='none'||next.momentumSounds.sell!=='none') {
-            try{await enableSignalSound();}catch(error){message.textContent=error.message;return;}
+            void enableSignalSound().catch(error=>{message.textContent=error.message;});
         }
+        try {if(signalSoundChanged)await saveSignalPreferences({buy:next.momentumSounds.buy,sell:next.momentumSounds.sell});}catch(error){message.textContent=error.message;return;}
+        if(signalVolumeChanged)setSignalVolume(next.momentumSounds.volume);
         try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
         catch { message.textContent = "Could not save preferences in this browser."; return; }
         saved = next; apply(); window.dispatchEvent(new Event("chart-settings-change")); dialog.close();
     };
     gear.onclick = () => {
-        draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
+        signalSoundChanged=false;signalVolumeChanged=false;draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
         tabs.querySelector('[aria-selected="true"]').focus();
         if (section === "coins" && admin.isAdmin()) void loadRegistry();
         void admin.load().then(() => {

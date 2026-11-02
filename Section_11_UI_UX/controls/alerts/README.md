@@ -11,12 +11,12 @@ direction. Signed thresholds and comparisons such as +DI > -DI are supported.
 
 Two evaluation modes:
 - Live candle: high, low and close from the existing shared backend live feed.
-  Features cannot be selected in this mode. A crossing needs two observed
+  Provisional EMA and RSI are also supported. A crossing needs two observed
   snapshots; a level condition can trigger on the first available snapshot.
 - Closed candle / stored features: candle fields and every numeric permanent
   features-store field, including ADX, DI direction/spread, RSI, EMA, ATR, etc.
-  Feature-dependent rules wait for stored features. No mutable decision-memory
-  fields are exposed. Unsupported/null feature values do not create alerts.
+  Feature-dependent rules wait for stored features. BUY/SELL presets expose the current committed Decision Engine signal only;
+  arbitrary decision-memory fields are not exposed. Unsupported/null feature values do not create alerts.
 
 Examples:
 - ETHUSDT / 1m / live / candle high / crosses above / a chosen price.
@@ -65,3 +65,34 @@ finite numeric thresholds, supported fields, mode compatibility and same-origin
 writes. Evaluation uses revision checks inside a SQLite write transaction so an
 old worker snapshot cannot fire an edited/deleted rule. Data-policy locking and
 storage epochs prevent stale post-deletion closed-bar evaluation.
+
+## Automatic desktop signal alerts
+
+Automatic BUY/SELL monitoring subscribes the signed-in account to every active
+symbol/timeframe on first app load. It reads committed ADCN decisions from the
+current `DI_TURNING_POINT_V3` rule, never chart visibility or inferred feature
+thresholds. Missing decisions wait; WAIT rows advance the cursor. New pairs,
+re-armed subscriptions and data deletion epochs start at the current boundary,
+so old downloaded history is not announced. Cursors and per-candle event IDs are
+durable in the account alert store; automatic rules are separate from the 50
+manual-rule allowance. No decision or feature calculation is changed.
+
+Use **Enable sound / notifications** after opening the app. Browsers require a
+user gesture to unlock audio and separate OS permission for notifications. The
+toolbar reports audio readiness. The app must remain open for browser delivery;
+its UI backend must remain running for evaluation and activity recording. Sleep,
+shutdown, browser suspension and denied OS permissions can prevent delivery.
+This is desktop delivery, not phone push or a native OS background alarm.
+
+Alerts offers all-active-chart monitoring, separate BUY/SELL tones and desktop
+notification controls. Momentum settings use the same account sound preferences.
+Choosing sounds does not require enabling chart markers. Saving a preference
+never waits for browser audio permission. Volume remains a local setting.
+
+Manual rules have BUY/SELL shortcuts plus searchable fields. Signal shortcuts
+hide numeric conditions and follow current stored decisions, with repeat-per-bar
+as the default. Other price/feature rules retain their existing evaluation.
+Activity is collapsed by default, shows the latest ten rows with expandable
+information, and can be cleared locally without deleting stored event history.
+Phone push is intentionally deferred; no third-party delivery credentials or
+network destinations are configured.

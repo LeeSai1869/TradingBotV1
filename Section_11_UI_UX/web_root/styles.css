@@ -285,3 +285,6 @@ button:hover { background: #333; }
 #drawing-input[hidden] {display:none;}
 .drawing-notice {position:absolute;bottom:35px;right:80px;z-index:29;max-width:min(420px,80%);padding:5px 8px;margin:0;font-size:11px;color:#ddd;background:#202631e8;border-radius:4px;pointer-events:none;}
 .drawing-notice[hidden] {display:none;}
+
+/* Simple signal presets hide numeric-condition controls without changing layout. */
+.alert-form [hidden] { display: none !important; }

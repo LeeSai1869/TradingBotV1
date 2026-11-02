@@ -6,9 +6,10 @@ from Section_1_Global_Core import data_admin, data_policy
 
 
 def handle_get(path,query,server):
-    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events'}: return None,None
+    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events','/api/alerts/signals'}: return None,None
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
+    if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'])
     if path=='/api/alerts/catalog':
         registry=data_admin.catalog()
         symbols=sorted({r['symbol'] for key in ('approved','disapproved','pending','staged','top50') for r in registry.get(key,[])})
@@ -23,7 +24,7 @@ def handle_get(path,query,server):
 
 
 def handle_post(path,body,server):
-    if path not in {'/api/alerts','/api/alerts/delete'}: return None,None
+    if path not in {'/api/alerts','/api/alerts/delete','/api/alerts/signals'}: return None,None
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
     origin=server.headers.get('Origin')
@@ -31,6 +32,7 @@ def handle_post(path,body,server):
     try:
         data=json.loads(body)
         if not isinstance(data,dict): raise ValueError('JSON object required')
+        if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'],data)
         if path=='/api/alerts/delete': alerts.delete(identity['username'],data.get('id'));return 200,{'ok':True}
         return 200,{'ok':True,'id':alerts.save(identity['username'],data)}
     except (ValueError,TypeError,KeyError) as error: return 400,{'error':str(error)}
