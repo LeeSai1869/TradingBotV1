@@ -31,6 +31,8 @@ for key,source in ALIASES.items():FIELDS[key]=FIELDS.get(source,'float')
 for p in (7,25,50,100,200,300):FIELDS[f'prev_ema{p}']='float'
 FIELDS['prev_atr']='float'
 FIELDS['daily_source_ready']='bool'
+from ..features.momentum_anchors import EXPORTS as MOMENTUM_ANCHOR_FIELDS
+FIELDS.update(MOMENTUM_ANCHOR_FIELDS)
 FIELDS['sr_zone_events']='string'
 FIELDS['ob_zone_events']='string'
 for side in ('support','resistance','inst_support','inst_resistance'):

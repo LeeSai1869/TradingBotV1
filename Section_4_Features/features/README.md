@@ -42,3 +42,9 @@ superseded `individual` tree have been removed; previous source backups remain.
 | 4.2.21 SESSION CONTEXT | [sessions.py](sessions.py) | 4923–5098 |
 | 4.2.22 PRICE EXTENSION | [price_extension.py](price_extension.py) | 5099–5104 |
 | 4.2.23 DAILY REFERENCE LEVELS | [daily_levels.py](daily_levels.py) | 5105–5112 |
+
+Momentum also owns the feature-only DI-anchor extension in `momentum_anchors.py`.
+Detection runs alongside existing DI calculations; its final context attachment
+runs after existing structure/regime outputs are available. It adds no BUY/SELL
+rules. See `../MOMENTUM_DI_ANCHORS.md` for configuration, field semantics, isolated
+replay, corrected Pine v6 scripts and integration scope.

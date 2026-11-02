@@ -284,6 +284,14 @@ feature_config_registry: Dict[str, FeatureCalculationConfig] = {
 def get_feature_calculation_config(engine_name: str) -> Optional[FeatureCalculationConfig]:
     return feature_config_registry.get(engine_name)
 
+# Momentum DI anchors only. Override named settings from momentum_anchors.DEFAULTS.
+# Thresholds qualify detected peaks; they never suppress/reset geometric tracking.
+MOMENTUM_DI_ANCHORS = {
+    'diAnchorReversal': 2.0,
+    'diAnchorPlusHighMin': 30.0,
+    'diAnchorMinusHighMin': 30.0,
+}
+
 # =========================
 # 2.12 STYLE (optional – mostly for future UI)
 # =========================

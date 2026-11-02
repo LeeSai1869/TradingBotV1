@@ -24,7 +24,12 @@ class Context:
             'FVG_MIN_ATR_MULT':constants.FVG_MULTIPLIER_NORMAL,'FVG_STRONG_ATR_MULT':constants.FVG_MULTIPLIER_STRONG,
             **{name:getattr(market_definitions,name) for name in ('TREND_FRESH','TREND_MATURE','TREND_WEAK','TREND_NONE','TRANSITION_NONE','TRANSITION_RISK','TRANSITION_ACTIVE')},
         }
+        from ..features.momentum_anchors import DEFAULTS as anchor_defaults,validate as validate_anchors
+        anchor_options=getattr(inputs,'MOMENTUM_DI_ANCHORS',{})
+        if set(anchor_options)-set(anchor_defaults):raise ValueError('Unknown Momentum DI anchor setting')
+        self.parameters.update(anchor_defaults);self.parameters.update(anchor_options)
         self.parameters.update(parameters or {})
+        validate_anchors(self.parameters)
         for key in ('rsiLen','adxLen','atrLen','atrMaLen','srPivotLen','volumeLookback','vpLookback','vpBins','liquidityLookback','rangeLookback',*[f'ema{p}Len' for p in (7,25,50,100,200,300)]):
             value=self.parameters[key]
             if type(value) is not int or not 1<=value<=5000:raise ValueError(f'{key} must be an integer from 1 to 5000')

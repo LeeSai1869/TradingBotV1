@@ -880,3 +880,10 @@ priority, one representative per family, three-family/one-ATR fallback clusters,
 no chaining, and native clearance that cannot be bypassed by an inner thin zone.
 The browser evidence fixture now uses 1.5-ATR native zones and checks their full
 bounds survive storage, polling and rendering. Source formulas are unchanged.
+
+Momentum DI anchors: `test_momentum_anchors.py` covers unqualified real peaks,
+negative spread, first-turn bootstrap, immutable cycles, plateau origins, noise
+and delayed confirmations, known-time price/regime association, retests/breaks,
+gaps, previews/duplicate bars, bounded histories, validation, Momentum ownership,
+new-field-only replay and checkpoint equivalence. Legacy packet checksum tests
+exclude only the newly added fields and retain their previous expected digest.

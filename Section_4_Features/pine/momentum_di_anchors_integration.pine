@@ -1,0 +1,277 @@
+// Pine v6 integration fragment: replace the old DI peak blocks with this code.
+// Parent indicator supplies global aliases for diPlus, diMinus, atr and confirmed structure/regime.
+// If your values are function-local (f_market_state), map aliases from its returned
+// MarketFeatures/MarketRegime objects at the handoff. Keep UDTs/methods at global scope.
+// Do not paste type declarations inside f_market_state. See MOMENTUM_DI_ANCHORS.md.
+
+// Features only. No entries, exits, BUY/SELL overrides or future pivots.
+// Existing-source adapter is below. Thresholds qualify actual detected extrema.
+float daReversal = input.float(2.0, "Reversal (DI points)", minval=0, maxval=200, step=0.1)
+int daConfirmBars = input.int(1, "Minimum bars after extreme", minval=1, maxval=511)
+int daSpacing = input.int(1, "Minimum bars between confirmations", minval=1, maxval=511)
+int daKeep = input.int(32, "Confirmed records per high/low", minval=1, maxval=128)
+int daSourceKeep = input.int(256, "Origin lookup history", minval=2, maxval=512)
+float daPlusHiMin = input.float(30, "DI+ high minimum", minval=0, maxval=100)
+float daPlusHiMax = input.float(100, "DI+ high maximum", minval=0, maxval=100)
+float daPlusLoMin = input.float(0, "DI+ low minimum", minval=0, maxval=100)
+float daPlusLoMax = input.float(30, "DI+ low maximum", minval=0, maxval=100)
+float daMinusHiMin = input.float(30, "DI- high minimum", minval=0, maxval=100)
+float daMinusHiMax = input.float(100, "DI- high maximum", minval=0, maxval=100)
+float daMinusLoMin = input.float(0, "DI- low minimum", minval=0, maxval=100)
+float daMinusLoMax = input.float(30, "DI- low maximum", minval=0, maxval=100)
+float daSpreadHiMin = input.float(0, "Signed spread high minimum", minval=-100, maxval=100)
+float daSpreadHiMax = input.float(100, "Signed spread high maximum", minval=-100, maxval=100)
+float daSpreadLoMin = input.float(-100, "Signed spread low minimum", minval=-100, maxval=100)
+float daSpreadLoMax = input.float(0, "Signed spread low maximum", minval=-100, maxval=100)
+float daRetestATR = input.float(0.1, "Price retest tolerance (anchor ATR)", minval=0, maxval=10)
+int daRetestAge = input.int(1, "Minimum bars after price anchor is known", minval=1, maxval=5000)
+
+if barstate.isfirst
+    if daSourceKeep <= math.max(daConfirmBars, daSpacing)
+        runtime.error("Origin history must exceed confirmation delays")
+    if daPlusHiMin > daPlusHiMax or daPlusLoMin > daPlusLoMax or daMinusHiMin > daMinusHiMax or daMinusLoMin > daMinusLoMax or daSpreadHiMin > daSpreadHiMax or daSpreadLoMin > daSpreadLoMax
+        runtime.error("Qualification minimum must not exceed maximum")
+
+float daPlus = diPlus
+float daMinus = diMinus
+float daSignedSpread = daPlus - daMinus  // Separate from any existing absolute diSpread.
+float daATR = atr
+bool daReady = not na(daPlus) and not na(daMinus) and daPlus >= 0 and daMinus >= 0
+
+// Existing confirmed market-structure inputs. Names match the supplied feature source.
+// Use existing confirmed structure values, not candidate pivots or future values.
+float daPriceHigh = nearestSwingHigh
+int daPriceHighBar = nearestSwingHighBar
+int daPriceHighTime = nearestSwingHighTime
+float daPriceLow = nearestSwingLow
+int daPriceLowBar = nearestSwingLowBar
+int daPriceLowTime = nearestSwingLowTime
+string daRegime = regimeState
+string daStructure = currentStructure
+
+type DaPoint
+    float value
+    int originBar
+    int originTime
+    float price
+    float priceHigh
+    float priceLow
+    string regime
+    string structure
+
+type DaPeak
+    float value
+    int originBar
+    int originTime
+    int confirmedBar
+    int confirmedTime
+    float price
+    float priceHigh
+    float priceLow
+    string originRegime
+    string originStructure
+    string confirmationRegime
+    string confirmationStructure
+    bool qualified
+    string classification
+    float sinceMin
+    float sinceMax
+    float knownPriceHigh
+    int knownPriceHighTime
+    int knownPriceHighAt
+    float knownPriceLow
+    int knownPriceLowTime
+    int knownPriceLowAt
+
+type DaTracker
+    string phase = "SEEK_TURN"
+    DaPoint candidateHigh = na
+    DaPoint candidateLow = na
+    DaPeak lastHigh = na
+    DaPeak lastLow = na
+    array<DaPeak> highs = na
+    array<DaPeak> lows = na
+    array<DaPoint> samples = na
+    int lastTime = na
+    int lastClose = na
+    int lastConfirmation = na
+    bool ready = false
+    bool continuous = false
+
+f_daTracker() =>
+    DaTracker.new(highs=array.new<DaPeak>(), lows=array.new<DaPeak>(), samples=array.new<DaPoint>())
+
+method reset(DaTracker t) =>
+    t.phase := "SEEK_TURN"
+    t.candidateHigh := na
+    t.candidateLow := na
+    t.lastHigh := na
+    t.lastLow := na
+    t.lastTime := na
+    t.lastClose := na
+    t.lastConfirmation := na
+    t.ready := false
+    t.continuous := false
+    array.clear(t.highs)
+    array.clear(t.lows)
+    array.clear(t.samples)
+    t
+
+method originValue(DaTracker t, int stamp, float current) =>
+    float found = stamp == time ? current : na
+    if na(found) and not na(stamp) and array.size(t.samples) > 0
+        for j = array.size(t.samples) - 1 to 0
+            DaPoint p = array.get(t.samples, j)
+            if p.originTime == stamp
+                found := p.value
+                break
+    found
+
+type DaPriceAnchor
+    float price
+    int originBar
+    int originTime
+    int knownBar
+    int knownTime
+    string regime
+    string structure
+    float tolerance
+    float originPlus
+    float originMinus
+    float originSpread
+    float confirmedPlus
+    float confirmedMinus
+    float confirmedSpread
+    float minPlus
+    float maxPlus
+    float minMinus
+    float maxMinus
+    float minSpread
+    float maxSpread
+
+f_daPrice(DaPriceAnchor previous, float price, int originBar, int stamp, DaTracker plus, DaTracker minus, DaTracker spread) =>
+    DaPriceAnchor p = previous
+    bool valid = not na(price) and price > 0 and not na(originBar) and originBar <= bar_index and not na(stamp) and stamp <= time
+    if valid and (na(p) or p.price != price or p.originBar != originBar or p.originTime != stamp)
+        p := DaPriceAnchor.new(price, originBar, stamp, bar_index, time_close, daRegime, daStructure,
+             not na(daATR) and daATR > 0 ? daATR * daRetestATR : na,
+             plus.originValue(stamp, daPlus), minus.originValue(stamp, daMinus), spread.originValue(stamp, daSignedSpread),
+             daPlus, daMinus, daSignedSpread, daPlus, daPlus, daMinus, daMinus, daSignedSpread, daSignedSpread)
+    if not na(p)
+        p.minPlus := math.min(p.minPlus, daPlus)
+        p.maxPlus := math.max(p.maxPlus, daPlus)
+        p.minMinus := math.min(p.minMinus, daMinus)
+        p.maxMinus := math.max(p.maxMinus, daMinus)
+        p.minSpread := math.min(p.minSpread, daSignedSpread)
+        p.maxSpread := math.max(p.maxSpread, daSignedSpread)
+    p
+
+method step(DaTracker t, float value, float hiMin, float hiMax, float loMin, float loMax, DaPriceAnchor ph, DaPriceAnchor pl) =>
+    if barstate.isconfirmed and (na(t.lastTime) or time > t.lastTime)
+        bool continuity = t.ready and not na(t.lastClose) and t.lastClose == time
+        if not na(t.lastTime) and t.lastClose != time
+            t.reset()
+        if na(value)
+            t.reset()
+            t.lastTime := time
+            t.lastClose := time_close
+        else
+            t.continuous := continuity
+            t.ready := true
+            t.lastTime := time
+            t.lastClose := time_close
+            DaPoint current = DaPoint.new(value, bar_index, time, close, high, low, daRegime, daStructure)
+            array.push(t.samples, current)
+            if array.size(t.samples) > daSourceKeep
+                array.shift(t.samples)
+            if not na(t.lastHigh)
+                t.lastHigh.sinceMin := math.min(t.lastHigh.sinceMin, value)
+                t.lastHigh.sinceMax := math.max(t.lastHigh.sinceMax, value)
+            if not na(t.lastLow)
+                t.lastLow.sinceMin := math.min(t.lastLow.sinceMin, value)
+                t.lastLow.sinceMax := math.max(t.lastLow.sinceMax, value)
+            if t.phase == "SEEK_TURN" or t.phase == "SEEK_HIGH"
+                if na(t.candidateHigh) or value > t.candidateHigh.value
+                    t.candidateHigh := current
+            if t.phase == "SEEK_TURN" or t.phase == "SEEK_LOW"
+                if na(t.candidateLow) or value < t.candidateLow.value
+                    t.candidateLow := current
+            bool spacingOK = na(t.lastConfirmation) or bar_index - t.lastConfirmation >= daSpacing
+            bool highOK = (t.phase == "SEEK_TURN" or t.phase == "SEEK_HIGH") and not na(t.candidateHigh) and value < t.candidateHigh.value and t.candidateHigh.value - value >= daReversal and bar_index - t.candidateHigh.originBar >= daConfirmBars and spacingOK
+            bool lowOK = (t.phase == "SEEK_TURN" or t.phase == "SEEK_LOW") and not na(t.candidateLow) and value > t.candidateLow.value and value - t.candidateLow.value >= daReversal and bar_index - t.candidateLow.originBar >= daConfirmBars and spacingOK
+            int turn = highOK ? 1 : lowOK ? -1 : 0
+            if turn != 0
+                DaPoint origin = turn == 1 ? t.candidateHigh : t.candidateLow
+                DaPeak previous = turn == 1 ? t.lastHigh : t.lastLow
+                string classification = na(previous) ? na : turn == 1 ? (origin.value > previous.value ? "HH" : origin.value < previous.value ? "LH" : "EH") : (origin.value < previous.value ? "LL" : origin.value > previous.value ? "HL" : "EL")
+                bool eligible = turn == 1 ? origin.value >= hiMin and origin.value <= hiMax : origin.value >= loMin and origin.value <= loMax
+                DaPeak peak = DaPeak.new(origin.value, origin.originBar, origin.originTime, bar_index, time_close,
+                     origin.price, origin.priceHigh, origin.priceLow, origin.regime, origin.structure, daRegime, daStructure,
+                     eligible, classification, value, value, na(ph) ? na : ph.price, na(ph) ? na : ph.originTime, na(ph) ? na : ph.knownTime,
+                     na(pl) ? na : pl.price, na(pl) ? na : pl.originTime, na(pl) ? na : pl.knownTime)
+                if turn == 1
+                    t.lastHigh := peak
+                    array.push(t.highs, peak.copy())
+                    if array.size(t.highs) > daKeep
+                        array.shift(t.highs)
+                else
+                    t.lastLow := peak
+                    array.push(t.lows, peak.copy())
+                    if array.size(t.lows) > daKeep
+                        array.shift(t.lows)
+                t.lastConfirmation := bar_index
+                t.phase := turn == 1 ? "SEEK_LOW" : "SEEK_HIGH"
+                DaPoint seed = na
+                if array.size(t.samples) > 0
+                    for j = array.size(t.samples) - 1 to 0
+                        DaPoint p = array.get(t.samples, j)
+                        if p.originBar < origin.originBar
+                            break
+                        if na(seed) or (turn == -1 ? p.value >= seed.value : p.value <= seed.value)
+                            seed := p
+                t.candidateHigh := turn == -1 ? seed : na
+                t.candidateLow := turn == 1 ? seed : na
+    t
+
+var DaTracker daPlusTracker = f_daTracker()
+var DaTracker daMinusTracker = f_daTracker()
+var DaTracker daSpreadTracker = f_daTracker()
+var DaPriceAnchor daHighAnchor = na
+var DaPriceAnchor daLowAnchor = na
+var int daLastProcessed = na
+var int daLastClose = na
+
+if barstate.isconfirmed and (na(daLastProcessed) or time > daLastProcessed)
+    bool resetContext = not daReady or (not na(daLastClose) and daLastClose != time)
+    if resetContext
+        daHighAnchor := na
+        daLowAnchor := na
+        daPlusTracker.reset()
+        daMinusTracker.reset()
+        daSpreadTracker.reset()
+    if daReady
+        daHighAnchor := f_daPrice(daHighAnchor, daPriceHigh, daPriceHighBar, daPriceHighTime, daPlusTracker, daMinusTracker, daSpreadTracker)
+        daLowAnchor := f_daPrice(daLowAnchor, daPriceLow, daPriceLowBar, daPriceLowTime, daPlusTracker, daMinusTracker, daSpreadTracker)
+    daPlusTracker.step(daReady ? daPlus : na, daPlusHiMin, daPlusHiMax, daPlusLoMin, daPlusLoMax, daHighAnchor, daLowAnchor)
+    daMinusTracker.step(daReady ? daMinus : na, daMinusHiMin, daMinusHiMax, daMinusLoMin, daMinusLoMax, daHighAnchor, daLowAnchor)
+    daSpreadTracker.step(daReady ? daSignedSpread : na, daSpreadHiMin, daSpreadHiMax, daSpreadLoMin, daSpreadLoMax, daHighAnchor, daLowAnchor)
+    daLastProcessed := time
+    daLastClose := time_close
+
+// Feature aliases for your future indicator. No plotting or trading calls.
+float daPlusLocalHigh = na(daPlusTracker.lastHigh) ? na : daPlusTracker.lastHigh.value
+float daPlusLocalLow = na(daPlusTracker.lastLow) ? na : daPlusTracker.lastLow.value
+float daMinusLocalHigh = na(daMinusTracker.lastHigh) ? na : daMinusTracker.lastHigh.value
+float daMinusLocalLow = na(daMinusTracker.lastLow) ? na : daMinusTracker.lastLow.value
+float daSpreadLocalHigh = na(daSpreadTracker.lastHigh) ? na : daSpreadTracker.lastHigh.value
+float daSpreadLocalLow = na(daSpreadTracker.lastLow) ? na : daSpreadTracker.lastLow.value
+// Float 1/0/na preserves unavailable flags (Pine v6 bool cannot represent na).
+var float daLowBroken = na
+var float daHighBroken = na
+var float daLowRetest = na
+var float daHighRetest = na
+if barstate.isconfirmed
+    daLowBroken := na(daLowAnchor) or na(daLowAnchor.tolerance) ? na : close < daLowAnchor.price - daLowAnchor.tolerance ? 1.0 : 0.0
+    daHighBroken := na(daHighAnchor) or na(daHighAnchor.tolerance) ? na : close > daHighAnchor.price + daHighAnchor.tolerance ? 1.0 : 0.0
+    daLowRetest := na(daLowAnchor) or na(daLowAnchor.tolerance) ? na : bar_index - daLowAnchor.knownBar >= daRetestAge and low <= daLowAnchor.price + daLowAnchor.tolerance and low >= daLowAnchor.price - daLowAnchor.tolerance and close > daLowAnchor.price + daLowAnchor.tolerance ? 1.0 : 0.0
+    daHighRetest := na(daHighAnchor) or na(daHighAnchor.tolerance) ? na : bar_index - daHighAnchor.knownBar >= daRetestAge and high >= daHighAnchor.price - daHighAnchor.tolerance and high <= daHighAnchor.price + daHighAnchor.tolerance and close < daHighAnchor.price - daHighAnchor.tolerance ? 1.0 : 0.0

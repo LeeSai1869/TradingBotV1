@@ -8,8 +8,10 @@ from .contract import canonical
 STEPS=tuple((importlib.import_module(step['module'] if '.' in step['module'] else 'Section_4_Features.features.'+step['module'],__package__),step['function']) for step in MANIFEST['steps'])
 
 EXTRA_STEP={'module':'Section_4_Features.execution.zone_lifecycle','function':'update'}
-STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['function']))
-EXTRA_FIELDS=('obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh')
+ADDITIONAL_STEPS=({'module':'Section_4_Features.features.momentum_anchors','function':'update'},)
+STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['function']),*((importlib.import_module(s['module']),s['function']) for s in ADDITIONAL_STEPS))
+from ..features.momentum_anchors import EXPORTS as MOMENTUM_ANCHOR_FIELDS
+EXTRA_FIELDS=('obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh',*MOMENTUM_ANCHOR_FIELDS)
 
 class Engine:
     def __init__(self,symbol,timeframe,parameters=None):
