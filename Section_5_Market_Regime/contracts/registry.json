@@ -1,0 +1,135 @@
+{
+  "contract_release": "1.0.0",
+  "status": "DESIGN_ONLY",
+  "runtime_enabled": false,
+  "owner": "Section_5_Market_Regime",
+  "shared_feature_owner": "Section_4_Features",
+  "persistence_owner": "Section_1_Global_Core",
+  "engines": [
+    {
+      "id": "REGIME",
+      "contract": "engines/01_regime.md",
+      "proposed_module": "Section_5_Market_Regime.engines.regime",
+      "dependencies": [],
+      "feature_gaps": [
+        "REGIME_REQUIRED_FEATURES"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "TREND",
+      "contract": "engines/02_trend.md",
+      "proposed_module": "Section_5_Market_Regime.engines.trend",
+      "dependencies": [
+        "STRUCTURE"
+      ],
+      "feature_gaps": [
+        "EMA_NORMALIZED_SLOPES",
+        "DIRECTIONAL_CONSISTENCY"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "STRUCTURE",
+      "contract": "engines/03_structure.md",
+      "proposed_module": "Section_5_Market_Regime.engines.structure",
+      "dependencies": [],
+      "feature_gaps": [],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "MOMENTUM",
+      "contract": "engines/04_momentum.md",
+      "proposed_module": "Section_5_Market_Regime.engines.momentum",
+      "dependencies": [],
+      "feature_gaps": [
+        "ROC_AND_NORMALIZED_MOMENTUM",
+        "MACD_OPTIONAL"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "VOLATILITY",
+      "contract": "engines/05_volatility.md",
+      "proposed_module": "Section_5_Market_Regime.engines.volatility",
+      "dependencies": [],
+      "feature_gaps": [
+        "NORMALIZED_VOLATILITY_DISTRIBUTIONS",
+        "BOLLINGER",
+        "REALIZED_VOLATILITY"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "PHASE",
+      "contract": "engines/06_phase.md",
+      "proposed_module": "Section_5_Market_Regime.engines.phase",
+      "dependencies": [
+        "TREND",
+        "STRUCTURE",
+        "PARTICIPATION"
+      ],
+      "feature_gaps": [
+        "RANGE_SEQUENCE_MEASUREMENTS",
+        "RELATIVE_STRENGTH_OPTIONAL"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "PARTICIPATION",
+      "contract": "engines/07_participation.md",
+      "proposed_module": "Section_5_Market_Regime.engines.participation",
+      "dependencies": [],
+      "feature_gaps": [
+        "VOLUME_VALIDITY_AND_CHANGE"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "LIQUIDITY",
+      "contract": "engines/08_liquidity.md",
+      "proposed_module": "Section_5_Market_Regime.engines.liquidity",
+      "dependencies": [],
+      "feature_gaps": [
+        "OBSERVED_CANDLE_SUMMARIES_IF_MISSING",
+        "CROSS_MARKET_BASIS_OPTIONAL"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "SENTIMENT",
+      "contract": "engines/09_sentiment.md",
+      "proposed_module": "Section_5_Market_Regime.engines.sentiment",
+      "dependencies": [],
+      "feature_gaps": [
+        "EXTERNAL_SOURCE_ADAPTERS",
+        "EXTERNAL_NORMALIZATION"
+      ],
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "id": "BIAS",
+      "contract": "engines/10_bias.md",
+      "proposed_module": "Section_5_Market_Regime.engines.bias",
+      "dependencies": [
+        "REGIME",
+        "TREND",
+        "STRUCTURE",
+        "MOMENTUM",
+        "VOLATILITY",
+        "PHASE",
+        "PARTICIPATION",
+        "LIQUIDITY",
+        "SENTIMENT"
+      ],
+      "feature_gaps": [],
+      "status": "DESIGN_ONLY"
+    }
+  ],
+  "aggregator": {
+    "contract": "AGGREGATION.md",
+    "proposed_module": "Section_5_Market_Regime.aggregation",
+    "status": "DESIGN_ONLY",
+    "depends_on": "per-timeframe results of one requested engine family; never feeds its own base engines"
+  }
+}

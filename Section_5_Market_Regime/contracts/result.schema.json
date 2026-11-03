@@ -1,0 +1,974 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tradingindicator.invalid/contracts/section5/result-1.0.0.schema.json",
+  "title": "Section 5 analytical result \u2014 design contract 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "engine",
+    "engine_version",
+    "state_schema_version",
+    "identity",
+    "candle_open_time",
+    "candle_close_time",
+    "as_of",
+    "computed_at",
+    "available_at",
+    "mode",
+    "classification",
+    "candidate_classification",
+    "strength",
+    "confidence",
+    "coverage",
+    "data_quality",
+    "quality_flags",
+    "measurements",
+    "confirmation",
+    "previous_state",
+    "evidence",
+    "config_hash",
+    "input_signature",
+    "provenance"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "engine": {
+      "enum": [
+        "REGIME",
+        "TREND",
+        "STRUCTURE",
+        "MOMENTUM",
+        "VOLATILITY",
+        "PHASE",
+        "PARTICIPATION",
+        "LIQUIDITY",
+        "SENTIMENT",
+        "BIAS"
+      ]
+    },
+    "engine_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].+)?$"
+    },
+    "state_schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].+)?$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "venue",
+        "market_type",
+        "instrument_id",
+        "symbol",
+        "timeframe",
+        "dataset_generation"
+      ],
+      "properties": {
+        "venue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "market_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeframe": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_generation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "candle_open_time": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candle_close_time": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "as_of": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "computed_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "available_at": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "mode": {
+      "enum": [
+        "CONFIRMED",
+        "PROVISIONAL"
+      ]
+    },
+    "classification": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "candidate_classification": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "strength": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "coverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "data_quality": {
+      "enum": [
+        "VALID",
+        "PARTIAL",
+        "WARMUP",
+        "GAP",
+        "STALE",
+        "INVALID"
+      ]
+    },
+    "quality_flags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "measurements": {
+      "type": "object"
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "candidate_bars",
+        "required_bars"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "PENDING",
+            "UNAVAILABLE"
+          ]
+        },
+        "candidate_bars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_bars": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "previous_state": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "inputs"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "observed": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "config_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_signature": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "source_versions",
+        "dependency_results"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "LIVE",
+            "HISTORICAL_RECONSTRUCTION",
+            "SIMULATION"
+          ]
+        },
+        "source_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dependency_results": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "REGIME"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/regime_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/regime_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "TREND"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/trend_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/trend_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "STRUCTURE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/structure_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/structure_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "MOMENTUM"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/momentum_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/momentum_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "VOLATILITY"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/volatility_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/volatility_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "PHASE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/phase_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/phase_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "PARTICIPATION"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/participation_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/participation_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "LIQUIDITY"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/liquidity_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/liquidity_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "SENTIMENT"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/sentiment_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/sentiment_classification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "engine": {
+            "const": "BIAS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/bias_classification"
+          },
+          "candidate_classification": {
+            "$ref": "#/$defs/bias_classification"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "regime_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "direction",
+        "volatility_level",
+        "volatility_change",
+        "stability"
+      ],
+      "properties": {
+        "primary": {
+          "enum": [
+            "TRENDING",
+            "RANGING",
+            "TRANSITIONAL",
+            "UNKNOWN"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "BULLISH",
+            "BEARISH",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        },
+        "volatility_level": {
+          "enum": [
+            "EXTREMELY_LOW",
+            "LOW",
+            "NORMAL",
+            "HIGH",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        },
+        "volatility_change": {
+          "enum": [
+            "CONTRACTING",
+            "STABLE",
+            "EXPANDING",
+            "UNKNOWN"
+          ]
+        },
+        "stability": {
+          "enum": [
+            "STABLE",
+            "TRANSITIONING",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "trend_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "strength_band",
+        "persistence",
+        "condition",
+        "structural_alignment"
+      ],
+      "properties": {
+        "direction": {
+          "enum": [
+            "BULLISH",
+            "BEARISH",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        },
+        "strength_band": {
+          "enum": [
+            "WEAK",
+            "MODERATE",
+            "STRONG",
+            "VERY_STRONG",
+            "UNKNOWN"
+          ]
+        },
+        "persistence": {
+          "enum": [
+            "INCREASING",
+            "STABLE",
+            "DECLINING",
+            "UNKNOWN"
+          ]
+        },
+        "condition": {
+          "enum": [
+            "DEVELOPING",
+            "ESTABLISHED",
+            "EXHAUSTING",
+            "UNCONFIRMED",
+            "UNKNOWN"
+          ]
+        },
+        "structural_alignment": {
+          "enum": [
+            "ALIGNED",
+            "CONFLICTED",
+            "NEUTRAL",
+            "UNAVAILABLE"
+          ]
+        }
+      }
+    },
+    "structure_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "condition",
+        "last_event",
+        "active_structure"
+      ],
+      "properties": {
+        "direction": {
+          "enum": [
+            "BULLISH",
+            "BEARISH",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        },
+        "condition": {
+          "enum": [
+            "DEVELOPING",
+            "CONFIRMED",
+            "BROKEN",
+            "INVALIDATED",
+            "UNKNOWN"
+          ]
+        },
+        "last_event": {
+          "enum": [
+            "HIGHER_HIGH",
+            "HIGHER_LOW",
+            "LOWER_HIGH",
+            "LOWER_LOW",
+            "EQUAL_HIGH",
+            "EQUAL_LOW",
+            "BOS",
+            "CHOCH",
+            "SWING_FAILURE",
+            "NONE",
+            "UNKNOWN"
+          ]
+        },
+        "active_structure": {
+          "enum": [
+            "HH_HL",
+            "LH_LL",
+            "RANGE",
+            "MIXED",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "momentum_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "strength_band",
+        "acceleration",
+        "condition"
+      ],
+      "properties": {
+        "direction": {
+          "enum": [
+            "BULLISH",
+            "BEARISH",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        },
+        "strength_band": {
+          "enum": [
+            "WEAK",
+            "MODERATE",
+            "STRONG",
+            "VERY_STRONG",
+            "UNKNOWN"
+          ]
+        },
+        "acceleration": {
+          "enum": [
+            "ACCELERATING",
+            "STABLE",
+            "DECELERATING",
+            "UNKNOWN"
+          ]
+        },
+        "condition": {
+          "enum": [
+            "BUILDING",
+            "SUSTAINING",
+            "WEAKENING",
+            "EXHAUSTING",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "volatility_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "state",
+        "distribution",
+        "shock"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "EXTREMELY_LOW",
+            "LOW",
+            "NORMAL",
+            "HIGH",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        },
+        "state": {
+          "enum": [
+            "CONTRACTING",
+            "STABLE",
+            "EXPANDING",
+            "UNKNOWN"
+          ]
+        },
+        "distribution": {
+          "enum": [
+            "SYMMETRIC",
+            "SKEWED",
+            "UNKNOWN"
+          ]
+        },
+        "shock": {
+          "enum": [
+            "NONE",
+            "MODERATE",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "phase_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "development",
+        "preceding_trend"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "ACCUMULATION",
+            "MARKUP",
+            "DISTRIBUTION",
+            "MARKDOWN",
+            "REACCUMULATION",
+            "REDISTRIBUTION",
+            "TRANSITION",
+            "UNKNOWN"
+          ]
+        },
+        "development": {
+          "enum": [
+            "DEVELOPING",
+            "CONFIRMED",
+            "INVALIDATED",
+            "UNKNOWN"
+          ]
+        },
+        "preceding_trend": {
+          "enum": [
+            "BULLISH",
+            "BEARISH",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "participation_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activity",
+        "participation",
+        "dominance",
+        "confirmation"
+      ],
+      "properties": {
+        "activity": {
+          "enum": [
+            "VERY_LOW",
+            "LOW",
+            "NORMAL",
+            "HIGH",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        },
+        "participation": {
+          "enum": [
+            "INCREASING",
+            "STABLE",
+            "DECLINING",
+            "UNKNOWN"
+          ]
+        },
+        "dominance": {
+          "enum": [
+            "BUY_DOMINANT",
+            "SELL_DOMINANT",
+            "BALANCED",
+            "UNKNOWN"
+          ]
+        },
+        "confirmation": {
+          "enum": [
+            "CONFIRMING",
+            "DIVERGING",
+            "NEUTRAL",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "liquidity_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "structural_side",
+        "sweep",
+        "sweep_status",
+        "book_state",
+        "derivatives_state"
+      ],
+      "properties": {
+        "structural_side": {
+          "enum": [
+            "BUY_SIDE_NEAR",
+            "SELL_SIDE_NEAR",
+            "AT_LEVEL",
+            "MID_RANGE",
+            "UNKNOWN"
+          ]
+        },
+        "sweep": {
+          "enum": [
+            "BSL_SWEEP",
+            "SSL_SWEEP",
+            "NONE",
+            "UNKNOWN"
+          ]
+        },
+        "sweep_status": {
+          "enum": [
+            "POTENTIAL",
+            "CONFIRMED_REJECTION",
+            "ACCEPTANCE_ABOVE",
+            "ACCEPTANCE_BELOW",
+            "NONE",
+            "UNKNOWN"
+          ]
+        },
+        "book_state": {
+          "enum": [
+            "DEEP",
+            "NORMAL",
+            "THIN",
+            "WITHDRAWING",
+            "UNKNOWN"
+          ]
+        },
+        "derivatives_state": {
+          "enum": [
+            "BUILDING",
+            "UNWINDING",
+            "STABLE",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "sentiment_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sentiment",
+        "positioning",
+        "stability",
+        "risk"
+      ],
+      "properties": {
+        "sentiment": {
+          "enum": [
+            "EXTREMELY_BULLISH",
+            "BULLISH",
+            "NEUTRAL",
+            "BEARISH",
+            "EXTREMELY_BEARISH",
+            "UNKNOWN"
+          ]
+        },
+        "positioning": {
+          "enum": [
+            "LONG_CROWDED",
+            "SHORT_CROWDED",
+            "BALANCED",
+            "UNKNOWN"
+          ]
+        },
+        "stability": {
+          "enum": [
+            "IMPROVING",
+            "STABLE",
+            "DETERIORATING",
+            "RAPIDLY_CHANGING",
+            "UNKNOWN"
+          ]
+        },
+        "risk": {
+          "enum": [
+            "LOW",
+            "MODERATE",
+            "HIGH",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "bias_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "risk",
+        "alignment"
+      ],
+      "properties": {
+        "direction": {
+          "enum": [
+            "STRONG_BULLISH",
+            "BULLISH",
+            "NEUTRAL",
+            "BEARISH",
+            "STRONG_BEARISH",
+            "UNKNOWN"
+          ]
+        },
+        "risk": {
+          "enum": [
+            "LOW",
+            "MODERATE",
+            "HIGH",
+            "EXTREME",
+            "UNKNOWN"
+          ]
+        },
+        "alignment": {
+          "enum": [
+            "ALIGNED",
+            "PARTIALLY_ALIGNED",
+            "CONFLICTED",
+            "UNKNOWN"
+          ]
+        }
+      }
+    }
+  }
+}
