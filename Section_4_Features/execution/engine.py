@@ -9,11 +9,13 @@ STEPS=tuple((importlib.import_module(step['module'] if '.' in step['module'] els
 
 EXTRA_STEP={'module':'Section_4_Features.execution.zone_lifecycle','function':'update'}
 ADDITIONAL_STEPS=({'module':'Section_4_Features.features.momentum_anchors','function':'update'},
-                  {'module':'Section_4_Features.features.shared_measurements','function':'update'})
+                  {'module':'Section_4_Features.features.shared_measurements','function':'update'},
+                  {'module':'Section_4_Features.features.structure_events','function':'update'})
 STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['function']),*((importlib.import_module(s['module']),s['function']) for s in ADDITIONAL_STEPS))
 from ..features.momentum_anchors import EXPORTS as MOMENTUM_ANCHOR_FIELDS
 from ..features.shared_measurements import EXPORTS as SHARED_MEASUREMENT_FIELDS
-EXTRA_FIELDS=(*SHARED_MEASUREMENT_FIELDS,'obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh',*MOMENTUM_ANCHOR_FIELDS)
+from ..features.structure_events import EXPORTS as STRUCTURE_EVENT_FIELDS
+EXTRA_FIELDS=(*STRUCTURE_EVENT_FIELDS,*SHARED_MEASUREMENT_FIELDS,'obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh',*MOMENTUM_ANCHOR_FIELDS)
 
 class Engine:
     def __init__(self,symbol,timeframe,parameters=None):

@@ -1,9 +1,8 @@
 # 03 — STRUCTURE: contract 1.0.0
 
-Status: RUNNER_CONNECTED_PARTIAL. State and source-break counter adapter:
-`engines/structure.py`. See [STRUCTURE_V1.md](../../STRUCTURE_V1.md).
-Complete confirmed-pivot event lineage remains unavailable and is not inferred
-from legacy candidate fields.
+Status: RUNNER_CONNECTED. Structure 1.1 consumes the producer's confirmed-event
+channel and existing state mapping. See [STRUCTURE_V1.md](../../STRUCTURE_V1.md).
+Missing old break references remain unavailable rather than invented.
 
 ## Responsibility
 

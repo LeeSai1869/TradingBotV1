@@ -954,3 +954,10 @@ recent seeding and following a new close in the same run. Structure tests cover
 explicit enum mapping, source break deduplication, unavailable event origins,
 gaps, preview isolation, restart and the common output schema. Existing DI and
 legacy-feature regression tests remain unchanged.
+
+`test_structure_lineage.py` checks producer IDs and origin/confirmation times,
+confirmed-price comparisons, source-engine checkpoint/preview/prefix parity,
+consumer deduplication and rejection of future events. Counter/candidate fields
+cannot manufacture events. The existing legacy packet hash remains unchanged
+after excluding the three additive lineage fields; selective replay tests verify
+correct recomputation through existing store/checkpoint paths.

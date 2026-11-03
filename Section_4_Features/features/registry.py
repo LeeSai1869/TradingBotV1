@@ -16,6 +16,9 @@ def load():
     from .momentum_anchors import EXPORTS
     for row in result:
         if row['name']=='momentum':row['output_fields']+=tuple(EXPORTS)
+    from .structure_events import EXPORTS as STRUCTURE_EVENTS
+    for row in result:
+        if row['name']=='market_structure':row['output_fields']+=tuple(STRUCTURE_EVENTS)
     from .shared_measurements import GROUPS
     for row in result:
         row['output_fields']+=GROUPS.get(row['name'],())

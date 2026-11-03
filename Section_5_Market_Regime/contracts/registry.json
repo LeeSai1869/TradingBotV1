@@ -33,7 +33,7 @@
       "proposed_module": "Section_5_Market_Regime.engines.structure",
       "dependencies": [],
       "feature_gaps": [],
-      "status": "RUNNER_CONNECTED_PARTIAL"
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "MOMENTUM",

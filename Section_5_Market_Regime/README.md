@@ -10,7 +10,7 @@ then read the [common contract](contracts/COMMON.md),
 [shared feature audit](contracts/FEATURE_AUDIT.md) and
 [implementation gates](contracts/IMPLEMENTATION.md).
 
-**Status: Regime v1 and the partial Structure adapter run automatically.** The JSON
+**Status: Regime v1 and the Structure event adapter run automatically.** The JSON
 registry remains descriptive and is not imported by the runner. The existing
 six-state calculations and all current consumers remain unchanged.
 
@@ -19,8 +19,7 @@ six-state calculations and all current consumers remain unchanged.
 [REGIME_V1.md](REGIME_V1.md) is the frozen experimental implementation spec.
 `engines/regime.py` is pure and independent; Core owns `regime_inputs.py`,
 `regime_research.py` and the shared analytical history store. Its research command remains available; automatic runner integration is described
-below. It is not connected to chart or decision consumers. Structure now has a
-conservative state adapter; the other eight engines remain design-only.
+below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; the other eight engines remain design-only.
 
 For a recent independently seeded research run:
 
@@ -69,5 +68,6 @@ python3 run_regime.py --automatic --engine STRUCTURE --symbols BTCUSDT --interva
 ```
 
 The chart and BUY/SELL, confidence and opportunity consumers are unchanged.
-Structure is intentionally PARTIAL until original confirmed-pivot event lineage
-is available; it does not guess missing history or reuse candidate fields as facts.
+Structure 1.1 consumes confirmed producer pivot/BOS/CHOCH events, including IDs
+and origin/known times. Missing lineage or unavailable old break references remain
+explicitly partial; candidate fields never substitute for confirmed events.

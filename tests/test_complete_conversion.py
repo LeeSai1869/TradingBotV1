@@ -50,7 +50,8 @@ class CompleteConversionTests(unittest.TestCase):
             # Newly exported legacy candle field was absent from the old packet.
             from Section_4_Features.features.momentum_anchors import EXPORTS as added_momentum_fields
             from Section_4_Features.features.shared_measurements import EXPORTS as added_shared_fields
-            for field in (*added_momentum_fields,*added_shared_fields):packet.pop(field)
+            from Section_4_Features.features.structure_events import EXPORTS as added_structure_fields
+            for field in (*added_momentum_fields,*added_shared_fields,*added_structure_fields):packet.pop(field)
             packet.pop('prev_candle_range')
             packet.pop('sr_zone_events')
             packet.pop('ob_zone_events')
@@ -85,7 +86,7 @@ class CompleteConversionTests(unittest.TestCase):
         from pathlib import Path
         folder=Path(__file__).parents[1]/'Section_4_Features'
         self.assertFalse((folder/'individual').exists())
-        self.assertEqual({p.stem for p in (folder/'features').glob('*.py')}-{'__init__','registry','momentum_anchors','shared_measurements'},set(entries[row]['feature'] for row in entries))
+        self.assertEqual({p.stem for p in (folder/'features').glob('*.py')}-{'__init__','registry','momentum_anchors','shared_measurements','structure_events'},set(entries[row]['feature'] for row in entries))
 
     def test_all_contract_fields_and_hand_calculated_wilder_seed(self):
         engine=Engine('ETHUSDT','1m',{'rsiLen':3,'atrLen':2,'adxLen':2})

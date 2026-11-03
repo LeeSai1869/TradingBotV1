@@ -17,15 +17,17 @@ from Section_5_Market_Regime.engines import structure
 def source(i,**fields):
     item=snapshot(i);values=dict(current_structure='STRUCTURE_BULL',bullish_structure_active=True,bearish_structure_active=False,range_structure_active=False,
         bull_bos_count=0,bear_bos_count=0,range_bos_count=0,last_structure_bos='',last_structure_choch='',
-        measurement_gap=False,measurement_version='shared-v1',measurement_config_id='x')
+        measurement_gap=False,measurement_version='shared-v1',measurement_config_id='x',structure_events='[]',structure_events_version='structure-events-v1',structure_event_status='READY')
     values.update(fields);item['features']=values;item['units']=structure.UNITS.copy();item['field_validity']={k:'VALID' if v is not None else 'UNAVAILABLE' for k,v in values.items()};item['field_available_at']={k:item['as_of'] for k in values}
     return item
 
 class StructureEngine(unittest.TestCase):
     def test_explicit_mapping_break_dedup_and_no_candidate_pivots(self):
         result,state=structure.evaluate(source(0))
-        self.assertEqual(result['classification']['active_structure'],'HH_HL');self.assertEqual(result['coverage'],.8)
-        result,state=structure.evaluate(source(1,bull_bos_count=1,last_structure_bos='bullishBOS'),previous_state=state)
+        self.assertEqual(result['classification']['active_structure'],'HH_HL');self.assertEqual(result['coverage'],1.)
+        from Section_4_Features.features import structure_events as producer
+        _,buffer=producer.transition(producer.new_state(),[],'BTCUSDT','1m',dict(open_time=60000,close_time=119999),'BOS','bullishBOS',1,0)
+        result,state=structure.evaluate(source(1,bull_bos_count=1,last_structure_bos='bullishBOS',structure_events=json.dumps(buffer)),previous_state=state)
         self.assertEqual(result['classification']['condition'],'BROKEN');events=result['measurements']['new_events'];self.assertEqual(len(events),1)
         self.assertIsNone(events[0]['origin_time']);self.assertEqual(events[0]['known_time'],120000)
         result,state=structure.evaluate(source(2,bull_bos_count=1,last_structure_bos='bullishBOS'),previous_state=state)

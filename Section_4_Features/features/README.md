@@ -53,3 +53,7 @@ The additive `shared_measurements.py` extension supplies the numerical foundatio
 for the new analytical engines without changing Pine formulas. It consumes existing
 indicators and exports causal ER/Bollinger/ranks, normalized slopes/momentum,
 return statistics and valid volume measures. See [the numerical contract](../SHARED_MEASUREMENTS.md).
+
+`structure_events.py` exports confirmation events captured directly inside the
+existing market-structure branches. It adds lineage without changing pivot or BOS
+conditions. See [Structure 1.1](../../Section_5_Market_Regime/STRUCTURE_V1.md).
