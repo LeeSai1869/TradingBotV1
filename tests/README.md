@@ -931,3 +931,10 @@ checks 125 messages across pages, chart-free cards and offline local history.
 Build Android with `cd mobile/android && ./gradlew assembleDebug bundleRelease`.
 The release bundle needs operator signing before Play submission. No test proves
 real FCM receipt without a Firebase project/phone; see mobile/android/README.md.
+
+Section 4 shared measurements: `test_shared_measurements.py` covers hand-computed
+ER, Bollinger population variance, causal full-baseline midranks, flat/zero/invalid
+inputs, gap/config resets, independent pair state and checkpoint/preview parity.
+The selective-feature integration test verifies stored new fields, unchanged
+legacy columns, restarts and continued streaming. The 700-candle legacy packet
+hash remains unchanged after excluding the documented additive exports.

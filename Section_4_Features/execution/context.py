@@ -28,7 +28,12 @@ class Context:
         anchor_options=getattr(inputs,'MOMENTUM_DI_ANCHORS',{})
         if set(anchor_options)-set(anchor_defaults):raise ValueError('Unknown Momentum DI anchor setting')
         self.parameters.update(anchor_defaults);self.parameters.update(anchor_options)
+        from ..features.shared_measurements import DEFAULTS as measurement_defaults, validate as validate_measurements
+        measurement_options=getattr(inputs,'SHARED_MEASUREMENTS',{})
+        if set(measurement_options)-set(measurement_defaults):raise ValueError('Unknown shared measurement setting')
+        self.parameters.update(measurement_defaults);self.parameters.update(measurement_options)
         self.parameters.update(parameters or {})
+        validate_measurements(self.parameters)
         validate_anchors(self.parameters)
         for key in ('rsiLen','adxLen','atrLen','atrMaLen','srPivotLen','volumeLookback','vpLookback','vpBins','liquidityLookback','rangeLookback',*[f'ema{p}Len' for p in (7,25,50,100,200,300)]):
             value=self.parameters[key]

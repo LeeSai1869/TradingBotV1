@@ -237,8 +237,8 @@ class SelectiveFeatures(unittest.TestCase):
             current=components.Catalog()
         changed={uid for uid in current.source if current.source[uid]!=baseline.get(uid)}
         self.assertTrue(changed)
-        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure','.order_blocks','.liquidity','.momentum_anchors')) or current.by_id[uid].module.endswith('.momentum') and 'diAnchorsState' in current.by_id[uid].writes for uid in changed))
-        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle','.order_blocks','.liquidity'))}).columns)
+        self.assertTrue(all(current.by_id[uid].module.endswith(('.fair_value_gaps','.support_resistance','.zone_lifecycle','.market_structure','.order_blocks','.liquidity','.momentum_anchors','.shared_measurements')) or current.by_id[uid].module.endswith('.momentum') and 'diAnchorsState' in current.by_id[uid].writes for uid in changed))
+        allowed=set(current.plan({u.id for u in current.units if u.module.endswith(('.market_structure','.fair_value_gaps','.support_resistance','.zone_lifecycle','.order_blocks','.liquidity','.shared_measurements'))}).columns)
         self.assertLessEqual(current.plan(current.changed(baseline,{},{})).columns,allowed)
         self.assertFalse({'ema50','adx','rsi','vp_poc'} & current.plan(current.changed(baseline,{},{})).columns)
 
@@ -370,3 +370,16 @@ class SelectiveFeatures(unittest.TestCase):
         for key,value in expected.items():
             if value is not None and (features_store._translated_fields.get(key)=='string' or key.endswith('_type')):value=str(value)
             self.assertEqual(actual[key],value,key)
+
+    def test_shared_measurement_replay_preserves_legacy_columns_and_resumes(self):
+        from Section_4_Features.features.shared_measurements import EXPORTS
+        params=self.config(measurementERLength=12,measurementRankLength=30)
+        reference=Engine('ETHUSDT','1m',params);expected=[reference.step(b) for b in self.clients]
+        with patch.object(momentum,'calculate_dmi',side_effect=AssertionError('DMI must not run')),patch.object(trend,'calculate_ema',side_effect=AssertionError('EMA must not run')),patch.object(volume_profile,'accumulate_histogram',side_effect=AssertionError('VP must not run')):
+            self.finish()
+        for old,new,ref in zip(self.before,self.raw_features(),expected):
+            for field in old:
+                self.assertEqual(new[field],ref[field] if field in EXPORTS else old[field],field)
+        next_bar=bar(220,114);db.write_klines([next_bar]);processor._ENGINES.clear();processor.catch_up('ETHUSDT','1m')
+        actual=db.read_features('ETHUSDT','1m',next_bar['open_time']);expected_next=reference.step(next_bar)
+        for field in EXPORTS:self.assertEqual(actual[field],expected_next[field],field)

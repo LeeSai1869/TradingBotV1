@@ -16,4 +16,10 @@ def load():
     from .momentum_anchors import EXPORTS
     for row in result:
         if row['name']=='momentum':row['output_fields']+=tuple(EXPORTS)
+    from .shared_measurements import GROUPS
+    for row in result:
+        row['output_fields']+=GROUPS.get(row['name'],())
+    result.append({'name':'shared_measurements','inputs':('context',),
+        'module':importlib.import_module('Section_4_Features.features.shared_measurements'),
+        'output_fields':GROUPS['shared_measurements']})
     return result

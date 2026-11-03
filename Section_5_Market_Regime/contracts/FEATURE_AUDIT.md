@@ -78,3 +78,16 @@ parameters, warmup, gap/zero handling, availability and dependency fingerprint.
 Store/configure logical feature IDs plus parameter hashes rather than proliferating
 columns for every n/k combination. Preserve existing wide-store contracts until
 an explicit migration defines how multiple configurations coexist.
+
+## Section 4 implementation update
+
+The initial candle-derived measurement foundation is implemented in
+[SHARED_MEASUREMENTS.md](../../Section_4_Features/SHARED_MEASUREMENTS.md). It closes
+REGIME_REQUIRED_FEATURES, BOLLINGER, NORMALIZED_VOLATILITY_DISTRIBUTIONS,
+EMA_NORMALIZED_SLOPES, DIRECTIONAL_CONSISTENCY, ROC_AND_NORMALIZED_MOMENTUM,
+MACD_OPTIONAL, REALIZED_VOLATILITY and VOLUME_VALIDITY_AND_CHANGE for the documented
+v1 configuration. Existing calculated values/units remain unchanged.
+
+This is numerical feature work only. Analytical classification, Phase sequence
+interpretation, external source adapters/normalization, benchmark association and
+Core-owned engine persistence remain separate implementation gates.

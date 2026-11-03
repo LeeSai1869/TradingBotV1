@@ -71,3 +71,12 @@ measurement/state schema, the Core public adapter, persistence migrations and UI
 presentation are future implementation work. They must be explicit before those
 engines enter the production scheduler. A schema-valid record alone does not
 establish semantic correctness, data quality or predictive value.
+
+## Section 4 foundation delivered
+
+Stage 1 shared candle inputs are now implemented and covered by numerical,
+checkpoint, dependency-replay and legacy-regression tests. See
+[the feature contract](../../Section_4_Features/SHARED_MEASUREMENTS.md).
+This does not change the existing Section 5 runtime. The next implementation unit
+is Regime v1, after finalizing its scoring, public snapshot adapter and immutable
+projected-input lineage/persistence described above.

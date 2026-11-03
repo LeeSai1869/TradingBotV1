@@ -49,7 +49,8 @@ class CompleteConversionTests(unittest.TestCase):
             packet=engine.step(client)
             # Newly exported legacy candle field was absent from the old packet.
             from Section_4_Features.features.momentum_anchors import EXPORTS as added_momentum_fields
-            for field in added_momentum_fields:packet.pop(field)
+            from Section_4_Features.features.shared_measurements import EXPORTS as added_shared_fields
+            for field in (*added_momentum_fields,*added_shared_fields):packet.pop(field)
             packet.pop('prev_candle_range')
             packet.pop('sr_zone_events')
             packet.pop('ob_zone_events')
@@ -61,7 +62,7 @@ class CompleteConversionTests(unittest.TestCase):
         owners={row['name']:row for row in load()}
         for name in ('liquidity','support_resistance','sessions','order_blocks','trend','momentum','candle','market_structure'):
             self.assertIn(name,owners)
-        self.assertEqual(len(owners),22)
+        self.assertEqual(len(owners),23)
         from Section_11_UI_UX.server.hud import FIELDS
         for field in ('di_dominance','rsi','adx','ema50','vwap'):
             self.assertIn('features.'+field,FIELDS)
@@ -84,7 +85,7 @@ class CompleteConversionTests(unittest.TestCase):
         from pathlib import Path
         folder=Path(__file__).parents[1]/'Section_4_Features'
         self.assertFalse((folder/'individual').exists())
-        self.assertEqual({p.stem for p in (folder/'features').glob('*.py')}-{'__init__','registry','momentum_anchors'},set(entries[row]['feature'] for row in entries))
+        self.assertEqual({p.stem for p in (folder/'features').glob('*.py')}-{'__init__','registry','momentum_anchors','shared_measurements'},set(entries[row]['feature'] for row in entries))
 
     def test_all_contract_fields_and_hand_calculated_wilder_seed(self):
         engine=Engine('ETHUSDT','1m',{'rsiLen':3,'atrLen':2,'adxLen':2})

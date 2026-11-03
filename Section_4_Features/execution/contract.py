@@ -33,6 +33,8 @@ FIELDS['prev_atr']='float'
 FIELDS['daily_source_ready']='bool'
 from ..features.momentum_anchors import EXPORTS as MOMENTUM_ANCHOR_FIELDS
 FIELDS.update(MOMENTUM_ANCHOR_FIELDS)
+from ..features.shared_measurements import EXPORTS as SHARED_MEASUREMENT_FIELDS
+FIELDS.update(SHARED_MEASUREMENT_FIELDS)
 FIELDS['sr_zone_events']='string'
 FIELDS['ob_zone_events']='string'
 for side in ('support','resistance','inst_support','inst_resistance'):

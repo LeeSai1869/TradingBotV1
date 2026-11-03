@@ -302,3 +302,8 @@ TABLE_POSITION: str = "top_right"
 # ======================================================
 # SECTION 2 END
 # ======================================================
+
+# Additive shared numerical inputs for Section 5. Keys/defaults and validation
+# live in Section_4_Features.features.shared_measurements.DEFAULTS. Override only
+# reviewed settings here; configuration changes trigger dependency-directed replay.
+SHARED_MEASUREMENTS = {}

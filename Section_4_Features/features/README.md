@@ -48,3 +48,8 @@ Detection runs alongside existing DI calculations; its final context attachment
 runs after existing structure/regime outputs are available. It adds no BUY/SELL
 rules. See `../MOMENTUM_DI_ANCHORS.md` for configuration, field semantics, isolated
 replay, corrected Pine v6 scripts and integration scope.
+
+The additive `shared_measurements.py` extension supplies the numerical foundation
+for the new analytical engines without changing Pine formulas. It consumes existing
+indicators and exports causal ER/Bollinger/ranks, normalized slopes/momentum,
+return statistics and valid volume measures. See [the numerical contract](../SHARED_MEASUREMENTS.md).
