@@ -988,3 +988,10 @@ Participation v1: `python3 -m unittest discover -s tests -p 'test_participation*
 checks RVOL boundaries, real zero versus unavailable volume, symmetric price/volume
 confirmation, no inferred aggressor dominance, event deduplication, preview/gap and
 restart safety, and immutable history reproduction through the real Core gateway.
+
+Phase v1: `python3 -m unittest discover -s tests -p 'test_phase*.py'` verifies
+preceding-trend/range/evidence ordering, all four developing cycle hypotheses,
+consolidation without unsupported labels, frozen geometry, causal structural
+confirmation, invalidation/failure/expiry, conflicting evidence, source identity
+and availability gates, restart/preview/gap behavior, exact immutable dependencies,
+rollback and the shared row budget (including nested Trend/Structure work).

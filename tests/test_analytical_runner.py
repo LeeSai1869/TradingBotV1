@@ -55,9 +55,10 @@ class RunnerTurns(unittest.TestCase):
             if len(seen)==1:raise RuntimeError('injected adapter failure')
             return dict(processed=options['limit'],status='processed',latest={})
         with patch.object(research,'catch_up',side_effect=advance):
-            self.assertLessEqual(worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10),120)
-            worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10)
-            worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10)
+            # Adding an independent engine increases visits, never per-turn work.
+            for _ in range(10):
+                self.assertLessEqual(worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10),120)
+                if any(row[0]=='ETHUSDT' for row in seen):break
         self.assertTrue(any(row[0]=='ETHUSDT' for row in seen));self.assertTrue(worker.process_bar(SimpleNamespace()))
         with patch.object(research,'catch_up') as call:worker.maintenance([],['1m']);call.assert_not_called()
 

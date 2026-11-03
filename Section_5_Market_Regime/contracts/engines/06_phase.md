@@ -1,7 +1,8 @@
 # 06 — PHASE: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/phase.py`.
+Status: RUNNER_CONNECTED. Inherits [COMMON.md](../COMMON.md).
+Implementation: `engines/phase.py`. Exact v1 sequence rules, defaults and limitations:
+[PHASE_V1.md](../../PHASE_V1.md).
 
 ## Responsibility
 

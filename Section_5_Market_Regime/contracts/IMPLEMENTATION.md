@@ -126,3 +126,9 @@ See VOLATILITY_V1.md for the prior-ATR range/opening-gap shock model.
 Participation v1 is implemented and runner-connected. Its exact rules, fixed
 coverage budget and unsupported aggressor-flow policy are in
 [PARTICIPATION_V1.md](../PARTICIPATION_V1.md).
+
+Phase v1 is runner-connected with exact public Trend/Structure/Participation
+references and bounded transitive dependency work. Existing Section 4 range bounds
+are frozen into Phase-owned interpretation state; sequence duration and failed
+attempts are interpretation events, not duplicate shared numerical indicators.
+See [PHASE_V1.md](../PHASE_V1.md) for the complete v1 rules and evidence budget.

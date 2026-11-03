@@ -148,3 +148,11 @@ The experimental evidence scores are not probabilities or profit estimates.
 coin/timeframe. It reuses shared RVOL, volume change and price progress. Aggressor
 dominance stays UNKNOWN without matched observed flow; candle-only coverage is .75
 at most. No BUY/SELL, confidence/opportunity or UI rules are changed.
+
+## Phase v1
+
+[Phase](PHASE_V1.md) consumes exact persisted Trend, Structure and Participation
+outputs plus existing range/volatility measurements. It tracks a preceding trend,
+a frozen range and later corroboration before calling a cycle hypothesis; structural
+confirmation, failed breakouts, invalidation and expiry have separate known times.
+The normal bounded runner saves independent history for active coins/timeframes.

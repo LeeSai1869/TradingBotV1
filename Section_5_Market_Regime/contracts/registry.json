@@ -58,10 +58,9 @@
         "PARTICIPATION"
       ],
       "feature_gaps": [
-        "RANGE_SEQUENCE_MEASUREMENTS",
         "RELATIVE_STRENGTH_OPTIONAL"
       ],
-      "status": "DESIGN_ONLY"
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "PARTICIPATION",
