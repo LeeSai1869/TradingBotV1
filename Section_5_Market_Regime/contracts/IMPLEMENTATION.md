@@ -106,3 +106,11 @@ The pure Trend classifier, independent immutable config, exact same-candle
 Structure dependency projection/reference, atomic historical state and automatic
 runner turn are implemented. Dependency processing shares the existing row budget.
 No Section 4 formula, UI or strategy migration is included. See TREND_V1.md.
+
+## Momentum v1 delivered
+
+Pure Momentum interpretation and separate immutable configuration are connected
+to the existing bounded analytical maintenance/store. Shared numerical features
+and confirmed DI-anchor events are reused; no second detector or indicator is
+created. Acceleration uses absolute-strength change, and exhaustion requires
+persistent weakening with timed corroboration. See MOMENTUM_V1.md.

@@ -10,7 +10,7 @@ then read the [common contract](contracts/COMMON.md),
 [shared feature audit](contracts/FEATURE_AUDIT.md) and
 [implementation gates](contracts/IMPLEMENTATION.md).
 
-**Status: Regime, Structure and Trend run automatically.** The JSON
+**Status: Regime, Structure, Trend and Momentum run automatically.** The JSON
 registry remains descriptive and is not imported by the runner. The existing
 six-state calculations and all current consumers remain unchanged.
 
@@ -19,7 +19,7 @@ six-state calculations and all current consumers remain unchanged.
 [REGIME_V1.md](REGIME_V1.md) is the frozen experimental implementation spec.
 `engines/regime.py` is pure and independent; Core owns `regime_inputs.py`,
 `regime_research.py` and the shared analytical history store. Its research command remains available; automatic runner integration is described
-below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; Trend now consumes that same-candle public output; the other seven engines remain design-only.
+below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; Trend now consumes that same-candle public output; Momentum is implemented as described below; the other six engines remain design-only.
 
 For a recent independently seeded research run:
 
@@ -96,3 +96,25 @@ python3 run_regime.py --automatic --engine TREND --symbols BTCUSDT --intervals 1
 
 The command's legacy filename is retained; `--engine` chooses the classifier.
 Thresholds are experimental and evidence confidence is not a win probability.
+
+## Momentum v1
+
+[MOMENTUM_V1.md](MOMENTUM_V1.md) defines the independent Momentum classifier.
+It reuses RSI, ROC, ATR-normalized displacement/change, signed DI dominance,
+confirmed DI turns and price-linked DI anchors. MACD is optional and disabled
+by default. Direction, strength, acceleration and condition are separate outputs.
+
+The existing runner rotates Momentum under the same shared budget. It creates
+no Section 4 columns, downloader, daemon, chart overlay or BUY/SELL filter.
+Other engine algorithms/configuration are unchanged. Directional confidence is
+rule evidence, not a win probability. Future/malformed DI turns cannot confirm
+exhaustion, and missing anchor history remains explicitly partial.
+
+Pull and restart the runner once. For optional inspection only:
+
+```bash
+python3 run_regime.py --automatic --engine MOMENTUM --symbols BTCUSDT --intervals 15m --summary --diagnostics
+```
+
+Historical source publication times remain reconstructed; results retain exact
+projected inputs and original confirmed anchor timestamps for audit/replay.

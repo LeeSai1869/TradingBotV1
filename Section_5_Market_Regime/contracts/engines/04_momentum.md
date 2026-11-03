@@ -1,7 +1,9 @@
 # 04 — MOMENTUM: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/momentum.py`.
+Status: RUNNER_CONNECTED. Pure module: `engines/momentum.py`.
+Inherits [COMMON.md](../COMMON.md). See [MOMENTUM_V1.md](../../MOMENTUM_V1.md)
+for the frozen experimental family weights, confirmation, anchor timing and
+absolute-strength acceleration/exhaustion rules.
 
 ## Responsibility
 

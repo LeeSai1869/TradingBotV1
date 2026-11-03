@@ -12,10 +12,10 @@ from Section_5_Market_Regime import config as configuration
 def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME'):
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Batch limit must be 1–200')
     if since is not None and (type(since) is not int or since<0):raise ValueError('Invalid history start')
-    from Section_5_Market_Regime.engines import structure,trend,trend_config
-    if engine_name not in ('REGIME','STRUCTURE','TREND'):raise ValueError('Unknown analytical engine')
-    module={'REGIME':regime,'STRUCTURE':structure,'TREND':trend}[engine_name]
-    cfg=config or (trend_config.TrendConfig() if engine_name=='TREND' else configuration.RegimeConfig())
+    from Section_5_Market_Regime.engines import structure,trend,trend_config,momentum,momentum_config
+    if engine_name not in ('REGIME','STRUCTURE','TREND','MOMENTUM'):raise ValueError('Unknown analytical engine')
+    module={'REGIME':regime,'STRUCTURE':structure,'TREND':trend,'MOMENTUM':momentum}[engine_name]
+    cfg=config or (trend_config.TrendConfig() if engine_name=='TREND' else momentum_config.MomentumConfig() if engine_name=='MOMENTUM' else configuration.RegimeConfig())
     cfg_values=structure.CONFIG if engine_name=='STRUCTURE' else asdict(cfg)
     cfg_hash=structure.CONFIG_HASH if engine_name=='STRUCTURE' else cfg.fingerprint
     dependency_processed=0
@@ -31,6 +31,7 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
             if engine_name=='REGIME':
                 for key,expected in (('measurementERLength',cfg.er_length),('measurementRankLength',cfg.baseline_length),('measurementChangeLength',cfg.change_length)):
                     if parameters[key]!=expected:raise regime_inputs.InputsUnavailable('Regime config must match Section 4 '+key)
+            if engine_name=='MOMENTUM' and parameters['measurementMomentumLength']!=cfg.momentum_length:raise regime_inputs.InputsUnavailable('Momentum config must match Section 4 measurementMomentumLength')
             if engine_name=='TREND':
                 for key,expected in (('measurementERLength',cfg.er_length),('measurementSlopeLength',cfg.slope_length),('measurementReturnLength',cfg.consistency_length)):
                     if parameters[key]!=expected:raise regime_inputs.InputsUnavailable('Trend config must match Section 4 '+key)
@@ -38,7 +39,7 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
                 versions={**versions,'structure_dependency':engine_store.digest(dict(sources=dependency_versions,code=Path(structure.__file__).read_text(),config=structure.CONFIG_HASH))}
             identity=dict(venue='binance',market_type='spot',instrument_id=symbol,symbol=symbol,timeframe=interval,
                 dataset_generation=engine_store.digest(dict(raw_epoch=versions['raw_epoch'],revision=revision)))
-            code=dict(engine=Path(module.__file__).read_text(),config=Path(configuration.__file__).read_text() if engine_name=='REGIME' else Path(trend_config.__file__).read_text() if engine_name=='TREND' else '')
+            code=dict(engine=Path(module.__file__).read_text(),config=Path(configuration.__file__).read_text() if engine_name=='REGIME' else Path(trend_config.__file__).read_text() if engine_name=='TREND' else Path(momentum_config.__file__).read_text() if engine_name=='MOMENTUM' else '')
             store=engine_store.open_db()
             if since is None:
                 cap=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
@@ -108,6 +109,6 @@ def diagnostics(run_id):
             mean_primary_duration_bars=sum(durations)/len(durations) if durations else None,pending_candles=pending)
         if last is not None and 'primary' not in last:
             for key in ('primary_counts','primary_changes','primary_changes_per_1000','mean_primary_duration_bars'):
-                report[key.replace('primary','structure' if 'active_structure' in last else 'trend')]=report.pop(key)
+                report[key.replace('primary','structure' if 'active_structure' in last else 'momentum' if item['engine']=='MOMENTUM' else 'trend')]=report.pop(key)
         return report
     finally:conn.close()

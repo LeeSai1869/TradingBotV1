@@ -37,11 +37,8 @@
       "contract": "engines/04_momentum.md",
       "proposed_module": "Section_5_Market_Regime.engines.momentum",
       "dependencies": [],
-      "feature_gaps": [
-        "ROC_AND_NORMALIZED_MOMENTUM",
-        "MACD_OPTIONAL"
-      ],
-      "status": "DESIGN_ONLY"
+      "feature_gaps": [],
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "VOLATILITY",

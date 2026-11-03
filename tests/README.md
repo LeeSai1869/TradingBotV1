@@ -968,3 +968,10 @@ weakening/exhaustion, flat markets, preview/restart/gap isolation and rejected
 wrong-time/market/version/config/source dependencies. `test_trend_history.py`
 checks exact persisted dependency projection/references, replay parity, shared
 budgets, failure rollback, backlog blocking and runner budget accounting.
+
+Momentum: `test_momentum_engine.py` checks bullish/bearish acceleration,
+corroborated persistent exhaustion, malformed/future DI-turn batch rejection,
+anchor missingness, flat markets, preview/restart/gap and identity boundaries,
+optional MACD and the common JSON schema. `test_momentum_history.py` checks
+automatic fixed seeding, bounded resume, exact immutable-input reproduction and
+Momentum-specific diagnostic counts through the real Core stores.
