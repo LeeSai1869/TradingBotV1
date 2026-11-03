@@ -983,3 +983,8 @@ preview/restart/time/schema checks, calendar months and unsupported sessions.
 `test_volatility_history.py` checks automatic bounded resume, SQLite primitive
 typing, frozen-input reproduction and direction-free diagnostic reports through
 the actual Core stores. Existing engine and trading regressions remain in place.
+
+Participation v1: `python3 -m unittest discover -s tests -p 'test_participation*.py'`
+checks RVOL boundaries, real zero versus unavailable volume, symmetric price/volume
+confirmation, no inferred aggressor dominance, event deduplication, preview/gap and
+restart safety, and immutable history reproduction through the real Core gateway.

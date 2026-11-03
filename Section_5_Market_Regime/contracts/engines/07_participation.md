@@ -1,7 +1,7 @@
 # 07 — PARTICIPATION: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/participation.py`.
+Status: RUNNER_CONNECTED. Inherits [COMMON.md](../COMMON.md).
+Implementation: `engines/participation.py`; exact v1 rules: [PARTICIPATION_V1.md](../../PARTICIPATION_V1.md).
 
 ## Responsibility
 

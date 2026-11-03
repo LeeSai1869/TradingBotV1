@@ -141,3 +141,10 @@ python3 run_regime.py --automatic --engine VOLATILITY --symbols BTCUSDT --interv
 
 High volatility is not automatically a shock, bullish signal or bearish signal.
 The experimental evidence scores are not probabilities or profit estimates.
+
+## Participation v1
+
+[Participation](PARTICIPATION_V1.md) is runner-connected independently per active
+coin/timeframe. It reuses shared RVOL, volume change and price progress. Aggressor
+dominance stays UNKNOWN without matched observed flow; candle-only coverage is .75
+at most. No BUY/SELL, confidence/opportunity or UI rules are changed.

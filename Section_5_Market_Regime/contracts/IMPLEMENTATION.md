@@ -122,3 +122,7 @@ Core scheduling/persistence. Relative level, change, skewness and shock warm and
 confirm independently. No new shared-feature work or strategy/UI migration is
 included. Missing baselines, gaps and unsupported calendars are explicit.
 See VOLATILITY_V1.md for the prior-ATR range/opening-gap shock model.
+
+Participation v1 is implemented and runner-connected. Its exact rules, fixed
+coverage budget and unsupported aggressor-flow policy are in
+[PARTICIPATION_V1.md](../PARTICIPATION_V1.md).

@@ -68,10 +68,8 @@
       "contract": "engines/07_participation.md",
       "proposed_module": "Section_5_Market_Regime.engines.participation",
       "dependencies": [],
-      "feature_gaps": [
-        "VOLUME_VALIDITY_AND_CHANGE"
-      ],
-      "status": "DESIGN_ONLY"
+      "feature_gaps": [],
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "LIQUIDITY",
