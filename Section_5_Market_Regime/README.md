@@ -172,3 +172,10 @@ point-to-point funding stability and observed leverage/liquidation risk from the
 existing recorder. It is explicitly derivatives-only; crowding, normalized extremes,
 news and social sources remain unavailable. Fixed full-source coverage caps this v1
 at .40. The normal runner persists exact source evidence without UI/trading changes.
+
+## Multi-Timeframe Aggregator v1
+
+[Aggregation](AGGREGATION_V1.md) is runner-connected per public engine family.
+It preserves horizon conflicts, full configured evidence budgets, actual publication
+availability and source scope. Core stores deduplicated input references separately
+from base-engine history. Optional inspection: `python3 aggregate_market.py --engine TREND --summary`.

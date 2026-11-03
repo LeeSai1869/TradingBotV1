@@ -1,6 +1,7 @@
 # Multi-Timeframe Aggregator — contract 1.0.0
 
-Status: DESIGN_ONLY. Proposed Section 5 module `aggregation.py`. This is not an
+Status: RUNNER_CONNECTED. Section 5 module `aggregation.py`. Exact v1 policy:
+[AGGREGATION_V1.md](../AGGREGATION_V1.md). This is not an
 extra indicator or a hidden dependency inside each analytical engine.
 
 ## Input

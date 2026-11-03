@@ -69,6 +69,10 @@
     "run_regime.py": [
       "Section_1_Global_Core.data_policy",
       "Section_1_Global_Core.regime_research"
+    ],
+    "aggregate_market.py": [
+      "Section_1_Global_Core.aggregation_processor",
+      "Section_1_Global_Core.data_policy"
     ]
   }
 }

@@ -144,3 +144,8 @@ fixed .40 maximum full-source coverage. Core owns bounded as-of recorder project
 Section 5 distinguishes funding tilt, leverage change and reported stress. Raw rates
 are not historical normalized extremes or comprehensive sentiment. See
 [SENTIMENT_V1.md](../SENTIMENT_V1.md) for all admission rules and missing-source gates.
+
+Multi-Timeframe Aggregation v1 is implemented as a pure Section 5 module with Core
+publication indexing/history. Existing runner turns may aggregate one family within
+their remaining budget; no decisions or base classifiers consume their own aggregates.
+See [AGGREGATION_V1.md](../AGGREGATION_V1.md) for hierarchy, availability and cohort rules.

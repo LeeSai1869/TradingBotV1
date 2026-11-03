@@ -114,7 +114,7 @@
   "aggregator": {
     "contract": "AGGREGATION.md",
     "proposed_module": "Section_5_Market_Regime.aggregation",
-    "status": "DESIGN_ONLY",
+    "status": "RUNNER_CONNECTED",
     "depends_on": "per-timeframe results of one requested engine family; never feeds its own base engines"
   }
 }

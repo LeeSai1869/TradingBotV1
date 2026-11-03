@@ -3,7 +3,7 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
-from . import regime_research
+from . import regime_research,aggregation_processor
 
 _LOCK=threading.RLock()
 _cursor=0
@@ -27,6 +27,12 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
                 if row['processed'] or prior!=row['status']:
                     latest=row.get('latest') or {}
                     print(f"[{engine.lower()}] {symbol} {interval}: +{row['processed']} closed classifications; {row['status']}; through={latest.get('candle_open_time')}",flush=True)
+                # Aggregate only public normal-runner responses. One family per
+                # visit; base/dependency rows plus aggregate rows share this budget.
+                if row.get('symbol')==symbol and row.get('timeframe')==interval and total<max_bars and time.monotonic()-started<time_budget:
+                    aggregation_processor.observe(symbol,interval,engine,row)
+                    aggregate=aggregation_processor.refresh(symbol,engine,intervals=intervals,deadline=started+time_budget)
+                    total+=aggregate['processed']
             except Exception:
                 traceback.print_exc()  # Other processors/pairs still get their turns.
     return total

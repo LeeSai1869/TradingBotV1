@@ -1007,3 +1007,9 @@ partial derivatives scope, zero versus missing funding, no invented crowding/ext
 funding-point stability, optimistic funding with elevated stress, independent missing
 sources, timestamps/identity/basis/gap gates, restart/preview/events, fixed coverage,
 read-only as-of projection, immutable replay after pruning and runner budget use.
+
+MTF v1: `python3 -m unittest discover -s tests -p 'test_aggregation*.py'` covers
+horizon budgets/countertrend conflicts, independent Regime dimensions, partial/missing
+coverage, disabled/new timeframes, unavailable/stale/future/revised inputs, exact
+source cohorts, calendar months, actual versus explicitly simulated availability,
+immutable reference reconstruction, deduplication, rollback and shared runner budgets.
