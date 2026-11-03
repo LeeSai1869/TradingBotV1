@@ -98,7 +98,6 @@ class Opportunity {
             }
             if(layer==='labels')for(const label of layoutLabels(labels,mediaSize.height)){
                 const width=context.measureText(label.text).width+8,x=Math.max(4,Math.min(right-8,mediaSize.width-8)-width);
-                context.globalAlpha=.9;context.fillStyle='#101820';context.fillRect(x-4,label.textY-8,width+4,16);context.globalAlpha=1;
                 context.strokeStyle=label.color;context.setLineDash([]);
                 if(Math.abs(label.textY-label.y)>3){context.beginPath();context.moveTo(x-6,label.y);context.lineTo(x-2,label.textY);context.stroke();}
                 context.fillStyle=label.color;context.fillText(label.text,x,label.textY);
