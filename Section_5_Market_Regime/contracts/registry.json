@@ -21,11 +21,8 @@
       "dependencies": [
         "STRUCTURE"
       ],
-      "feature_gaps": [
-        "EMA_NORMALIZED_SLOPES",
-        "DIRECTIONAL_CONSISTENCY"
-      ],
-      "status": "DESIGN_ONLY"
+      "feature_gaps": [],
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "STRUCTURE",

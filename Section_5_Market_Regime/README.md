@@ -10,7 +10,7 @@ then read the [common contract](contracts/COMMON.md),
 [shared feature audit](contracts/FEATURE_AUDIT.md) and
 [implementation gates](contracts/IMPLEMENTATION.md).
 
-**Status: Regime v1 and the Structure event adapter run automatically.** The JSON
+**Status: Regime, Structure and Trend run automatically.** The JSON
 registry remains descriptive and is not imported by the runner. The existing
 six-state calculations and all current consumers remain unchanged.
 
@@ -19,7 +19,7 @@ six-state calculations and all current consumers remain unchanged.
 [REGIME_V1.md](REGIME_V1.md) is the frozen experimental implementation spec.
 `engines/regime.py` is pure and independent; Core owns `regime_inputs.py`,
 `regime_research.py` and the shared analytical history store. Its research command remains available; automatic runner integration is described
-below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; the other eight engines remain design-only.
+below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; Trend now consumes that same-candle public output; the other seven engines remain design-only.
 
 For a recent independently seeded research run:
 
@@ -71,3 +71,28 @@ The chart and BUY/SELL, confidence and opportunity consumers are unchanged.
 Structure 1.1 consumes confirmed producer pivot/BOS/CHOCH events, including IDs
 and origin/known times. Missing lineage or unavailable old break references remain
 explicitly partial; candidate fields never substitute for confirmed events.
+
+## Trend v1
+
+[The Trend specification](TREND_V1.md) defines direction, strength, persistence
+and structural alignment separately. It consumes existing shared indicators and
+a versioned same-candle Structure result. It adds no Section 4 columns, UI
+overlays, downloads or BUY/SELL filters. The existing analytical processor now
+rotates Regime → Structure → Trend under the same shared work limits.
+
+Dependency work counts inside the row budget. A Structure backlog blocks the
+corresponding Trend point; a real unavailable/warming Structure classification
+permits explicitly marked measurement-only output with reduced coverage.
+Every Trend record retains the exact upstream result reference and a minimal
+immutable dependency projection. Regime/Structure code and configuration remain
+unchanged, and their existing runs are preserved.
+
+After pulling, restart the normal runner. No repeated manual command is required.
+For optional inspection:
+
+```bash
+python3 run_regime.py --automatic --engine TREND --symbols BTCUSDT --intervals 15m --summary --diagnostics
+```
+
+The command's legacy filename is retained; `--engine` chooses the classifier.
+Thresholds are experimental and evidence confidence is not a win probability.

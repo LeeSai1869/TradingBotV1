@@ -12,7 +12,7 @@ _status=OrderedDict()
 
 def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
     global _cursor
-    pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE')]
+    pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND')]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
     started=time.monotonic();total=0
     with _LOCK:
@@ -21,7 +21,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
             symbol,interval,engine=pairs[_cursor%len(pairs)];_cursor+=1
             try:
                 row=regime_research.catch_up(symbol,interval,limit=min(100,max_bars-total),since=None,engine_name=engine,lock_timeout=.02)
-                total+=row['processed'];key=(symbol,interval,engine)
+                total+=row['processed']+row.get('dependency_processed',0);key=(symbol,interval,engine)
                 prior=_status.get(key);_status[key]=row['status'];_status.move_to_end(key)
                 if len(_status)>2000:_status.popitem(last=False)
                 if row['processed'] or prior!=row['status']:

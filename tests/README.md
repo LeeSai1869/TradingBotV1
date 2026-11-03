@@ -961,3 +961,10 @@ consumer deduplication and rejection of future events. Counter/candidate fields
 cannot manufacture events. The existing legacy packet hash remains unchanged
 after excluding the three additive lineage fields; selective replay tests verify
 correct recomputation through existing store/checkpoint paths.
+
+Trend: `test_trend_engine.py` covers capped families, confirmation/hysteresis,
+measurement-only versus neutral/conflicted Structure, warm EMA seeds, directional
+weakening/exhaustion, flat markets, preview/restart/gap isolation and rejected
+wrong-time/market/version/config/source dependencies. `test_trend_history.py`
+checks exact persisted dependency projection/references, replay parity, shared
+budgets, failure rollback, backlog blocking and runner budget accounting.

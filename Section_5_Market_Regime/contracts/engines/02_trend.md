@@ -1,7 +1,8 @@
 # 02 — TREND: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/trend.py`.
+Status: RUNNER_CONNECTED. Pure module: `engines/trend.py`.
+Inherits [COMMON.md](../COMMON.md); the exact experimental scoring, hysteresis,
+warmup and dependency policies are specified in [TREND_V1.md](../../TREND_V1.md).
 
 ## Responsibility
 

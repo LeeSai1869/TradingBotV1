@@ -10,7 +10,7 @@ from Section_5_Market_Regime.config import RegimeConfig
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--engine',choices=('REGIME','STRUCTURE'),default='REGIME')
+    parser.add_argument('--engine',choices=('REGIME','STRUCTURE','TREND'),default='REGIME')
     parser.add_argument('--automatic',action='store_true',help='Inspect/resume the same saved recent seed used by the normal runner')
     parser.add_argument('--symbols',nargs='+');parser.add_argument('--intervals',nargs='+')
     parser.add_argument('--max-bars',type=int,default=1000,help='Global work budget, 1–10000; processed in transactions of at most 200')
@@ -33,15 +33,19 @@ def main():
         if since is not None and since<0:raise ValueError('History start must be >=1970')
         if not args.revision or len(args.revision)>200:raise ValueError('Revision must be 1–200 characters')
         from pathlib import Path
-        cfg=RegimeConfig(**(json.loads(Path(args.config).read_text()) if args.config else {}))
+        from Section_5_Market_Regime.engines.trend_config import TrendConfig
+        Config=TrendConfig if args.engine=='TREND' else RegimeConfig
+        cfg=Config(**(json.loads(Path(args.config).read_text()) if args.config else {}))
         quota=args.max_bars//len(pairs);results=[]
+        if args.engine=='TREND' and quota<2:raise ValueError('Trend needs a budget of at least two rows per pair, including dependency work')
         for symbol,interval in pairs:
-            remaining=quota;processed=0
+            remaining=quota;processed=0;dependency_processed=0
             while remaining>0:
+                if args.engine=='TREND' and remaining<2:break
                 row=regime_research.catch_up(symbol,interval,limit=min(200,remaining),since=since,config=cfg,revision=args.revision,engine_name=args.engine)
-                processed+=row['processed'];remaining-=row['processed']
+                processed+=row['processed'];dependency_processed+=row.get('dependency_processed',0);remaining-=row['processed']+row.get('dependency_processed',0)
                 if not row['processed']:break
-            row['processed']=processed
+            row['processed']=processed;row['dependency_processed']=dependency_processed
             if args.diagnostics and row.get('run_id'):row['diagnostics']=regime_research.diagnostics(row['run_id'])
             results.append(row)
         if args.summary:
@@ -50,7 +54,8 @@ def main():
                 result=row.get('latest') or {};labels=result.get('classification') or {}
                 stamp=datetime.fromtimestamp(result['candle_open_time']/1000,timezone.utc).isoformat() if result else 'unavailable'
                 print(row['symbol'],row['timeframe'],'+'+str(row['processed']),row['status'],'through='+stamp,json.dumps(labels),result.get('data_quality',''),
-                    'evidence='+str(result.get('confidence','unavailable')),'coverage='+str(result.get('coverage','unavailable')))
+                    'evidence='+str(result.get('confidence','unavailable')),'coverage='+str(result.get('coverage','unavailable')),
+                    'dependency_rows='+str(row.get('dependency_processed',0)))
                 if row.get('diagnostics'):print(json.dumps(row['diagnostics'],sort_keys=True))
         else:print(json.dumps(dict(engine=args.engine,version='1.0.0',mode='on-demand shadow',pairs=results),indent=2,allow_nan=False))
     except (ValueError,TypeError,OSError,RuntimeError,sqlite3.Error) as error:parser.exit(1,str(error)+'\n')

@@ -99,3 +99,10 @@ budget. Automatic runs use a saved recent 32-candle seed and then follow closes;
 full historical research runs remain separately available. No UI or DI policy
 migration is included. Structure's state/counter adapter is implemented with
 explicit partial coverage; confirmed-pivot event lineage remains a source gap.
+
+## Trend v1 delivered
+
+The pure Trend classifier, independent immutable config, exact same-candle
+Structure dependency projection/reference, atomic historical state and automatic
+runner turn are implemented. Dependency processing shares the existing row budget.
+No Section 4 formula, UI or strategy migration is included. See TREND_V1.md.
