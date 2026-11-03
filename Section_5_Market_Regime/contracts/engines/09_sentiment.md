@@ -1,7 +1,8 @@
 # 09 — SENTIMENT: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/sentiment.py`.
+Status: RUNNER_CONNECTED, PARTIAL DERIVATIVES SOURCES. Inherits [COMMON.md](../COMMON.md).
+Implementation: `engines/sentiment.py`; exact v1 scope and rules:
+[SENTIMENT_V1.md](../../SENTIMENT_V1.md).
 
 ## Responsibility
 
@@ -54,3 +55,8 @@ No SQL, network fetches or cross-engine implementation imports belong here.
 - Bullish mood with crowded-long risk.
 - No sources returns UNKNOWN, not NEUTRAL.
 - All common causal, identity, version, missing-data and restart gates.
+
+V1 admits raw indicative funding tilt and explicit five-minute comparisons, not
+normalized historical extremes. EXTREMELY_* sentiment and all crowding labels remain
+unavailable pending proper normalization/source adapters. This partial scope is
+mandatory in the result measurements; broad sentiment is not claimed.

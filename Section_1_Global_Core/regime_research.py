@@ -12,10 +12,10 @@ from Section_5_Market_Regime import config as configuration
 def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME'):
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Batch limit must be 1–200')
     if since is not None and (type(since) is not int or since<0):raise ValueError('Invalid history start')
-    from Section_5_Market_Regime.engines import structure,trend,trend_config,momentum,momentum_config,volatility,volatility_config,participation,participation_config,phase,phase_config,liquidity,liquidity_config
-    if engine_name not in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY'):raise ValueError('Unknown analytical engine')
-    module={'REGIME':regime,'STRUCTURE':structure,'TREND':trend,'MOMENTUM':momentum,'VOLATILITY':volatility,'PARTICIPATION':participation,'PHASE':phase,'LIQUIDITY':liquidity}[engine_name]
-    cfg=config or (liquidity_config.LiquidityConfig() if engine_name=='LIQUIDITY' else phase_config.PhaseConfig() if engine_name=='PHASE' else participation_config.ParticipationConfig() if engine_name=='PARTICIPATION' else trend_config.TrendConfig() if engine_name=='TREND' else momentum_config.MomentumConfig() if engine_name=='MOMENTUM' else volatility_config.VolatilityConfig() if engine_name=='VOLATILITY' else configuration.RegimeConfig())
+    from Section_5_Market_Regime.engines import structure,trend,trend_config,momentum,momentum_config,volatility,volatility_config,participation,participation_config,phase,phase_config,liquidity,liquidity_config,sentiment,sentiment_config
+    if engine_name not in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT'):raise ValueError('Unknown analytical engine')
+    module={'REGIME':regime,'STRUCTURE':structure,'TREND':trend,'MOMENTUM':momentum,'VOLATILITY':volatility,'PARTICIPATION':participation,'PHASE':phase,'LIQUIDITY':liquidity,'SENTIMENT':sentiment}[engine_name]
+    cfg=config or (sentiment_config.SentimentConfig() if engine_name=='SENTIMENT' else liquidity_config.LiquidityConfig() if engine_name=='LIQUIDITY' else phase_config.PhaseConfig() if engine_name=='PHASE' else participation_config.ParticipationConfig() if engine_name=='PARTICIPATION' else trend_config.TrendConfig() if engine_name=='TREND' else momentum_config.MomentumConfig() if engine_name=='MOMENTUM' else volatility_config.VolatilityConfig() if engine_name=='VOLATILITY' else configuration.RegimeConfig())
     cfg_values=structure.CONFIG if engine_name=='STRUCTURE' else asdict(cfg)
     cfg_hash=structure.CONFIG_HASH if engine_name=='STRUCTURE' else cfg.fingerprint
     dependency_processed=0
@@ -54,11 +54,15 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
                 if parameters['liquidityLookback']!=cfg.liquidity_length:raise regime_inputs.InputsUnavailable('Liquidity config must match Section 4 liquidityLookback')
             identity=dict(venue='binance',market_type='spot',instrument_id=symbol,symbol=symbol,timeframe=interval,
                 dataset_generation=engine_store.digest(dict(raw_epoch=versions['raw_epoch'],revision=revision)))
-            code=dict(engine=Path(module.__file__).read_text(),config=Path(configuration.__file__).read_text() if engine_name=='REGIME' else Path(trend_config.__file__).read_text() if engine_name=='TREND' else Path(momentum_config.__file__).read_text() if engine_name=='MOMENTUM' else Path(volatility_config.__file__).read_text() if engine_name=='VOLATILITY' else Path(participation_config.__file__).read_text() if engine_name=='PARTICIPATION' else Path(phase_config.__file__).read_text() if engine_name=='PHASE' else Path(liquidity_config.__file__).read_text() if engine_name=='LIQUIDITY' else '')
+            code=dict(engine=Path(module.__file__).read_text(),config=Path(configuration.__file__).read_text() if engine_name=='REGIME' else Path(trend_config.__file__).read_text() if engine_name=='TREND' else Path(momentum_config.__file__).read_text() if engine_name=='MOMENTUM' else Path(volatility_config.__file__).read_text() if engine_name=='VOLATILITY' else Path(participation_config.__file__).read_text() if engine_name=='PARTICIPATION' else Path(phase_config.__file__).read_text() if engine_name=='PHASE' else Path(liquidity_config.__file__).read_text() if engine_name=='LIQUIDITY' else Path(sentiment_config.__file__).read_text() if engine_name=='SENTIMENT' else '')
             if engine_name=='LIQUIDITY':
                 from . import liquidity_inputs
                 code['observations']=Path(liquidity_inputs.__file__).read_text()
                 observation_reader=liquidity_inputs.reader();observations=observation_reader.__enter__()
+            if engine_name=='SENTIMENT':
+                from . import sentiment_inputs
+                code['observations']=Path(sentiment_inputs.__file__).read_text()
+                observation_reader=sentiment_inputs.reader();observations=observation_reader.__enter__()
             store=engine_store.open_db()
             if since is None:
                 cap=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
@@ -125,6 +129,7 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
                     if len(snapshot['dependencies'])!=len(phase.DEPENDENCIES):break
 
                 if engine_name=='LIQUIDITY':snapshot['observations']=liquidity_inputs.project(observations,snapshot,cfg)
+                if engine_name=='SENTIMENT':snapshot['sentiment_sources']=sentiment_inputs.project(observations,snapshot)
                 result,state=module.evaluate(snapshot,None if engine_name=='STRUCTURE' else cfg,state);batch.append((snapshot,result))
             if batch:engine_store.commit_batch(store,metadata,cursor,batch,state)
             latest=engine_store.latest(store,run_id)
@@ -140,7 +145,7 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
 def diagnostics(run_id):
     conn=engine_store.open_db()
     try:
-        primary={};quality={};directions={};volatility={};durations=[];duration=0;changes=0;primary_changes=0;last=None;count=0;pending=0;phase_development={};phase_events={};liquidity_dimensions={};liquidity_events={}
+        primary={};quality={};directions={};volatility={};durations=[];duration=0;changes=0;primary_changes=0;last=None;count=0;pending=0;phase_development={};phase_events={};liquidity_dimensions={};liquidity_events={};sentiment_dimensions={};sentiment_events={}
         for row in conn.execute('SELECT payload FROM engine_results WHERE run_id=? ORDER BY candle_time',(run_id,)):
             item=json.loads(row[0]);key=item['classification'].get('primary',item['classification'].get('active_structure',item['classification'].get('direction',item['classification'].get('level',item['classification'].get('activity',item['classification'].get('phase','UNKNOWN'))))));primary[key]=primary.get(key,0)+1
             value=item['data_quality'];quality[value]=quality.get(value,0)+1;current=item['classification']
@@ -153,6 +158,12 @@ def diagnostics(run_id):
                     counts[value]=counts.get(value,0)+1
                 for event in item['measurements']['new_events']:
                     kind=event['type'];liquidity_events[kind]=liquidity_events.get(kind,0)+1
+            if item['engine']=='SENTIMENT':
+                for dimension,value in current.items():
+                    counts=sentiment_dimensions.setdefault(dimension,{})
+                    counts[value]=counts.get(value,0)+1
+                for event in item['measurements']['new_events']:
+                    kind=event['type'];sentiment_events[kind]=sentiment_events.get(kind,0)+1
             if item['engine']=='PHASE':
                 development=current['development'];phase_development[development]=phase_development.get(development,0)+1
                 for event in item['measurements']['new_events']:
@@ -170,11 +181,14 @@ def diagnostics(run_id):
         if last is not None and 'primary' not in last:
             for key in ('primary_counts','primary_changes','primary_changes_per_1000','mean_primary_duration_bars'):
                 report[key.replace('primary','phase' if item['engine']=='PHASE' else 'activity' if item['engine']=='PARTICIPATION' else 'level' if item['engine']=='VOLATILITY' else 'structure' if 'active_structure' in last else 'momentum' if item['engine']=='MOMENTUM' else 'trend')]=report.pop(key)
-        if last is not None and item['engine'] in ('VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY'):report.pop('direction_counts',None)
-        if last is not None and item['engine'] in ('PARTICIPATION','PHASE','LIQUIDITY'):report.pop('volatility_counts',None)
+        if last is not None and item['engine'] in ('VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT'):report.pop('direction_counts',None)
+        if last is not None and item['engine'] in ('PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT'):report.pop('volatility_counts',None)
         if last is not None and item['engine']=='PHASE':report.update(development_counts=phase_development,event_counts=phase_events)
         if last is not None and item['engine']=='LIQUIDITY':
             for key in ('trend_counts','trend_changes','trend_changes_per_1000','mean_trend_duration_bars','direction_counts','volatility_counts'):report.pop(key,None)
             report.update(dimension_counts=liquidity_dimensions,event_counts=liquidity_events)
+        if last is not None and item['engine']=='SENTIMENT':
+            for key in ('trend_counts','trend_changes','trend_changes_per_1000','mean_trend_duration_bars','direction_counts','volatility_counts'):report.pop(key,None)
+            report.update(dimension_counts=sentiment_dimensions,event_counts=sentiment_events)
         return report
     finally:conn.close()

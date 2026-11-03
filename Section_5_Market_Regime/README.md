@@ -164,3 +164,11 @@ observed execution and derivatives context. The existing perpetual recorder is a
 read-only input; spot/perpetual association requires explicit basis/freshness checks.
 Unknown historical books stay unknown. The normal runner persists independent
 results and minimal immutable inputs without changing chart display.
+
+## Sentiment v1 (partial derivatives sources)
+
+[Sentiment](SENTIMENT_V1.md) independently classifies indicative funding tilt,
+point-to-point funding stability and observed leverage/liquidation risk from the
+existing recorder. It is explicitly derivatives-only; crowding, normalized extremes,
+news and social sources remain unavailable. Fixed full-source coverage caps this v1
+at .40. The normal runner persists exact source evidence without UI/trading changes.

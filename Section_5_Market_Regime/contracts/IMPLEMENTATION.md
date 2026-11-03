@@ -138,3 +138,9 @@ Section 5 interprets pre-existing references, later sweep outcomes and separatel
 scoped observed perpetual context. Existing recorder/UI/Section 4 formulas are
 unchanged. See [LIQUIDITY_V1.md](../LIQUIDITY_V1.md) for rules, evidence budgets,
 identity/freshness gates and point-snapshot limitations.
+
+Sentiment v1 is runner-connected with partial existing derivatives sources and a
+fixed .40 maximum full-source coverage. Core owns bounded as-of recorder projection;
+Section 5 distinguishes funding tilt, leverage change and reported stress. Raw rates
+are not historical normalized extremes or comprehensive sentiment. See
+[SENTIMENT_V1.md](../SENTIMENT_V1.md) for all admission rules and missing-source gates.

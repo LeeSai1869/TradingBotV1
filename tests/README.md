@@ -1001,3 +1001,9 @@ checks causal sweep acceptance/rejection, pivot knowledge times, ambiguity/expir
 covered depth/slippage/withdrawal, flow completeness, OI baselines, zero versus
 missing context, timestamps/wildcard gaps, explicit spot/perpetual association,
 corrupt optional inputs, read-only projection and immutable replay after pruning.
+
+Sentiment v1: `python3 -m unittest discover -s tests -p 'test_sentiment*.py'` checks
+partial derivatives scope, zero versus missing funding, no invented crowding/extremes,
+funding-point stability, optimistic funding with elevated stress, independent missing
+sources, timestamps/identity/basis/gap gates, restart/preview/events, fixed coverage,
+read-only as-of projection, immutable replay after pruning and runner budget use.

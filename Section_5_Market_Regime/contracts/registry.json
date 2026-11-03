@@ -87,10 +87,10 @@
       "proposed_module": "Section_5_Market_Regime.engines.sentiment",
       "dependencies": [],
       "feature_gaps": [
-        "EXTERNAL_SOURCE_ADAPTERS",
-        "EXTERNAL_NORMALIZATION"
+        "NEWS_SOCIAL_AND_ACCOUNT_RATIO_ADAPTERS",
+        "HISTORICAL_SOURCE_NORMALIZATION"
       ],
-      "status": "DESIGN_ONLY"
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "BIAS",
