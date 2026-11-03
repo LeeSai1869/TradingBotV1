@@ -9,6 +9,10 @@
     {
       "module": "Section_8_Decision_Engine.processor",
       "function": "process_bar"
+    },
+    {
+      "module": "Section_1_Global_Core.analytical_processor",
+      "function": "process_bar"
     }
   ]
 }

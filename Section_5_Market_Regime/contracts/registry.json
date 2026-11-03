@@ -1,7 +1,7 @@
 {
   "contract_release": "1.0.0",
-  "status": "PARTIALLY_IMPLEMENTED_SHADOW",
-  "runtime_enabled": false,
+  "status": "PARTIAL_ANALYTICAL_RUNTIME",
+  "runtime_enabled": true,
   "owner": "Section_5_Market_Regime",
   "shared_feature_owner": "Section_4_Features",
   "persistence_owner": "Section_1_Global_Core",
@@ -12,7 +12,7 @@
       "proposed_module": "Section_5_Market_Regime.engines.regime",
       "dependencies": [],
       "feature_gaps": [],
-      "status": "SHADOW_IMPLEMENTED"
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "TREND",
@@ -33,7 +33,7 @@
       "proposed_module": "Section_5_Market_Regime.engines.structure",
       "dependencies": [],
       "feature_gaps": [],
-      "status": "DESIGN_ONLY"
+      "status": "RUNNER_CONNECTED_PARTIAL"
     },
     {
       "id": "MOMENTUM",

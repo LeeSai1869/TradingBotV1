@@ -947,3 +947,10 @@ identity/config/source isolation, restart parity and the public JSON schema.
 projected inputs, policy/pending-feature guards, missing-row blocking, concurrent
 cursor protection, divergence rejection, new source revisions and the command.
 No live scheduler/UI integration or predictive performance is claimed by these tests.
+
+Automatic analytical processing: `test_analytical_runner.py` checks bounded
+round-robin work, adapter failure isolation, non-gating event callbacks, persistent
+recent seeding and following a new close in the same run. Structure tests cover
+explicit enum mapping, source break deduplication, unavailable event origins,
+gaps, preview isolation, restart and the common output schema. Existing DI and
+legacy-feature regression tests remain unchanged.

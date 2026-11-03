@@ -10,6 +10,8 @@ from Section_5_Market_Regime.config import RegimeConfig
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--engine',choices=('REGIME','STRUCTURE'),default='REGIME')
+    parser.add_argument('--automatic',action='store_true',help='Inspect/resume the same saved recent seed used by the normal runner')
     parser.add_argument('--symbols',nargs='+');parser.add_argument('--intervals',nargs='+')
     parser.add_argument('--max-bars',type=int,default=1000,help='Global work budget, 1–10000; processed in transactions of at most 200')
     parser.add_argument('--since',help='UTC ISO date/time; creates a separately seeded research run')
@@ -23,10 +25,12 @@ def main():
         pairs=[(s,iv) for s in symbols for iv in intervals]
         if not pairs:raise ValueError('No configured pairs')
         if not len(pairs)<=args.max_bars<=10000:raise ValueError('Budget must cover one candle per pair and be <=10000; select fewer pairs if needed')
-        since=0
+        if args.automatic and args.since:raise ValueError('Choose --automatic or --since')
+        if args.engine=='STRUCTURE' and args.config:raise ValueError('Structure v1 uses a fixed source adapter')
+        since=None if args.automatic else 0
         if args.since:
             date=datetime.fromisoformat(args.since.replace('Z','+00:00'));since=int((date if date.tzinfo else date.replace(tzinfo=timezone.utc)).timestamp()*1000)
-        if since<0:raise ValueError('History start must be >=1970')
+        if since is not None and since<0:raise ValueError('History start must be >=1970')
         if not args.revision or len(args.revision)>200:raise ValueError('Revision must be 1–200 characters')
         from pathlib import Path
         cfg=RegimeConfig(**(json.loads(Path(args.config).read_text()) if args.config else {}))
@@ -34,21 +38,21 @@ def main():
         for symbol,interval in pairs:
             remaining=quota;processed=0
             while remaining>0:
-                row=regime_research.catch_up(symbol,interval,limit=min(200,remaining),since=since,config=cfg,revision=args.revision)
+                row=regime_research.catch_up(symbol,interval,limit=min(200,remaining),since=since,config=cfg,revision=args.revision,engine_name=args.engine)
                 processed+=row['processed'];remaining-=row['processed']
                 if not row['processed']:break
             row['processed']=processed
             if args.diagnostics and row.get('run_id'):row['diagnostics']=regime_research.diagnostics(row['run_id'])
             results.append(row)
         if args.summary:
-            print('Regime v1 shadow history; no BUY/SELL or UI/scheduler changes.')
+            print(args.engine+' v1 analytical history; no BUY/SELL or UI changes.')
             for row in results:
                 result=row.get('latest') or {};labels=result.get('classification') or {}
                 stamp=datetime.fromtimestamp(result['candle_open_time']/1000,timezone.utc).isoformat() if result else 'unavailable'
                 print(row['symbol'],row['timeframe'],'+'+str(row['processed']),row['status'],'through='+stamp,json.dumps(labels),result.get('data_quality',''),
                     'evidence='+str(result.get('confidence','unavailable')),'coverage='+str(result.get('coverage','unavailable')))
                 if row.get('diagnostics'):print(json.dumps(row['diagnostics'],sort_keys=True))
-        else:print(json.dumps(dict(engine='REGIME',version='1.0.0',mode='on-demand shadow',pairs=results),indent=2,allow_nan=False))
+        else:print(json.dumps(dict(engine=args.engine,version='1.0.0',mode='on-demand shadow',pairs=results),indent=2,allow_nan=False))
     except (ValueError,TypeError,OSError,RuntimeError,sqlite3.Error) as error:parser.exit(1,str(error)+'\n')
 
 if __name__=='__main__':main()

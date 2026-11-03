@@ -90,3 +90,12 @@ It is deliberately on-demand: no scheduler, UI or decision migration is included
 Source/config/seed changes produce separate runs. Out-of-band raw edits require an
 explicit revision; historical publication availability remains reconstructed.
 Live shadow scheduling and later engines remain subsequent stages.
+
+## Automatic maintenance and Structure state adapter
+
+The existing processor registry now runs Core analytical maintenance after
+features and decisions. Active pair/engine scopes rotate under a shared bounded
+budget. Automatic runs use a saved recent 32-candle seed and then follow closes;
+full historical research runs remain separately available. No UI or DI policy
+migration is included. Structure's state/counter adapter is implemented with
+explicit partial coverage; confirmed-pivot event lineage remains a source gap.

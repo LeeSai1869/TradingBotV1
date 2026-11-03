@@ -10,7 +10,7 @@ then read the [common contract](contracts/COMMON.md),
 [shared feature audit](contracts/FEATURE_AUDIT.md) and
 [implementation gates](contracts/IMPLEMENTATION.md).
 
-**Status: Regime v1 is available as an on-demand shadow engine.** The JSON
+**Status: Regime v1 and the partial Structure adapter run automatically.** The JSON
 registry remains descriptive and is not imported by the runner. The existing
 six-state calculations and all current consumers remain unchanged.
 
@@ -18,9 +18,9 @@ six-state calculations and all current consumers remain unchanged.
 
 [REGIME_V1.md](REGIME_V1.md) is the frozen experimental implementation spec.
 `engines/regime.py` is pure and independent; Core owns `regime_inputs.py`,
-`regime_research.py` and the shared analytical history store. It is an on-demand
-shadow engine, not connected to the live scheduler, chart or decision consumers.
-The other nine engine contracts remain design-only.
+`regime_research.py` and the shared analytical history store. Its research command remains available; automatic runner integration is described
+below. It is not connected to chart or decision consumers. Structure now has a
+conservative state adapter; the other eight engines remain design-only.
 
 For a recent independently seeded research run:
 
@@ -42,3 +42,32 @@ bundles and archived classifier/config source. Corrections outside the normal
 feature-generation/policy-epoch pipeline require a new explicit `--revision`.
 Do not label an old run current after out-of-band source edits. Historical results
 are reconstructions with actual computation times, not proven live publications.
+
+## Automatic runner integration
+
+Regime and the [Structure state adapter](STRUCTURE_V1.md) now run through
+`Section_1_Global_Core.analytical_processor` in the existing processor registry,
+after features and decisions. One bounded shared turn visits active pair/engine
+scopes round-robin (200 rows total, at most four visits, .20s soft time budget
+checked between visits). There is no new downloader, daemon or unbounded loop.
+Unavailable Section 4 inputs remain blocked; automatic processing also waits for
+the latest closed-candle feature checkpoint so an old feature prefix is not
+seeded as current analysis. Analytics never gate DI event progress.
+
+For each source/config/pair, automatic processing saves a fixed seed from the
+latest 32 committed closed candles, then resumes from its own checkpoint as new
+candles close. The seed does not move each cycle. It is a recent classification
+run, not a claim that every old candle has already been classified. Full historical
+research runs and their earlier snapshots remain separate and preserved.
+
+After pulling, use `python3 restart_runner.py`. No manual research command is
+needed to keep these engines working. For inspection only:
+
+```bash
+python3 run_regime.py --automatic --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 run_regime.py --automatic --engine STRUCTURE --symbols BTCUSDT --intervals 15m --summary --diagnostics
+```
+
+The chart and BUY/SELL, confidence and opportunity consumers are unchanged.
+Structure is intentionally PARTIAL until original confirmed-pivot event lineage
+is available; it does not guess missing history or reuse candidate fields as facts.

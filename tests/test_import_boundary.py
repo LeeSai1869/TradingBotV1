@@ -28,4 +28,4 @@ class ImportBoundaryTests(unittest.TestCase):
         root=guard.PROJECT_ROOT
         for file,_ in guard._load_integrations():self.assertTrue((root/file).is_file(),file)
         processors=json.loads((root/'Section_1_Global_Core/processors.json').read_text())['processors']
-        self.assertEqual([p['module'] for p in processors],['Section_4_Features.processor','Section_8_Decision_Engine.processor'])
+        self.assertEqual([p['module'] for p in processors],['Section_4_Features.processor','Section_8_Decision_Engine.processor','Section_1_Global_Core.analytical_processor'])

@@ -1,8 +1,10 @@
 # Regime v1 implementation specification
 
-This is the first independent analytical engine, running in research/shadow mode.
+This is the first independent analytical engine. It now runs through the existing
+runner maintenance hook; the original on-demand research path is preserved.
 It does not replace the existing six-state Section 5 interpretation or change
-UI, runner scheduling, decisions, confidence or opportunity. Core owns bounded
+UI, decisions, confidence or opportunity. The processor registry now includes a
+bounded Core analytical turn; existing feature/decision policies are preserved. Core owns bounded
 input projection, immutable input bundles, storage and checkpoint transactions.
 
 ## Frozen experimental configuration
@@ -85,8 +87,8 @@ calculation time. This is not proof of live availability or profitability.
 
 Run `python3 run_regime.py --help`. The command defaults to active configured
 symbols/timeframes and a global 1000-candle budget, divided across pairs in transactions of at most 200. It does not install a daemon,
-change runner policy or start another downloader. A future live scheduler/UI
-integration remains separate from this first independently inspectable engine.
+change runner policy or start another downloader. The existing runner now invokes the bounded analytical maintenance hook.
+UI/decision integration remains separate.
 
 ## Corrected raw data outside normal ingestion
 
@@ -96,3 +98,6 @@ cursor alone. After an out-of-band correction, recalculate the relevant features
 then start a new `--revision correction-YYYY-MM-DD` run. The prior run/input bundles
 remain unchanged. This limit is explicit; a content hash is not claimed to detect
 all upstream corrections or prove historical publication availability.
+
+Automatic operation uses a saved recent 32-candle seed per source/config/pair,
+then follows new closes. Full historical command runs remain separate. See README.

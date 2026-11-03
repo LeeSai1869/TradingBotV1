@@ -16,6 +16,8 @@ def open_db():
     conn=sqlite3.connect(DB_PATH,timeout=5);conn.row_factory=sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
     conn.executescript('''
+        CREATE TABLE IF NOT EXISTS engine_live_seeds (
+            seed_key TEXT PRIMARY KEY, candle_time INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS engine_runs (
             run_id TEXT PRIMARY KEY, metadata TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT -1, state TEXT);
         CREATE TABLE IF NOT EXISTS engine_input_bundles (

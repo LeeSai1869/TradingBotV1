@@ -1,7 +1,9 @@
 # 03 — STRUCTURE: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/structure.py`.
+Status: RUNNER_CONNECTED_PARTIAL. State and source-break counter adapter:
+`engines/structure.py`. See [STRUCTURE_V1.md](../../STRUCTURE_V1.md).
+Complete confirmed-pivot event lineage remains unavailable and is not inferred
+from legacy candidate fields.
 
 ## Responsibility
 
