@@ -33,7 +33,7 @@ class MobilePush(unittest.TestCase):
         self.event()
         with patch.object(push,'send') as send:
             push.deliver_once();push.deliver_once();self.assertEqual(send.call_count,1)
-            packet=send.call_args.args[1];self.assertIn('Confidence 88/100',packet['body']);self.assertIn('at=120000',packet['data']['url'])
+            packet=send.call_args.args[1];self.assertIn('Confidence 88/100',packet['body']);self.assertEqual(packet['data']['url'],'/web_root/mobile.html?seq=1')
         self.assertEqual(push.devices('user')['devices'],[])
         self.assertIsNotNone(push.devices('admin')['devices'][0]['last_sent'])
         push.remove('user',{'endpoint':subscription()['endpoint']});self.assertEqual(len(push.devices('admin')['devices']),1)

@@ -923,3 +923,11 @@ dismiss and no-API-cache behavior. `browser_notification_cards.py` checks rich
 card content, dismissal, 20-second expiry, historical-candle focus and mobile
 sign-in/setup-needed UI. Real phone receipt requires private HTTPS and device
 enrollment; tests do not send messages to an external push endpoint.
+
+Native Android inbox: `test_android_push.py` checks complete private history
+paging, cursor-preserving device settings, muted-event skipping and private
+Firebase setup/public configuration separation. `browser_mobile_inbox.py`
+checks 125 messages across pages, chart-free cards and offline local history.
+Build Android with `cd mobile/android && ./gradlew assembleDebug bundleRelease`.
+The release bundle needs operator signing before Play submission. No test proves
+real FCM receipt without a Firebase project/phone; see mobile/android/README.md.

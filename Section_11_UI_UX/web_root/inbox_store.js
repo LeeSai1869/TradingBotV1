@@ -1,0 +1,10 @@
+// Shared local inbox for the PWA page and its service worker. No credentials stored.
+(function(root){
+    let connection;
+    function open(){return connection??=new Promise((resolve,reject)=>{const request=indexedDB.open('trading-alert-inbox',1);request.onupgradeneeded=()=>{const db=request.result;const rows=db.createObjectStore('messages',{keyPath:'id'});rows.createIndex('account',['server','account','seq']);db.createObjectStore('preferences',{keyPath:'id'});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>{connection=null;reject(request.error);};});}
+    const id=(server,account)=>JSON.stringify([server,account]);
+    async function save(server,account,event){const db=await open();return new Promise((resolve,reject)=>{const tx=db.transaction('messages','readwrite'),store=tx.objectStore('messages');store.put({id:JSON.stringify([server,account,event.seq]),server,account,seq:event.seq,event,received:Date.now()});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
+    async function list(server,account,before=Number.MAX_SAFE_INTEGER,limit=50){const db=await open();return new Promise((resolve,reject)=>{const rows=[],tx=db.transaction('messages'),range=IDBKeyRange.bound([server,account,0],[server,account,before],false,true),request=tx.objectStore('messages').index('account').openCursor(range,'prev');request.onsuccess=()=>{const cursor=request.result;if(cursor&&rows.length<limit){rows.push(cursor.value.event);cursor.continue();}else resolve(rows);};request.onerror=()=>reject(request.error);});}
+    async function settings(server,account,patch){const db=await open();return new Promise((resolve,reject)=>{const tx=db.transaction('preferences',patch?'readwrite':'readonly'),store=tx.objectStore('preferences'),request=store.get(id(server,account));let value;request.onsuccess=()=>{value={id:id(server,account),notifications:true,sound:true,...request.result,...patch};if(patch)store.put(value);};tx.oncomplete=()=>resolve(value);tx.onerror=()=>reject(tx.error);});}
+    root.InboxStore={save,list,settings};
+})(globalThis);

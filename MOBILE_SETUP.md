@@ -1,11 +1,12 @@
 # Laptop-hosted alerts for 4–5 people
 
 The laptop runs the existing calculations, alert evaluator and a separate small
-Web Push sender. No VPS, Play Store release or Apple App Store release is needed.
-The mobile companion is an installable web app (PWA), served by the same backend.
+push sender. No VPS is required. The native Android inbox and its Firebase/build
+instructions are in [mobile/android/README.md](mobile/android/README.md).
+The alternative mobile companion is an installable web app (PWA), served by the same backend.
 It shows signal price, directional confidence, nearest sell-zone upper edge and
-nearest buy-zone lower edge. Tapping a notification opens its original chart
-candle. It does not place trades or connect to an exchange account.
+nearest buy-zone lower edge. Tapping a mobile notification opens its saved inbox message; no charts are shown.
+History is paginated and received messages are cached locally for offline reading. It does not place trades or connect to an exchange account.
 
 ## Private connection — no public website required
 
@@ -70,10 +71,11 @@ audio is not a custom phone OS notification ringtone.
 The laptop must stay awake, online and running the backend. A sleeping/offline
 laptop cannot generate new pushes. Phone OS push delivery can be delayed and is
 not a guaranteed trade-execution channel. The private connection is needed to
-sign in, enroll or open charts. After enrollment, OS push receipt uses Apple/
+sign in, enroll or synchronize message history. After enrollment, OS push receipt uses Apple/
 Google/browser infrastructure; it need not keep the app screen open.
 
-In-app cards have a dismiss button and a 20-second lifetime. Phone system banner
+Desktop toast cards have a dismiss button and a 20-second lifetime. Mobile inbox
+messages remain in saved history. Phone system banner
 appearance/lifetime is controlled by the OS; cards can be dismissed/tapped. Old
 history is not pushed on first enrollment. The worker retries temporary failures,
 removes expired endpoints and expires unsent alerts after five minutes. A stable
@@ -89,6 +91,16 @@ or hosting was created during development.
 ## Later
 
 The same backend and phone app can move to an always-on machine when needed.
-Android store packaging is possible later, but store publication is unnecessary
+Android APK/AAB packaging is included in mobile/android, but store publication is unnecessary
 for this small private group and does not replace the notification-generating
 backend. No store listing, account fee or review is part of this update.
+
+## Desktop sound check
+
+Open Settings → Sounds, turn **Alert sounds on**, select your BUY/SELL sounds
+and use Preview. The app resumes browser audio on a user interaction and shows
+whether audio is blocked, disabled or at zero volume. Browser autoplay rules
+still require an interaction after opening/reloading the app. Check the laptop's
+output volume and OS settings too. Selecting a sound now also attempts to enable
+browser audio; uploads and assignments remain per account. Mobile sound switches
+are separate and use the phone's system notification tone.

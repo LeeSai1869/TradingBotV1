@@ -34,4 +34,4 @@ def push_payload(event):
     stamp=datetime.fromtimestamp((data.get('signal_ms') or event['created'])/1000,timezone.utc).isoformat()
     body=f"Time {stamp}\nPrice {fmt(data.get('price'))} · Confidence {fmt(data.get('confidence'))}/100\nSell OZ upper {fmt(upper.get('high'))} · Buy OZ lower {fmt(lower.get('low'))}"
     return dict(title=title,body=body,tag=f"signal-{event['seq']}",timestamp=data.get('signal_ms') or event['created'],
-                data=dict(url=chart_url(event),event={key:event.get(key) for key in ('seq','name','symbol','interval','bar_time','created','details')}))
+                data=dict(url='/web_root/mobile.html?seq='+str(event['seq']),event={key:event.get(key) for key in ('seq','name','symbol','interval','bar_time','created','details')}))

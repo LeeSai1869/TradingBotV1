@@ -6,6 +6,9 @@ let editor, editorTitle, editorStatus, form, activity, status, catalog, audio, v
 let signalPrefs=null, deliveryButton, notificationPanel, newButton;
 const customBuffers=new Map();
 let customLibrary=[];
+let soundEnabled=true;
+const playingSources=new Set();
+function soundPreference(){try{localStorage.setItem(`alerts.enabled.${window.AppSession.username}`,String(soundEnabled));}catch{}}
 let mobileConfigPromise;
 function mobileConfig(){return mobileConfigPromise??=request('/api/mobile/config').catch(error=>{mobileConfigPromise=null;throw error;});}
 let polling=false, timer, editing=null, saving=false;
@@ -46,16 +49,17 @@ function sound(key) {
     notes.forEach((hz,i)=>{
         const oscillator=audio.createOscillator(), gain=audio.createGain(), t=audio.currentTime+i*.22;
         oscillator.type=key==='alarm'?'square':'sine';oscillator.frequency.value=hz;
-        gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(volume*.15,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+.3);
-        oscillator.connect(gain);gain.connect(audio.destination);oscillator.start(t);oscillator.stop(t+.32);
+        gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(volume*.4,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+.3);
+        oscillator.connect(gain);gain.connect(audio.destination);playingSources.add(oscillator);oscillator.onended=()=>playingSources.delete(oscillator);oscillator.start(t);oscillator.stop(t+.32);
     });
 }
 function enqueueSound(key){
-    if(key==='none'||audio?.state!=='running')return;
+    if(!soundEnabled||key==='none')return;
+    if(audio?.state!=='running'){updateDeliveryStatus();return;}
     if(soundQueue.length<20)soundQueue.push(key);
     async function next(){
         if(soundBusy||!soundQueue.length)return;soundBusy=true;
-        let duration=1.1;try{duration=await play(soundQueue.shift());}catch(error){if(status?.isConnected)status.textContent=error.message;}
+        let duration=1.1;try{duration=await play(soundQueue.shift(),true);}catch(error){if(status?.isConnected)status.textContent=error.message;}
         setTimeout(()=>{soundBusy=false;void next();},Math.max(100,duration*1000+50));
     }
     void next();
@@ -171,6 +175,10 @@ async function build() {
 }
 export function mount() {
     try {const stored=Number(localStorage.getItem(`alerts.volume.${window.AppSession.username}`));if(Number.isFinite(stored)&&stored>=0&&stored<=1&&localStorage.getItem(`alerts.volume.${window.AppSession.username}`)!==null)volume=stored;}catch{}
+    try{soundEnabled=localStorage.getItem(`alerts.enabled.${window.AppSession.username}`)!=='false';}catch{}
+    const resumeOnGesture=()=>{if(soundEnabled&&audio?.state!=='running')void unlock().catch(()=>{});};
+    document.addEventListener('pointerdown',resumeOnGesture,{capture:true});
+    document.addEventListener('keydown',resumeOnGesture,{capture:true});
     const toolbar=document.getElementById('toolbar'), open=el('button','Notifications',toolbar);open.id='alerts-button';
     const gear=document.getElementById('settings-button');if(gear)gear.before(open);
     el('div','',document.body).id='alert-toasts';
@@ -189,7 +197,7 @@ function updateDeliveryStatus(){
     const ready=audio?.state==='running';
     deliveryButton.textContent=`Notifications: ${signalPrefs?.notify?'on':'off'}`;
     deliveryButton.setAttribute('aria-label','Toggle desktop notifications');deliveryButton.setAttribute('aria-pressed',String(signalPrefs?.notify===true));
-    for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=node.dataset.audio==='true'?`Sound: ${ready?'enabled':'click Enable sound'}`:`Desktop permission: ${globalThis.Notification?.permission||'unavailable'}`;
+    for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=node.dataset.audio==='true'?`Sound: ${!soundEnabled?'off':ready?(volume===0?'volume is 0':'ready'):'blocked — click Enable sound or interact with the app'}`:`Desktop permission: ${globalThis.Notification?.permission||'unavailable'}`;
     deliveryButton.title=`Desktop notification toggle; configure rules in Settings → Notifications. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
 }
 export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
@@ -247,7 +255,8 @@ export async function renderNotificationSettings(parent){
 export async function renderSoundSettings(parent){
     const marker=el('div','',parent),feedback=deliveryState(parent,true);
     el('p','Upload your own audio or choose a built-in tone. Select Silent to mute an event. Changes save immediately.',parent,'settings-note');
-    const enable=el('button','Enable sound',parent);enable.onclick=async()=>{try{await unlock();sound('chime');updateDeliveryStatus();}catch(error){feedback.textContent=error.message;}};
+    const enabled=input('Alert sounds on','sound_enabled','checkbox',parent);enabled.checked=soundEnabled;enabled.onchange=()=>{soundEnabled=enabled.checked;soundPreference();if(!soundEnabled){soundQueue.length=0;for(const source of playingSources){try{source.stop();}catch{}}playingSources.clear();}else void unlock().catch(error=>feedback.textContent=error.message);updateDeliveryStatus();};
+    const enable=el('button','Enable sound',parent);enable.onclick=async()=>{try{soundEnabled=true;enabled.checked=true;soundPreference();await unlock();sound('chime');updateDeliveryStatus();}catch(error){feedback.textContent=error.message;}};
     const slider=input('Sound volume','volume','range',parent);slider.min=0;slider.max=1;slider.step=.05;slider.value=volume;slider.oninput=()=>setSignalVolume(slider.value);
     try{
         const [prefs,library,packet]=await Promise.all([getSignalPreferences(),request('/api/alerts/sounds'),request('/api/alerts')]);if(!marker.isConnected)return;
@@ -255,7 +264,7 @@ export async function renderSoundSettings(parent){
         const options=[['none','Silent'],['chime','Chime'],['bell','Bell'],['alarm','Alarm'],...customLibrary.map(row=>[row.id,row.name])];
         function tone(label,value,save){
             const row=el('div','',parent,'settings-row'),choice=select(label,'tone',options,row);choice.value=value;
-            choice.onchange=()=>void save(choice.value).catch(error=>feedback.textContent=error.message);
+            choice.onchange=()=>{if(soundEnabled&&choice.value!=='none')void unlock().catch(error=>feedback.textContent=error.message);void save(choice.value).catch(error=>feedback.textContent=error.message);};
             const test=el('button',`Preview ${label}`,row);test.onclick=async()=>{try{await unlock();await play(choice.value);feedback.textContent=choice.value==='none'?'This event is silent.':'Preview played.';}catch(error){feedback.textContent=error.message;}};
         }
         for(const side of ['buy','sell'])tone(`${side.toUpperCase()} sound`,prefs[side],value=>saveSignalPreferences({[side]:value}));
@@ -288,14 +297,15 @@ export async function renderSoundSettings(parent){
 }
 
 function audioContext(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw new Error('Audio is unavailable in this browser.');if(!audio){audio=new Audio();audio.onstatechange=updateDeliveryStatus;}return audio;}
-function playBuffer(buffer){const source=audio.createBufferSource(),gain=audio.createGain();source.buffer=buffer;gain.gain.value=volume;source.connect(gain);gain.connect(audio.destination);source.start();return buffer.duration;}
-async function play(key){
-    if(key==='none'||audio?.state!=='running')return 0;
+function playBuffer(buffer){const source=audio.createBufferSource(),gain=audio.createGain();source.buffer=buffer;gain.gain.value=volume;source.connect(gain);gain.connect(audio.destination);playingSources.add(source);source.onended=()=>playingSources.delete(source);source.start();return buffer.duration;}
+async function play(key,respectMute=false){
+    if(key==='none'||audio?.state!=='running'||respectMute&&!soundEnabled)return 0;
     if(!key.startsWith('custom:')){sound(key);return 1.1;}
     if(!customBuffers.has(key)){
         const packet=await request('/api/alerts/sounds?id='+encodeURIComponent(key)),bytes=Uint8Array.from(atob(packet.data),value=>value.charCodeAt(0));
         customBuffers.set(key,await audio.decodeAudioData(bytes.buffer));
     }
+    if(respectMute&&!soundEnabled)return 0;
     return playBuffer(customBuffers.get(key));
 }
 

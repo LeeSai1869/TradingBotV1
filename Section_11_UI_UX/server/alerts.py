@@ -44,6 +44,8 @@ def open_db():
         CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,owner TEXT NOT NULL,rule_id TEXT NOT NULL,
             epoch TEXT NOT NULL,bar_time INTEGER NOT NULL,created INTEGER NOT NULL,packet TEXT NOT NULL,
             UNIQUE(rule_id,epoch,bar_time));
+        CREATE TABLE IF NOT EXISTS android_devices(id TEXT PRIMARY KEY,owner TEXT NOT NULL,token TEXT NOT NULL,cursor INTEGER NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,sound INTEGER NOT NULL DEFAULT 1,failures INTEGER NOT NULL DEFAULT 0,next_try REAL NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',touched REAL NOT NULL);
+        CREATE INDEX IF NOT EXISTS android_devices_owner ON android_devices(owner);
         CREATE TABLE IF NOT EXISTS push_devices(id TEXT PRIMARY KEY,owner TEXT NOT NULL,subscription TEXT NOT NULL,cursor INTEGER NOT NULL,failures INTEGER NOT NULL,next_try REAL NOT NULL,last_error TEXT NOT NULL,last_sent INTEGER,touched REAL NOT NULL);
         CREATE INDEX IF NOT EXISTS push_devices_owner ON push_devices(owner);
         CREATE TABLE IF NOT EXISTS custom_sounds(id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL);
@@ -52,6 +54,10 @@ def open_db():
         CREATE TABLE IF NOT EXISTS live_state(rule_id TEXT PRIMARY KEY,value REAL,target REAL,revision TEXT);
         CREATE INDEX IF NOT EXISTS events_owner ON events(owner,seq);
     ''')
+    columns={row[1] for row in conn.execute('PRAGMA table_info(push_devices)')}
+    for name in ('enabled','sound'):
+        if name not in columns:conn.execute(f'ALTER TABLE push_devices ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1')
+    conn.commit()
     return conn
 
 
@@ -125,7 +131,7 @@ def delete(owner,key):
     finally: conn.close()
 
 
-def events(owner,after):
+def events(owner,after,*,history_before=None,history_limit=20):
     conn=open_db()
     try:
         row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
@@ -145,8 +151,11 @@ def events(owner,after):
             return event
         latest=conn.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE owner=?',(owner,)).fetchone()[0]
         if after is None:
-            history=conn.execute('SELECT seq,packet FROM events WHERE owner=? ORDER BY seq DESC LIMIT 20',(owner,)).fetchall()
-            return {'events':[],'cursor':latest,'history':[packet(r) for r in reversed(history)]}
+            if not 1<=history_limit<=100 or history_before is not None and (type(history_before) is not int or history_before<1):raise ValueError('Invalid history page')
+            sql='SELECT seq,packet FROM events WHERE owner=?'+(' AND seq<?' if history_before is not None else '')+' ORDER BY seq DESC LIMIT ?'
+            args=(owner,history_before,history_limit+1) if history_before is not None else (owner,history_limit+1)
+            rows=conn.execute(sql,args).fetchall();history=rows[:history_limit]
+            return {'events':[],'cursor':latest,'history':[packet(r) for r in reversed(history)],'has_more':len(rows)>history_limit,'next_before':history[-1]['seq'] if history else None}
         rows=conn.execute('SELECT seq,packet FROM events WHERE owner=? AND seq>? ORDER BY seq LIMIT 100',(owner,after)).fetchall()
         return {'events':[packet(r) for r in rows],'cursor':rows[-1]['seq'] if rows else max(after,latest)}
     finally: conn.close()
@@ -336,12 +345,12 @@ def signal_preferences(owner, changes=None):
                         if not isinstance(flags,dict) or set(flags)-{'desktop','mobile'} or any(type(value) is not bool for value in flags.values()):raise ValueError('Invalid notification delivery switch')
                         if flags.get('mobile'):
                             from . import mobile_push
-                            if not mobile_push.status()['ready']:raise ValueError('Mobile notifications require HTTPS and push setup first')
+                            if not mobile_available():raise ValueError('Mobile notifications require HTTPS and push setup first')
                         merged[key]={**merged.get(key,{}),**flags}
                     updates[scope]=merged
                 if updates.get('mobile'):
                     from . import mobile_push
-                    if not mobile_push.status()['ready']:raise ValueError('Mobile notifications require HTTPS and push setup first')
+                    if not mobile_available():raise ValueError('Mobile notifications require HTTPS and push setup first')
                 spec.update(updates)
                 if any(type(spec[k]) is not bool for k in ('enabled','notify','app','mobile','buy_notify','sell_notify')) or any(not valid_sound(owner,spec[k],conn) for k in ('buy','sell')):raise ValueError('Invalid signal preferences')
             conn.execute('INSERT OR REPLACE INTO signal_preferences VALUES (?,?)',(owner,json.dumps(spec)))
@@ -449,3 +458,9 @@ def delete_sound(owner,key):
                     conn.execute('UPDATE rules SET spec=?,revision=? WHERE id=?',(json.dumps(spec),uuid.uuid4().hex,row['id']))
         return {'ok':True}
     finally:conn.close()
+
+
+
+def mobile_available():
+    from . import mobile_push,android_push
+    return mobile_push.status()['ready'] or android_push.status()['ready']

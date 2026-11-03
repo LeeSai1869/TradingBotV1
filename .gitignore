@@ -39,3 +39,13 @@ Section_1_Global_Core/Symbols/daily_refresh_state.tmp
 
 # Owned live perpetual-liquidity archive/runtime metadata
 Section_1_Global_Core/memory_storage/Storage/liquidity/
+
+# Android build products and private Firebase/signing configuration
+.gradle/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+**/google-services.json
+**/*service-account*.json

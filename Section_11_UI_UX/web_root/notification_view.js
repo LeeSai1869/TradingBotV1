@@ -9,10 +9,10 @@ export function notificationView(event){
         lines:[`Price ${price(data.price)} · Confidence ${price(data.confidence)}/100`,
             `Sell OZ · upper ${price(data.upper?.high)}`,`Buy OZ · lower ${price(data.lower?.low)}`]};
 }
-export function notificationCard(event,{open,ephemeral=false}={}){
+export function notificationCard(event,{open,ephemeral=false,navigate=true,dismissible=true}={}){
     const view=notificationView(event),card=document.createElement('article');card.className='alert-toast';card.setAttribute('role','status');
-    const close=document.createElement('button');close.textContent='×';close.className='alert-dismiss';close.setAttribute('aria-label','Dismiss notification');card.append(close);
-    const link=document.createElement('a');link.href=view.url;link.className='alert-open';card.append(link);
+    const close=document.createElement('button');close.textContent='×';close.className='alert-dismiss';close.setAttribute('aria-label','Dismiss notification');if(dismissible)card.append(close);
+    const link=document.createElement(navigate?'a':'div');if(navigate)link.href=view.url;link.className='alert-open';card.append(link);
     const time=document.createElement('time');time.textContent=view.time;link.append(time);
     const title=document.createElement('strong');title.textContent=view.title;link.append(title);
     for(const line of view.lines){const text=document.createElement('span');text.textContent=line;link.append(text);}

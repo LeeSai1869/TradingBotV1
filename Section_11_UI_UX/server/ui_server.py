@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse,unquote
 import posixpath
 
-from . import routes,mobile_push,public_access
+from . import routes,mobile_push,public_access,android_push
 
 HERE = Path(__file__).resolve().parent          # Section_11_UI_UX/server/
 SECTION_11 = HERE.parent                        # Section_11_UI_UX/
@@ -86,7 +86,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _local_host(self):
         allowed={f"127.0.0.1:{self.server.server_port}",f"localhost:{self.server.server_port}"}
         try:
-            origin=mobile_push.configuration().get('origin')
+            origin=public_access.configured_origin()
             if origin:allowed.add(urlparse(origin).netloc)
         except (OSError,ValueError):pass
         return self.headers.get('Host') in allowed
@@ -137,6 +137,7 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     stop_alerts = routes.alert_routes.alerts.start()
     stop_push=mobile_push.start()
+    stop_android=android_push.start()
     print(f"chart server on http://localhost:{PORT}/")
     print(f"root:  {SECTION_11}")
     print(f"web:   {WEB_ROOT}")
@@ -147,6 +148,7 @@ def main():
     finally:
         stop_alerts.set()
         stop_push.set()
+        stop_android.set()
         server.server_close()
 
 

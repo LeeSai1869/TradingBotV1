@@ -7,12 +7,17 @@ from Section_1_Global_Core import data_admin, data_policy
 
 
 def handle_get(path,query,server):
-    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events','/api/alerts/signals','/api/alerts/sounds'}: return None,None
+    if path not in {'/api/alerts','/api/alerts/catalog','/api/alerts/events','/api/alerts/signals','/api/alerts/sounds','/api/alerts/history'}: return None,None
     identity=admin_routes.user(server)
     if identity['role']=='guest': return 401,{'error':'Sign in required'}
     if path=='/api/alerts/sounds':
         try:return 200,alerts.sounds(identity['username'],parse_qs(query).get('id',[None])[0])
         except ValueError as error:return 404,{'error':str(error)}
+    if path=='/api/alerts/history':
+        try:
+            qs=parse_qs(query);before=qs.get('before',[None])[0];limit=int(qs.get('limit',['50'])[0])
+            return 200,alerts.events(identity['username'],None,history_before=int(before) if before is not None else None,history_limit=limit)
+        except (ValueError,TypeError):return 400,{'error':'Choose a valid history page (1–100 messages)'}
     if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'])
     if path=='/api/alerts/catalog':
         registry=data_admin.catalog()

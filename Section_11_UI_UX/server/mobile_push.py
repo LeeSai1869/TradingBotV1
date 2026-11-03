@@ -63,7 +63,7 @@ def enroll(owner,data):
             old=conn.execute('SELECT owner FROM push_devices WHERE id=?',(key,)).fetchone()
             latest=conn.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE owner=?',(owner,)).fetchone()[0]
             if conn.execute('SELECT COUNT(*) FROM push_devices WHERE owner=?',(owner,)).fetchone()[0]>=5 and (not old or old['owner']!=owner):raise ValueError('Maximum five push devices per account')
-            conn.execute('INSERT OR REPLACE INTO push_devices VALUES (?,?,?,?,0,0,\'\',NULL,?)',(key,owner,json.dumps(subscription),latest,time.time()))
+            conn.execute('INSERT OR REPLACE INTO push_devices(id,owner,subscription,cursor,failures,next_try,last_error,last_sent,touched) VALUES (?,?,?,?,0,0,\'\',NULL,?)',(key,owner,json.dumps(subscription),latest,time.time()))
         alerts.signal_preferences(owner,{'mobile':True})
         return {'ok':True,'device':key}
     finally:conn.close()
@@ -113,7 +113,7 @@ def deliver_once():
         if device['owner'] not in auth.users():continue
         packet=alerts.events(device['owner'],device['cursor']);cursor=device['cursor'];error='';failures=0;next_try=0;sent=device['last_sent'];gone=False
         for event in packet['events'][:20]:
-            if not event.get('mobile') or time.time()*1000-event['created']>MAX_AGE_SECONDS*1000:
+            if not device['enabled'] or not event.get('mobile') or time.time()*1000-event['created']>MAX_AGE_SECONDS*1000:
                 cursor=event['seq'];continue
             if budget<=0:break
             budget-=1
@@ -122,7 +122,8 @@ def deliver_once():
                 try:current=check.execute('SELECT 1 FROM push_devices WHERE id=? AND owner=? AND subscription=? AND cursor=?',(device['id'],device['owner'],device['subscription'],device['cursor'])).fetchone()
                 finally:check.close()
                 if not current:break
-                send(json.loads(device['subscription']),notification_payload.push_payload(event),cfg)
+                payload=notification_payload.push_payload(event);payload['data'].update(account=device['owner'],server=cfg['origin']);payload['silent']=not bool(device['sound'])
+                send(json.loads(device['subscription']),payload,cfg)
                 cursor=event['seq'];sent=int(time.time()*1000)
             except Exception as failure:
                 response=getattr(failure,'response',None);code=getattr(response,'status_code',None)
@@ -161,3 +162,15 @@ def send_test(owner,data):
     if not row:raise ValueError('Connect this device first')
     send(json.loads(row['subscription']),dict(title='Push connection test',body='This device can receive alerts from your laptop.',tag='mobile-test',timestamp=int(time.time()*1000),data={'url':'/web_root/mobile.html'}),configuration())
     return {'ok':True}
+
+
+
+def preferences(owner,data):
+    from . import alerts
+    endpoint=data.get('endpoint')
+    if not isinstance(endpoint,str) or any(type(data.get(key)) is not bool for key in ('enabled','sound')):raise ValueError('Device switches required')
+    key=hashlib.sha256(endpoint.encode()).hexdigest();conn=alerts.open_db()
+    try:
+        with conn:conn.execute('UPDATE push_devices SET enabled=?,sound=? WHERE id=? AND owner=?',(data['enabled'],data['sound'],key,owner))
+        return {'ok':True}
+    finally:conn.close()
