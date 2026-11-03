@@ -132,3 +132,9 @@ references and bounded transitive dependency work. Existing Section 4 range boun
 are frozen into Phase-owned interpretation state; sequence duration and failed
 attempts are interpretation events, not duplicate shared numerical indicators.
 See [PHASE_V1.md](../PHASE_V1.md) for the complete v1 rules and evidence budget.
+
+Liquidity v1 is runner-connected. Core owns bounded as-of recorder projection;
+Section 5 interprets pre-existing references, later sweep outcomes and separately
+scoped observed perpetual context. Existing recorder/UI/Section 4 formulas are
+unchanged. See [LIQUIDITY_V1.md](../LIQUIDITY_V1.md) for rules, evidence budgets,
+identity/freshness gates and point-snapshot limitations.

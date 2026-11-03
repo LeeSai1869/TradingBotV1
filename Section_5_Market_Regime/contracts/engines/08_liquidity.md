@@ -1,7 +1,8 @@
 # 08 — LIQUIDITY: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/liquidity.py`.
+Status: RUNNER_CONNECTED. Inherits [COMMON.md](../COMMON.md).
+Implementation: `engines/liquidity.py`; exact v1 scopes, rules and limitations:
+[LIQUIDITY_V1.md](../../LIQUIDITY_V1.md).
 
 ## Responsibility
 

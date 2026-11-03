@@ -76,10 +76,10 @@
       "proposed_module": "Section_5_Market_Regime.engines.liquidity",
       "dependencies": [],
       "feature_gaps": [
-        "OBSERVED_CANDLE_SUMMARIES_IF_MISSING",
-        "CROSS_MARKET_BASIS_OPTIONAL"
+        "CANDLE_WIDE_OBSERVED_AGGREGATION_OPTIONAL",
+        "CROSS_VENUE_COVERAGE_OPTIONAL"
       ],
-      "status": "DESIGN_ONLY"
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "SENTIMENT",

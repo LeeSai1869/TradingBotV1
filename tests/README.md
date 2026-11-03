@@ -995,3 +995,9 @@ consolidation without unsupported labels, frozen geometry, causal structural
 confirmation, invalidation/failure/expiry, conflicting evidence, source identity
 and availability gates, restart/preview/gap behavior, exact immutable dependencies,
 rollback and the shared row budget (including nested Trend/Structure work).
+
+Liquidity analytical v1: `python3 -m unittest discover -s tests -p 'test_liquidity_engine*.py'`
+checks causal sweep acceptance/rejection, pivot knowledge times, ambiguity/expiry,
+covered depth/slippage/withdrawal, flow completeness, OI baselines, zero versus
+missing context, timestamps/wildcard gaps, explicit spot/perpetual association,
+corrupt optional inputs, read-only projection and immutable replay after pruning.

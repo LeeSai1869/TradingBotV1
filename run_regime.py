@@ -10,7 +10,7 @@ from Section_5_Market_Regime.config import RegimeConfig
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--engine',choices=('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE'),default='REGIME')
+    parser.add_argument('--engine',choices=('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY'),default='REGIME')
     parser.add_argument('--automatic',action='store_true',help='Inspect/resume the same saved recent seed used by the normal runner')
     parser.add_argument('--symbols',nargs='+');parser.add_argument('--intervals',nargs='+')
     parser.add_argument('--max-bars',type=int,default=1000,help='Global work budget, 1–10000; processed in transactions of at most 200')
@@ -38,7 +38,8 @@ def main():
         from Section_5_Market_Regime.engines.volatility_config import VolatilityConfig
         from Section_5_Market_Regime.engines.participation_config import ParticipationConfig
         from Section_5_Market_Regime.engines.phase_config import PhaseConfig
-        Config=PhaseConfig if args.engine=='PHASE' else ParticipationConfig if args.engine=='PARTICIPATION' else VolatilityConfig if args.engine=='VOLATILITY' else MomentumConfig if args.engine=='MOMENTUM' else TrendConfig if args.engine=='TREND' else RegimeConfig
+        from Section_5_Market_Regime.engines.liquidity_config import LiquidityConfig
+        Config=LiquidityConfig if args.engine=='LIQUIDITY' else PhaseConfig if args.engine=='PHASE' else ParticipationConfig if args.engine=='PARTICIPATION' else VolatilityConfig if args.engine=='VOLATILITY' else MomentumConfig if args.engine=='MOMENTUM' else TrendConfig if args.engine=='TREND' else RegimeConfig
         cfg=Config(**(json.loads(Path(args.config).read_text()) if args.config else {}))
         quota=args.max_bars//len(pairs);results=[]
         if args.engine=='TREND' and quota<2:raise ValueError('Trend needs a budget of at least two rows per pair, including dependency work')

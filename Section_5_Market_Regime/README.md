@@ -156,3 +156,11 @@ outputs plus existing range/volatility measurements. It tracks a preceding trend
 a frozen range and later corroboration before calling a cycle hypothesis; structural
 confirmation, failed breakouts, invalidation and expiry have separate known times.
 The normal bounded runner saves independent history for active coins/timeframes.
+
+## Liquidity v1
+
+[Liquidity](LIQUIDITY_V1.md) separates inferred locations/sweep outcomes from fresh
+observed execution and derivatives context. The existing perpetual recorder is a
+read-only input; spot/perpetual association requires explicit basis/freshness checks.
+Unknown historical books stay unknown. The normal runner persists independent
+results and minimal immutable inputs without changing chart display.
