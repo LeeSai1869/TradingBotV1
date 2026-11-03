@@ -1,6 +1,6 @@
 {
   "contract_release": "1.0.0",
-  "status": "DESIGN_ONLY",
+  "status": "PARTIALLY_IMPLEMENTED_SHADOW",
   "runtime_enabled": false,
   "owner": "Section_5_Market_Regime",
   "shared_feature_owner": "Section_4_Features",
@@ -11,10 +11,8 @@
       "contract": "engines/01_regime.md",
       "proposed_module": "Section_5_Market_Regime.engines.regime",
       "dependencies": [],
-      "feature_gaps": [
-        "REGIME_REQUIRED_FEATURES"
-      ],
-      "status": "DESIGN_ONLY"
+      "feature_gaps": [],
+      "status": "SHADOW_IMPLEMENTED"
     },
     {
       "id": "TREND",

@@ -80,3 +80,13 @@ checkpoint, dependency-replay and legacy-regression tests. See
 This does not change the existing Section 5 runtime. The next implementation unit
 is Regime v1, after finalizing its scoring, public snapshot adapter and immutable
 projected-input lineage/persistence described above.
+
+## Regime v1 shadow implementation delivered
+
+The first pure classifier, typed immutable configuration, public Core projection
+adapter, immutable minimal input bundles and atomic versioned history/checkpoints
+are implemented. See [REGIME_V1.md](../REGIME_V1.md) and `run_regime.py --help`.
+It is deliberately on-demand: no scheduler, UI or decision migration is included.
+Source/config/seed changes produce separate runs. Out-of-band raw edits require an
+explicit revision; historical publication availability remains reconstructed.
+Live shadow scheduling and later engines remain subsequent stages.

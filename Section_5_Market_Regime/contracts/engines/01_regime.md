@@ -1,7 +1,8 @@
 # 01 — REGIME: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/regime.py`.
+Status: SHADOW_IMPLEMENTED. Inherits [COMMON.md](../COMMON.md). Pure module:
+`Section_5_Market_Regime.engines.regime`. See [the implementation specification](../../REGIME_V1.md)
+for finalized scoring, change deadbands, availability and persistence policy.
 
 ## Responsibility
 
@@ -89,9 +90,8 @@ These are explicit starting assumptions, not optimal or validated values.
 7. No structural acceleration shortcut in v1. Separate volatility level/change
    rules do not override the confirmed primary tuple.
 
-The volatility level uses the bands in the Volatility contract. BBW percentile
-and NATR-change jointly corroborate change; disagreement produces UNKNOWN change
-until the exact change windows/deadbands are finalized. This is an explicit
-remaining mathematical gate, not permission to invent a threshold in runtime.
-Scoring weights, volatility-change deadbands and dimension-specific warmup must
-be finalized in the Regime implementation specification before coding that engine.
+The volatility level uses the bands in the Volatility contract. The former
+remaining scoring/change-window gate is finalized in [REGIME_V1.md](../../REGIME_V1.md).
+BBW and NATR five-interval fractional changes now corroborate change direction;
+relative percentile level remains a separate attribute. These choices are
+explicit experimental rules, not claims of optimal thresholds or profitability.

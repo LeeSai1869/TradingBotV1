@@ -65,6 +65,10 @@
     ],
     "liquidity_status.py": [
       "Section_1_Global_Core.liquidity.store"
+    ],
+    "run_regime.py": [
+      "Section_1_Global_Core.data_policy",
+      "Section_1_Global_Core.regime_research"
     ]
   }
 }

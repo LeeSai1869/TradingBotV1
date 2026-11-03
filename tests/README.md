@@ -938,3 +938,12 @@ inputs, gap/config resets, independent pair state and checkpoint/preview parity.
 The selective-feature integration test verifies stored new fields, unchanged
 legacy columns, restarts and continued streaming. The 700-candle legacy packet
 hash remains unchanged after excluding the documented additive exports.
+
+Independent Regime v1: `test_regime_engine.py` checks rule thresholds/hysteresis,
+confirmation and preview isolation, independent dimensions, warmup, flat/degenerated
+baselines, gaps, timestamp/units/availability checks, calendar-month continuity,
+identity/config/source isolation, restart parity and the public JSON schema.
+`test_regime_history.py` verifies actual stores, bounded atomic resume, immutable
+projected inputs, policy/pending-feature guards, missing-row blocking, concurrent
+cursor protection, divergence rejection, new source revisions and the command.
+No live scheduler/UI integration or predictive performance is claimed by these tests.
