@@ -57,6 +57,7 @@ class RunnerTurns(unittest.TestCase):
         with patch.object(research,'catch_up',side_effect=advance):
             self.assertLessEqual(worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10),120)
             worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10)
+            worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10)
         self.assertTrue(any(row[0]=='ETHUSDT' for row in seen));self.assertTrue(worker.process_bar(SimpleNamespace()))
         with patch.object(research,'catch_up') as call:worker.maintenance([],['1m']);call.assert_not_called()
 

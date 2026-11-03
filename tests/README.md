@@ -975,3 +975,11 @@ anchor missingness, flat markets, preview/restart/gap and identity boundaries,
 optional MACD and the common JSON schema. `test_momentum_history.py` checks
 automatic fixed seeding, bounded resume, exact immutable-input reproduction and
 Momentum-specific diagnostic counts through the real Core stores.
+
+Volatility: `test_volatility_engine.py` checks percentile boundaries independent
+of shock/direction, prior-ATR shocks, severity deduplication, signed-mirror
+invariance, flat/zero/degenerate/missing baselines, independent warmup, gaps,
+preview/restart/time/schema checks, calendar months and unsupported sessions.
+`test_volatility_history.py` checks automatic bounded resume, SQLite primitive
+typing, frozen-input reproduction and direction-free diagnostic reports through
+the actual Core stores. Existing engine and trading regressions remain in place.

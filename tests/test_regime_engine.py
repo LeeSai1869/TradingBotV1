@@ -137,6 +137,7 @@ class RegimeEngine(unittest.TestCase):
 from Section_5_Market_Regime.engines.regime import evaluate
 from Section_5_Market_Regime.engines.trend import evaluate as trend
 from Section_5_Market_Regime.engines.momentum import evaluate as momentum
+from Section_5_Market_Regime.engines.volatility import evaluate as volatility
 assert not any(key.startswith(('Section_1_Global_Core','Section_4_Features')) for key in sys.modules)
 from Section_5_Market_Regime import RegimePacket,create_regime_packet
 assert callable(RegimePacket) and callable(create_regime_packet)

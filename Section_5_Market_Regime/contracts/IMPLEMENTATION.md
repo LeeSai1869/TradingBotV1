@@ -114,3 +114,11 @@ to the existing bounded analytical maintenance/store. Shared numerical features
 and confirmed DI-anchor events are reused; no second detector or indicator is
 created. Acceleration uses absolute-strength change, and exhaustion requires
 persistent weakening with timed corroboration. See MOMENTUM_V1.md.
+
+## Volatility v1 delivered
+
+The independent Volatility engine and immutable config run through existing
+Core scheduling/persistence. Relative level, change, skewness and shock warm and
+confirm independently. No new shared-feature work or strategy/UI migration is
+included. Missing baselines, gaps and unsupported calendars are explicit.
+See VOLATILITY_V1.md for the prior-ATR range/opening-gap shock model.

@@ -10,7 +10,7 @@ then read the [common contract](contracts/COMMON.md),
 [shared feature audit](contracts/FEATURE_AUDIT.md) and
 [implementation gates](contracts/IMPLEMENTATION.md).
 
-**Status: Regime, Structure, Trend and Momentum run automatically.** The JSON
+**Status: Regime, Structure, Trend, Momentum and Volatility run automatically.** The JSON
 registry remains descriptive and is not imported by the runner. The existing
 six-state calculations and all current consumers remain unchanged.
 
@@ -19,7 +19,7 @@ six-state calculations and all current consumers remain unchanged.
 [REGIME_V1.md](REGIME_V1.md) is the frozen experimental implementation spec.
 `engines/regime.py` is pure and independent; Core owns `regime_inputs.py`,
 `regime_research.py` and the shared analytical history store. Its research command remains available; automatic runner integration is described
-below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; Trend now consumes that same-candle public output; Momentum is implemented as described below; the other six engines remain design-only.
+below. It is not connected to chart or decision consumers. Structure now consumes producer-confirmed event lineage; Trend now consumes that same-candle public output; Momentum is implemented as described below; Volatility is implemented as described below; the other five engines remain design-only.
 
 For a recent independently seeded research run:
 
@@ -118,3 +118,26 @@ python3 run_regime.py --automatic --engine MOMENTUM --symbols BTCUSDT --interval
 
 Historical source publication times remain reconstructed; results retain exact
 projected inputs and original confirmed anchor timestamps for audit/replay.
+
+## Volatility v1
+
+[VOLATILITY_V1.md](VOLATILITY_V1.md) defines direction-free relative level,
+expansion/contraction, return skewness and prior-ATR shock dimensions. The
+existing runner schedules it under the same bounded analytical work budget,
+with persistent source/config-specific state and immutable historical inputs.
+No Section 4 calculation/column, downloader, chart overlay or trading policy
+is added. Earlier engine algorithms/configuration and runs are preserved.
+
+Percentiles require their full prior baseline. Other dimensions can be available
+while that baseline warms; zero-variance skewness and positive motion against
+a zero prior ATR stay explicitly unavailable. Complete observed flat movement
+has a separate absolute-zero rule, not invented percentile history.
+
+Pull and restart the runner once. Optional inspection only:
+
+```bash
+python3 run_regime.py --automatic --engine VOLATILITY --symbols BTCUSDT --intervals 15m --summary --diagnostics
+```
+
+High volatility is not automatically a shock, bullish signal or bearish signal.
+The experimental evidence scores are not probabilities or profit estimates.

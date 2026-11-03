@@ -1,7 +1,9 @@
 # 05 — VOLATILITY: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/volatility.py`.
+Status: RUNNER_CONNECTED. Pure module: `engines/volatility.py`.
+Inherits [COMMON.md](../COMMON.md); [VOLATILITY_V1.md](../../VOLATILITY_V1.md)
+freezes the experimental level/change/distribution/shock rules and independent
+confirmation, flat/zero-baseline, calendar and scoring policies.
 
 ## Responsibility
 

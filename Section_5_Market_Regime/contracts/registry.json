@@ -45,12 +45,8 @@
       "contract": "engines/05_volatility.md",
       "proposed_module": "Section_5_Market_Regime.engines.volatility",
       "dependencies": [],
-      "feature_gaps": [
-        "NORMALIZED_VOLATILITY_DISTRIBUTIONS",
-        "BOLLINGER",
-        "REALIZED_VOLATILITY"
-      ],
-      "status": "DESIGN_ONLY"
+      "feature_gaps": [],
+      "status": "RUNNER_CONNECTED"
     },
     {
       "id": "PHASE",
