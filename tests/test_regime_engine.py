@@ -142,6 +142,7 @@ from Section_5_Market_Regime.engines.participation import evaluate as participat
 from Section_5_Market_Regime.engines.phase import evaluate as phase
 from Section_5_Market_Regime.engines.liquidity import evaluate as liquidity
 from Section_5_Market_Regime.engines.sentiment import evaluate as sentiment
+from Section_5_Market_Regime.engines.bias import evaluate as bias
 from Section_5_Market_Regime.aggregation import evaluate as aggregate
 assert not any(key.startswith(('Section_1_Global_Core','Section_4_Features')) for key in sys.modules)
 from Section_5_Market_Regime import RegimePacket,create_regime_packet

@@ -108,7 +108,7 @@
         "SENTIMENT"
       ],
       "feature_gaps": [],
-      "status": "DESIGN_ONLY"
+      "status": "RUNNER_CONNECTED"
     }
   ],
   "aggregator": {

@@ -1013,3 +1013,10 @@ horizon budgets/countertrend conflicts, independent Regime dimensions, partial/m
 coverage, disabled/new timeframes, unavailable/stale/future/revised inputs, exact
 source cohorts, calendar months, actual versus explicitly simulated availability,
 immutable reference reconstruction, deduplication, rollback and shared runner budgets.
+
+Bias v1: `python3 -m unittest discover -s tests -p 'test_bias*.py'` checks capped
+price families, independent risk/context, conflict/neutral versus missing coverage,
+no directional funding proxy, observed-flow scope, confirmation/restart/preview/gap,
+future/wrong-identity/aggregated input rejection, exact stored dependency replay,
+common recent seeds, waiting for backlog, source generation changes and rollback
+without child reprocessing. Aggregation also tests strong Bias countertrend labels.

@@ -12,7 +12,7 @@ _status=OrderedDict()
 
 def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
     global _cursor
-    pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT')]
+    pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS')]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
     started=time.monotonic();total=0
     with _LOCK:

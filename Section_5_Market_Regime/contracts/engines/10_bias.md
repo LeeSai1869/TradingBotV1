@@ -1,7 +1,8 @@
 # 10 — BIAS: contract 1.0.0
 
-Status: DESIGN_ONLY. Inherits [COMMON.md](../COMMON.md); no runtime implementation
-is added by this file. Proposed module: `engines/bias.py`.
+Status: RUNNER_CONNECTED. Inherits [COMMON.md](../COMMON.md).
+Implementation: `engines/bias.py`; exact v1 synthesis rules and limitations:
+[BIAS_V1.md](../../BIAS_V1.md).
 
 ## Responsibility
 

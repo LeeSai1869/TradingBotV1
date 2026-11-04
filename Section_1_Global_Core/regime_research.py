@@ -10,6 +10,9 @@ from Section_5_Market_Regime import config as configuration
 
 
 def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME'):
+    if engine_name=='BIAS':
+        from . import bias_processor
+        return bias_processor.catch_up(symbol,interval,limit=limit,since=since,config=config,revision=revision,now_ms=now_ms,lock_timeout=lock_timeout)
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Batch limit must be 1–200')
     if since is not None and (type(since) is not int or since<0):raise ValueError('Invalid history start')
     from Section_5_Market_Regime.engines import structure,trend,trend_config,momentum,momentum_config,volatility,volatility_config,participation,participation_config,phase,phase_config,liquidity,liquidity_config,sentiment,sentiment_config
@@ -180,9 +183,9 @@ def diagnostics(run_id):
             mean_primary_duration_bars=sum(durations)/len(durations) if durations else None,pending_candles=pending)
         if last is not None and 'primary' not in last:
             for key in ('primary_counts','primary_changes','primary_changes_per_1000','mean_primary_duration_bars'):
-                report[key.replace('primary','phase' if item['engine']=='PHASE' else 'activity' if item['engine']=='PARTICIPATION' else 'level' if item['engine']=='VOLATILITY' else 'structure' if 'active_structure' in last else 'momentum' if item['engine']=='MOMENTUM' else 'trend')]=report.pop(key)
+                report[key.replace('primary','phase' if item['engine']=='PHASE' else 'activity' if item['engine']=='PARTICIPATION' else 'level' if item['engine']=='VOLATILITY' else 'structure' if 'active_structure' in last else 'momentum' if item['engine']=='MOMENTUM' else 'bias' if item['engine']=='BIAS' else 'trend')]=report.pop(key)
         if last is not None and item['engine'] in ('VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT'):report.pop('direction_counts',None)
-        if last is not None and item['engine'] in ('PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT'):report.pop('volatility_counts',None)
+        if last is not None and item['engine'] in ('PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS'):report.pop('volatility_counts',None)
         if last is not None and item['engine']=='PHASE':report.update(development_counts=phase_development,event_counts=phase_events)
         if last is not None and item['engine']=='LIQUIDITY':
             for key in ('trend_counts','trend_changes','trend_changes_per_1000','mean_trend_duration_bars','direction_counts','volatility_counts'):report.pop(key,None)

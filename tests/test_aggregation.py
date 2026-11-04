@@ -74,3 +74,9 @@ class Aggregation(unittest.TestCase):
         s['as_of']+=100000;s['computed_at']+=100000
         self.assertNotEqual(r['input_signature'],evaluate(s)['input_signature'])
         with self.assertRaises(ValueError):AggregationConfig(timeframe_weights=(('1m',0),))
+
+    def test_bias_strong_direction_preserves_countertrend_conflict(self):
+        s=snapshot({'1m':'STRONG_BULLISH','4h':'BEARISH'});s['engine']='BIAS'
+        for slot in s['timeframes']:slot['result']['engine']='BIAS'
+        r=evaluate(s)
+        self.assertEqual(r['alignment'],'CONFLICTED');self.assertTrue(any(c['type']=='COUNTERTREND' for c in r['conflicts']))

@@ -84,7 +84,8 @@ def evaluate(snapshot,config=None):
         for dimension in sorted(r1['classification'].keys() & r2['classification'].keys()):
             a,b=r1['classification'][dimension],r2['classification'][dimension]
             if a=='UNKNOWN' or b=='UNKNOWN' or a==b:continue
-            directional=dimension=='direction' and {a,b}=={'BULLISH','BEARISH'}
+            direction_sign=lambda value:1 if value in ('BULLISH','STRONG_BULLISH') else -1 if value in ('BEARISH','STRONG_BEARISH') else 0
+            directional=dimension=='direction' and direction_sign(a)*direction_sign(b)==-1
             conflict=dict(dimension=dimension,type='COUNTERTREND' if directional and g1!=g2 else 'DIRECTIONAL_OPPOSITION' if directional else 'STATE_DISAGREEMENT',
                 timeframes=[tf1,tf2],states=[a,b],horizons=[g1,g2],known_times=[r1['as_of'],r2['as_of']])
             if directional:

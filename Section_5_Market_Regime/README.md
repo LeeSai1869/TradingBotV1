@@ -179,3 +179,11 @@ at .40. The normal runner persists exact source evidence without UI/trading chan
 It preserves horizon conflicts, full configured evidence budgets, actual publication
 availability and source scope. Core stores deduplicated input references separately
 from base-engine history. Optional inspection: `python3 aggregate_market.py --engine TREND --summary`.
+
+## Bias v1
+
+[Bias](BIAS_V1.md) completes the first-version synthesis layer. It consumes exact
+same-candle public outputs, caps correlated Trend/Structure evidence, distinguishes
+risk from preference, and reserves missing independent-sentiment coverage. It never
+issues BUY/SELL or replaces Section 9 confidence. The normal runner saves Bias
+history; MTF aggregation can consume Bias outputs without a circular dependency.

@@ -149,3 +149,9 @@ Multi-Timeframe Aggregation v1 is implemented as a pure Section 5 module with Co
 publication indexing/history. Existing runner turns may aggregate one family within
 their remaining budget; no decisions or base classifiers consume their own aggregates.
 See [AGGREGATION_V1.md](../AGGREGATION_V1.md) for hierarchy, availability and cohort rules.
+
+Bias v1 is runner-connected through a dedicated Core stored-output join, with no
+child reprocessing. Full budgets/correlation caps, confirmation, missingness, risk
+rules and publication lineage are specified in [BIAS_V1.md](../BIAS_V1.md). Bias
+reads no MTF output; MTF can aggregate Bias. Independent broad sentiment remains an
+explicit missing budget rather than a funding-derived directional edge.
