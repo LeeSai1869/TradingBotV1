@@ -5,7 +5,8 @@ from pathlib import Path
 import tempfile
 from . import data_policy
 
-CONFIG_FILE=Path(__file__).with_name('feature_runtime.json')
+from .paths import data_path
+CONFIG_FILE=data_path('config/feature_runtime.json',Path(__file__).with_name('feature_runtime.json'))
 DEFAULTS=dict(time_budget=1.,max_bars=1000,priority=None)
 
 

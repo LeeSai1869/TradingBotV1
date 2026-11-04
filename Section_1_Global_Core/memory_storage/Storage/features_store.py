@@ -16,7 +16,8 @@ import sqlite3
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).resolve().parent / "features.db"
+from ...paths import data_path
+DB_PATH = data_path('storage/features.db',Path(__file__).resolve().parent / "features.db")
 
 
 _SCHEMA = """

@@ -8,7 +8,8 @@ import threading
 import time
 from urllib.parse import urlparse
 
-CONFIG_FILE=Path.home()/'.tradingbot'/'android_push.json'
+from Section_1_Global_Core.paths import data_path
+CONFIG_FILE=data_path('accounts/android_push.json',Path.home()/'.tradingbot'/'android_push.json')
 
 
 def configuration():

@@ -1,0 +1,5 @@
+# Build on each target operating system / CPU architecture.
+pyinstaller>=6.11,<7
+requests>=2.31,<3
+websocket-client>=1.8,<2
+cryptography>=43,<47

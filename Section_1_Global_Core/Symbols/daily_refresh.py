@@ -5,7 +5,8 @@ import threading
 import time
 from pathlib import Path
 
-STATE=Path(__file__).with_name('daily_refresh_state.json')
+from ..paths import data_path
+STATE=data_path('state/daily_refresh.json',Path(__file__).with_name('daily_refresh_state.json'))
 _lock=threading.Lock()
 _worker=None
 _next_attempt=0

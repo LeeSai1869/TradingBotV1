@@ -1,6 +1,7 @@
 """Runtime policy, runner write coordination, and a separate reader/deletion guard."""
 from contextlib import contextmanager
-import fcntl
+from . import file_locks as fcntl
+from .paths import data_path
 import json
 from pathlib import Path
 import tempfile
@@ -8,8 +9,8 @@ import time
 import threading
 
 ROOT = Path(__file__).resolve().parent
-POLICY_FILE = ROOT / 'runtime_policy.json'
-LOCK_FILE = ROOT / '.data-policy.lock'
+POLICY_FILE = data_path('config/runtime_policy.json',ROOT / 'runtime_policy.json')
+LOCK_FILE = data_path('locks/data-policy.lock',ROOT / '.data-policy.lock')
 # Threads serialize here; nested writer scopes reuse the outer OS file lock.
 _WRITER_MUTEX = threading.RLock()
 _WRITER_LOCAL = threading.local()

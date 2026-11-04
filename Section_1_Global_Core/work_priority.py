@@ -20,7 +20,7 @@ def work_symbol(symbols,intervals):
     if identity!=_identity:_selected=None;_identity=identity
     if not symbols or not intervals:return None
     if not klines_store.DB_PATH.exists():return symbols[0]
-    with closing(sqlite3.connect(f'file:{klines_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as raw:
+    with closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
         waiting=klines_store.first_close_waits(raw,int(time.time()*1000))
         history_cursors={}
@@ -28,7 +28,7 @@ def work_symbol(symbols,intervals):
             history_cursors={(s,t):v for s,t,v in raw.execute('SELECT symbol,interval,next_open_time FROM history_progress')}
         checkpoints={};versions=None;jobs=set();repairs={}
         if features_store.DB_PATH.exists():
-            with closing(sqlite3.connect(f'file:{features_store.DB_PATH}?mode=ro',uri=True,timeout=2)) as features:
+            with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=2)) as features:
                 if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
                     checkpoints={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,last_open_time FROM feature_engine_state')}
                 if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():

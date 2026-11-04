@@ -448,7 +448,7 @@ def iter_decision_history(symbols=None,intervals=None):
     if not klines_store.DB_PATH.exists() or not features_store.DB_PATH.exists():return
     raw=_read_connection(klines_store.DB_PATH)
     try:
-        raw.execute('ATTACH DATABASE ? AS f',(f'file:{features_store.DB_PATH}?mode=ro',))
+        raw.execute('ATTACH DATABASE ? AS f',(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',))
         raw.execute('BEGIN')
         if not raw.execute("SELECT 1 FROM f.sqlite_master WHERE name='feature_engine_state'").fetchone():return
         pairs=raw.execute('SELECT symbol,interval,last_open_time FROM f.feature_engine_state ORDER BY symbol,interval').fetchall()

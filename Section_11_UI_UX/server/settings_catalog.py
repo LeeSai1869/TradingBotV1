@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 from Section_1_Global_Core import data_policy
 
-REGISTRY_PATH = Path(__file__).resolve().parents[2] / "Section_1_Global_Core" / "Symbols" / "symbols.json"
+from Section_1_Global_Core.paths import data_path
+REGISTRY_PATH = data_path('config/symbols.json',Path(__file__).resolve().parents[2] / 'Section_1_Global_Core' / 'Symbols' / 'symbols.json')
 
 
 def _ineligible(row):

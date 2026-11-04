@@ -5,7 +5,8 @@ import sqlite3
 import time
 import zlib
 
-ROOT=Path(__file__).resolve().parents[1]/'memory_storage'/'Storage'/'liquidity'
+from ..paths import data_path
+ROOT=data_path('storage/liquidity',Path(__file__).resolve().parents[1]/'memory_storage'/'Storage'/'liquidity')
 DB_PATH=ROOT/'liquidity.db'
 STALE_MS=10000
 

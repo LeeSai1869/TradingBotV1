@@ -21,7 +21,8 @@ import sqlite3
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).resolve().parent / "ADCN.db"
+from ...paths import data_path
+DB_PATH = data_path('storage/ADCN.db',Path(__file__).resolve().parent / "ADCN.db")
 
 
 _SCHEMA = """

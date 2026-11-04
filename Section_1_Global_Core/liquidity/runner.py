@@ -1,7 +1,7 @@
 """Run independently: python3 -m Section_1_Global_Core.liquidity.runner."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-import fcntl
+from .. import file_locks as fcntl
 import os
 import re
 import signal

@@ -18,3 +18,8 @@ state, not bundled application code. Transfer secrets privately only to the trus
 backend machine when needed; phone applications receive public configuration/device
 registration, never the service-account private key. See `SERVER_MODE.md` for logout
 and idle-sleep operation, and `mobile/android/README.md` for Android push setup.
+
+## Standalone distribution
+
+The standalone build and separate cross-platform memory profile are described in
+[STANDALONE_APP.md](STANDALONE_APP.md). Source-mode defaults above remain unchanged.

@@ -37,7 +37,8 @@
       "Section_1_Global_Core"
     ],
     "Section_11_UI_UX/server/settings_catalog.py": [
-      "Section_1_Global_Core"
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.paths"
     ],
     "Section_11_UI_UX/server/admin_routes.py": [
       "Section_1_Global_Core"
@@ -85,6 +86,22 @@
     ],
     "configure_feature_runtime.py": [
       "Section_1_Global_Core.feature_runtime"
+    ],
+    "portable_app.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_11_UI_UX/server/auth.py": [
+      "Section_1_Global_Core.paths"
+    ],
+    "Section_11_UI_UX/server/mobile_push.py": [
+      "Section_1_Global_Core.paths"
+    ],
+    "Section_11_UI_UX/server/android_push.py": [
+      "Section_1_Global_Core.paths"
+    ],
+    "Section_11_UI_UX/server/ui_server.py": [
+      "Section_1_Global_Core.paths"
     ]
   }
 }

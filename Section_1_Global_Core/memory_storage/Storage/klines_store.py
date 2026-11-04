@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 
-DB_PATH = Path(__file__).resolve().parent / "klines.db"
+from ...paths import data_path
+DB_PATH = data_path('storage/klines.db',Path(__file__).resolve().parent / "klines.db")
 
 
 def open_db() -> sqlite3.Connection:

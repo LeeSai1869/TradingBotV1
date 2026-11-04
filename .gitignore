@@ -52,3 +52,9 @@ local.properties
 
 # Machine-local feature recovery preferences
 Section_1_Global_Core/feature_runtime.json
+
+# Standalone build outputs (memory is never packaged)
+/build/
+/dist/
+/standalone-test-data/
+/.venv-build/

@@ -16,7 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DB_PATH=Path(__file__).with_name('memory_storage')/'Storage'/'sentiment_sources.db'
+from .paths import data_path
+DB_PATH=data_path('storage/sentiment_sources.db',Path(__file__).with_name('memory_storage')/'Storage'/'sentiment_sources.db')
 VERSION='external-sentiment-v1'
 MAX_PROVIDERS=20
 

@@ -29,3 +29,13 @@ class ImportBoundaryTests(unittest.TestCase):
         for file,_ in guard._load_integrations():self.assertTrue((root/file).is_file(),file)
         processors=json.loads((root/'Section_1_Global_Core/processors.json').read_text())['processors']
         self.assertEqual([p['module'] for p in processors],['Section_4_Features.processor','Section_8_Decision_Engine.processor','Section_1_Global_Core.analytical_processor'])
+
+    def test_generated_bundles_are_excluded_without_authorizing_source_imports(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);core=root/'Section_1_Global_Core';core.mkdir()
+            generated=root/'dist/TradingIndicator';generated.mkdir(parents=True)
+            (generated/'worker.py').write_text('from Section_1_Global_Core.memory_storage import Storage\n')
+            with patch.object(guard,'PROJECT_ROOT',root),patch.object(guard,'GLOBAL_CORE',core),contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(guard.scan(),0)
+                (root/'worker.py').write_text('from Section_1_Global_Core.memory_storage import Storage\n')
+                self.assertEqual(guard.scan(),1)

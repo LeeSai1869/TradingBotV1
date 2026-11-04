@@ -8,7 +8,8 @@ import threading
 import time
 from urllib.parse import urlparse
 
-CONFIG_FILE=Path.home()/'.tradingbot'/'mobile_push.json'
+from Section_1_Global_Core.paths import data_path
+CONFIG_FILE=data_path('accounts/mobile_push.json',Path.home()/'.tradingbot'/'mobile_push.json')
 PROVIDERS=('fcm.googleapis.com','push.services.mozilla.com','web.push.apple.com','notify.windows.com')
 MAX_AGE_SECONDS=300
 

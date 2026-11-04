@@ -24,8 +24,9 @@ from Section_1_Global_Core import data_policy
 
 
 _DIR = Path(__file__).resolve().parent
-_JSON = _DIR / "symbols.json"
-_LOG = _DIR / "symbols_audit.log"
+from ..paths import data_path
+_JSON = data_path('config/symbols.json',_DIR / "symbols.json")
+_LOG = data_path('state/symbols_audit.log',_DIR / 'symbols_audit.log')
 
 
 def _now():

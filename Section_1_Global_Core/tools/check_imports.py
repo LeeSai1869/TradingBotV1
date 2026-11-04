@@ -110,6 +110,9 @@ def scan() -> int:
     violations: list[tuple[Path, str]] = []
 
     for py in PROJECT_ROOT.rglob("*.py"):
+        # Generated standalone bundles duplicate already-reviewed source paths.
+        # These exact root output/build-environment directories are not source.
+        if py.relative_to(PROJECT_ROOT).parts[0] in ('build','dist','.venv-build'):continue
         # Retired engines must not return through any runtime or test import.
         for module in _imports_of(py):
             if module.startswith(('Section_6_Base_Scoring_Engines','Section_7_Confluence_Engines')):

@@ -1077,3 +1077,18 @@ Checks opt-in configuration bounds/defaults, priority release/fairness, checkpoi
 serialization outside the writer lock, failed serialization retaining prior progress,
 and numerical/continuation equivalence of repaired features. No production data is
 used and no recovery preference is enabled by tests.
+
+Standalone profile/build regressions:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_standalone.py'
+python3 packaging/smoke.py
+python3 tests/frozen_backend_smoke.py
+```
+
+The last two require a built distribution (the backend smoke uses Linux executable
+layout and localhost port 8000). Profile tests cover relocation, duplicate instances,
+WAL-aware offline import, private account import, formula compatibility refusal and
+matching pending-replay admission. Frozen smoke checks exact source formula identity,
+Tcl resources and feature/checkpoint roundtrip; HTTP smoke checks locally bundled chart
+assets. Native Windows/macOS builds still require native runners.

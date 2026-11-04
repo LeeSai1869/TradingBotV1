@@ -9,7 +9,8 @@ import secrets
 import sqlite3
 import time
 
-USERS_FILE = Path.home() / '.tradingbot' / 'users.json'
+from Section_1_Global_Core.paths import data_path
+USERS_FILE=data_path('accounts/users.json',Path.home() / '.tradingbot' / 'users.json')
 SESSIONS = {}
 ATTEMPTS = []
 COOKIE = 'tradingbot_session'

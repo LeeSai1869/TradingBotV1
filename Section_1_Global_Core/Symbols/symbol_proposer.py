@@ -27,7 +27,8 @@ from Section_1_Global_Core import data_policy
 
 
 _DIR = Path(__file__).resolve().parent
-_JSON = _DIR / "symbols.json"
+from ..paths import data_path
+_JSON = data_path('config/symbols.json',_DIR / "symbols.json")
 _ENV = _DIR / ".env"
 
 _CG_BASE = ("https://api.coingecko.com/api/v3/coins/markets"

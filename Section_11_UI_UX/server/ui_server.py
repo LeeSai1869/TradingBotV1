@@ -18,7 +18,8 @@ SECTION_11 = HERE.parent                        # Section_11_UI_UX/
 WEB_ROOT = SECTION_11 / "web_root"
 
 routes.SECTION_11 = SECTION_11
-routes.UI_CONFIG = SECTION_11 / "config" / "ui_config.json"
+from Section_1_Global_Core.paths import data_path
+routes.UI_CONFIG = data_path('config/ui_config.json',SECTION_11 / 'config' / 'ui_config.json')
 
 PORT = 8000
 

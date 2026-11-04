@@ -48,7 +48,8 @@ from Section_1_Global_Core import data_policy
 # ------------------------------------------------------------
 
 PROCESSORS_FILE = _HERE / "processors.json"
-STATE_FILE = _HERE / "section_1_9_state.json"
+from .paths import data_path
+STATE_FILE = data_path('state/runner.json',_HERE / 'section_1_9_state.json')
 DEFAULT_POLL_SECONDS = 1
 
 

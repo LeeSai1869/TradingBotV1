@@ -20,7 +20,8 @@ import json
 from pathlib import Path
 
 
-_SYMBOLS_JSON = Path(__file__).resolve().parent / "symbols.json"
+from ..paths import data_path
+_SYMBOLS_JSON = data_path('config/symbols.json',Path(__file__).resolve().parent / "symbols.json")
 
 BTC_SYMBOL = "BTCUSDT"
 

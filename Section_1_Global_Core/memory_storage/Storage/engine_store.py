@@ -4,7 +4,8 @@ import hashlib
 import json
 import sqlite3
 
-DB_PATH=Path(__file__).with_name('intelligence.db')
+from ...paths import data_path
+DB_PATH = data_path('storage/intelligence.db',Path(__file__).with_name('intelligence.db'))
 
 
 def encode(value):return json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False)

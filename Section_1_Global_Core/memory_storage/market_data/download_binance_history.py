@@ -36,11 +36,12 @@ from urllib.error import HTTPError, URLError
 # CONFIG
 # ==============================================================================
 
-DB_PATH = (
+from ...paths import data_path
+DB_PATH = data_path('storage/klines.db',(
     Path(__file__).resolve().parent.parent
     / "Storage"
     / "klines.db"
-)
+))
 
 SYMBOLS = ["BTCUSDT", "SUIUSDT"]
 
