@@ -1020,3 +1020,14 @@ no directional funding proxy, observed-flow scope, confirmation/restart/preview/
 future/wrong-identity/aggregated input rejection, exact stored dependency replay,
 common recent seeds, waiting for backlog, source generation changes and rollback
 without child reprocessing. Aggregation also tests strong Bias countertrend labels.
+
+Optional sentiment sources and read-only intelligence tools:
+
+```bash
+python3 -m unittest discover -s tests -p "test_sentiment*.py"
+python3 -m unittest discover -s tests -p "test_intelligence_tools.py"
+```
+
+Covers source revisions/receipt-time joins, configuration history, freshness, publisher
+deduplication, source failure isolation, explicit credential fetch mocks, next eligible
+entry opens, split/end purging, gaps/tails, bounded evaluation and read-only cohort guards.

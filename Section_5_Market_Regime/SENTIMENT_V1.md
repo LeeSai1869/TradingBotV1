@@ -1,5 +1,7 @@
 # Sentiment v1.0.0 — partial derivatives context
 
+Historical version specification. Current additive extension: [Sentiment 1.1](SENTIMENT_V1_1.md).
+
 V1 describes **indicative funding tilt**, changes in funding/open interest and
 reported liquidation stress from the existing Binance USDT perpetual recorder.
 It does not claim broad crowd/news/social sentiment, hidden positioning, forecast

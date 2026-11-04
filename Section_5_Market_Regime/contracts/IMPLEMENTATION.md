@@ -140,7 +140,10 @@ unchanged. See [LIQUIDITY_V1.md](../LIQUIDITY_V1.md) for rules, evidence budgets
 identity/freshness gates and point-snapshot limitations.
 
 Sentiment v1 is runner-connected with partial existing derivatives sources and a
-fixed .40 maximum full-source coverage. Core owns bounded as-of recorder projection;
+fixed .40 derivatives-only coverage. The additive [1.1 extension](../SENTIMENT_V1_1.md)
+prepares opt-in scored news/social sources with independent reserved budgets, raising
+maximum coverage to .80 only when those sources are configured and valid. Core owns
+bounded as-of recorder/external-source projection;
 Section 5 distinguishes funding tilt, leverage change and reported stress. Raw rates
 are not historical normalized extremes or comprehensive sentiment. See
 [SENTIMENT_V1.md](../SENTIMENT_V1.md) for all admission rules and missing-source gates.
@@ -154,4 +157,5 @@ Bias v1 is runner-connected through a dedicated Core stored-output join, with no
 child reprocessing. Full budgets/correlation caps, confirmation, missingness, risk
 rules and publication lineage are specified in [BIAS_V1.md](../BIAS_V1.md). Bias
 reads no MTF output; MTF can aggregate Bias. Independent broad sentiment remains an
-explicit missing budget rather than a funding-derived directional edge.
+explicit unvalidated budget rather than a funding-derived directional edge. Optional
+news/social preparation does not activate a Bias directional sentiment vote.

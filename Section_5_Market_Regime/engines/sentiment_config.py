@@ -7,6 +7,11 @@ import math
 
 @dataclass(frozen=True)
 class SentimentConfig:
+    news_ttl_ms: int = 21600000
+    social_ttl_ms: int = 3600000
+    external_neutral_band: float = .10
+    external_extreme_band: float = .60
+    market_wide_factor: float = .50
     funding_neutral_fraction: float = .00005
     funding_strength_fraction: float = .00030
     funding_change_fraction: float = .00005
@@ -26,6 +31,8 @@ class SentimentConfig:
             elif isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:raise ValueError('Invalid '+key)
         if not self.funding_neutral_fraction<self.funding_strength_fraction or not self.funding_change_fraction<self.funding_rapid_change_fraction:raise ValueError('Invalid funding thresholds')
         if self.high_liquidations_usdt_per_second>=self.extreme_liquidations_usdt_per_second:raise ValueError('Invalid stress thresholds')
+        if not 0<self.external_neutral_band<self.external_extreme_band<=1 or not 0<self.market_wide_factor<=1:raise ValueError('Invalid external score thresholds')
+        if self.news_ttl_ms>604800000 or self.social_ttl_ms>86400000:raise ValueError('External TTL exceeds declared freshness bound')
         if self.sample_max_age_ms>10000 or self.context_max_age_ms>120000:raise ValueError('Cannot relax source freshness limits')
 
     @property

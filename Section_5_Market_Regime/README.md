@@ -187,3 +187,9 @@ same-candle public outputs, caps correlated Trend/Structure evidence, distinguis
 risk from preference, and reserves missing independent-sentiment coverage. It never
 issues BUY/SELL or replaces Section 9 confidence. The normal runner saves Bias
 history; MTF aggregation can consume Bias outputs without a circular dependency.
+
+## Completion diagnostics and optional sources
+
+See [operational readiness and causal outcome research](../MARKET_INTELLIGENCE_READINESS.md)
+and [Sentiment 1.1 optional news/social](SENTIMENT_V1_1.md). Optional providers remain
+disabled until explicitly configured; implementation does not establish profitability.

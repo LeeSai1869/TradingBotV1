@@ -6,7 +6,7 @@ import math
 from .bias_config import BiasConfig
 
 VERSION='1.0.0'
-DEPENDENCIES={name:('1.1.0' if name=='STRUCTURE' else '1.0.0') for name in ('REGIME','TREND','STRUCTURE','MOMENTUM','VOLATILITY','PHASE','PARTICIPATION','LIQUIDITY','SENTIMENT')}
+DEPENDENCIES={name:('1.1.0' if name in ('STRUCTURE','SENTIMENT') else '1.0.0') for name in ('REGIME','TREND','STRUCTURE','MOMENTUM','VOLATILITY','PHASE','PARTICIPATION','LIQUIDITY','SENTIMENT')}
 FIELDS=('measurement_gap','measurement_version','measurement_config_id')
 UNITS=dict(measurement_gap='boolean',measurement_version='version',measurement_config_id='identifier')
 UNKNOWN=dict(direction='UNKNOWN',risk='UNKNOWN',alignment='UNKNOWN')

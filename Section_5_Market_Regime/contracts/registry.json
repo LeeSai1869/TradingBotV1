@@ -87,7 +87,8 @@
       "proposed_module": "Section_5_Market_Regime.engines.sentiment",
       "dependencies": [],
       "feature_gaps": [
-        "NEWS_SOCIAL_AND_ACCOUNT_RATIO_ADAPTERS",
+        "OPTIONAL_NEWS_SOCIAL_PROVIDER_CONFIGURATION",
+        "ACCOUNT_RATIO_ACQUISITION",
         "HISTORICAL_SOURCE_NORMALIZATION"
       ],
       "status": "RUNNER_CONNECTED"

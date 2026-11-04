@@ -9,6 +9,9 @@ import math
 import sqlite3
 import zlib
 from .liquidity import store
+from . import sentiment_external
+from collections import namedtuple
+Sources=namedtuple('Sources','recorder external')
 
 VERSION='sentiment-projection-v1'
 
@@ -22,7 +25,8 @@ def reader():
     except (OSError,sqlite3.Error):
         if conn:conn.close()
         conn=None
-    try:yield conn
+    try:
+        with sentiment_external.reader() as external:yield Sources(conn,external)
     finally:
         if conn:conn.close()
 
@@ -43,7 +47,12 @@ def row_at(conn,symbol,at):
 
 
 def project(conn,snapshot):
-    result=dict(version=VERSION,status='UNAVAILABLE',current=None,baseline=None,last_gap_ms=None,association=None)
+    external=conn.external if isinstance(conn,Sources) else None
+    conn=conn.recorder if isinstance(conn,Sources) else conn
+    external_error=False
+    try:external_rows=sentiment_external.project(external,snapshot['identity']['symbol'],snapshot['as_of']) if external else []
+    except (sqlite3.Error,ValueError,TypeError,KeyError):external_rows=[];external_error=True
+    result=dict(version=VERSION,status='UNAVAILABLE',current=None,baseline=None,last_gap_ms=None,association=None,external=external_rows,external_error=external_error)
     if conn is None:return result
     identity=snapshot['identity'];at=snapshot['as_of'];symbol=identity['symbol']
     if identity['venue']!='binance' or identity['instrument_id']!=symbol or not symbol.endswith('USDT'):return result
@@ -63,4 +72,4 @@ def project(conn,snapshot):
                 basis=(mid/close-1)*10000
                 if math.isfinite(basis):result['association']=dict(kind='RELATED_PERPETUAL_CONTEXT',spot_close=close,spot_close_time=snapshot['candle_close_time'],perpetual_mid=mid,basis_bps=basis)
         return result
-    except errors:return dict(version=VERSION,status='UNAVAILABLE',current=None,baseline=None,last_gap_ms=None,association=None)
+    except errors:return dict(version=VERSION,status='UNAVAILABLE',current=None,baseline=None,last_gap_ms=None,association=None,external=external_rows,external_error=external_error)

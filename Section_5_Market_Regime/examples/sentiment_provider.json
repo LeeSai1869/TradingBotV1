@@ -1,0 +1,10 @@
+{
+  "provider_id": "my_provider",
+  "category": "NEWS",
+  "source_name": "REPLACE with selected provider",
+  "publisher_group": "REPLACE with underlying publisher identity",
+  "method": "REPLACE with documented aggregate-score transformation to [-1,1]",
+  "terms_url": "https://example.org/REPLACE-with-real-terms",
+  "enabled": false,
+  "reliability": 0.5
+}

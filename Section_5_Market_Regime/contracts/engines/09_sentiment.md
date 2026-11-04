@@ -1,8 +1,8 @@
 # 09 — SENTIMENT: contract 1.0.0
 
-Status: RUNNER_CONNECTED, PARTIAL DERIVATIVES SOURCES. Inherits [COMMON.md](../COMMON.md).
+Status: RUNNER_CONNECTED, PARTIAL SOURCES; optional news/social imports prepared. Inherits [COMMON.md](../COMMON.md).
 Implementation: `engines/sentiment.py`; exact v1 scope and rules:
-[SENTIMENT_V1.md](../../SENTIMENT_V1.md).
+[SENTIMENT_V1.md](../../SENTIMENT_V1.md) and [additive 1.1 extension](../../SENTIMENT_V1_1.md).
 
 ## Responsibility
 
@@ -56,7 +56,8 @@ No SQL, network fetches or cross-engine implementation imports belong here.
 - No sources returns UNKNOWN, not NEUTRAL.
 - All common causal, identity, version, missing-data and restart gates.
 
-V1 admits raw indicative funding tilt and explicit five-minute comparisons, not
-normalized historical extremes. EXTREMELY_* sentiment and all crowding labels remain
-unavailable pending proper normalization/source adapters. This partial scope is
-mandatory in the result measurements; broad sentiment is not claimed.
+Derivatives retain raw indicative funding tilt and explicit five-minute comparisons,
+not normalized historical extremes. Optional 1.1 aggregate news/social sources declare
+their scope independently and may supply external intensity labels. All crowding
+labels remain unavailable pending normalization/account-ratio sources. No provider
+is connected by default; no broad sentiment claim may be made from funding alone.

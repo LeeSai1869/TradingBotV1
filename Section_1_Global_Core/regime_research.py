@@ -65,6 +65,8 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
             if engine_name=='SENTIMENT':
                 from . import sentiment_inputs
                 code['observations']=Path(sentiment_inputs.__file__).read_text()
+                from . import sentiment_external
+                code['external_sources']=Path(sentiment_external.__file__).read_text()
                 observation_reader=sentiment_inputs.reader();observations=observation_reader.__enter__()
             store=engine_store.open_db()
             if since is None:

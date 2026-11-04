@@ -31,6 +31,7 @@ def generation(engine):
         visiting.add(name);entry=entries[name];paths.add(ROOT/(entry['proposed_module'].replace('.','/')+'.py'))
         if name=='REGIME':paths.add(ROOT/'Section_5_Market_Regime/config.py')
         elif name!='STRUCTURE':paths.add(ROOT/('Section_5_Market_Regime/engines/'+name.lower()+'_config.py'))
+        if name=='SENTIMENT':paths.add(ROOT/'Section_1_Global_Core/sentiment_external.py')
         if name=='BIAS':paths.add(ROOT/'Section_1_Global_Core/bias_processor.py')
         if name in ('LIQUIDITY','SENTIMENT'):paths.add(ROOT/('Section_1_Global_Core/'+name.lower()+'_inputs.py'))
         for child in entry['dependencies']:add(child)

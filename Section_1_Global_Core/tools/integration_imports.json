@@ -73,6 +73,15 @@
     "aggregate_market.py": [
       "Section_1_Global_Core.aggregation_processor",
       "Section_1_Global_Core.data_policy"
+    ],
+    "intelligence_status.py": [
+      "Section_1_Global_Core.intelligence_audit"
+    ],
+    "evaluate_intelligence.py": [
+      "Section_1_Global_Core.intelligence_evaluation"
+    ],
+    "sentiment_sources.py": [
+      "Section_1_Global_Core.sentiment_external"
     ]
   }
 }

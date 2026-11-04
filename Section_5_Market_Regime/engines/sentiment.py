@@ -1,7 +1,7 @@
-"""Partial derivatives sentiment context, never broad crowd mood or a BUY edge.
+"""Independent derivatives context and optional scored news/social evidence.
 
 Raw thresholds are explicit experimental provider-period thresholds. Historical
-normalization, social/news sentiment and crowding ratios are not fabricated.
+normalization and crowding ratios are not fabricated; headlines are not scored here.
 """
 from copy import deepcopy
 import hashlib
@@ -9,7 +9,7 @@ import json
 import math
 from .sentiment_config import SentimentConfig
 
-VERSION='1.0.0'
+VERSION='1.1.0'
 FIELDS=('measurement_gap','measurement_version','measurement_config_id')
 UNITS=dict(measurement_gap='boolean',measurement_version='version',measurement_config_id='identifier')
 UNKNOWN=dict(sentiment='UNKNOWN',positioning='UNKNOWN',stability='UNKNOWN',risk='UNKNOWN')
@@ -28,7 +28,7 @@ def context(snapshot,cfg):
         unavailable_sources=['NORMALIZED_POSITIONING','ACCOUNT_RATIOS','NEWS','CROWD_SOCIAL'])
     classification=UNKNOWN.copy();parts={key:0. for key in BUDGET}
     bundle=snapshot.get('sentiment_sources')
-    if not isinstance(bundle,dict) or bundle.get('version')!='sentiment-projection-v1' or bundle.get('status')!='RECORDED':
+    if not isinstance(bundle,dict) or bundle.get('version') not in ('sentiment-projection-v1','sentiment-projection-v2') or bundle.get('status')!='RECORDED':
         return classification,parts,measurements,['SENTIMENT_SOURCES_UNAVAILABLE']
     sample=bundle.get('current');base=bundle.get('baseline');identity=snapshot['identity'];at=snapshot['as_of'];age=cfg.sample_max_age_ms
     source_ok=lambda s:isinstance(s,dict) and s.get('venue')==identity['venue']=='binance' and s.get('market')=='usdt_perpetual' and s.get('symbol')==identity['symbol']==identity['instrument_id'] and s.get('quote')=='USDT' and s.get('observed') is True
@@ -95,6 +95,52 @@ def context(snapshot,cfg):
     return classification,parts,measurements,flags
 
 
+
+def external_context(snapshot,cfg):
+    bundle=snapshot.get('sentiment_sources')
+    if bundle is None:return None,{},dict(),[]
+    if not isinstance(bundle,dict):return None,{},dict(),['EXTERNAL_SCHEMA_REJECTED']
+    rows=bundle.get('external',[])
+    flags=['EXTERNAL_SOURCE_MEMORY_UNAVAILABLE'] if bundle.get('external_error') else [];valid=[];seen=set();at=snapshot['as_of'];asset=snapshot['identity']['instrument_id']
+    if not isinstance(rows,list) or len(rows)>20:return None,{},dict(),['EXTERNAL_SCHEMA_REJECTED']
+    for row in rows:
+        if not isinstance(row,dict):flags.append('EXTERNAL_SCHEMA_REJECTED');continue
+        identifier=row.get('provider_id');category=row.get('category');score=row.get('score');published=row.get('published_ms');received=row.get('received_ms');known=row.get('profile_known_ms');quality=row.get('reliability')
+        valid_times=all(type(t) is int and t>=0 for t in (published,received,known)) and known<=at and received<=at and published<=received
+        allowed=(row.get('version')=='external-sentiment-v1' and category in ('NEWS','SOCIAL') and isinstance(identifier,str) and identifier and identifier not in seen
+            and isinstance(row.get('publisher_group'),str) and row['publisher_group'] and row.get('asset') in (asset,'*') and valid_times
+            and finite(quality) and 0<quality<=1 and row.get('kind')=='AGGREGATE_SENTIMENT' and finite(score) and -1<=score<=1
+            and all(isinstance(row.get(k),str) and row[k] for k in ('method','terms_url','revision','event_id','profile_revision')))
+        if not allowed:flags.append('EXTERNAL_UNSCORED_OR_INVALID');continue
+        ttl=cfg.news_ttl_ms if category=='NEWS' else cfg.social_ttl_ms
+        if at-published>ttl:flags.append('EXTERNAL_STALE:'+identifier);continue
+        seen.add(identifier);item=dict(row);item['effective_quality']=quality*(cfg.market_wide_factor if row['asset']=='*' else 1.)
+        if item['effective_quality']<=0:flags.append('EXTERNAL_QUALITY_UNAVAILABLE');continue
+        if row['asset']=='*':flags.append('MARKET_WIDE_SENTIMENT_NOT_ASSET_SPECIFIC')
+        valid.append(item)
+    # Copied/repackaged sources from one publisher group do not earn two budgets.
+    grouped={}
+    for row in sorted(valid,key=lambda r:(-r['effective_quality'],-r['published_ms'],r['provider_id'])):
+        group=row['publisher_group']
+        if group in grouped:flags.append('CORRELATED_PUBLISHER_GROUP_EXCLUDED');continue
+        grouped[group]=row
+    categories={};contributions={};weighted=0.;absolute=0.
+    for category,key in (('NEWS','news'),('SOCIAL','crowd_social')):
+        selected=[r for r in grouped.values() if r['category']==category]
+        if not selected:continue
+        total=sum(r['effective_quality'] for r in selected);score=sum(r['score']*r['effective_quality'] for r in selected)/total
+        quality=max(r['effective_quality'] for r in selected);weight=BUDGET[key]*quality
+        categories[category]=dict(score=score,quality=quality,sources=[{k:r[k] for k in ('provider_id','publisher_group','event_id','revision','profile_revision','published_ms','received_ms','asset','method','terms_url')} for r in selected])
+        contributions[key]=weight;weighted+=score*weight;absolute+=abs(score)*weight
+    covered=sum(contributions.values())
+    if not covered:return None,contributions,dict(categories=categories,agreement=None),flags
+    score=weighted/covered;agreement=abs(weighted)/absolute if absolute else 1.
+    if agreement<.5 and absolute:flags.append('CONFLICTING_EXTERNAL_SENTIMENT')
+    independent=len(categories)==2 and covered>=.30
+    label='EXTREMELY_BULLISH' if independent and score>=cfg.external_extreme_band else 'EXTREMELY_BEARISH' if independent and score<=-cfg.external_extreme_band else 'BULLISH' if score>=cfg.external_neutral_band else 'BEARISH' if score<=-cfg.external_neutral_band else 'NEUTRAL'
+    return label,contributions,dict(categories=categories,score=score,agreement=agreement,scope='EXTERNAL_NEWS_SOCIAL_SENTIMENT' if len(categories)==2 else 'EXTERNAL_SENTIMENT_PARTIAL'),flags
+
+
 def evaluate(snapshot,config=None,previous_state=None):
     cfg=config or SentimentConfig()
     if not isinstance(cfg,SentimentConfig):raise TypeError('Use SentimentConfig')
@@ -126,8 +172,25 @@ def evaluate(snapshot,config=None,previous_state=None):
             json.dumps(measurements,allow_nan=False);flags.extend(source_flags)
         except (ValueError,TypeError,KeyError,AttributeError,OverflowError,ZeroDivisionError):
             classification=UNKNOWN.copy();parts={key:0. for key in BUDGET};measurements=dict(scope='DERIVATIVES_FUNDING_TILT_ONLY');flags.append('SOURCE_SCHEMA_REJECTED')
+    external_label=None;external_parts={};external_measurements={}
+    if closed and raw and calendar:
+        external_label,external_parts,external_measurements,external_flags=external_context(snapshot,cfg)
+        flags.extend(external_flags);parts.update(external_parts)
+        if external_label is not None:
+            classification['sentiment']=external_label
+            measurements['funding_scope']='DERIVATIVES_FUNDING_TILT_ONLY'
+            measurements['scope']=external_measurements['scope']
+            measurements['external_sentiment']=external_measurements
+            measurements['unavailable_sources']=['NORMALIZED_POSITIONING','ACCOUNT_RATIOS']+(['NEWS'] if 'news' not in external_parts else [])+(['CROWD_SOCIAL'] if 'crowd_social' not in external_parts else [])
+            flags=[flag for flag in flags if flag not in ('SENTIMENT_SOURCES_UNAVAILABLE','BROAD_SENTIMENT_AND_CROWDING_UNAVAILABLE')]
+            flags.append('CROWDING_UNAVAILABLE')
+            if not parts['funding']:flags.append('DERIVATIVES_SOURCES_UNAVAILABLE')
     coverage=sum(parts.values());strength=None
     if measurements.get('funding_rate') is not None:strength=100*min(1,abs(measurements['funding_rate'])/cfg.funding_strength_fraction)
+    if external_label is not None:strength=100*abs(external_measurements['score'])
+    confidence=sum(value*(external_measurements.get('agreement',1.) if key in external_parts else 1.) for key,value in parts.items())
+    evidence=[dict(code='PARTIAL_DERIVATIVES_SENTIMENT',inputs=['recorded indicative funding','earlier funding/OI observations','reported liquidation windows'],description='Funding tilt, positioning change and observed stress are distinct. Positive funding alone cannot establish crowded longs. Missing inputs remain unknown.')]
+    if external_label is not None:evidence.append(dict(code='OPTIONAL_SCORED_EXTERNAL_SENTIMENT',inputs=list(external_measurements['categories']),description='Declared provider aggregate scores with as-of publication/receipt checks, freshness limits and publisher-group deduplication. Not a validated prediction or a locally scored headline.'))
     events=[]
     if closed and classification!=old and classification!=UNKNOWN:
         event=dict(type='SENTIMENT_TRANSITION',classification=deepcopy(classification),origin_time=start,known_time=end+1)
@@ -135,10 +198,10 @@ def evaluate(snapshot,config=None,previous_state=None):
     quality='GAP' if gap else 'INVALID' if not raw else 'PARTIAL' if coverage else 'WARMUP'
     if snapshot['provenance_mode']=='HISTORICAL_RECONSTRUCTION':flags.append('AVAILABILITY_RECONSTRUCTED')
     result=dict(contract_version='1.0.0',engine='SENTIMENT',engine_version=VERSION,state_schema_version=VERSION,identity=identity,candle_open_time=start,candle_close_time=end,as_of=known,computed_at=computed,available_at=computed if closed else None,mode='CONFIRMED' if closed else 'PROVISIONAL',
-        classification=classification if closed else old,candidate_classification=classification,strength=strength,confidence=round(coverage,8),coverage=round(coverage,8),data_quality=quality,quality_flags=sorted(set(flags)),
-        measurements={**measurements,'evidence_budget':BUDGET.copy(),'evidence_contributions':parts,'new_events':events,'strength_meaning':'absolute indicative funding tilt intensity, not market-wide sentiment or win probability'},
+        classification=classification if closed else old,candidate_classification=classification,strength=strength,confidence=round(confidence,8),coverage=round(coverage,8),data_quality=quality,quality_flags=sorted(set(flags)),
+        measurements={**measurements,'evidence_budget':BUDGET.copy(),'evidence_contributions':parts,'new_events':events,'strength_meaning':'external normalized source-score intensity' if external_label is not None else 'absolute indicative funding tilt intensity, not market-wide sentiment or win probability'},
         confirmation=dict(status='CONFIRMED' if coverage else 'UNAVAILABLE',candidate_bars=1 if coverage else 0,required_bars=1),previous_state=dict(classification=old),
-        evidence=[dict(code='PARTIAL_DERIVATIVES_SENTIMENT',inputs=['recorded indicative funding','earlier funding/OI observations','reported liquidation windows'],description='Funding tilt, positioning change and observed stress are distinct. Positive funding alone cannot establish crowded longs. Missing crowd/news/normalized inputs remain unknown.')],
+        evidence=evidence,
         config_hash=cfg.fingerprint,input_signature=signature,provenance=dict(mode=snapshot['provenance_mode'],source_versions=deepcopy(snapshot['source_versions']),dependency_results=[]))
     state.update(last_open=start,last_close=end,classification=classification)
     return result,state if closed else deepcopy(previous_state)
