@@ -64,7 +64,7 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
     if getattr(engine,'_repair_pending',False):return _advance_targeted(symbol,interval,engine,epoch,max_bars,deadline)
     conn=klines_store.open_db()
     try:
-        rows=klines_store.read_after_page(conn,symbol,interval,engine.context.last_time if engine.context.last_time is not None else -1,max_bars)
+        rows=klines_store.read_after_page(conn,symbol,interval,engine.context.last_time if engine.context.last_time is not None else -1,min(1000,max_bars))
         cursor=klines_store.history_cursor(conn,symbol,interval)
         if cursor is not None:rows=[row for row in rows if row[2]<cursor]
     finally:conn.close()

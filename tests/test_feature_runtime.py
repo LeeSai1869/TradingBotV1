@@ -80,3 +80,26 @@ class CheckpointSerialization(unittest.TestCase):
         conn=features_store.open_db()
         try:self.assertEqual(tuple(conn.execute('SELECT last_time,state FROM feature_replay_jobs').fetchone()),tuple(before))
         finally:conn.close()
+
+    def test_large_recovery_budget_uses_real_bounded_reader_and_resumes_exactly(self):
+        from test_complete_conversion import bar
+        from Section_1_Global_Core.memory_storage.Storage import db,klines_store,features_store
+        processor.catch_up('ETHUSDT','1m')
+        clients=[bar(i,100+(i%17)*.7+(i%3)*.2) for i in range(220,1325)]
+        db.write_klines(clients)
+        reader=klines_store.read_after_page
+        with patch.object(klines_store,'read_after_page',wraps=reader) as reads:
+            self.assertEqual(processor.maintenance(['ETHUSDT'],['1m'],max_bars=3000,time_budget=30),1000)
+            conn=features_store.open_db()
+            try:self.assertEqual(conn.execute('SELECT last_open_time FROM feature_engine_state').fetchone()[0],clients[999]['open_time'])
+            finally:conn.close()
+            self.assertEqual(processor.maintenance(['ETHUSDT'],['1m'],max_bars=10000,time_budget=30),105)
+            self.assertTrue(all(1<=call.args[-1]<=1000 for call in reads.call_args_list))
+        for client in clients:expected=self.engine.step(client)
+        result=db.read_features('ETHUSDT','1m',clients[-1]['open_time'])
+        self.assertEqual(result['rsi'],expected['rsi'])
+        conn=features_store.open_db()
+        try:
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM features').fetchone()[0],1325)
+            self.assertEqual(conn.execute('SELECT last_open_time FROM feature_engine_state').fetchone()[0],clients[-1]['open_time'])
+        finally:conn.close()
