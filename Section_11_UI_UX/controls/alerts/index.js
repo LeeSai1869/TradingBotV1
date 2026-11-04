@@ -1,6 +1,7 @@
 // Alert configuration is per account; evaluation happens in the local backend.
 import {notificationCard,notificationView,TOAST_LIFETIME_MS} from '../../web_root/notification_view.js';
 import {formatValue} from '../../web_root/value_format.js';
+import {createAlertFeed,watchAlertFeed} from './feed.js';
 export const name = 'alerts';
 let editor, editorTitle, editorStatus, form, activity, status, catalog, audio, volume=0.35, eventCursor=null;
 let signalPrefs=null, deliveryButton, notificationPanel, newButton;
@@ -11,7 +12,7 @@ const playingSources=new Set();
 function soundPreference(){try{localStorage.setItem(`alerts.enabled.${window.AppSession.username}`,String(soundEnabled));}catch{}}
 let mobileConfigPromise;
 function mobileConfig(){return mobileConfigPromise??=request('/api/mobile/config').catch(error=>{mobileConfigPromise=null;throw error;});}
-let polling=false, timer, editing=null, saving=false;
+let editing=null, saving=false, feedError=null;
 const recent=[];
 const soundQueue=[];let soundBusy=false;
 function el(tag,text,parent,className) {
@@ -93,17 +94,6 @@ function receive(event,deliver=true) {
     }
 }
 
-async function poll() {
-    if(polling)return;polling=true;
-    try {
-        const packet=await request('/api/alerts/events'+(eventCursor===null?'':`?after=${eventCursor}`));
-        if(eventCursor===null)for(const event of packet.history||[])receive(event,false);
-        for(const event of packet.events)receive(event);
-        eventCursor=packet.cursor;
-        updateDeliveryStatus();
-    } catch(error) {if(status?.isConnected)status.textContent=error.message;}
-    finally {polling=false;timer=setTimeout(poll,2000);}
-}
 async function refresh(){if(notificationPanel?.marker.isConnected)await renderNotificationSettings(notificationPanel.parent);}
 function syncMode() {
     const decision=form.elements.field.value.startsWith('decision.');
@@ -186,10 +176,14 @@ export function mount() {
     open.onclick=async()=>{open.disabled=true;try{const prefs=await getSignalPreferences();await saveSignalPreferences({notify:!prefs.notify});}catch(error){open.title=error.message;}finally{open.disabled=false;}};
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
-    request('/api/alerts/events').then(packet=>{eventCursor=packet.cursor;for(const event of packet.history||[])recent.push(event);renderActivity();timer=setTimeout(poll,2000);}).catch(()=>{timer=setTimeout(poll,5000);});
+    const feed=createAlertFeed({request,
+        onHistory:events=>{for(const event of events)receive(event,false);},
+        onEvent:receive,
+        onState:error=>{feedError=error;updateDeliveryStatus();},
+    });
+    watchAlertFeed(feed);
     deliveryButton=open;
     void getSignalPreferences().then(updateDeliveryStatus).catch(error=>{open.title=error.message;}).finally(()=>{open.disabled=false;});
-    window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
 }
 
 function updateDeliveryStatus(){
@@ -198,7 +192,7 @@ function updateDeliveryStatus(){
     deliveryButton.textContent=`Notifications: ${signalPrefs?.notify?'on':'off'}`;
     deliveryButton.setAttribute('aria-label','Toggle desktop notifications');deliveryButton.setAttribute('aria-pressed',String(signalPrefs?.notify===true));
     for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=node.dataset.audio==='true'?`Sound: ${!soundEnabled?'off':ready?(volume===0?'volume is 0':'ready'):'blocked — click Enable sound or interact with the app'}`:`Desktop permission: ${globalThis.Notification?.permission||'unavailable'}`;
-    deliveryButton.title=`Desktop notification toggle; configure rules in Settings → Notifications. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
+    deliveryButton.title=`Desktop notification toggle; configure rules in Settings → Notifications. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Live feed: ${feedError?'retrying — '+feedError.message:'connected'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
 }
 export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
 export async function saveSignalPreferences(value){

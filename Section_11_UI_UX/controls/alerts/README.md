@@ -77,3 +77,21 @@ it and explicitly enroll their phones. A separate worker performs encrypted Web
 Push without blocking calculations or alert evaluation. Subscription ownership,
 provider endpoint validation, retry/expiry and device removal are tested. Default
 local-only desktop operation needs no mobile setup or additional dependencies.
+
+Live delivery uses a single account event cursor independently of the current chart.
+Startup history stays silent. Polling resumes immediately on page restore, return to
+foreground/focus, or network reconnection, retaining the cursor so new notifications
+are delivered without duplicating past ones. Temporary request failures retry without
+advancing the cursor. The Notifications button tooltip reports feed retry errors.
+Desktop permission and the existing sound enable/volume preferences still apply.
+
+Regression checks:
+
+```bash
+node tests/alert_feed.test.mjs
+PYTHONPATH=. python3 tests/browser_alert_delivery.py
+```
+
+The browser test uses the actual alert control with mocked API, OS notification and
+audio objects. It verifies in-app cards and delivery/playback calls while open, after
+suspension/restoration and after a network failure; it does not test macOS permissions.

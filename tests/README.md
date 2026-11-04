@@ -1031,3 +1031,13 @@ python3 -m unittest discover -s tests -p "test_intelligence_tools.py"
 Covers source revisions/receipt-time joins, configuration history, freshness, publisher
 deduplication, source failure isolation, explicit credential fetch mocks, next eligible
 entry opens, split/end purging, gaps/tails, bounded evaluation and read-only cohort guards.
+
+Live alert lifecycle regression (no production data or actual desktop notices):
+
+```bash
+node tests/alert_feed.test.mjs
+PYTHONPATH=. python3 tests/browser_alert_delivery.py
+```
+
+Checks open-app delivery, silent startup history, duplicate prevention, preserved
+cursors after pagehide/pageshow and reconnection, plus desktop/audio delivery calls.
