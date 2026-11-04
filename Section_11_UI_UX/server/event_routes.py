@@ -8,7 +8,7 @@ def handle_get(path,query):
     if path=='/api/events/catalog':return 200,catalog.definitions()
     if path=='/api/strategy/btc':
         qs=parse_qs(query)
-        try:return 200,btc_strategy_history.history(qs.get('symbol',['BTCUSDT'])[0],qs.get('interval',['5m'])[0],before=int(qs['before'][0]) if 'before' in qs else None)
+        try:return 200,btc_strategy_history.history(qs.get('symbol',['BTCUSDT'])[0],qs.get('interval',['5m'])[0],before=int(qs['before'][0]) if 'before' in qs else None,days=int(qs.get('days',['90'])[0]))
         except (ValueError,TypeError) as error:return 400,dict(error=str(error))
     if path!='/api/events/history':return None,None
     qs=parse_qs(query)

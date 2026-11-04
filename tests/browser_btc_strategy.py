@@ -31,12 +31,16 @@ window.data={symbol:'BTCUSDT',timeframe:'5m',atLiveEdge:true};strategy.mount();w
             await page.get_by_role('checkbox').check();await page.get_by_text('Simulated ·',exact=False).wait_for()
             await page.wait_for_timeout(100)
             assert len(requests)==1
+            assert 'days=90' in requests[0]
             assert await page.evaluate('series.priceToCoordinate(100)')==before
             await page.evaluate('change()');assert len(requests)==1
+            await page.get_by_label('BTC strategy history').select_option('365')
+            await page.get_by_text('Simulated ·',exact=False).wait_for()
+            assert len(requests)==2 and 'days=365' in requests[-1]
             await page.screenshot(path='/tmp/btc-strategy.png')
             await page.evaluate("data.symbol='ETHUSDT';change()")
             assert await page.get_by_role('checkbox').is_disabled()
-            assert len(requests)==1
+            assert len(requests)==2
             assert not errors,errors
             print('PASS real chart overlay, toggle, BTC scope, bounded polling, unchanged autoscale')
         finally:await browser.close()

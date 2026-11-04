@@ -11,8 +11,15 @@ candidate-low observations, cyan markers show simulated buys, amber markers show
 exits. Cyan lines show entry, red lines hard stop, amber lines active stop (these
 overlap until trailing activates). Turn the checkbox off to hide the layer.
 
-Each selected timeframe is simulated independently over at most 1000 committed,
-closed candles. It starts flat at the window boundary. The sliding window can
+Choose 7, 30, 90 or 365 days beside the checkbox (default 90). Each selected
+timeframe is simulated independently over committed, closed candles in that
+period: about 25,920 bars for 90 days of 5m history, or 105,120 for 365 days.
+Only the latest 1,000 candles worth of drawing data is returned to the chart;
+simulated positions carry forward from the earlier history. Selecting a longer
+period does not download missing history or recalculate features. Actual coverage
+is displayed and depends on the committed feature checkpoint.
+
+It starts flat at the evaluation history boundary. The sliding window can
 therefore exclude positions originating earlier; it is not persistent live
 position accounting. Historical chart mode evaluates through the displayed last
 closed candle. Source feature replay or invalid signatures produce an explicit
@@ -40,9 +47,10 @@ buckets. Existing confidence is evidence quality, not win probability. The initi
 rules and costs are hypotheses, not calibrated BTC parameters. No profitability
 claim has been made. Production history is on the user's laptop, not this workspace.
 
-Read-only API: `/api/strategy/btc?symbol=BTCUSDT&interval=5m`, optionally `before`
+Read-only API: `/api/strategy/btc?symbol=BTCUSDT&interval=5m`, optionally `days` (7/30/90/365) and `before`
 (UTC milliseconds, exclusive close boundary). It uses existing API authentication.
-The overlay polls at most once per 15 seconds while enabled and receives no live
+The overlay requests again when the last displayed closed candle or selected
+horizon changes, with a maximum frequency of once per 15 seconds, and receives no live
 exchange ticks. No request is made while disabled or on unsupported symbols.
 
 Validation: unit tests cover next-open fills, gap stops/costs, nonretroactive trails,
