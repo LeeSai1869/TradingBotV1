@@ -1,4 +1,5 @@
 import {mountResize} from './resize.js';
+import {mountEvents} from '../events/index.js';
 import {chartColumn} from './chart_column.js';
 import {hudRequest} from './requests.js';
 import {normalizeHud} from './preferences.js';
@@ -106,7 +107,7 @@ export function mount() {
     // Interacting with the overlay must not pan or zoom the chart underneath it.
     for(const event of ['pointerdown','mousedown','touchstart','wheel','dblclick'])hud.addEventListener(event,event=>event.stopPropagation());
     const analysis=el('section','',body,'workspace-card');el('h3','Chart analysis',analysis);
-    el('p','Coin and timeframe analysis will be connected here later.',analysis);
+    mountEvents(analysis);
     const chat=el('section','',body,'workspace-card workspace-chat');el('h3','AI chat',chat);
     el('p','Chat will be available when an AI provider is connected.',chat);
     const input=el('textarea','',chat);input.disabled=true;input.placeholder='AI chat is not connected yet';input.setAttribute('aria-label','AI chat message');

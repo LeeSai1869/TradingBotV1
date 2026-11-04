@@ -1092,3 +1092,17 @@ WAL-aware offline import, private account import, formula compatibility refusal 
 matching pending-replay admission. Frozen smoke checks exact source formula identity,
 Tcl resources and feature/checkpoint roundtrip; HTTP smoke checks locally bundled chart
 assets. Native Windows/macOS builds still require native runners.
+
+Research catalogue and manual historical event viewer:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_research_events.py'
+python3 -m unittest discover -s tests -p 'test_event_history.py'
+PYTHONPATH=. python3 tests/browser_research_events.py
+```
+
+Covers candidate/confirmation separation, active-side selection, native qualification,
+unknown DI candidate origin, causal knowledge times, malformed/future sources, gap
+handling, prefix invariance, generation guards, real read-only storage, bounded whole-
+candle pagination and actual viewer navigation/filter controls. No trading rule or
+feature formula is changed.
