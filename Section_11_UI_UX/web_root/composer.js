@@ -3,6 +3,7 @@
 // Adding a feature = one import + one list entry.
 // ============================================================
 
+import * as btcStrategy from '../overlays/btc_strategy/index.js';
 import * as candles from "../overlays/candles/index.js";
 import * as volumeProfile from "../overlays/volume_profile/index.js";
 import * as opportunity from '../overlays/opportunity/index.js';
@@ -24,7 +25,7 @@ import * as alertsControl from "../controls/alerts/index.js";
 import * as workspaceControl from "../controls/workspace/index.js";
 import * as settingsControl from "../controls/settings/index.js";
 
-const VISUALS = [candles, markers, ema50, indicators, zones, volumeProfile, liquidity, opportunity, candleDetails];
+const VISUALS = [candles, btcStrategy, markers, ema50, indicators, zones, volumeProfile, liquidity, opportunity, candleDetails];
 const PANELS = [];
 
 const Composer = {

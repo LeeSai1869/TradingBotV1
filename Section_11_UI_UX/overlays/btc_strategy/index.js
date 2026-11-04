@@ -1,0 +1,73 @@
+import {getSeries} from '../candles/index.js';
+export const name='btc_strategy';
+let primitive,label,toggle,lastData,enabled=false,scope='',lastFetch=0,serial=0,pending=false;
+class StrategyVisual {
+    attached({chart,series,requestUpdate}){Object.assign(this,{chart,series,requestUpdate});}
+    detached(){this.chart=this.series=this.requestUpdate=null;}
+    paneViews(){return [this];}
+    renderer(){return this;}
+    zOrder(){return 'top';}
+    draw(target){
+        if(!this.series||!enabled)return;
+        target.useMediaCoordinateSpace(({context:ctx,mediaSize:size})=>{
+            ctx.save();ctx.font='bold 11px sans-serif';
+            const point=(t,p)=>[this.chart.timeScale().timeToCoordinate(t/1000),this.series.priceToCoordinate(p)];
+            for(const observation of this.packet?.observations||[]){
+                const [x,y]=point(observation.time,observation.price);if(x===null||y===null||x<0||x>size.width)continue;
+                ctx.fillStyle='#bba0f5';ctx.fillText('◇',x-4,y+18);
+            }
+            for(const trade of this.packet?.trades||[]){
+                for(const [t,p,text,color] of [[trade.entry_time,trade.entry,'BTC BUY','#54d5e8'],[trade.exit_time,trade.exit,`BTC EXIT${Number.isFinite(trade.net_pct)?' '+trade.net_pct.toFixed(2)+'%':''}`,'#ffb454']]){
+                    if(!Number.isFinite(t)||!Number.isFinite(p))continue;
+                    const [x,y]=point(t,p);if(x===null||y===null||x<0||x>size.width)continue;
+                    ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();ctx.fillText(text,x+6,y-8);
+                }
+            }
+            for(const key of ['entry','hard_stop','stop']){
+                ctx.strokeStyle={entry:'#54d5e8',hard_stop:'#e35c73',stop:'#ffb454'}[key];ctx.setLineDash(key==='entry'?[2,4]:[]);
+                ctx.beginPath();let previous=null;
+                for(const level of this.packet?.levels||[]){
+                    if(key==='stop'&&level.stop===level.hard_stop){previous=null;continue;}
+                    const [x,y]=point(level.time,level[key]);
+                    if(x===null||y===null){previous=null;continue;}
+                    if(previous&&level.entry_time===previous.entry_time)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+                    previous=level;
+                }ctx.stroke();
+            }
+            ctx.restore();
+        });
+    }
+}
+export function mount(){
+    primitive=new StrategyVisual();getSeries().attachPrimitive(primitive);
+    const box=document.createElement('div');Object.assign(box.style,{position:'absolute',left:'8px',top:'45px',zIndex:4,fontSize:'11px',color:'#bdeaf2',maxWidth:'75%'});
+    const control=document.createElement('label');toggle=document.createElement('input');toggle.type='checkbox';control.append(toggle,document.createTextNode(' BTC strategy · experimental spot'));
+    label=document.createElement('div');box.append(control,label);document.getElementById('chart').append(box);
+    toggle.onchange=()=>{enabled=toggle.checked;lastFetch=0;serial++;pending=false;primitive.packet=null;primitive.requestUpdate?.();if(!enabled)label.textContent='';else if(lastData)update(null,lastData);};
+}
+export async function update(chart,data){
+    lastData=data;
+    const symbol=data.symbol,timeframe=data.timeframe;
+    const supported=symbol==='BTCUSDT'&&['5m','15m','30m','1h'].includes(timeframe);
+    const next=`${symbol}:${timeframe}:${data.atLiveEdge===false?'history':'latest'}`;
+    if(scope!==next){scope=next;serial++;pending=false;lastFetch=0;primitive.packet=null;primitive.requestUpdate?.();}
+    toggle.disabled=!supported;
+    if(!enabled)return;
+    if(!supported){label.textContent='Choose BTCUSDT · 5m / 15m / 30m / 1h';return;}
+    if(pending||Date.now()-lastFetch<15000)return;
+    const token=++serial;pending=true;lastFetch=Date.now();label.textContent='Loading stored strategy…';
+    const query=new URLSearchParams({symbol,interval:timeframe});
+    const end=data.bars?.filter(b=>!b.provisional).at(-1);
+    if(data.atLiveEdge===false&&end)query.set('before',String(end.client?.close_time+1||end.time*1000+1));
+    try{
+        const response=await fetch(`/api/strategy/btc?${query}`,{cache:'no-store',signal:AbortSignal.timeout(10000)}),packet=await response.json();
+        if(token!==serial)return;
+        if(!response.ok)throw new Error(packet.error||'Strategy unavailable');
+        primitive.packet=packet;primitive.requestUpdate?.();
+        const open=packet.trades?.find(t=>t.status==='OPEN');
+        label.textContent=packet.status==='READY'?`Simulated · starts flat · ${packet.candles} candles · ${packet.trades.length} entries · through ${packet.window_end?new Date(packet.window_end).toISOString().slice(0,16)+'Z':'window end'} · ${open?'holding BTC':'flat'} · cyan entry / red hard stop / amber trail · 0.5% activates trail · costs included${packet.gaps?' · gaps censored':''}`:packet.reason;
+        boxTitle(packet);
+    }catch(error){if(token===serial){primitive.packet=null;primitive.requestUpdate?.();label.textContent=error.message;}}
+    finally{if(token===serial)pending=false;}
+}
+function boxTitle(packet){label.title=`${packet.interpretation||''}\nWindow starts flat; earlier positions excluded. Confirmed closed candles only. 0.5% hard stop is a price threshold, not a guaranteed loss cap; gaps and costs can exceed it. Trend/regime filters and confidence calibration are pending.`;}

@@ -1106,3 +1106,10 @@ unknown DI candidate origin, causal knowledge times, malformed/future sources, g
 handling, prefix invariance, generation guards, real read-only storage, bounded whole-
 candle pagination and actual viewer navigation/filter controls. No trading rule or
 feature formula is changed.
+
+BTC visual strategy: `python3 -m unittest discover -s tests -p 'test_btc*.py'`
+checks causal fills, stop gaps/costs, trailing activation without retroactive fills,
+missing-data censoring, symbol scope, read-only closed-history bounds and replay
+guards. `PYTHONPATH=. python3 tests/browser_btc_strategy.py` uses the real local
+chart vendor and overlay to check visibility, request throttling and autoscale.
+See `Section_8_Decision_Engine/BTC_VISUAL_STRATEGY.md` for experimental scope.
