@@ -102,6 +102,9 @@
     ],
     "Section_11_UI_UX/server/ui_server.py": [
       "Section_1_Global_Core.paths"
+    ],
+    "Section_11_UI_UX/server/public_access.py": [
+      "Section_1_Global_Core.paths"
     ]
   }
 }

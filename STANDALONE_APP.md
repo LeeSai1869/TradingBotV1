@@ -131,3 +131,22 @@ the compatibility guard prevents a casual formula-changing update from silently
 forcing historical recalculation. Back up the stopped profile before any release.
 No unattended updater, rollback/database migration system, profitability claim or
 cross-platform trading-execution validation is included in this initial package.
+
+## Per-machine Tailscale/reverse-proxy access
+
+Do not hardcode one laptop's hostname into the server source. Configure the explicit
+HTTPS origin without enabling mobile push:
+
+```bash
+TradingIndicator --data-dir /PATH/TO/ProductionMemory \
+  --public-origin https://YOUR-MACHINE.YOUR-NETWORK.ts.net
+```
+
+This saves `accounts/public_access.json` and exits without starting services. For
+the development checkout use `python3 configure_access.py --origin https://...`,
+which uses the existing private account directory. Restart the backend/app after
+configuration. A newly built app is required for this option. This does not install
+Tailscale, expose a port, enable mobile delivery, or alter authentication. The host
+and origin must match the independently configured HTTPS proxy; push setups, if
+added later, must use the same origin. Change this setting when moving the profile
+to a machine with a different address.

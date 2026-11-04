@@ -127,6 +127,7 @@ def main(argv=None):
     parser.add_argument('--self-test',action='store_true');parser.add_argument('--setup',action='store_true')
     parser.add_argument('--no-browser',action='store_true');parser.add_argument('--import-legacy',type=Path)
     parser.add_argument('--source-stopped',action='store_true')
+    parser.add_argument('--public-origin',help='Save this installation HTTPS proxy origin and exit; no push setup required')
     parser.add_argument('--accounts-from',type=Path)
     parser.add_argument('--include-raw-archive',action='store_true')
     args=parser.parse_args(argv)
@@ -149,6 +150,10 @@ def main(argv=None):
                 raw=args.import_legacy/'Section_1_Global_Core/memory_storage/Storage/liquidity/raw'
                 if raw.is_dir():shutil.copytree(raw,folder/'storage/liquidity/raw')
         initialize(folder)
+        if args.public_origin:
+            if args.worker:raise ValueError('Configure the origin through the main launcher')
+            from Section_11_UI_UX.server import public_access
+            print('HTTPS access configured:',public_access.save_origin(args.public_origin));return 0
         if args.worker:
             if args.worker=='runner':check_compatibility(folder)
             import runpy
