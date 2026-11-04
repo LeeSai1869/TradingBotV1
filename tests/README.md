@@ -1041,3 +1041,15 @@ PYTHONPATH=. python3 tests/browser_alert_delivery.py
 
 Checks open-app delivery, silent startup history, duplicate prevention, preserved
 cursors after pagehide/pageshow and reconnection, plus desktop/audio delivery calls.
+
+Portable launchers, system-service exports and notification pipeline diagnostics:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_portable_launchers.py'
+python3 -m unittest discover -s tests -p 'test_server_service_config.py'
+python3 -m unittest discover -s tests -p 'test_delivery_diagnostics.py'
+```
+
+Uses disposable paths/notification stores; no macOS service is installed and no
+push message is sent. Validates moved folders with spaces, explicit Python selection,
+opt-in caffeinate export and credential/token-free read-only delivery reporting.
