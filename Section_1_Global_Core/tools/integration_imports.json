@@ -82,6 +82,9 @@
     ],
     "sentiment_sources.py": [
       "Section_1_Global_Core.sentiment_external"
+    ],
+    "configure_feature_runtime.py": [
+      "Section_1_Global_Core.feature_runtime"
     ]
   }
 }

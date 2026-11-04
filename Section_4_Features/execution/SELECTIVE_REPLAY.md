@@ -172,3 +172,48 @@ This does not make an incompatible historical checkpoint safe for live use. A pa
 whose targeted repair is in 2018 still needs that repair completed before current
 stateful outputs/decisions can resume. No state is reset, no historical candles are
 skipped and no provisional output is promoted to a confirmed trading signal.
+
+### Optional recovery budget and pair preference
+
+The default feature allocation remains 1 second / 1000 rows per maintenance turn.
+For a long repair, the operator can increase its bounded allocation and prefer a
+specific active pair without pausing coins, launching another writer, resetting
+state or changing formula fingerprints:
+
+```bash
+python3 configure_feature_runtime.py --seconds 3 --max-bars 3000 \
+  --priority-symbol BTCUSDT --priority-timeframe 5m
+```
+
+The existing runner reads settings at its next feature maintenance turn. The code
+update itself requires one runner restart. Configuration is machine-local in
+`Section_1_Global_Core/feature_runtime.json` (Git-ignored). This scheduling preference
+never restarts historical replay or alters the epoch/formula signature. The
+preferred pair gets the bulk feature allocation only while it has pending history,
+a targeted job or an outdated signature. Other symbols **and other timeframes of
+the preferred symbol** retain the existing bounded background share. Once caught up,
+the normal bulk selector resumes; a later new candle may make that preferred pair
+eligible again. Paused/inactive preferred pairs are ignored, not re-enabled.
+
+This can increase CPU use and delay other runner phases. Budgets are soft between
+bars and exclude some setup/commit overhead; they are not wall-clock guarantees.
+Time is limited to .25–10 seconds and the row setting to 200–10000. Existing full
+and selective batch caps still apply; a 3000-row setting is a maintenance budget,
+not a promise that each SQL batch will contain 3000 rows.
+
+Inspect settings or restore the original scheduling at any time:
+
+```bash
+python3 configure_feature_runtime.py
+python3 configure_feature_runtime.py --reset
+```
+
+Full and selective feature batches now serialize checkpoints and materialize SQL
+parameters before acquiring the market-data writer lock. Epoch/enabled validation
+still occurs under that lock, and the rows and matching checkpoint commit in one
+transaction. Serialization failure cannot publish a partially prepared batch.
+Full logs distinguish `serialize`, `lock_wait`, and `db` (opening/writing/checkpoint
+storage/commit); selective logs additionally separate `restore`, `read`, and
+`compute` seconds. These measurements do not presume that lock delays are disk I/O.
+Use actual laptop measurements to evaluate improvement; synthetic fixtures do not
+establish a production speedup or an ETA for years of replay.

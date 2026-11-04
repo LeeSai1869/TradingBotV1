@@ -1064,3 +1064,16 @@ python3 -m unittest discover -s tests -p 'test_analytical_retry.py'
 Tests alternate near-current and historical service without admitting targeted
 repair jobs to the live lane, retain bulk ownership, and retry transient analytical
 writer collisions next turn without duplicate traceback/log spam.
+
+Recovery budget and shorter feature critical sections:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_feature_runtime.py'
+python3 -m unittest discover -s tests -p 'test_fair_service.py'
+python3 -m unittest discover -s tests -p 'test_selective_features.py'
+```
+
+Checks opt-in configuration bounds/defaults, priority release/fairness, checkpoint
+serialization outside the writer lock, failed serialization retaining prior progress,
+and numerical/continuation equivalence of repaired features. No production data is
+used and no recovery preference is enabled by tests.

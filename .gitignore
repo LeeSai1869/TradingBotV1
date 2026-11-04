@@ -49,3 +49,6 @@ local.properties
 *.keystore
 **/google-services.json
 **/*service-account*.json
+
+# Machine-local feature recovery preferences
+Section_1_Global_Core/feature_runtime.json

@@ -105,3 +105,21 @@ class FairService(unittest.TestCase):
             c.executemany('INSERT INTO klines VALUES (?,?,?)',[('SUI','1m',i) for i in range(5,20)])
         work_priority._service_cursors.clear();work_priority._service_phases.clear()
         self.assertEqual(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features'),('ENA','1m'))
+
+    def test_priority_pair_keeps_same_coin_other_frames_in_background(self):
+        with sqlite3.connect(self.raw) as c:c.execute("INSERT INTO klines VALUES ('BTC','5m',0)")
+        turn=work_priority.service_pair(['BTC'],['1m','5m'],'BTC','features',owner_interval='1m')
+        self.assertEqual(turn,('BTC','5m'))
+
+    def test_pending_priority_releases_only_after_checkpoint_and_generation_match(self):
+        from Section_4_Features.execution.components import current_signature
+        self.assertTrue(work_priority.pending_feature_pair('BTC','1m'))
+        with sqlite3.connect(self.features) as c:
+            c.execute("UPDATE feature_engine_state SET last_open_time=4 WHERE symbol='BTC'")
+            c.execute('CREATE TABLE feature_calculation_versions(symbol,interval,signature)')
+            c.execute('INSERT INTO feature_calculation_versions VALUES (?,?,?)',('BTC','1m',current_signature()))
+            c.execute('CREATE TABLE feature_replay_jobs(symbol,interval)')
+        self.assertFalse(work_priority.pending_feature_pair('BTC','1m'))
+        with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('BTC','1m')")
+        self.assertTrue(work_priority.pending_feature_pair('BTC','1m'))
+        self.assertFalse(work_priority.pending_feature_pair('MISSING','1m'))

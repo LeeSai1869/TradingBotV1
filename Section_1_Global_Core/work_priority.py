@@ -83,7 +83,7 @@ _service_cursors={}
 _live_cursors={}
 _service_phases={}
 
-def service_pair(symbols,intervals,owner,kind):
+def service_pair(symbols,intervals,owner,kind,*,owner_interval=None):
     """Give non-owner pairs bounded turns without changing bulk ownership.
 
     Only indexed existence checks are used. Every connection closes even when a
@@ -92,7 +92,7 @@ def service_pair(symbols,intervals,owner,kind):
     from contextlib import ExitStack
     if kind not in ('downloads','features'):raise ValueError('Unknown service kind')
     symbols=list(symbols);intervals=list(intervals)
-    pairs=[(s,t) for s in symbols if s!=owner for t in reversed(intervals)]
+    pairs=[(s,t) for s in symbols for t in reversed(intervals) if s!=owner or owner_interval is not None and t!=owner_interval]
     if not pairs or not klines_store.DB_PATH.exists():return None
     identity=(str(klines_store.DB_PATH),str(features_store.DB_PATH),tuple(pairs),kind)
     cursor=_service_cursors.get(identity,0)
@@ -147,3 +147,23 @@ def service_pair(symbols,intervals,owner,kind):
                 if limit is not None:sql+=' AND open_time<?';args.append(limit)
                 if raw.execute(sql+' LIMIT 1',args).fetchone():return pair
     return None
+
+
+def pending_feature_pair(symbol,interval):
+    """Indexed pending-state check for an optional operator recovery preference."""
+    if not klines_store.DB_PATH.exists():return False
+    pair=(symbol,interval)
+    with closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as raw:
+        latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',pair).fetchone()[0]
+    if latest is None:return False
+    if not features_store.DB_PATH.exists():return True
+    with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as features:
+        tables={r[0] for r in features.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if 'feature_replay_jobs' in tables and features.execute('SELECT 1 FROM feature_replay_jobs WHERE symbol=? AND interval=?',pair).fetchone():return True
+        if 'feature_engine_state' not in tables:return True
+        row=features.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',pair).fetchone()
+        if not row or row[0] is None or row[0]<latest:return True
+        if 'feature_calculation_versions' not in tables:return True
+        from Section_4_Features.execution.components import current_signature
+        version=features.execute('SELECT signature FROM feature_calculation_versions WHERE symbol=? AND interval=?',pair).fetchone()
+        return not version or version[0]!=current_signature()

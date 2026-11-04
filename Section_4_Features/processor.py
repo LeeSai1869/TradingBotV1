@@ -84,21 +84,29 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
         packet.features['daily_source_ready']=daily_ready
         output.append(packet.features)
     if not output:return 0
-    compute_seconds=time.monotonic()-compute_started;write_started=time.monotonic()
+    compute_seconds=time.monotonic()-compute_started
+    # Freeze the batch before acquiring the shared writer lock. Serialization
+    # is CPU work; rows and this exact checkpoint still commit atomically.
+    serialize_started=time.monotonic()
+    state_text=checkpoint.dump(engine,epoch)
+    columns=features_store.COLUMNS
+    values=[[r.get(c) for c in columns] for r in output]
+    signature=current_signature()
+    serialize_seconds=time.monotonic()-serialize_started;write_started=time.monotonic()
     with data_policy.locked():
+        lock_seconds=time.monotonic()-write_started;db_started=time.monotonic()
         if not data_policy.enabled(symbol,interval) or epoch!=_epoch(symbol,interval):
             reset_pair(symbol,interval);raise RuntimeError('Feature replay cancelled after data policy changed')
         conn=features_store.open_db()
         try:
             with conn:
-                columns=features_store.COLUMNS
-                conn.executemany(f'INSERT OR REPLACE INTO features ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})',[[r.get(c) for c in columns] for r in output])
-                conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,engine.context.last_time,checkpoint.dump(engine,epoch)))
-                conn.execute('INSERT INTO feature_calculation_versions(symbol,interval,signature,generation) VALUES (?,?,?,0) ON CONFLICT(symbol,interval) DO UPDATE SET signature=excluded.signature',(symbol,interval,current_signature()))
+                conn.executemany(f'INSERT OR REPLACE INTO features ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})',values)
+                conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,engine.context.last_time,state_text))
+                conn.execute('INSERT INTO feature_calculation_versions(symbol,interval,signature,generation) VALUES (?,?,?,0) ON CONFLICT(symbol,interval) DO UPDATE SET signature=excluded.signature',(symbol,interval,signature))
         except Exception:
             reset_pair(symbol,interval);raise
         finally:conn.close()
-    print(f'[processor] {symbol} {interval}: +{len(output)} complete feature packets; replay through {engine.context.last_time}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s; compute={1000*compute_seconds/len(output):.3f} ms/bar; commit={time.monotonic()-write_started:.3f}s',flush=True)
+    print(f'[processor] {symbol} {interval}: +{len(output)} complete feature packets; replay through {engine.context.last_time}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s; compute={1000*compute_seconds/len(output):.3f} ms/bar; serialize={serialize_seconds:.3f}s; lock_wait={lock_seconds:.3f}s; db={time.monotonic()-db_started:.3f}s; commit={time.monotonic()-write_started:.3f}s',flush=True)
     return len(output)
 
 
@@ -109,18 +117,27 @@ def catch_up(symbol,interval):
             reset_pair(symbol,interval);raise
 
 
-def maintenance(symbols,intervals,*,max_bars=1000,time_budget=1.):
+def maintenance(symbols,intervals,*,max_bars=None,time_budget=None):
     """Keep bulk symbol priority while reserving progress for other active pairs."""
     global _cursor
+    from Section_1_Global_Core import work_priority,feature_runtime
+    runtime=feature_runtime.read()
+    if max_bars is None:max_bars=runtime['max_bars']
+    if time_budget is None:time_budget=runtime['time_budget']
+    if max_bars<=0 or time_budget<=0:return 0
     _recover_runtime_format_job(symbols,intervals)
-    from Section_1_Global_Core import work_priority
-    owner=work_priority.work_symbol(symbols,intervals)
+    priority=runtime['priority'];priority_interval=None
+    if (priority and priority['symbol'] in symbols and priority['timeframe'] in intervals
+            and work_priority.pending_feature_pair(priority['symbol'],priority['timeframe'])):
+        owner=priority['symbol'];priority_interval=priority['timeframe']
+    else:owner=work_priority.work_symbol(symbols,intervals)
     ordered=([owner]+[s for s in symbols if s!=owner]) if owner else list(symbols)
     pairs=[(symbol,interval) for symbol in ordered for interval in intervals]
     if not pairs:return 0
     start=time.monotonic();deadline=start+time_budget;count=0;service_extra=0
     with _LOCK:
-        service=work_priority.service_pair(symbols,intervals,owner,'features')
+        service=(work_priority.service_pair(symbols,intervals,owner,'features',owner_interval=priority_interval)
+                 if priority_interval else work_priority.service_pair(symbols,intervals,owner,'features'))
         if service:
             try:
                 print(f'[processor] background feature turn: {service[0]} {service[1]}',flush=True)
@@ -129,11 +146,13 @@ def maintenance(symbols,intervals,*,max_bars=1000,time_budget=1.):
                 service_extra=max(0,serviced-cap)
             except Exception:
                 reset_pair(*service);traceback.print_exc()
-        for _ in range(len(intervals)):
+        owner_intervals=[priority_interval] if priority_interval else list(intervals)
+        for _ in range(len(owner_intervals)):
             if count-service_extra>=max_bars or time.monotonic()>=deadline:break
 
             # Cursor rotates frames of the owner, not the entire coin universe.
-            symbol,interval=pairs[_cursor%len(intervals)];_cursor+=1
+            symbol=owner if owner else pairs[0][0]
+            interval=owner_intervals[_cursor%len(owner_intervals)];_cursor+=1
             try:count+=_advance(symbol,interval,max_bars-count+service_extra,deadline)
             except Exception as error:
                 reset_pair(symbol,interval)
@@ -297,10 +316,12 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     try:job=selective.read_job(conn,symbol,interval)
     finally:conn.close()
     if not job:base._repair_pending=False;return 0
+    restore_started=time.monotonic()
     plan=catalog().plan(set(json.loads(job['changed'])))
     restored=checkpoint.restore(symbol,interval,job['state'],epoch) if job['state'] else None
     if job['state'] and restored is None:raise RuntimeError('Invalid selective replay checkpoint; stored features retained')
     partial=selective.PartialEngine(symbol,interval,plan,selective.desired_parameters(),restored.context if restored else None)
+    restore_seconds=time.monotonic()-restore_started;read_started=time.monotonic()
     raw=klines_store.open_db()
     try:rows=[r for r in klines_store.read_after_page(raw,symbol,interval,job['last_time'],min(1000,max_bars*5)) if r[2]<=job['target']]
     finally:raw.close()
@@ -312,6 +333,7 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     if 'mtfData.volumeMA' in plan.reads:required.add('volume_ma')
     try:stored={r['open_time']:r for r in features_store.read_replay_inputs(conn,symbol,interval,rows[0][2],rows[-1][2]+1,required)}
     finally:conn.close()
+    read_seconds=time.monotonic()-read_started;compute_started=time.monotonic()
     output=[]
     for row in rows:
         if output and deadline is not None and time.monotonic()>=deadline:break
@@ -325,10 +347,16 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
             daily=[dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),r)) for r in daily_rows] if ready else []
         result=partial.step(client,old,daily_bars=daily);result['daily_source_ready']=ready
         output.append(result)
+    compute_seconds=time.monotonic()-compute_started;serialize_started=time.monotonic()
     last=partial.context.last_time;complete=last>=job['target']
     columns=sorted(set(plan.columns)&set(features_store.COLUMNS)-{'symbol','interval','open_time','formula_version'})
     merged=selective.merge(base,partial) if complete else None
+    state_text=checkpoint.dump(merged if complete else partial,epoch)
+    values=[[r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output]
+    signature=current_signature()
+    serialize_seconds=time.monotonic()-serialize_started;write_started=time.monotonic()
     with data_policy.locked():
+        lock_seconds=time.monotonic()-write_started;db_started=time.monotonic()
         if epoch!=_epoch(symbol,interval) or not data_policy.enabled(symbol,interval):
             reset_pair(symbol,interval);return 0
         conn=features_store.open_db()
@@ -336,18 +364,18 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
             with conn:
                 if columns:
                     conn.executemany('UPDATE features SET '+','.join(f'{c}=?' for c in columns)+' WHERE symbol=? AND interval=? AND open_time=?',
-                                     [[r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output])
+                                     values)
                 if complete:
-                    conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(checkpoint.dump(merged,epoch),symbol,interval))
+                    conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(state_text,symbol,interval))
                     conn.execute('DELETE FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval))
-                    conn.execute('UPDATE feature_calculation_versions SET signature=? WHERE symbol=? AND interval=?',(current_signature(),symbol,interval))
+                    conn.execute('UPDATE feature_calculation_versions SET signature=? WHERE symbol=? AND interval=?',(signature,symbol,interval))
                 else:
-                    conn.execute('UPDATE feature_replay_jobs SET last_time=?,state=? WHERE symbol=? AND interval=?',(last,checkpoint.dump(partial,epoch),symbol,interval))
+                    conn.execute('UPDATE feature_replay_jobs SET last_time=?,state=? WHERE symbol=? AND interval=?',(last,state_text,symbol,interval))
         finally:conn.close()
     if complete:
         key=(str(features_store.DB_PATH),symbol,interval,epoch)
         merged._repair_pending=False;merged._prepared_signature=current_signature();_ENGINES[key]=merged
-    print(f'[processor] {symbol} {interval}: targeted +{len(output)} rows, {len(columns)} columns; through={last}; complete={complete}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s',flush=True)
+    print(f'[processor] {symbol} {interval}: targeted +{len(output)} rows, {len(columns)} columns; through={last}; complete={complete}; {len(output)/max(.001,time.monotonic()-started):.1f} rows/s; restore={restore_seconds:.3f}s; read={read_seconds:.3f}s; compute={compute_seconds:.3f}s; serialize={serialize_seconds:.3f}s; lock_wait={lock_seconds:.3f}s; db={time.monotonic()-db_started:.3f}s',flush=True)
     return len(output)
 
 
