@@ -158,3 +158,17 @@ the breaker), not a probability or an invented reaction score. Charts use sparse
 events plus the committed checkpoint; missing/masked history is never extended
 as if validity were established. No arbitrary zone cap silently deletes blocks;
 processing cost scales with the number of still-valid zones.
+
+### Keeping ready pairs current during long repairs
+
+The bounded non-owner feature turn alternates between near-current eligible pairs
+and the original historical round-robin service. Near-current means an existing
+checkpoint with the current calculation signature, no targeted replay job, and
+1–12 pending raw rows (checked with an indexed LIMIT 13 query). The raw historical
+cursor still gates actual processing. The bulk owner's time/row reservation is
+unchanged; repair jobs retain regular background turns.
+
+This does not make an incompatible historical checkpoint safe for live use. A pair
+whose targeted repair is in 2018 still needs that repair completed before current
+stateful outputs/decisions can resume. No state is reset, no historical candles are
+skipped and no provisional output is promoted to a confirmed trading signal.

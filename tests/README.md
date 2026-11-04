@@ -1053,3 +1053,14 @@ python3 -m unittest discover -s tests -p 'test_delivery_diagnostics.py'
 Uses disposable paths/notification stores; no macOS service is installed and no
 push message is sent. Validates moved folders with spaces, explicit Python selection,
 opt-in caffeinate export and credential/token-free read-only delivery reporting.
+
+Live progress under replay backlog:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_fair_service.py'
+python3 -m unittest discover -s tests -p 'test_analytical_retry.py'
+```
+
+Tests alternate near-current and historical service without admitting targeted
+repair jobs to the live lane, retain bulk ownership, and retry transient analytical
+writer collisions next turn without duplicate traceback/log spam.

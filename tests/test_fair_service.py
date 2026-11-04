@@ -88,3 +88,20 @@ class FairService(unittest.TestCase):
             count=processor.maintenance(['BTC'],['1m'],time_budget=10)
         self.assertEqual(count,1000)
         self.assertEqual(work.call_count,1)
+
+    def test_near_current_turns_alternate_with_targeted_background_repair(self):
+        from Section_4_Features.execution.components import current_signature
+        with sqlite3.connect(self.features) as c:
+            c.execute('CREATE TABLE feature_calculation_versions(symbol,interval,signature)')
+            c.executemany('INSERT INTO feature_calculation_versions VALUES (?,?,?)',[(s,'1m',current_signature()) for s in ('BTC','ENA','SUI')])
+            c.execute('CREATE TABLE feature_replay_jobs(symbol,interval)')
+            c.execute("INSERT INTO feature_replay_jobs VALUES ('ENA','1m')")
+        work_priority._live_cursors.clear();work_priority._service_phases.clear()
+        turns=[work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features') for _ in range(4)]
+        self.assertEqual(turns,[('SUI','1m'),('ENA','1m'),('SUI','1m'),('SUI','1m')])
+        # Near-current ENA cannot skip its pending repair to enter the live lane.
+        self.assertEqual(turns[0],('SUI','1m'))
+        with sqlite3.connect(self.raw) as c:
+            c.executemany('INSERT INTO klines VALUES (?,?,?)',[('SUI','1m',i) for i in range(5,20)])
+        work_priority._service_cursors.clear();work_priority._service_phases.clear()
+        self.assertEqual(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features'),('ENA','1m'))

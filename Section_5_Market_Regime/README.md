@@ -193,3 +193,8 @@ history; MTF aggregation can consume Bias outputs without a circular dependency.
 See [operational readiness and causal outcome research](../MARKET_INTELLIGENCE_READINESS.md)
 and [Sentiment 1.1 optional news/social](SENTIMENT_V1_1.md). Optional providers remain
 disabled until explicitly configured; implementation does not establish profitability.
+
+Transient market-data writer contention in analytical maintenance is deferred to the
+next runner turn, preserving the scope cursor rather than waiting a full universe
+rotation. The repeated waiting status is logged once; it is not an engine exception
+traceback. This does not bypass the shared writer lock or feature-generation gates.

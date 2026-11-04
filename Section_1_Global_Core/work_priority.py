@@ -80,6 +80,8 @@ def owns_history(symbol):
 
 
 _service_cursors={}
+_live_cursors={}
+_service_phases={}
 
 def service_pair(symbols,intervals,owner,kind):
     """Give non-owner pairs bounded turns without changing bulk ownership.
@@ -111,6 +113,26 @@ def service_pair(symbols,intervals,owner,kind):
             if features.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():
                 from Section_4_Features.execution.components import current_signature
                 signature=current_signature();versions={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,signature FROM feature_calculation_versions')}
+        # Alternate near-current work and historical background turns. A
+        # universe full of targeted replays must not make a ready pair wait an
+        # entire rotation just to calculate its next closed candle.
+        phase=_service_phases.get(identity,0)
+        if len(_service_phases)>8:_service_phases.clear();_live_cursors.clear()
+        _service_phases[identity]=phase+1
+        if kind=='features' and versions is not None and phase%2==0:
+            live_cursor=_live_cursors.get(identity,0)
+            for _ in pairs:
+                pair=pairs[live_cursor%len(pairs)];live_cursor+=1
+                _live_cursors[identity]=live_cursor
+                if pair in waiting or pair in jobs or pair not in checkpoints or versions.get(pair)!=signature:continue
+                s,t=pair;through=checkpoints[pair]
+                # At most thirteen indexed rows: no full-history COUNT scans.
+                rows=raw.execute('SELECT open_time FROM klines WHERE symbol=? AND interval=? AND open_time>? ORDER BY open_time LIMIT 13',(s,t,through)).fetchall()
+                if not 0<len(rows)<=12:continue
+                # Do not step beyond the actually downloaded historical prefix.
+                limit=history.get(pair)
+                if limit is not None and rows[0][0]>=limit:continue
+                return pair
         for _ in pairs:
             pair=pairs[cursor%len(pairs)];cursor+=1;_service_cursors[identity]=cursor
             s,t=pair

@@ -33,6 +33,17 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
                     aggregation_processor.observe(symbol,interval,engine,row)
                     aggregate=aggregation_processor.refresh(symbol,engine,intervals=intervals,deadline=started+time_budget)
                     total+=aggregate['processed']
+            except TimeoutError:
+                # A transient writer collision must not postpone this scope for
+                # an entire universe rotation. Retry it next maintenance turn.
+                _cursor-=1
+                key=(symbol,interval,engine)
+                message='Waiting for market-data writer; retry next turn'
+                if _status.get(key)!=message:
+                    print(f"[{engine.lower()}] {symbol} {interval}: {message}",flush=True)
+                _status[key]=message;_status.move_to_end(key)
+                if len(_status)>max(2000,len(pairs)):_status.popitem(last=False)
+                break
             except Exception:
                 traceback.print_exc()  # Other processors/pairs still get their turns.
     return total
