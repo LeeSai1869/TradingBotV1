@@ -2,13 +2,16 @@
 import sqlite3
 import time
 from . import data_policy,regime_inputs
+from Section_8_Decision_Engine.btc_sell_rules import SellConfig,RULE_IDS
 from Section_8_Decision_Engine.btc_research import FIELDS,TIMEFRAMES,simulate
 
-def history(symbol,interval,limit=1000,before=None,days=90,include_all_trades=False):
+def history(symbol,interval,limit=1000,before=None,days=90,include_all_trades=False,disabled_sell_rules=()):
     if symbol!='BTCUSDT' or interval not in TIMEFRAMES:raise ValueError('BTC strategy supports BTCUSDT: 5m, 15m, 30m, 1h')
     if type(limit) is not int or not 2<=limit<=1000 or before is not None and (type(before) is not int or before<0):raise ValueError('Invalid strategy window')
     if type(days) is not int or days not in (7,30,90,365):raise ValueError('Choose 7, 30, 90 or 365 days')
     if type(include_all_trades) is not bool:raise ValueError('Invalid trade detail scope')
+    if not isinstance(disabled_sell_rules,(tuple,list)) or any(rule not in RULE_IDS for rule in disabled_sell_rules):raise ValueError('Unknown sell rule')
+    sell_config=SellConfig(enabled=tuple(rule for rule in RULE_IDS if rule not in disabled_sell_rules))
     source=None
     try:
         with data_policy.snapshot_guard(timeout=1):
@@ -28,7 +31,7 @@ def history(symbol,interval,limit=1000,before=None,days=90,include_all_trades=Fa
         # receives only its visible-sized tail; position state spans the horizon.
         source.close();source=None
         visible_start=rows[-limit]['open_time'] if len(rows)>=limit else rows[0]['open_time'] if rows else 0
-        result=simulate(rows,detail_since=visible_start)
+        result=simulate(rows,detail_since=visible_start,sell_config=sell_config)
         total_trades=len(result['trades'])
         result['levels']=[level for level in result['levels'] if level['time']>=visible_start]
         result['events']=[event for event in result['events'] if event['time']>=visible_start]

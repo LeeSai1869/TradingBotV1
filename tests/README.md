@@ -1131,3 +1131,10 @@ python3 inspect_btc_strategy.py --timeframe 15m --days 90 \
 This exports the full trade list and a simulated cash summary. Event and stop
 level details remain the recent chart tail. Open/censored positions are excluded
 from the closed-trade balance; this is not live or marked-to-market performance.
+
+BTC controlled sells v0.4: `test_btc_sell_rules.py` isolates S1 trail arming, S2
+strict spread-40 maturity/first decline, bearish-vs-bullish scope, S3 entry-scenario
+and gain-before-loss crossover, declared exit priority and rule disabling.
+Integration tests verify no profit-only activation, independent monotonic trailing
+after DI resumes rising, nonretroactive stop updates and per-trade exit rule IDs.
+The CLI supports `--disable-sell-rule` for fixed-period comparisons.

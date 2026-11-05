@@ -4,6 +4,7 @@ from datetime import datetime,timezone
 import json
 from pathlib import Path
 from Section_1_Global_Core.btc_strategy_history import history
+from Section_8_Decision_Engine.btc_sell_rules import RULE_IDS
 
 
 def main():
@@ -11,6 +12,7 @@ def main():
     parser.add_argument('--timeframe',choices=('5m','15m','30m','1h'),default='15m')
     parser.add_argument('--days',type=int,choices=(7,30,90,365),default=90)
     parser.add_argument('--before',help='Optional exclusive UTC close boundary, ISO with timezone')
+    parser.add_argument('--disable-sell-rule',action='append',choices=RULE_IDS,default=[],help='Disable one named rule for a controlled comparison; repeatable')
     parser.add_argument('--output',default='btc_strategy_review.json')
     args=parser.parse_args();before=None
     if args.before:
@@ -19,7 +21,7 @@ def main():
             if point.tzinfo is None:raise ValueError('Include a timezone offset')
             before=int(point.timestamp()*1000)
         except ValueError as error:parser.error(str(error))
-    packet=history('BTCUSDT',args.timeframe,days=args.days,before=before,include_all_trades=True)
+    packet=history('BTCUSDT',args.timeframe,days=args.days,before=before,include_all_trades=True,disabled_sell_rules=args.disable_sell_rule)
     Path(args.output).write_text(json.dumps(packet,indent=2,allow_nan=False),encoding='utf-8')
     print('BTCUSDT',args.timeframe,packet.get('version',''),packet['status'])
     print(json.dumps(packet.get('summary') or dict(reason=packet.get('reason')),sort_keys=True))

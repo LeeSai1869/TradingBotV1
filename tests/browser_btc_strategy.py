@@ -21,7 +21,7 @@ window.data={symbol:'BTCUSDT',timeframe:'5m',atLiveEdge:true};strategy.mount();w
                 if path=='/vendor.js':return await route.fulfill(path=str(ROOT/'packaging/vendor/lightweight-charts.js'),content_type='text/javascript')
                 if path=='/api/strategy/btc':
                     requests.append(route.request.url)
-                    return await route.fulfill(json=dict(status='READY',candles=20,trades=[dict(entry_time=900000,entry=100,exit_time=1500000,exit=100.7,status='CLOSED')],levels=[dict(time=t,entry_time=900000,entry=100,hard_stop=99.5,stop=99.5) for t in [900000,1200000,1500000]],version='btc-events-v0.3',events=[dict(time=600000,known_time=900000,type='BUY_CONFIRMED',context=dict(di_plus=20,di_minus=35,spread=15,dominant='DI_MINUS'))],observations=[dict(time=600000,price=99.2,type='BUY DI CONFIRMED')],gaps=0))
+                    return await route.fulfill(json=dict(status='READY',candles=20,trades=[dict(entry_time=900000,entry=100,exit_time=1500000,exit=100.7,status='CLOSED')],levels=[dict(time=t,entry_time=900000,entry=100,hard_stop=99.5,stop=99.5) for t in [900000,1200000,1500000]],version='btc-events-v0.4',events=[dict(time=600000,known_time=900000,type='BUY_CONFIRMED',context=dict(di_plus=20,di_minus=35,spread=15,dominant='DI_MINUS')),dict(time=900000,known_time=1200000,type='TRAIL_ARMED',rule_id='S1_EARLY_SELL_TRAIL',action='STATE')],observations=[dict(time=600000,price=99.2,type='BUY DI CONFIRMED')],gaps=0))
                 file=ROOT/'Section_11_UI_UX'/path.lstrip('/')
                 await route.fulfill(path=str(file),content_type='text/css' if file.suffix=='.css' else 'text/javascript')
             await page.route('http://btc.test/**',route);await page.goto('http://btc.test/');await page.wait_for_function('window.ready')
@@ -38,6 +38,8 @@ window.data={symbol:'BTCUSDT',timeframe:'5m',atLiveEdge:true};strategy.mount();w
             await page.get_by_role('button',name='BTC events',exact=True).click()
             dialog=page.get_by_role('dialog',name='BTC strategy events',exact=True)
             assert await dialog.get_by_role('cell',name='BUY CONFIRMED',exact=True).count()==1
+            assert await dialog.get_by_role('cell',name='S1_EARLY_SELL_TRAIL',exact=True).count()==1
+            assert await dialog.get_by_role('cell',name='TRAIL ARMED',exact=True).count()==1
             await page.get_by_role('button',name='Close events',exact=True).click()
             await page.evaluate('change()');assert len(requests)==1
             await page.get_by_label('BTC strategy history').select_option('365')

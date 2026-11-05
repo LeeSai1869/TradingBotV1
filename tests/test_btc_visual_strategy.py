@@ -75,25 +75,51 @@ class BTCVisualStrategy(unittest.TestCase):
         self.assertLess(trade['net_pct'],-.5)
         self.assertEqual(trade['reason'],'Hard stop');self.assertEqual(rows,original)
 
-    def test_trail_not_retroactive_and_profit_not_fixed_target(self):
+    def test_profit_alone_no_longer_arms_trailing(self):
         rows=setup()+[bar(3,o=100.4,h=102,l=100.3,c=101.8)]
-        first=simulate(rows);self.assertEqual(first['trades'][0]['status'],'OPEN')
-        self.assertEqual(first['levels'][0]['stop'],first['trades'][0]['hard_stop'])
-        later=simulate(rows+[bar(4,o=101.8,h=102,l=101.6,c=101.9)])
-        self.assertEqual(later['trades'][0]['reason'],'Trailing stop')
-        self.assertEqual(first['levels'],later['levels'][:1])
+        result=simulate(rows);trade=result['trades'][0]
+        self.assertEqual(trade['status'],'OPEN')
+        self.assertFalse(trade['sell_state']['trailing_armed'])
+        self.assertEqual(trade['stop'],trade['hard_stop'])
 
-    def test_di_plus_peak_exits_without_price_weakness_at_next_open(self):
+    def test_early_setup_arms_trail_only_then_independent_nonretroactive_stop(self):
         rows=setup()+[bar(3,o=100,h=100.2,l=99.9,c=100.1,plus=30,minus=20),
             bar(4,o=100.1,h=100.3,l=100,c=100.2,plus=40,minus=20),
-            bar(5,o=100.2,h=100.3,l=100.1,c=100.2,plus=35,minus=20),
-            bar(6,o=100.2,h=100.3,l=100.1,c=100.2)]
-        result=simulate(rows);trade=result['trades'][0]
-        self.assertEqual(trade['reason'],'Dominant DI+ three-candle peak')
+            bar(5,o=100.2,h=100.3,l=99.9,c=100.2,plus=35,minus=20)]
+        first=simulate(rows);trade=first['trades'][0]
+        self.assertEqual(trade['status'],'OPEN')
+        self.assertTrue(trade['sell_state']['trailing_armed'])
+        self.assertLess(first['levels'][-1]['stop'],trade['stop'])
+        self.assertFalse(any(e['type']=='SELL_CONFIRMED' for e in first['events']))
+        # DI+ resumes rising; trailing remains armed and tightens anyway.
+        rows += [bar(6,o=100.2,h=100.4,l=100.05,c=100.3,plus=45,minus=20),
+                 bar(7,o=100.3,h=100.4,l=100,c=100.2,plus=46,minus=20)]
+        later=simulate(rows)
+        self.assertEqual(later['trades'][0]['reason'],'Trailing stop')
+        self.assertEqual(later['trades'][0]['exit_rule_id'],'P_TRAILING_STOP')
+        self.assertEqual(later['trades'][0]['exit_time'],2100000)
+        self.assertEqual(first['levels'],later['levels'][:len(first['levels'])])
+
+    def test_spread_maturity_decrease_exits_with_explicit_rule_reason(self):
+        from Section_8_Decision_Engine.btc_sell_rules import MATURITY
+        result=simulate(setup()+[bar(3,plus=60,minus=10),bar(4,plus=61,minus=10),
+                                bar(5,plus=60.999,minus=10),bar(6)])
+        trade=result['trades'][0]
+        self.assertEqual(trade['exit_rule_id'],MATURITY)
         self.assertEqual(trade['exit_time'],1800000)
-        event=next(e for e in result['events'] if e['type']=='SELL_CONFIRMED')
-        self.assertFalse(event['price_confluence']['close_below_previous_low'])
-        self.assertEqual(len(result['trades']),1)
+        self.assertEqual(trade['matched_exit_rules'],[MATURITY])
+        self.assertTrue(any(e['type']=='BULLISH_SPREAD_MATURE' for e in result['events']))
+
+    def test_emerging_control_loss_exit_is_separate_from_small_peaks(self):
+        from Section_8_Decision_Engine.btc_sell_rules import CONTROL
+        rows=setup()
+        for row in rows:row['features']['di_plus']=10
+        result=simulate(rows+[bar(3,plus=30,minus=20),bar(4,plus=20,minus=21),bar(5)])
+        trade=result['trades'][0]
+        self.assertEqual(trade['exit_rule_id'],CONTROL)
+        self.assertEqual(trade['exit_time'],1500000)
+        self.assertEqual(trade['sell_state']['entry_scenario'],'BELOW_BOTH')
+        self.assertTrue(any(e['type']=='BUYER_CONTROL_GAINED' for e in result['events']))
 
     def test_gap_censors_and_resets_three_candle_memory(self):
         result=simulate(setup()+[bar(3,o=100.4,h=100.5,l=100.3,c=100.4),bar(5)])

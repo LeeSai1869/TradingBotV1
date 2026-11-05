@@ -1,8 +1,9 @@
 """Causal BTC spot event sequence. Never publishes production decisions."""
 from collections import deque
 import math
+from . import btc_sell_rules as sell
 
-VERSION = 'btc-events-v0.3'
+VERSION = 'btc-events-v0.4'
 TIMEFRAMES = ('5m', '15m', '30m', '1h')
 FIELDS = ('measurement_version', 'measurement_config_id', 'measurement_gap',
           'candidate_pivot', 'candidate_pivot_low_price', 'candidate_pivot_low_time',
@@ -45,7 +46,9 @@ def turns(before, peak, after):
     return result
 
 
-def simulate(rows, *, detail_since=None):
+def simulate(rows, *, detail_since=None, sell_config=None):
+    sell_config = sell_config or sell.SellConfig()
+    configuration_id = VERSION + ':' + ('-'.join(rule.split('_')[0] for rule in sell.RULE_IDS if rule in sell_config.enabled) or 'NONE')
     trades, levels, observations, events = [], [], [], []
     history = deque(maxlen=2)
     position = pending = None
@@ -57,7 +60,7 @@ def simulate(rows, *, detail_since=None):
 
     def record_event(record):
         nonlocal event_serial
-        record['id'] = f'{VERSION}:{record["time"]}:{event_serial}'
+        record['id'] = f'{configuration_id}:{record["time"]}:{event_serial}'
         event_serial += 1
         if retain_detail(record['time']):
             events.append(record)
@@ -72,6 +75,7 @@ def simulate(rows, *, detail_since=None):
         nonlocal position
         fill = reference * (1 - slip)
         position.update(exit_time=row['open_time'], exit=fill, status='CLOSED', reason=reason,
+                        exit_rule_id=reason if reason in sell.RULE_IDS else ('P_TRAILING_STOP' if reason == 'Trailing stop' else 'P_HARD_STOP'),
                         net_pct=(fill * (1-fee) / (position['entry'] * (1+fee)) - 1) * 100)
         position = None
 
@@ -106,11 +110,13 @@ def simulate(rows, *, detail_since=None):
                 position['exit_setup_event_id'] = action['event_id']
                 position['exit_trigger_context'] = action['context']
                 position['exit_confirmation_context'] = action['confirmation_context']
-                close(row, o, 'Dominant DI+ three-candle peak')
+                position['matched_exit_rules'] = action['matched_exit_rules']
+                close(row, o, action['exit_rule_id'])
             elif action['side'] == 'BUY' and not position:
                 entry = o * (1+slip)
                 position = dict(entry_time=t, entry=entry, hard_stop=entry*.995, stop=entry*.995,
-                                peak=entry, status='OPEN', setup_time=action['time'],
+                                peak=entry, status='OPEN', sell_state=sell.initial_state(action['context']),
+                                setup_time=action['time'],
                                 setup_event_id=action['event_id'], confirmation_time=action['confirmation_time'],
                                 trigger_context=action['context'], di_peak_context=action['peak_context'],
                                 confirmation_context=action['context'],
@@ -126,45 +132,66 @@ def simulate(rows, *, detail_since=None):
                 close(row, stop, 'Trailing stop' if stop > position['hard_stop'] else 'Hard stop')
             else:
                 position['peak'] = max(position['peak'], h)
-                if c >= position['entry']*1.005:
-                    # Only effective next bar. No retroactive favorable fills.
-                    position['stop'] = min(c, max(stop, position['peak'] - 1.5*f['atr'],
-                                                   position['entry']*(1+fee)/(1-fee)/(1-slip)))
 
         detected = turns(history[0], history[1], row) if len(history) == 2 else []
         for turn in detected:
             record_event(turn)
         gate = context(f)['dominant']
-        side = 'SELL' if position else 'BUY'
-        channel = 'di_plus' if side == 'SELL' else 'di_minus'
-        expected_gate = channel.upper()
-        for turn in detected:
-            if (turn['type'] == channel.upper()+'_PEAK' and gate == expected_gate
-                    and turn['at_turn']['dominant'] == expected_gate):
-                # Price is observed confluence, never an entry/exit gate. A DI
-                # turn is already confirmed at this close; no later bar is needed.
-                price_confluence = dict(close=c, high=h, low=l,
-                    close_above_previous_high=c > history[-1]['high'],
-                    close_below_previous_low=c < history[-1]['low'])
-                record = event(side+'_CONFIRMED', row, confirmation_basis='DI_TURN_ONLY',
-                               turn_origin_time=turn['origin_time'], turn_event_id=turn['id'],
-                               context=context(f), peak_context=turn['at_turn'],
-                               candidate_confluence=candidate(f, side), price_confluence=price_confluence)
-                pending = dict(side=side, time=t, event_id=record['id'],
-                               confirmation_time=record['known_time'], context=context(f),
-                               peak_context=turn['at_turn'], confirmation_context=context(f),
-                               candidate=candidate(f, side), price_confluence=price_confluence)
+        if position:
+            plus_peak = any(turn['type'] == 'DI_PLUS_PEAK'
+                            and turn['at_turn']['dominant'] == 'DI_PLUS'
+                            and gate == 'DI_PLUS' for turn in detected)
+            previous_context = context(history[-1]['features']) if history else None
+            state, notes, selected = sell.evaluate(position['sell_state'], context(f),
+                                                    previous_context, plus_peak, sell_config)
+            position['sell_state'] = state
+            for note in notes:
+                if note['rule_id'] == sell.EARLY_TRAIL:
+                    origin = next(turn for turn in detected if turn['type'] == 'DI_PLUS_PEAK')
+                    note = dict(note, turn_event_id=origin['id'], turn_origin_time=origin['origin_time'], values=origin['values'])
+                event(note['type'], row, **{k:v for k,v in note.items() if k != 'type'},
+                      context=context(f), candidate_confluence=candidate(f, 'SELL'))
+                if retain_detail(t) and note['type'] in ('TRAIL_ARMED', 'BULLISH_SPREAD_MATURE'):
+                    observations.append(dict(time=t, price=h, type=note['type'].replace('_', ' ')))
+            if selected:
+                matched = [note['rule_id'] for note in notes if note['action'] == 'EXIT']
+                record = event('SELL_CONFIRMED', row, exit_rule_id=selected, matched_exit_rules=matched,
+                               context=context(f), candidate_confluence=candidate(f, 'SELL'))
+                pending = dict(side='SELL', time=t, event_id=record['id'], confirmation_time=record['known_time'],
+                               context=context(f), confirmation_context=context(f),
+                               exit_rule_id=selected, matched_exit_rules=matched)
                 if retain_detail(t):
-                    observations.append(dict(time=t, price=l if side == 'BUY' else h,
-                                             type=side+' DI CONFIRMED'))
-                break
+                    observations.append(dict(time=t, price=h, type='SELL '+selected.split('_')[0]))
+            if state['trailing_armed']:
+                # Once armed it is independent of DI, profit thresholds and
+                # subsequent invalidation of the early setup. Effective next bar.
+                position['stop'] = min(c, max(position['stop'], position['hard_stop'],
+                                              position['peak'] - sell_config.trailing_atr*f['atr']))
+        else:
+            for turn in detected:
+                if (turn['type'] == 'DI_MINUS_PEAK' and gate == 'DI_MINUS'
+                        and turn['at_turn']['dominant'] == 'DI_MINUS'):
+                    price_confluence = dict(close=c, high=h, low=l,
+                        close_above_previous_high=c > history[-1]['high'],
+                        close_below_previous_low=c < history[-1]['low'])
+                    record = event('BUY_CONFIRMED', row, confirmation_basis='DI_TURN_ONLY',
+                                   turn_origin_time=turn['origin_time'], turn_event_id=turn['id'],
+                                   context=context(f), peak_context=turn['at_turn'],
+                                   candidate_confluence=candidate(f, 'BUY'), price_confluence=price_confluence)
+                    pending = dict(side='BUY', time=t, event_id=record['id'],
+                                   confirmation_time=record['known_time'], context=context(f),
+                                   peak_context=turn['at_turn'], confirmation_context=context(f),
+                                   candidate=candidate(f, 'BUY'), price_confluence=price_confluence)
+                    if retain_detail(t):
+                        observations.append(dict(time=t, price=l, type='BUY DI CONFIRMED'))
+                    break
         history.append(row)
 
     closed = [trade for trade in trades if trade['status'] == 'CLOSED']
     realized_balance = 100.
     for trade in closed:
         realized_balance *= 1 + trade['net_pct']/100
-    return dict(version=VERSION, trades=trades, levels=levels, observations=observations, events=events,
+    return dict(version=VERSION, configuration_id=configuration_id, trades=trades, levels=levels, observations=observations, events=events,
                 gaps=gaps, status='READY', candles=len(rows),
                 summary=dict(entries=len(trades), closed=len(closed), open=sum(t['status']=='OPEN' for t in trades),
                              censored=sum(t['status']=='CENSORED' for t in trades),
@@ -174,10 +201,11 @@ def simulate(rows, *, detail_since=None):
                              mean_net_pct=sum(t['net_pct'] for t in closed)/len(closed) if closed else None),
                 interpretation='Experimental spot event sequence; independent timeframe; starts flat at history boundary. No orders or alerts. Confidence is not a win probability.',
                 costs=dict(fee_bps_per_side=4, slippage_bps_per_side=2),
-                rules=dict(hard_stop_pct=.5, trailing_activation_pct=.5, trailing_atr=1.5,
+                sell_rules=sell.manifest(sell_config),
+                rules=dict(hard_stop_pct=.5, trailing_activation='EARLY_SELL_SETUP', trailing_atr=1.5,
                            price_role='CONFLUENCE_ONLY', candidate_role='CONFLUENCE_ONLY',
                            breakout_crash_override='DEFERRED',
                            buy_trigger='DOMINANT_DI_MINUS_THREE_CANDLE_PEAK',
-                           sell_trigger='DOMINANT_DI_PLUS_THREE_CANDLE_PEAK',
+                           sell_trigger='CONTROLLED_SELL_RULES',
                            confirmation='DI_THREE_CANDLE_TURN_AT_THIRD_CLOSE', fill='NEXT_CANDLE_OPEN',
                            price_break_gate=False, chase_gate=False))
