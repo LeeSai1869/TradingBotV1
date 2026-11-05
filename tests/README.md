@@ -1113,3 +1113,10 @@ missing-data censoring, symbol scope, read-only closed-history bounds and replay
 guards. `PYTHONPATH=. python3 tests/browser_btc_strategy.py` uses the real local
 chart vendor and overlay to check visibility, request throttling and autoscale.
 See `Section_8_Decision_Engine/BTC_VISUAL_STRATEGY.md` for experimental scope.
+
+BTC event sequence v0.2 additionally verifies independent three-candle DI turns,
+candidate-only confluence, no same-candle confirmation, dominance gates, expiry,
+price invalidation, spot exits, protective stops under DI- dominance and prefix
+consistency. The browser check covers the BTC events dialog. For actual local
+history, run `python3 inspect_btc_strategy.py --timeframe 15m --days 90 --output
+btc_strategy_review.json`; the summary and costs are simulated, not live results.

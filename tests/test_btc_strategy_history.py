@@ -27,7 +27,7 @@ class BTCStrategyHistory(unittest.TestCase):
     def test_long_history_carries_position_into_small_visual_tail(self):
         from Section_1_Global_Core.memory_storage.Storage import db
         from test_btc_visual_strategy import setup,bar
-        rows=setup()+[bar(n,o=100.4,h=100.5,l=100.3,c=100.4) for n in range(2,1105)]
+        rows=setup()+[bar(n,o=100.4,h=100.5,l=100.3,c=100.4) for n in range(4,1105)]
         conn=klines_store.open_db()
         with conn:conn.execute("DELETE FROM klines WHERE symbol='BTCUSDT' AND interval='5m'")
         conn.close()

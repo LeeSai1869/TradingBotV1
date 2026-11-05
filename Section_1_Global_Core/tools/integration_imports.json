@@ -111,6 +111,9 @@
     ],
     "inspect_events.py": [
       "Section_1_Global_Core.event_history"
+    ],
+    "inspect_btc_strategy.py": [
+      "Section_1_Global_Core.btc_strategy_history"
     ]
   }
 }

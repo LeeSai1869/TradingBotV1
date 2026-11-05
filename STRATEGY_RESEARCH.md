@@ -1,5 +1,10 @@
 # Read-only scalping research
 
+The chart-visible BTC spot event-sequence prototype is documented separately in
+[BTC event strategy](Section_8_Decision_Engine/BTC_VISUAL_STRATEGY.md). Its
+`inspect_btc_strategy.py` report follows the chart rules; the evaluator below
+remains the older independent-event diagnostic.
+
 The current `evaluate_strategy.py` studies independent DI signal events. It uses
 next-bar-open entry and exits at fixed future candle closes. It does not simulate
 positions, stops/targets, capital, leverage, drawdown, funding or executable fills.

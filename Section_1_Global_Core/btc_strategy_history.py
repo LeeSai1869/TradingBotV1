@@ -26,10 +26,11 @@ def history(symbol,interval,limit=1000,before=None,days=90):
         # Release the read transaction before the pure simulation. The chart
         # receives only its visible-sized tail; position state spans the horizon.
         source.close();source=None
-        result=simulate(rows)
         visible_start=rows[-limit]['open_time'] if len(rows)>=limit else rows[0]['open_time'] if rows else 0
+        result=simulate(rows,detail_since=visible_start)
         total_trades=len(result['trades'])
         result['levels']=[level for level in result['levels'] if level['time']>=visible_start]
+        result['events']=[event for event in result['events'] if event['time']>=visible_start]
         result['observations']=[event for event in result['observations'] if event['time']>=visible_start]
         result['trades']=[trade for trade in result['trades'] if trade.get('exit_time',bound)>=visible_start]
         return dict(result,symbol=symbol,timeframe=interval,source=meta,requested_days=days,total_trades=total_trades,display_candles=min(limit,len(rows)),window_start=rows[0]['open_time'] if rows else None,window_end=rows[-1]['open_time'] if rows else None)
