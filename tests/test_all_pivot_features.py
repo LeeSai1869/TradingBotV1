@@ -48,6 +48,14 @@ class FeatureHistory(unittest.TestCase):
         finally:conn.close()
         self.assertEqual(result['pivots'],3);self.assertEqual(sum(result['origin_outcomes'].values()),3)
         self.assertIn('ema200',result['features']);self.assertIn('lower_wick_fraction',result['features'])
+        self.assertIn('atr_pct_of_close',result['features'])
+        for groups in result['features'].values():
+            keys=[(g['side'],g['outcome'],g['year']) for g in groups]
+            self.assertEqual(len(keys),len(set(keys)))
+        pct=result['features']['atr_pct_of_close'];fraction=result['features']['atr_percent']
+        for actual,legacy in zip(pct,fraction):
+            for a,b in zip(actual['mean'],legacy['mean']):
+                if a is not None and b is not None:self.assertAlmostEqual(a,b*100)
         self.assertEqual(result['offsets'],[-2,-1,0,1,2,3]);json.dumps(result,allow_nan=False)
         cohorts=[g for g in result['features']['raw_low'] if g['year']=='ALL']
         self.assertEqual(sum(g['pivots'] for g in cohorts),3)

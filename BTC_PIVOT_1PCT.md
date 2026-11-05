@@ -116,3 +116,16 @@ Validation:
 python3 -m unittest discover -s tests -p 'test_all_pivot_features.py'
 python3 -m unittest discover -s tests -p 'test_pivot_*.py'
 ```
+
+## ATR units in the first uploaded feature reports
+
+The first exporter reused `atr_percent` for both the stored legacy ATR/close
+fraction and derived 100*ATR/close percentage. This duplicated its group keys
+and mixed scales in that one feature's visual curve. The source formulas and
+other features were unchanged. The exporter now uses `atr_pct_of_close` for the
+derived percentage, keeps legacy `atr_percent` as a fraction, and records unit
+notes. Existing uploaded files remain preserved; the accompanying findings
+analysis explicitly recovers the second, percentage-valued groups after verifying
+identical sample counts and the 100x scaling relationship. No full candle replay
+is needed to recover those numbers. Do not interpret the old mixed-scale
+`atr_percent` plot as one consistent unit.

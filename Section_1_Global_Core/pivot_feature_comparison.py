@@ -79,7 +79,7 @@ def derived(source,report,times):
     result=dict(raw_open=o,raw_high=h,raw_low=l,raw_close=c,raw_volume=volume,
         candle_body_fraction=divide(abs(c-o),span),lower_wick_fraction=divide(np.minimum(o,c)-l,span),
         upper_wick_fraction=divide(h-np.maximum(o,c),span),close_position=divide(c-l,span),
-        range_in_atr=divide(span,atr),atr_percent=100*divide(atr,c),body_in_atr=divide(abs(c-o),atr),
+        range_in_atr=divide(span,atr),atr_pct_of_close=100*divide(atr,c),body_in_atr=divide(abs(c-o),atr),
         candle_return_pct=100*divide(c-o,o),di_absolute_spread=abs(plus-minus))
     both=np.isfinite(plus)&np.isfinite(minus)
     result['di_plus_dominant']=np.where(both,(plus>minus).astype(float),np.nan)
@@ -166,5 +166,6 @@ def compare(source,report,*,before=12,after=24,batch_size=24,progress=None,conte
         coverage=report['coverage'],pivots=len(cases),offsets=offsets,origin_outcomes=dict(Counter(labels.values())),
         missing_exact_offset_rows=int((~valid).sum()),engine_context=engine_context,timing=timing,features=features,categorical_features=categories,
         not_profiled_columns=[r[1] for r in schema if r[1] not in numeric and r[1] not in CATEGORIES],
+        unit_notes={'atr_percent':'Legacy stored ATR/close fraction; the name does not imply multiplication by 100','atr_pct_of_close':'Derived 100*ATR/close percentage points'},
         schema=dict(numeric=numeric,derived=list(extras),categorical=list(categories)),
         interpretation='Every source pivot, LOW=BUY research point, HIGH=SELL research point; 1% observed move on candles after origin until next opposite pivot. Same-origin close recovery is a separate timing diagnostic; the origin candle high/low order is unknown. Origin-relative retrospective comparisons, not signals or trading profits. Offset 0 uses the pivot candle close; positive offsets are LATER evidence and cannot explain an earlier prediction. Negative offsets use their own closes. Exact missing candles/invalid features remain unavailable. All numeric stored columns are profiled in bounded batches; selected low-cardinality strings are counted; IDs/event payloads are listed but not averaged. Means are descriptive, not an optimized rule. Annual groups expose some period confounding, not causal control or out-of-sample validation. Independent Section 5 context is not inferred from legacy categorical labels. Structure inputs remain subject to the staged defect review. No production memory or rules changed.')
