@@ -305,3 +305,5 @@ button:hover { background: #333; }
 /* Keep strategy and chart controls reachable on narrower laptop screens. */
 #toolbar {height:auto; min-height:55px; flex-wrap:wrap;}
 #btc-strategy-controls label {display:inline-flex; align-items:center; white-space:nowrap;}
+/* The BTC controls may wrap as a group on small screens. */
+#btc-strategy-controls {max-width:100%; min-width:0;}

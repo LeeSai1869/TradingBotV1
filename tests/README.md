@@ -1138,3 +1138,13 @@ and gain-before-loss crossover, declared exit priority and rule disabling.
 Integration tests verify no profit-only activation, independent monotonic trailing
 after DI resumes rising, nonretroactive stop updates and per-trade exit rule IDs.
 The CLI supports `--disable-sell-rule` for fixed-period comparisons.
+
+Historical pivot research: `python3 -m unittest discover -s tests -p 'test_pivot*.py'`
+checks exact 2% touches, both directions, first-hit bar counts, gaps/tail censoring,
+fixed-horizon boundaries, native pivot pairing, already-completed moves at
+confirmation, post-known outcomes, all-column contexts/cutoffs/source guards,
+read-only stores, scans beyond 1,000 bars and deterministic compressed reports.
+Git publishing is mocked to verify only the generated report is committed.
+`PYTHONPATH=. python3 tests/browser_pivot_research.py` checks compressed local
+report loading, full feature inspection, frozen embedded contexts, source mismatch,
+chart navigation and unchanged scale. See PIVOT_RESEARCH.md for the workflow.

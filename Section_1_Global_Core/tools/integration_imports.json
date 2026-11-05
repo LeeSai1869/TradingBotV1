@@ -114,6 +114,9 @@
     ],
     "inspect_btc_strategy.py": [
       "Section_1_Global_Core.btc_strategy_history"
+    ],
+    "study_pivot_moves.py": [
+      "Section_1_Global_Core"
     ]
   }
 }

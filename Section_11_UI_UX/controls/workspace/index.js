@@ -1,4 +1,5 @@
 import {mountResize} from './resize.js';
+import {mountPivotResearch} from '../pivot_research/index.js';
 import {mountEvents} from '../events/index.js';
 import {chartColumn} from './chart_column.js';
 import {hudRequest} from './requests.js';
@@ -108,6 +109,7 @@ export function mount() {
     for(const event of ['pointerdown','mousedown','touchstart','wheel','dblclick'])hud.addEventListener(event,event=>event.stopPropagation());
     const analysis=el('section','',body,'workspace-card');el('h3','Chart analysis',analysis);
     mountEvents(analysis);
+    mountPivotResearch(analysis);
     const chat=el('section','',body,'workspace-card workspace-chat');el('h3','AI chat',chat);
     el('p','Chat will be available when an AI provider is connected.',chat);
     const input=el('textarea','',chat);input.disabled=true;input.placeholder='AI chat is not connected yet';input.setAttribute('aria-label','AI chat message');
