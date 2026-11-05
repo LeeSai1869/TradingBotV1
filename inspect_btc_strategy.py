@@ -19,12 +19,12 @@ def main():
             if point.tzinfo is None:raise ValueError('Include a timezone offset')
             before=int(point.timestamp()*1000)
         except ValueError as error:parser.error(str(error))
-    packet=history('BTCUSDT',args.timeframe,days=args.days,before=before)
+    packet=history('BTCUSDT',args.timeframe,days=args.days,before=before,include_all_trades=True)
     Path(args.output).write_text(json.dumps(packet,indent=2,allow_nan=False),encoding='utf-8')
     print('BTCUSDT',args.timeframe,packet.get('version',''),packet['status'])
     print(json.dumps(packet.get('summary') or dict(reason=packet.get('reason')),sort_keys=True))
     print('Saved:',Path(args.output).resolve())
-    print('Summary spans the selected history; detailed events/levels are the recent chart tail. Simulated results are not live trading performance.')
+    print('Summary and full trade list span the selected history; event/level details are the recent chart tail. Simulated results are not live trading performance.')
     return 0 if packet['status']=='READY' else 1
 
 if __name__=='__main__':raise SystemExit(main())

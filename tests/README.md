@@ -1114,9 +1114,20 @@ guards. `PYTHONPATH=. python3 tests/browser_btc_strategy.py` uses the real local
 chart vendor and overlay to check visibility, request throttling and autoscale.
 See `Section_8_Decision_Engine/BTC_VISUAL_STRATEGY.md` for experimental scope.
 
-BTC event sequence v0.2 additionally verifies independent three-candle DI turns,
-candidate-only confluence, no same-candle confirmation, dominance gates, expiry,
-price invalidation, spot exits, protective stops under DI- dominance and prefix
-consistency. The browser check covers the BTC events dialog. For actual local
-history, run `python3 inspect_btc_strategy.py --timeframe 15m --days 90 --output
-btc_strategy_review.json`; the summary and costs are simulated, not live results.
+BTC DI-turn v0.3 verifies independent three-candle DI turns, candidate/price-only
+confluence, immediate eligibility at the third close, next-open fills without
+price-break or chase gates, dominance gates, spot exits, protective stops under
+DI- dominance and prefix consistency. The browser check covers the DI events
+dialog. Stored-history tests verify bounded chart output plus optional complete
+trade exports. Cash-summary tests check closed-trade $100 compounding.
+
+For actual local history, run:
+
+```sh
+python3 inspect_btc_strategy.py --timeframe 15m --days 90 \
+  --before 2026-11-05T00:00:00Z --output btc_di_only_v03_review.json
+```
+
+This exports the full trade list and a simulated cash summary. Event and stop
+level details remain the recent chart tail. Open/censored positions are excluded
+from the closed-trade balance; this is not live or marked-to-market performance.

@@ -18,7 +18,7 @@ class StrategyVisual {
                 const [x,y]=point(observation.time,observation.price);if(x===null||y===null||x<0||x>size.width)continue;
                 const confirmed=observation.type?.endsWith('CONFIRMED');
                 ctx.fillStyle=confirmed?'#54d5e8':'#bba0f5';
-                ctx.fillText(`${confirmed?'✓':'◇'} ${observation.type||'SETUP'}`,x+5,y+18);
+                ctx.fillText(`${confirmed?'✓':'◇'} ${observation.type||'DI TURN'}`,x+5,y+18);
             }
             for(const trade of this.packet?.trades||[]){
                 for(const [t,p,text,color] of [[trade.entry_time,trade.entry,'BTC BUY','#54d5e8'],[trade.exit_time,trade.exit,`BTC EXIT${Number.isFinite(trade.net_pct)?' '+trade.net_pct.toFixed(2)+'%':''}`,'#ffb454']]){
@@ -84,7 +84,7 @@ export async function update(chart,data){
         if(packet.status==='READY')lastKey=requestKey;
         primitive.packet=packet;primitive.requestUpdate?.();
         const open=packet.trades?.find(t=>t.status==='OPEN');
-        label.textContent=packet.status==='READY'?`Simulated · ${horizon.value} days · starts flat at history boundary · ${packet.version||'event sequence'} · ${packet.candles} candles · ${packet.total_trades??packet.trades.length} entries · from ${packet.window_start!=null?new Date(packet.window_start).toISOString().slice(0,10):'start'} · through ${packet.window_end?new Date(packet.window_end).toISOString().slice(0,16)+'Z':'window end'} · ${open?'holding BTC':'flat'} · purple setup / cyan confirmation & entry / red hard stop / amber trail · 0.5% activates trail · costs included${packet.gaps?' · gaps censored':''}`:packet.reason;
+        label.textContent=packet.status==='READY'?`Simulated · ${horizon.value} days · starts flat at history boundary · ${packet.version||'event sequence'} · ${packet.candles} candles · ${packet.total_trades??packet.trades.length} entries · from ${packet.window_start!=null?new Date(packet.window_start).toISOString().slice(0,10):'start'} · through ${packet.window_end?new Date(packet.window_end).toISOString().slice(0,16)+'Z':'window end'} · ${open?'holding BTC':'flat'} · cyan DI turn & entry / red hard stop / amber trail · 0.5% activates trail · costs included${packet.gaps?' · gaps censored':''}`:packet.reason;
         boxTitle(packet);
     }catch(error){if(token===serial){primitive.packet=null;primitive.requestUpdate?.();label.textContent=error.message;}}
     finally{if(token===serial)pending=false;}
@@ -97,7 +97,7 @@ function showEvents(){
     Object.assign(dialog.style,{width:'min(1100px,95vw)',maxHeight:'85vh',overflow:'auto',background:'#181d25',color:'#ddd',border:'1px solid #52647d',padding:'16px'});
     const title=document.createElement('h2');title.textContent='BTC strategy event sequence';
     const close=document.createElement('button');close.textContent='Close events';close.onclick=()=>dialog.close();
-    const note=document.createElement('p');note.textContent='Latest 300 events from the chart response. Times are UTC. A DI turn is known at the third candle close; a setup is not a trade. Candidate pivots provide confluence only.';
+    const note=document.createElement('p');note.textContent='Latest 300 events from the chart response. Times are UTC. A DI turn is known at the third candle close; confirmed DI turns are eligible at that close and fill at the next open. Price and candidates provide confluence only; there is no price-break gate.';
     dialog.append(title,close,note);
     const events=(primitive.packet?.events||[]).slice(-300);
     if(!events.length){const empty=document.createElement('p');empty.textContent=primitive.packet?.reason||'Enable BTC strategy flags and load data to inspect events.';dialog.append(empty);}
@@ -107,7 +107,7 @@ function showEvents(){
     const number=value=>Number.isFinite(value)?value.toFixed(2):'—';
     for(const event of events){
         const row=document.createElement('tr'),context=event.context||event.at_detection||{};
-        for(const text of [date(event.known_time),event.type.replaceAll('_',' '),number(context.di_plus),number(context.di_minus),number(context.spread),date(event.origin_time??event.turn_origin_time),(event.values||[]).map(number).join(' → '),event.reason||(Number.isFinite(event.confirmation_level)?`${context.dominant||''} · price must close ${event.type==='BUY_SETUP'?'above':'below'} ${event.confirmation_level.toFixed(2)}`:context.dominant||'')]){
+        for(const text of [date(event.known_time),event.type.replaceAll('_',' '),number(context.di_plus),number(context.di_minus),number(context.spread),date(event.origin_time??event.turn_origin_time),(event.values||[]).map(number).join(' → '),event.reason||context.dominant||'']){
             const cell=document.createElement('td');cell.textContent=text;cell.style.padding='5px';row.append(cell);
         }table.append(row);
     }

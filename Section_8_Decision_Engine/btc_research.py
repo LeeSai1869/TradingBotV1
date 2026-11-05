@@ -2,12 +2,11 @@
 from collections import deque
 import math
 
-VERSION = 'btc-events-v0.2'
+VERSION = 'btc-events-v0.3'
 TIMEFRAMES = ('5m', '15m', '30m', '1h')
 FIELDS = ('measurement_version', 'measurement_config_id', 'measurement_gap',
           'candidate_pivot', 'candidate_pivot_low_price', 'candidate_pivot_low_time',
           'candidate_pivot_high_price', 'candidate_pivot_high_time', 'di_plus', 'di_minus', 'atr')
-CONFIRMATION_BARS = 8
 
 
 def valid(value):
@@ -49,7 +48,7 @@ def turns(before, peak, after):
 def simulate(rows, *, detail_since=None):
     trades, levels, observations, events = [], [], [], []
     history = deque(maxlen=2)
-    position = pending = setup = None
+    position = pending = None
     gaps = 0
     event_serial = 0
 
@@ -76,7 +75,7 @@ def simulate(rows, *, detail_since=None):
                         net_pct=(fill * (1-fee) / (position['entry'] * (1+fee)) - 1) * 100)
         position = None
 
-    for index, row in enumerate(rows):
+    for row in rows:
         f, t = row['features'], row['open_time']
         o, h, l, c = (row[k] for k in ('open', 'high', 'low', 'close'))
         continuous = not history or history[-1]['close_time'] + 1 == t
@@ -89,7 +88,7 @@ def simulate(rows, *, detail_since=None):
             if position:
                 position.update(status='CENSORED', exit_time=t, reason='Missing or invalid candle/features')
             event('SEQUENCE_RESET', row, reason='Missing or invalid candle/features')
-            position = pending = setup = None
+            position = pending = None
             history.clear()
             continue
 
@@ -97,7 +96,6 @@ def simulate(rows, *, detail_since=None):
         # outrank discretionary exits; current close cannot change the open fill.
         if position and o <= position['stop']:
             close(row, o, 'Trailing stop' if position['stop'] > position['hard_stop'] else 'Hard stop')
-            setup = None
             if pending and pending['side'] == 'SELL':
                 pending = None
         if pending:
@@ -108,21 +106,17 @@ def simulate(rows, *, detail_since=None):
                 position['exit_setup_event_id'] = action['event_id']
                 position['exit_trigger_context'] = action['context']
                 position['exit_confirmation_context'] = action['confirmation_context']
-                close(row, o, 'DI+ peak then later price weakness')
+                close(row, o, 'Dominant DI+ three-candle peak')
             elif action['side'] == 'BUY' and not position:
-                if o > action['low'] and o <= action['trigger'] * 1.005:
-                    entry = o * (1+slip)
-                    position = dict(entry_time=t, entry=entry, hard_stop=entry*.995, stop=entry*.995,
-                                    peak=entry, status='OPEN', setup_time=action['time'],
-                                    setup_event_id=action['event_id'], confirmation_time=action['confirmation_time'],
-                                    trigger_context=action['context'], di_peak_context=action['peak_context'],
-                                    confirmation_context=action['confirmation_context'],
-                                    candidate_confluence=action['candidate'],
-                                    entry_reason='Dominant DI- three-candle peak then later price recovery')
-                    trades.append(position)
-                else:
-                    event('BUY_REJECTED', row, reason='Opening gap broke setup low or exceeded 0.5% chase limit',
-                          setup_event_id=action['event_id'])
+                entry = o * (1+slip)
+                position = dict(entry_time=t, entry=entry, hard_stop=entry*.995, stop=entry*.995,
+                                peak=entry, status='OPEN', setup_time=action['time'],
+                                setup_event_id=action['event_id'], confirmation_time=action['confirmation_time'],
+                                trigger_context=action['context'], di_peak_context=action['peak_context'],
+                                confirmation_context=action['context'],
+                                candidate_confluence=action['candidate'], price_confluence=action['price_confluence'],
+                                entry_reason='Dominant DI- three-candle peak confirmed at third close')
+                trades.append(position)
         if position:
             stop = position['stop']
             if retain_detail(t):
@@ -130,7 +124,6 @@ def simulate(rows, *, detail_since=None):
                                    hard_stop=position['hard_stop'], entry=position['entry']))
             if l <= stop:
                 close(row, stop, 'Trailing stop' if stop > position['hard_stop'] else 'Hard stop')
-                setup = None
             else:
                 position['peak'] = max(position['peak'], h)
                 if c >= position['entry']*1.005:
@@ -142,58 +135,49 @@ def simulate(rows, *, detail_since=None):
         for turn in detected:
             record_event(turn)
         gate = context(f)['dominant']
-        if setup:
-            side = setup['side']
-            reason = ('Dominance gate changed' if gate != setup['gate'] else
-                      'Setup price invalidated' if (l < setup['low'] if side == 'BUY' else h > setup['high']) else
-                      'Confirmation expired' if index-setup['index'] > CONFIRMATION_BARS else None)
-            if reason:
-                event(side+'_CANCELLED', row, reason=reason, setup_event_id=setup['event_id'])
-                setup = None
-            elif (c > setup['high'] if side == 'BUY' else c < setup['low']):
-                # setup is from a strictly earlier candle; DI need not mirror or
-                # turn again on this price-confirmation candle.
-                record = event(side+'_CONFIRMED', row, setup_event_id=setup['event_id'],
-                               context=context(f), price=c, candidate_confluence=candidate(f, side))
+        side = 'SELL' if position else 'BUY'
+        channel = 'di_plus' if side == 'SELL' else 'di_minus'
+        expected_gate = channel.upper()
+        for turn in detected:
+            if (turn['type'] == channel.upper()+'_PEAK' and gate == expected_gate
+                    and turn['at_turn']['dominant'] == expected_gate):
+                # Price is observed confluence, never an entry/exit gate. A DI
+                # turn is already confirmed at this close; no later bar is needed.
+                price_confluence = dict(close=c, high=h, low=l,
+                    close_above_previous_high=c > history[-1]['high'],
+                    close_below_previous_low=c < history[-1]['low'])
+                record = event(side+'_CONFIRMED', row, confirmation_basis='DI_TURN_ONLY',
+                               turn_origin_time=turn['origin_time'], turn_event_id=turn['id'],
+                               context=context(f), peak_context=turn['at_turn'],
+                               candidate_confluence=candidate(f, side), price_confluence=price_confluence)
+                pending = dict(side=side, time=t, event_id=record['id'],
+                               confirmation_time=record['known_time'], context=context(f),
+                               peak_context=turn['at_turn'], confirmation_context=context(f),
+                               candidate=candidate(f, side), price_confluence=price_confluence)
                 if retain_detail(t):
-                    observations.append(dict(time=t, price=c, type=side+' CONFIRMED'))
-                pending = dict(setup, trigger=c, confirmation_time=record['known_time'],
-                               confirmation_context=context(f), candidate=candidate(f, side) or setup['candidate'])
-                setup = None
-
-        if setup is None and pending is None:
-            side = 'SELL' if position else 'BUY'
-            channel = 'di_plus' if side == 'SELL' else 'di_minus'
-            expected_gate = channel.upper()
-            for turn in detected:
-                if (turn['type'] == channel.upper()+'_PEAK' and gate == expected_gate
-                        and turn['at_turn']['dominant'] == expected_gate):
-                    low = min(r['low'] for r in (*history, row)) if side == 'BUY' else l
-                    high = h if side == 'BUY' else max(r['high'] for r in (*history, row))
-                    record = event(side+'_SETUP', row, turn_origin_time=turn['origin_time'],
-                                   turn_event_id=turn['id'], confirmation_level=h if side == 'BUY' else l,
-                                   invalidation_level=low if side == 'BUY' else high,
-                                   context=context(f), peak_context=turn['at_turn'],
-                                   candidate_confluence=candidate(f, side))
-                    setup = dict(side=side, time=t, index=index, gate=expected_gate, event_id=record['id'],
-                                 low=low, high=high, peak_context=turn['at_turn'],
-                                 context=context(f), candidate=candidate(f, side))
-                    if retain_detail(t):
-                        observations.append(dict(time=t, price=l if side == 'BUY' else h, type=side+' SETUP'))
-                    break
+                    observations.append(dict(time=t, price=l if side == 'BUY' else h,
+                                             type=side+' DI CONFIRMED'))
+                break
         history.append(row)
 
     closed = [trade for trade in trades if trade['status'] == 'CLOSED']
+    realized_balance = 100.
+    for trade in closed:
+        realized_balance *= 1 + trade['net_pct']/100
     return dict(version=VERSION, trades=trades, levels=levels, observations=observations, events=events,
                 gaps=gaps, status='READY', candles=len(rows),
                 summary=dict(entries=len(trades), closed=len(closed), open=sum(t['status']=='OPEN' for t in trades),
                              censored=sum(t['status']=='CENSORED' for t in trades),
                              wins=sum(t['net_pct']>0 for t in closed),
+                             starting_capital_usd=100., realized_balance_usd=realized_balance,
+                             balance_basis='Full-balance fractional spot compounding of closed trades only; open/censored positions excluded',
                              mean_net_pct=sum(t['net_pct'] for t in closed)/len(closed) if closed else None),
                 interpretation='Experimental spot event sequence; independent timeframe; starts flat at history boundary. No orders or alerts. Confidence is not a win probability.',
                 costs=dict(fee_bps_per_side=4, slippage_bps_per_side=2),
                 rules=dict(hard_stop_pct=.5, trailing_activation_pct=.5, trailing_atr=1.5,
-                           confirmation_bars=CONFIRMATION_BARS, candidate_role='CONFLUENCE_ONLY',
+                           price_role='CONFLUENCE_ONLY', candidate_role='CONFLUENCE_ONLY',
+                           breakout_crash_override='DEFERRED',
                            buy_trigger='DOMINANT_DI_MINUS_THREE_CANDLE_PEAK',
                            sell_trigger='DOMINANT_DI_PLUS_THREE_CANDLE_PEAK',
-                           confirmation='LATER_CLOSE_BEYOND_TRIGGER_CANDLE_PRICE_EXTREME'))
+                           confirmation='DI_THREE_CANDLE_TURN_AT_THIRD_CLOSE', fill='NEXT_CANDLE_OPEN',
+                           price_break_gate=False, chase_gate=False))

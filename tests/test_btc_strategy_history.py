@@ -27,7 +27,8 @@ class BTCStrategyHistory(unittest.TestCase):
     def test_long_history_carries_position_into_small_visual_tail(self):
         from Section_1_Global_Core.memory_storage.Storage import db
         from test_btc_visual_strategy import setup,bar
-        rows=setup()+[bar(n,o=100.4,h=100.5,l=100.3,c=100.4) for n in range(4,1105)]
+        rows=setup()+[bar(3,o=100.4,h=100.5,l=100.3,c=100.4),
+            bar(4,o=99,h=99.2,l=98.9,c=99),bar(5,minus=30),bar(6,minus=40),bar(7,minus=35)]+[bar(n,o=100.4,h=100.5,l=100.3,c=100.4) for n in range(8,1105)]
         conn=klines_store.open_db()
         with conn:conn.execute("DELETE FROM klines WHERE symbol='BTCUSDT' AND interval='5m'")
         conn.close()
@@ -49,6 +50,10 @@ class BTCStrategyHistory(unittest.TestCase):
         self.assertEqual(len(packet['levels']),100)
         self.assertEqual(packet['trades'][0]['status'],'OPEN')
         self.assertLess(packet['trades'][0]['entry_time'],packet['levels'][0]['time'])
-        self.assertEqual(packet['total_trades'],1)
+        self.assertEqual(packet['total_trades'],2)
+        complete=btc_strategy_history.history('BTCUSDT','5m',limit=100,before=rows[-1]['close_time']+1,days=7,include_all_trades=True)
+        self.assertEqual(complete['trade_detail_scope'],'ALL')
+        self.assertEqual(len(complete['trades']),2)
+        self.assertEqual(complete['summary'],packet['summary'])
         for days in (0,1,366):
             with self.assertRaises(ValueError):btc_strategy_history.history('BTCUSDT','5m',days=days)

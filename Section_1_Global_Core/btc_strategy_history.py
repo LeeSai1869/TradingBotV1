@@ -4,10 +4,11 @@ import time
 from . import data_policy,regime_inputs
 from Section_8_Decision_Engine.btc_research import FIELDS,TIMEFRAMES,simulate
 
-def history(symbol,interval,limit=1000,before=None,days=90):
+def history(symbol,interval,limit=1000,before=None,days=90,include_all_trades=False):
     if symbol!='BTCUSDT' or interval not in TIMEFRAMES:raise ValueError('BTC strategy supports BTCUSDT: 5m, 15m, 30m, 1h')
     if type(limit) is not int or not 2<=limit<=1000 or before is not None and (type(before) is not int or before<0):raise ValueError('Invalid strategy window')
     if type(days) is not int or days not in (7,30,90,365):raise ValueError('Choose 7, 30, 90 or 365 days')
+    if type(include_all_trades) is not bool:raise ValueError('Invalid trade detail scope')
     source=None
     try:
         with data_policy.snapshot_guard(timeout=1):
@@ -32,7 +33,9 @@ def history(symbol,interval,limit=1000,before=None,days=90):
         result['levels']=[level for level in result['levels'] if level['time']>=visible_start]
         result['events']=[event for event in result['events'] if event['time']>=visible_start]
         result['observations']=[event for event in result['observations'] if event['time']>=visible_start]
-        result['trades']=[trade for trade in result['trades'] if trade.get('exit_time',bound)>=visible_start]
+        if not include_all_trades:
+            result['trades']=[trade for trade in result['trades'] if trade.get('exit_time',bound)>=visible_start]
+        result['trade_detail_scope']='ALL' if include_all_trades else 'RECENT_CHART_WINDOW'
         return dict(result,symbol=symbol,timeframe=interval,source=meta,requested_days=days,total_trades=total_trades,display_candles=min(limit,len(rows)),window_start=rows[0]['open_time'] if rows else None,window_end=rows[-1]['open_time'] if rows else None)
     except (regime_inputs.InputsUnavailable,sqlite3.Error,OSError,TimeoutError) as error:return dict(status='UNAVAILABLE',reason=str(error),trades=[],levels=[])
     finally:
