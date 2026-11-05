@@ -1,0 +1,20 @@
+--- a/Section_4_Features/features/market_structure.py
++++ b/Section_4_Features/features/market_structure.py
+@@ -461,7 +461,7 @@
+     # Pine 3015
+     e['hasStructureRangeLow'] = False
+     # Pine 3017
+-    if rt.truth(rt.binary('==', e['highPivotCount'], 2)):
++    if rt.truth(rt.binary('>=', e['highPivotCount'], 2)):
+         # Pine 3018
+         e['latestHighType'] = rt.arr_get(e['structureHighType'], rt.binary('-', e['highPivotCount'], 1))
+         # Pine 3020
+@@ -471,7 +471,7 @@
+         # Pine 3022
+         e['hasStructureRangeHigh'] = rt.binary('==', e['latestHighType'], 'EH')
+     # Pine 3024
+-    if rt.truth(rt.binary('==', e['lowPivotCount'], 2)):
++    if rt.truth(rt.binary('>=', e['lowPivotCount'], 2)):
+         # Pine 3025
+         e['latestLowType'] = rt.arr_get(e['structureLowType'], rt.binary('-', e['lowPivotCount'], 1))
+         # Pine 3027

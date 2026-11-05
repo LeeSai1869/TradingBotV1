@@ -1148,3 +1148,11 @@ Git publishing is mocked to verify only the generated report is committed.
 `PYTHONPATH=. python3 tests/browser_pivot_research.py` checks compressed local
 report loading, full feature inspection, frozen embedded contexts, source mismatch,
 chart navigation and unchanged scale. See PIVOT_RESEARCH.md for the workflow.
+
+Read-only Regime/Trend and Confidence/Opportunity audits:
+`python3 -m unittest discover -s tests -p 'test_pivot_context*.py'` covers exact
+closed-time HTF joins, immutable saved scores/bands, independent DI sequences,
+censoring, gaps, reaction timing and real SQLite no-write checks.
+`python3 -m unittest discover -s tests -p 'test_structure_latest_types_preview.py'`
+reproduces the count>2 structure defect and validates a staged patch without
+changing production formulas. See `PIVOT_CONTEXT_AUDIT.md` for full-history runs.
