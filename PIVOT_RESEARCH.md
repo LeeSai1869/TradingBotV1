@@ -120,3 +120,8 @@ examples. Actual BTC outcomes cannot be calculated in a workspace without the
 user's market databases. First inspect the selected moves; compare equivalent
 non-hits before proposing momentum-shift rules, then evaluate those rules on
 separate chronological data. No statistical or causal claim is made here.
+
+The browser viewer accepts up to 256 MiB of expanded JSON and 200,000 cases per
+file. The scanner has no 1,000-candle cap. For larger 1m/5m histories, use fixed
+chronological report ranges or fewer embedded contexts for browser inspection.
+The supplied 103,127-case BTC 15m report expands to about 171 MiB.

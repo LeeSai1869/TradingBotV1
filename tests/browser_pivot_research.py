@@ -2,6 +2,7 @@
 import asyncio
 import gzip
 import json
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright
@@ -47,6 +48,16 @@ window.DataCache={symbol:'BTCUSDT',timeframe:'15m'};window.jumps=[];window.openA
             await page.get_by_role('button',name='Inspect pivot',exact=True).click()
             await page.get_by_text('Feature generation differs',exact=True).wait_for()
             assert len(requests)==1
+            if len(sys.argv)>1:
+                await page.reload();await page.wait_for_function('window.ready');requests.clear()
+                await page.get_by_label('Pivot study report',exact=True).set_input_files(str(Path(sys.argv[1]).resolve()))
+                await page.get_by_role('button',name='Inspect pivot',exact=True).first.wait_for(timeout=120000)
+                text=await page.locator('#study [role=status]').first.inner_text();assert '103127 pivots in cohort' in text,text
+                await page.get_by_role('button',name='Inspect pivot',exact=True).first.click()
+                await page.get_by_role('button',name='Show pivot on chart',exact=True).wait_for()
+                assert await page.get_by_role('table',name='Pivot candle features').locator('tbody tr').count()>0
+                assert not requests
+                print('PASS real 171 MiB expanded report: 103127 cases and frozen all-feature context',flush=True)
             assert not errors,errors
             print('PASS compressed report, embedded full features, per-case request, source rejection, chart navigation and unchanged scale')
         finally:await browser.close()

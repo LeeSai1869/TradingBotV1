@@ -49,7 +49,7 @@ export function mountPivotResearch(parent){
             };
             save.onclick=()=>{const blob=new Blob([JSON.stringify({...packet,case:item},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${report.symbol}_${report.timeframe}_${item.id.slice(0,12)}_pivot.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
             const fields=[...new Set(packet.bars.flatMap(row=>Object.keys(row.features||{})))].sort();
-            const label=el('label','Additional feature ',detail),choice=el('select','',label);choice.setAttribute('aria-label','Pivot feature');el('option','Choose any stored feature',choice).value='';for(const key of fields)el('option',key,choice).value=key;
+            const label=el('label','Additional feature ',detail),choice=el('select','',label);choice.setAttribute('aria-label','Pivot feature');choice.style.maxWidth='100%';el('option','Choose any stored feature',choice).value='';for(const key of fields)el('option',key,choice).value=key;
             const plotNote=el('p','',detail),plot=el('div','',detail);plot.style.height='180px';plot.style.width='100%';plot.setAttribute('aria-label','Pivot feature plot');
             function drawPlot(){
                 disposePlot();
@@ -92,7 +92,7 @@ export function mountPivotResearch(parent){
             const chosen=file.files[0];if(!chosen)return;if(chosen.size>100*1024*1024)throw Error('Choose a report below 100 MiB');
             const stream=chosen.name.endsWith('.gz')?chosen.stream().pipeThrough(new DecompressionStream('gzip')):chosen.stream();
             const reader=stream.getReader(),chunks=[];let total=0;
-            while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>160*1024*1024){await reader.cancel();throw Error('Expanded report exceeds 160 MiB; export fewer embedded contexts');}chunks.push(value);}
+            while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>256*1024*1024){await reader.cancel();throw Error('Expanded report exceeds 256 MiB; export fewer embedded contexts');}chunks.push(value);}
             const packet=JSON.parse(await new Blob(chunks).text());
             if(packet.version!=='pivot-moves-v1'||!Array.isArray(packet.cases)||packet.cases.length>200000)throw Error('Choose a pivot-moves-v1 cohort report');
             if(token!==selection)return;
