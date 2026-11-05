@@ -1,0 +1,40 @@
+{
+  "version": "one-percent-extrema-summary-v1",
+  "symbol": "BTCUSDT",
+  "timeframe": "15m",
+  "source_file": "BTCUSDT_15m_all-history_2pct_pivots_v1.json.gz",
+  "source_sha256": "1b13442863196cc4d27c7502d7b0001508ecfb2bfe0f90480ebca5ca8629f69a",
+  "source_id": "e234ff6c94de739beb7c529be9937a516c637d7cad0006a80b96aa54b708e5dc",
+  "coverage": {
+    "first": 1502942400000,
+    "last": 1793835900000,
+    "candles": 322651
+  },
+  "observed_as_of": 1793836800000,
+  "benchmark_pct": 1.0,
+  "source_benchmark_pct": 2.0,
+  "horizon": "NEXT_OPPOSITE_PIVOT",
+  "sides": {
+    "BUY_SIDE": {
+      "pivots": 51564,
+      "counts": {
+        "HIT": 15781,
+        "NO_HIT": 35769,
+        "CENSORED": 14
+      },
+      "resolved": 51550,
+      "hit_rate_pct": 30.612997090203685
+    },
+    "SELL_SIDE": {
+      "pivots": 51563,
+      "counts": {
+        "NO_HIT": 36099,
+        "HIT": 15453,
+        "CENSORED": 11
+      },
+      "resolved": 51552,
+      "hit_rate_pct": 29.975558659217878
+    }
+  },
+  "interpretation": "Every pivot in uploaded 15m source; LOW=BUY research point, HIGH=SELL research point. Relabeling recorded subsequent-candle maximum favorable excursion at 1%, not recalculating first-touch timestamps, recognition timing, origin-candle recovery, complete feature windows, other timeframes, executed fills or profits. No new candidate entry/exit rule validated. Original 2% report preserved."
+}
