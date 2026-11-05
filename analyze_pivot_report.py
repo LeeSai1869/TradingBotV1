@@ -104,8 +104,9 @@ def figures(report,out):
                 b=record['client'];color='#18876b' if b['close']>=b['open'] else '#c44b53'
                 axes[0,col].vlines(pos,b['low'],b['high'],color=color,linewidth=1)
                 axes[0,col].add_patch(Rectangle((pos-.32,min(b['open'],b['close'])),.64,max(abs(b['close']-b['open']),pivot['price']*.000005),facecolor=color,edgecolor=color))
-            target=pivot['price']*(1+(.02 if case['side']=='BUY_SIDE' else -.02))
-            axes[0,col].axhline(target,color='#178ca4',linestyle=':',label='2% from retrospective pivot')
+            threshold=report.get('config',{}).get('threshold_pct',2.)
+            target=pivot['price']*(1+(threshold/100 if case['side']=='BUY_SIDE' else -threshold/100))
+            axes[0,col].axhline(target,color='#178ca4',linestyle=':',label=f'{threshold:g}% from retrospective pivot')
             axes[0,col].set_title(f"{utc(origin)[:16]} UTC · {case['side']}\n{case['origin']['status']}: observed max {case['origin']['max_favorable_pct']:.2f}%"+(' · partial swing' if not case['origin']['complete'] else ''),fontsize=11)
             for key,color in [('di_plus','#18876b'),('di_minus','#c44b53')]:axes[1,col].plot(x,[r['features'].get(key) for r in bars],label=key,color=color)
             axes[1,col].plot(x,[abs(r['features']['di_plus']-r['features']['di_minus']) if numeric(r['features'].get('di_plus')) and numeric(r['features'].get('di_minus')) else None for r in bars],color='#6954a1',label='absolute spread',linestyle='--')
