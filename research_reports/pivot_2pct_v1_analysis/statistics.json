@@ -1,0 +1,1232 @@
+{
+  "source_version": "pivot-moves-v1",
+  "source_id": "e234ff6c94de739beb7c529be9937a516c637d7cad0006a80b96aa54b708e5dc",
+  "coverage": {
+    "first": 1502942400000,
+    "last": 1793835900000,
+    "candles": 322651
+  },
+  "sides": {
+    "BUY_SIDE": {
+      "pivots": 51564,
+      "origin_hits": 5233,
+      "after_known_hits": 1920,
+      "hits_by_confirmation": 1824,
+      "origin_hit_rate_pct": 10.148553254208363,
+      "after_known_status_counts": {
+        "NO_HIT": 32181,
+        "NO_POST_CONFIRMATION_WINDOW": 17454,
+        "HIT": 1920,
+        "CENSORED": 9
+      },
+      "median_leg_bars": 2.0,
+      "median_origin_hit_bars": 3,
+      "median_confirmation_delay_bars": 2.0
+    },
+    "SELL_SIDE": {
+      "pivots": 51563,
+      "origin_hits": 5003,
+      "after_known_hits": 1959,
+      "hits_by_confirmation": 1653,
+      "origin_hit_rate_pct": 9.702693792060199,
+      "after_known_status_counts": {
+        "NO_POST_CONFIRMATION_WINDOW": 18220,
+        "NO_HIT": 31378,
+        "HIT": 1959,
+        "CENSORED": 6
+      },
+      "median_leg_bars": 2.0,
+      "median_origin_hit_bars": 3,
+      "median_confirmation_delay_bars": 2.0
+    }
+  },
+  "years": [
+    {
+      "year": "2017",
+      "side": "BUY_SIDE",
+      "pivots": 2205,
+      "origin_hits": 773,
+      "after_known_hits": 266
+    },
+    {
+      "year": "2018",
+      "side": "BUY_SIDE",
+      "pivots": 6258,
+      "origin_hits": 996,
+      "after_known_hits": 323
+    },
+    {
+      "year": "2019",
+      "side": "BUY_SIDE",
+      "pivots": 6112,
+      "origin_hits": 503,
+      "after_known_hits": 198
+    },
+    {
+      "year": "2020",
+      "side": "BUY_SIDE",
+      "pivots": 6046,
+      "origin_hits": 558,
+      "after_known_hits": 221
+    },
+    {
+      "year": "2021",
+      "side": "BUY_SIDE",
+      "pivots": 5426,
+      "origin_hits": 1008,
+      "after_known_hits": 337
+    },
+    {
+      "year": "2022",
+      "side": "BUY_SIDE",
+      "pivots": 5179,
+      "origin_hits": 473,
+      "after_known_hits": 172
+    },
+    {
+      "year": "2023",
+      "side": "BUY_SIDE",
+      "pivots": 5701,
+      "origin_hits": 204,
+      "after_known_hits": 100
+    },
+    {
+      "year": "2024",
+      "side": "BUY_SIDE",
+      "pivots": 5165,
+      "origin_hits": 317,
+      "after_known_hits": 153
+    },
+    {
+      "year": "2025",
+      "side": "BUY_SIDE",
+      "pivots": 5044,
+      "origin_hits": 228,
+      "after_known_hits": 83
+    },
+    {
+      "year": "2026",
+      "side": "BUY_SIDE",
+      "pivots": 4428,
+      "origin_hits": 173,
+      "after_known_hits": 67
+    },
+    {
+      "year": "2017",
+      "side": "SELL_SIDE",
+      "pivots": 2205,
+      "origin_hits": 701,
+      "after_known_hits": 258
+    },
+    {
+      "year": "2018",
+      "side": "SELL_SIDE",
+      "pivots": 6258,
+      "origin_hits": 996,
+      "after_known_hits": 390
+    },
+    {
+      "year": "2019",
+      "side": "SELL_SIDE",
+      "pivots": 6112,
+      "origin_hits": 470,
+      "after_known_hits": 188
+    },
+    {
+      "year": "2020",
+      "side": "SELL_SIDE",
+      "pivots": 6046,
+      "origin_hits": 504,
+      "after_known_hits": 179
+    },
+    {
+      "year": "2021",
+      "side": "SELL_SIDE",
+      "pivots": 5425,
+      "origin_hits": 985,
+      "after_known_hits": 398
+    },
+    {
+      "year": "2022",
+      "side": "SELL_SIDE",
+      "pivots": 5180,
+      "origin_hits": 462,
+      "after_known_hits": 189
+    },
+    {
+      "year": "2023",
+      "side": "SELL_SIDE",
+      "pivots": 5700,
+      "origin_hits": 182,
+      "after_known_hits": 60
+    },
+    {
+      "year": "2024",
+      "side": "SELL_SIDE",
+      "pivots": 5165,
+      "origin_hits": 318,
+      "after_known_hits": 137
+    },
+    {
+      "year": "2025",
+      "side": "SELL_SIDE",
+      "pivots": 5044,
+      "origin_hits": 220,
+      "after_known_hits": 100
+    },
+    {
+      "year": "2026",
+      "side": "SELL_SIDE",
+      "pivots": 4428,
+      "origin_hits": 165,
+      "after_known_hits": 60
+    }
+  ],
+  "sample_groups": [
+    {
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "n": 12,
+      "medians": {
+        "atr_pct": 0.6687931250668936,
+        "rsi": 46.18930062925458,
+        "adx": 28.99282114297781,
+        "relative_volume": 1.2069233497749388,
+        "spread": 8.028538464182343,
+        "candle_range_atr": 1.3274005068176216
+      },
+      "counts": {
+        "pressure_dominant": {
+          "true": 9,
+          "available": 12
+        },
+        "pressure_falling": {
+          "true": 3,
+          "available": 12
+        },
+        "candidate_same_side": {
+          "true": 12,
+          "available": 12
+        },
+        "pressure_peak_near_origin": {
+          "true": 12,
+          "available": 12
+        }
+      }
+    },
+    {
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "n": 11,
+      "medians": {
+        "atr_pct": 0.3476687774366507,
+        "rsi": 41.900707183644045,
+        "adx": 24.06699094662767,
+        "relative_volume": 0.8543198229998947,
+        "spread": 11.085881104112381,
+        "candle_range_atr": 0.8686851042297412
+      },
+      "counts": {
+        "pressure_dominant": {
+          "true": 7,
+          "available": 10
+        },
+        "pressure_falling": {
+          "true": 3,
+          "available": 10
+        },
+        "candidate_same_side": {
+          "true": 11,
+          "available": 11
+        },
+        "pressure_peak_near_origin": {
+          "true": 8,
+          "available": 10
+        }
+      }
+    },
+    {
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "n": 8,
+      "medians": {
+        "atr_pct": 0.803627382589131,
+        "rsi": 47.20883294694709,
+        "adx": 28.995639036341046,
+        "relative_volume": 1.2354234643755984,
+        "spread": 8.30164610085302,
+        "candle_range_atr": 1.2980582196882189
+      },
+      "counts": {
+        "pressure_dominant": {
+          "true": 3,
+          "available": 8
+        },
+        "pressure_falling": {
+          "true": 1,
+          "available": 8
+        },
+        "candidate_same_side": {
+          "true": 8,
+          "available": 8
+        },
+        "pressure_peak_near_origin": {
+          "true": 7,
+          "available": 8
+        }
+      }
+    },
+    {
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "n": 9,
+      "medians": {
+        "atr_pct": 0.34220686700595815,
+        "rsi": 54.655829033984,
+        "adx": 29.58106041902925,
+        "relative_volume": 1.0709893599492204,
+        "spread": 11.416256782165293,
+        "candle_range_atr": 1.2607033597265527
+      },
+      "counts": {
+        "pressure_dominant": {
+          "true": 5,
+          "available": 9
+        },
+        "pressure_falling": {
+          "true": 1,
+          "available": 9
+        },
+        "candidate_same_side": {
+          "true": 9,
+          "available": 9
+        },
+        "pressure_peak_near_origin": {
+          "true": 9,
+          "available": 9
+        }
+      }
+    }
+  ],
+  "quality": {
+    "pivot_prices_matching_raw_candle": 40,
+    "pivot_price_checks": 40,
+    "context_cases": 40,
+    "exported_context_rows": 1515,
+    "unique_context_rows": 1457,
+    "current_structure_counts": {
+      "": 15,
+      "STRUCTURE_BULL": 1500
+    },
+    "bearish_structure_active_counts": {
+      "0.0": 1515
+    },
+    "sample_year_counts": {
+      "HIT": {
+        "2017": 3,
+        "2018": 4,
+        "2019": 2,
+        "2020": 2,
+        "2021": 3,
+        "2022": 2,
+        "2023": 1,
+        "2024": 1,
+        "2025": 1,
+        "2026": 1
+      },
+      "NO_HIT": {
+        "2017": 1,
+        "2018": 2,
+        "2019": 3,
+        "2020": 2,
+        "2021": 2,
+        "2022": 2,
+        "2023": 2,
+        "2024": 2,
+        "2025": 2,
+        "2026": 2
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "db898d3ef0a8f13584f5aa1c3cdde9dd9a8da4f77f868268c1c1f49838715bcc",
+      "date": "2017-08-17T07:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.5782477510982766,
+      "rsi": 66.51763125142105,
+      "adx": null,
+      "relative_volume": null,
+      "pressure": 17.24997646585439,
+      "counterpart": 43.33831834735234,
+      "spread": 26.08834188149795,
+      "pressure_dominant": false,
+      "pressure_falling": true,
+      "candle_range_atr": 2.4879024502981077,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "47e46aa54b863c34078cfd95c937ed9c0edcd6b6784f3c1f7b218389b86239f2",
+      "date": "2017-10-22T06:00:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.0552258665188494,
+      "rsi": 33.48988172416598,
+      "adx": 33.03687661185529,
+      "relative_volume": 1.1843584747587472,
+      "pressure": 30.241145025809065,
+      "counterpart": 14.133546134984762,
+      "spread": 16.107598890824303,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.3067965456443247,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "f44754a7e55b20cde2156dda233df78e26c931de23984bf12264038732b69890",
+      "date": "2017-12-13T18:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.884729026507072,
+      "rsi": 44.311139028169045,
+      "adx": 45.80604452906403,
+      "relative_volume": 1.0137482985885669,
+      "pressure": 19.535858751548506,
+      "counterpart": 33.181994097540674,
+      "spread": 13.646135345992167,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 2.4168147101670385,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "806abb240f9175765d7205eade2a6f569fbeaf758e5e509679f533d880efac6c",
+      "date": "2018-01-09T20:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.9630185321714984,
+      "rsi": 51.14878206067282,
+      "adx": 16.56241351394526,
+      "relative_volume": 1.2388683459624188,
+      "pressure": 23.580273882702947,
+      "counterpart": 15.351078898275935,
+      "spread": 8.229194984427012,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 0.7779375211537556,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "bd2c901c64123bf2c781ff515e3f845ff514e917c061ffe31eb15e54dd4e96cf",
+      "date": "2018-02-06T06:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 3.608060589619348,
+      "rsi": 38.24403657271031,
+      "adx": 24.07878038722055,
+      "relative_volume": 0.6928660137556896,
+      "pressure": 20.68617898992235,
+      "counterpart": 15.568100970713976,
+      "spread": 5.118078019208374,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 0.7438701498390651,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -1
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "1be5f44ff2f336ced7911b1b019edf0f6db3d5e3059b94f22060d3b88bc735aa",
+      "date": "2018-03-30T16:30:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.7832719736458447,
+      "rsi": 39.39818905338431,
+      "adx": 29.78368442654714,
+      "relative_volume": 2.3443913444829736,
+      "pressure": 16.425324114501343,
+      "counterpart": 15.34808934154382,
+      "spread": 1.0772347729575227,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.8501973768096525,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "493811c51984463b28270ea1253f9bc757567c87ee7b4b0c0ac27675d8e41357",
+      "date": "2018-11-26T05:00:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.14011677256476,
+      "rsi": 49.34252180367137,
+      "adx": 18.089978401948148,
+      "relative_volume": 1.2069233497749388,
+      "pressure": 25.316155635164534,
+      "counterpart": 15.651005114978437,
+      "spread": 9.665150520186097,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.7721076120240584,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "e8e98c3a7adc377ccb09fc7c12d8a272693518ea0739ff4f36d4d2469b05354c",
+      "date": "2019-06-08T15:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.5179709326670744,
+      "rsi": 55.154451737965374,
+      "adx": 24.438757981926994,
+      "relative_volume": 1.4288346281796103,
+      "pressure": 15.719380772939907,
+      "counterpart": 24.093477990218933,
+      "spread": 8.374097217279026,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.4653704001177281,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "e40e7b6ae1cbddddcd99ce4c91674b59863ff09b77d53073242693aed42eade9",
+      "date": "2019-10-26T14:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.21801111290306,
+      "rsi": 44.71770286812932,
+      "adx": 28.99282114297781,
+      "relative_volume": 0.5955622910836127,
+      "pressure": 24.35968315099332,
+      "counterpart": 15.292984830569097,
+      "spread": 9.066698320424223,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 0.659906556217592,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "c3f10437941476fd2f00e774fd272209bab5c5bc53778c6b6ec70062189c5847",
+      "date": "2020-03-30T14:00:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.6473103021655382,
+      "rsi": 37.782444913138626,
+      "adx": 44.09000459654773,
+      "relative_volume": 1.3951032902278724,
+      "pressure": 21.181358251924518,
+      "counterpart": 18.87885468317692,
+      "spread": 2.3025035687475963,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.115666049388773,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "577d60e3ee115017be2cba0c7b223d9d74303eb93114eaf2c87774e4fc18dc13",
+      "date": "2020-12-11T08:15:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.5711594610650346,
+      "rsi": 59.524745532731345,
+      "adx": 28.207593646134953,
+      "relative_volume": 1.231978582788778,
+      "pressure": 24.423438674632603,
+      "counterpart": 22.497401506241804,
+      "spread": 1.926037168390799,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.3050980075638128,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "a54e3392e0c6927d67be9240f0f80d7858e5d02261d2d00f36420bb430360c69",
+      "date": "2021-02-03T14:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.6733455662185164,
+      "rsi": 57.112097287486804,
+      "adx": 24.36163313586648,
+      "relative_volume": 1.1230493954366347,
+      "pressure": 16.64963301878798,
+      "counterpart": 23.170256257767523,
+      "spread": 6.520623238979542,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.9472872074665869,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "a9b716c63a6abc2a63f7141383bfa78fd97789e7e599c294ccfa4f9f9461780a",
+      "date": "2021-05-13T17:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.5284486791103444,
+      "rsi": 24.5381023845068,
+      "adx": 31.42422707601823,
+      "relative_volume": 2.5067127877305566,
+      "pressure": 40.47969607878618,
+      "counterpart": 8.145615875686845,
+      "spread": 32.33408020309934,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 1.3480044679909184,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -1
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "3b4eb5e4481651d043b351e2e848d09a4f92fd32f135c1bfed792888f503406d",
+      "date": "2021-07-21T01:15:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.4492209339162582,
+      "rsi": 47.66089839037984,
+      "adx": 16.64718119106496,
+      "relative_volume": 1.4036713819449145,
+      "pressure": 25.217640864609205,
+      "counterpart": 20.194437500770007,
+      "spread": 5.0232033638391975,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.4552284068713737,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "9761c2be7218e27a729e834c2c72fe2b76db83f5febaad2edb38db980abd0c91",
+      "date": "2022-01-24T11:15:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 1.3015457353876831,
+      "rsi": 37.076526178192054,
+      "adx": 38.76563834070795,
+      "relative_volume": 1.7694069986443302,
+      "pressure": 12.926511239491973,
+      "counterpart": 29.884551900721288,
+      "spread": 16.958040661229315,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.291018431812625,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "11c88e46e0dfddf35dfebbd37e94717aaab57e50b63bb2e8fbf153945fb4d1c2",
+      "date": "2022-06-23T21:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.6642406839152708,
+      "rsi": 49.168574484612506,
+      "adx": 39.927002732242975,
+      "relative_volume": 0.5815757152882165,
+      "pressure": 18.804335298364936,
+      "counterpart": 25.456890207440853,
+      "spread": 6.652554909075917,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.082958884230511,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "363d278bf4f5e2bcdb405afa104ad119fa22d7a03bea89b41eb564a13e6859c5",
+      "date": "2023-05-01T00:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.28869973931488874,
+      "rsi": 42.70554852035444,
+      "adx": 39.97862453974208,
+      "relative_volume": 0.7018460328232534,
+      "pressure": 10.674253127118858,
+      "counterpart": 26.755550814546105,
+      "spread": 16.081297687427245,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.6581281399948419,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "45e7c3ebd894d43975e594434e002e42001c38c1c81f03eafdd03d2c2d111cab",
+      "date": "2024-07-08T14:00:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.6442362330067637,
+      "rsi": 50.10652686572514,
+      "adx": 18.716455268011693,
+      "relative_volume": 0.7653697606960042,
+      "pressure": 17.982136990435606,
+      "counterpart": 19.672687889985653,
+      "spread": 1.690550899550047,
+      "pressure_dominant": false,
+      "pressure_falling": true,
+      "candle_range_atr": 0.8748112902394183,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": false,
+      "pressure_peak_offsets": [],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "1c57e5e12b16eafa555371702911eca49372d8daf879fb5be0d4a7e8b9f908a3",
+      "date": "2025-04-22T00:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.293292738089083,
+      "rsi": 53.92698864052876,
+      "adx": 19.496239735351363,
+      "relative_volume": 2.689807196982605,
+      "pressure": 28.13685055538375,
+      "counterpart": 21.146471947443285,
+      "spread": 6.990378607940464,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 2.07806634513233,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "037049bebbe7c94ee99fcfff62f599c51437394785a8cd41ba05e3d71360daf0",
+      "date": "2026-11-04T03:00:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "HIT",
+      "atr_pct": 0.3967940840431589,
+      "rsi": 13.249445392174223,
+      "adx": 52.85374004150414,
+      "relative_volume": 5.400693764801678,
+      "pressure": 46.77761750315037,
+      "counterpart": 5.942476192199515,
+      "spread": 40.83514131095085,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.6729258370644928,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "8ee8d40371897aa671cded8f9cc9f0257cbb18952230b11c46340ef9a6ee14fa",
+      "date": "2017-08-17T04:15:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": null,
+      "rsi": null,
+      "adx": null,
+      "relative_volume": null,
+      "pressure": null,
+      "counterpart": null,
+      "spread": null,
+      "pressure_dominant": null,
+      "pressure_falling": null,
+      "candle_range_atr": null,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": null,
+      "pressure_peak_offsets": [],
+      "current_structure": ""
+    },
+    {
+      "id": "5121582aeac8c8a374841f3436bb72b1fcb70cf62f50e37a4242ef2156bc0b25",
+      "date": "2018-04-10T19:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.34220686700595815,
+      "rsi": 55.114925870485926,
+      "adx": 31.534611348430413,
+      "relative_volume": 0.6601224912101702,
+      "pressure": 20.737501714746397,
+      "counterpart": 12.290593437138185,
+      "spread": 8.446908277608213,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 0.8926810209477497,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "4cdbe5d0e1e8f172f1cb19a6b65e441b35649e95b0b249f9e2a2c3b24aeb8455",
+      "date": "2018-09-08T10:00:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.22850379178760835,
+      "rsi": 54.655829033984,
+      "adx": 21.67048883131194,
+      "relative_volume": 0.7867731628484851,
+      "pressure": 25.23535464645675,
+      "counterpart": 23.388559949902,
+      "spread": 1.846794696554749,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 1.4227094748621278,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -1
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "605a3e59fa19bfa8fa5bb768b7c0624ab758e8eea2155240924ded437a4571de",
+      "date": "2019-02-08T11:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.29266807527529526,
+      "rsi": 56.14355197803303,
+      "adx": 44.58077249231762,
+      "relative_volume": 0.5541121821048878,
+      "pressure": 10.890205623071155,
+      "counterpart": 26.36025690579095,
+      "spread": 15.470051282719796,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.7400996885690713,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "b1a82c20c95894fda7371b941ecc0f15ac83794d261bf43d585c4c2ef69982a6",
+      "date": "2019-07-26T03:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.5001769162120621,
+      "rsi": 42.58770999633426,
+      "adx": 61.88777363641365,
+      "relative_volume": 1.0709893599492204,
+      "pressure": 13.606360251076547,
+      "counterpart": 27.435243146641067,
+      "spread": 13.82888289556452,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.316230160416996,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "034c537f769cb61978311d8122a1d59034e3ac5c2d37521c10bd141fa5cf422e",
+      "date": "2019-12-24T20:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.5743289608385627,
+      "rsi": 43.501172024079246,
+      "adx": 36.940070029009696,
+      "relative_volume": 0.460639494911086,
+      "pressure": 27.775548599982795,
+      "counterpart": 14.393386276634176,
+      "spread": 13.382162323348618,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 0.6445695231316875,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -1
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "b9dd8d31226744b432e418602d714eeede60d5823fa4d1bfb7904201fc2cddb0",
+      "date": "2020-05-31T04:15:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.461659416234989,
+      "rsi": 25.673904180563795,
+      "adx": 25.272011164591678,
+      "relative_volume": 1.634240332976394,
+      "pressure": 30.73250394247338,
+      "counterpart": 9.199168233260734,
+      "spread": 21.533335709212643,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.8164228350677891,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "2c8dfc89d609f08edf2fb46af9742704f0142fe3538188bbf8c896d0bfe64a72",
+      "date": "2020-11-04T13:30:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.42601096402368205,
+      "rsi": 74.43113143289018,
+      "adx": 30.317013104449387,
+      "relative_volume": 1.2499886443780697,
+      "pressure": 28.13444897575121,
+      "counterpart": 9.827884150374985,
+      "spread": 18.306564825376224,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.2054920496752028,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "b91f4572b164d5bc40141dee8c96cc2f72f0db83e5ca30d07c610a1a23edbddc",
+      "date": "2021-06-06T20:15:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.46122958127867536,
+      "rsi": 47.63030245387658,
+      "adx": 29.58106041902925,
+      "relative_volume": 1.0891209535628852,
+      "pressure": 10.836274542796383,
+      "counterpart": 24.35806553889607,
+      "spread": 13.521790996099687,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.5908946001517967,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "a8bbaf52a7c37dd83a309a9576a6a4501953ef4289d8baad8157f4646ce4f667",
+      "date": "2021-12-11T19:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.4397710148877415,
+      "rsi": 28.825745315687072,
+      "adx": 22.861970728663664,
+      "relative_volume": 0.9765066728387124,
+      "pressure": 24.810329799987883,
+      "counterpart": 16.02072991511174,
+      "spread": 8.789599884876143,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 0.9972705198904112,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "3841ca79ff2d0881e54a71c57f147908a263b4f007390971c22da9ad5df8be24",
+      "date": "2022-07-03T09:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.4026694795980061,
+      "rsi": 26.303647327853767,
+      "adx": 30.799004754276126,
+      "relative_volume": 0.38272938002431867,
+      "pressure": 30.157299742628652,
+      "counterpart": 12.4260382579642,
+      "spread": 17.73126148466445,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 0.5713448328120346,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": false,
+      "pressure_peak_offsets": [],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "782189eae9b060e1c2ee7d1b7d6ca53c3083483faefe02326874dcc4136c41e8",
+      "date": "2022-12-25T09:30:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.0488006383008589,
+      "rsi": 47.68092968569368,
+      "adx": 13.495574889540201,
+      "relative_volume": 0.732132973161077,
+      "pressure": 13.691571392677549,
+      "counterpart": 14.773914740906099,
+      "spread": 1.0823433482285498,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.5370326795257953,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "75608d42c90d9380dda5f24d1dba174d5eaba305233395326f894f20479bb5c0",
+      "date": "2023-06-01T12:15:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.16779050909264015,
+      "rsi": 40.30024234320885,
+      "adx": 16.997955686622262,
+      "relative_volume": 2.4186093743913344,
+      "pressure": 32.28758282680359,
+      "counterpart": 18.831504868989438,
+      "spread": 13.456077957814156,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 2.258768387063385,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "cd28bf4a5f74bba4d9ea9b57d01010f5ae701c169dfc98ebbcf968d76827ee10",
+      "date": "2023-11-11T10:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.164953833157131,
+      "rsi": 50.73026259635341,
+      "adx": 17.558997421466785,
+      "relative_volume": 0.5685650836432109,
+      "pressure": 15.67968885322774,
+      "counterpart": 18.071688258753813,
+      "spread": 2.3919994055260734,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.7602254296333303,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "23ff0ab94dfafd9982d9472e60e4147bc166a98d78b3989f92dbad84de0054b0",
+      "date": "2024-05-14T14:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.5942142908966539,
+      "rsi": 50.40522169824192,
+      "adx": 25.796076242689043,
+      "relative_volume": 1.531375863624364,
+      "pressure": 24.443450745658293,
+      "counterpart": 22.169313657139686,
+      "spread": 2.274137088518607,
+      "pressure_dominant": true,
+      "pressure_falling": true,
+      "candle_range_atr": 1.0310236851560477,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": false,
+      "pressure_peak_offsets": [],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "a82bc1f6046ff70169fd75d66c2a017a1ee796075021629db4122085b36768dc",
+      "date": "2024-11-06T12:00:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.5827835096319924,
+      "rsi": 74.70887751368709,
+      "adx": 19.99730786953743,
+      "relative_volume": 0.7948752233534597,
+      "pressure": 33.595987055367445,
+      "counterpart": 17.730960238272186,
+      "spread": 15.86502681709526,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.1295901573462512,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        -2,
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "fbfe1472969462a76ae4091ca70f32bd841cbd482814e2db729ba6182e7add77",
+      "date": "2025-05-10T01:45:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.14184513073694818,
+      "rsi": 51.92362945660588,
+      "adx": 17.083399578874626,
+      "relative_volume": 1.4127581898481,
+      "pressure": 26.46124588904222,
+      "counterpart": 21.73642214842206,
+      "spread": 4.72482374062016,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.1661198554577399,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "557bf057779d7ce5053651c5d11d6aab826cd6800ce3b603c8ae568cf4e5b9dd",
+      "date": "2025-11-16T08:45:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.21630990859908777,
+      "rsi": 63.40923016145717,
+      "adx": 17.514911500727425,
+      "relative_volume": 1.2031390401485957,
+      "pressure": 24.41442004906202,
+      "counterpart": 13.084812361220875,
+      "spread": 11.329607687841145,
+      "pressure_dominant": true,
+      "pressure_falling": false,
+      "candle_range_atr": 1.3766502802748213,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "510254a1dedbfaeb4863b7aa381c63fd9a12e98f7b7a03300a81aacb50cb6c4b",
+      "date": "2026-05-02T06:15:00+00:00",
+      "side": "BUY_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.13725923687355504,
+      "rsi": 38.15150808266289,
+      "adx": 15.041105569653082,
+      "relative_volume": 0.3147285821484616,
+      "pressure": 22.6808953730607,
+      "counterpart": 23.513237170203812,
+      "spread": 0.832341797143112,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 0.6726137993821193,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    },
+    {
+      "id": "f722b3461cf62c23fbeffd751bc6f8e247a503f5dc6adf2e805f493e74ce48ca",
+      "date": "2026-11-04T02:00:00+00:00",
+      "side": "SELL_SIDE",
+      "outcome": "NO_HIT",
+      "atr_pct": 0.33375273534313743,
+      "rsi": 35.383292955072605,
+      "adx": 47.53611305341869,
+      "relative_volume": 1.218331051370191,
+      "pressure": 10.620890048094706,
+      "counterpart": 22.03714683026,
+      "spread": 11.416256782165293,
+      "pressure_dominant": false,
+      "pressure_falling": false,
+      "candle_range_atr": 1.2607033597265527,
+      "candidate_same_side": true,
+      "pressure_peak_near_origin": true,
+      "pressure_peak_offsets": [
+        0
+      ],
+      "current_structure": "STRUCTURE_BULL"
+    }
+  ],
+  "interpretation": "Full-cohort outcome/timing statistics; feature comparisons use only exported descriptive examples, are not year/volatility matched, and are not causal or predictive validation."
+}
