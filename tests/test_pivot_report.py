@@ -18,6 +18,7 @@ class PivotReport(unittest.TestCase):
         with patch('sys.argv',args),contextlib.redirect_stdout(io.StringIO()):self.assertEqual(cli.main(),0)
         first=path.read_bytes();packet=json.loads(gzip.decompress(first))
         self.assertEqual(packet['summary']['pivots'],3)
+        self.assertEqual(packet['config']['threshold_pct'],1.)
         self.assertEqual(len(packet['contexts']),1) # all synthetic origin swings hit; no complete failure is fabricated
         self.assertTrue(all(context['bars'] for context in packet['contexts'].values()))
         self.assertIn('ema200',next(iter(packet['contexts'].values()))['bars'][0]['features'])

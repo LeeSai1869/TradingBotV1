@@ -3,12 +3,12 @@ const el=(tag,text,parent)=>{const node=document.createElement(tag);node.textCon
 const utc=value=>Number.isFinite(value)?new Date(value).toISOString().slice(0,19).replace('T',' ')+'Z':'—';
 const pct=value=>Number.isFinite(value)?value.toFixed(2)+'%':'—';
 export function mountPivotResearch(parent){
-    const section=el('section','',parent);el('h3','Historical pivot moves ≥2%',section);
+    const section=el('section','',parent);el('h3','Historical pivot moves',section);
     el('p','Load a study report generated from stored history. This selects outcomes retrospectively; it does not generate BUY/SELL signals or prove cause.',section);
     const file=el('input','',section);file.type='file';file.accept='.json,.gz';file.setAttribute('aria-label','Pivot study report');
     const controls=el('div','',section);Object.assign(controls.style,{display:'flex',gap:'6px',flexWrap:'wrap'});
     const select=(label,values)=>{const node=el('select','',el('label',label+' ',controls));node.setAttribute('aria-label',label);for(const [value,text] of values){const option=el('option',text,node);option.value=value;}return node;};
-    const filter=select('Pivot outcome',[['ORIGIN_HIT','2% from pivot'],['KNOWN_HIT','2% after known'],['NO_HIT','Complete non-hits'],['ALL','All pivots']]);
+    const filter=select('Pivot outcome',[['ORIGIN_HIT','Benchmark from pivot'],['KNOWN_HIT','Benchmark after known'],['NO_HIT','Complete non-hits'],['ALL','All pivots']]);
     const side=select('Pivot side',[['ALL','Both sides'],['BUY_SIDE','Low → upward'],['SELL_SIDE','High → downward']]);
     const input=(name,value)=>{const node=el('input','',el('label',name+' ',controls));node.type='number';node.min=0;node.max=100;node.value=value;node.style.width='65px';node.setAttribute('aria-label',name);return node;};
     const before=input('Bars before',12),after=input('Bars after',24);
@@ -20,7 +20,7 @@ export function mountPivotResearch(parent){
     const clearVisual=()=>window.dispatchEvent(new CustomEvent('pivot-research-case',{detail:null}));
     const matches=()=>report?.cases.filter(c=>(side.value==='ALL'||c.side===side.value)&&(filter.value==='ALL'||filter.value==='ORIGIN_HIT'&&c.origin.status==='HIT'||filter.value==='KNOWN_HIT'&&c.after_known.status==='HIT'||filter.value==='NO_HIT'&&c.origin.status==='NO_HIT'))||[];
     function render(){
-        casesTable.replaceChildren();const rows=matches();const head=el('tr','',el('thead','',casesTable));for(const name of ['Pivot UTC','Side','From pivot','After known','Bars to 2%','Known UTC','Inspect'])el('th',name,head);
+        casesTable.replaceChildren();const rows=matches();const head=el('tr','',el('thead','',casesTable));for(const name of ['Pivot UTC','Side','From pivot','After known',`Bars to ${report?.config.threshold_pct??'benchmark'}%`,'Known UTC','Inspect'])el('th',name,head);
         const body=el('tbody','',casesTable);
         for(const item of rows.slice(page*50,page*50+50)){
             const row=el('tr','',body),p=item.pivot;
@@ -41,7 +41,7 @@ export function mountPivotResearch(parent){
             }
             if(token!==selection)return;
             if(packet.status!=='READY')throw Error(packet.reason||'Context unavailable');
-            status.textContent=`Pivot ${utc(item.pivot.origin_time)} · known ${utc(item.pivot.known_time)} · ${packet.bars.length} context candles · ${item.origin_hit_by_confirmation?'2% was already reached by confirmation.':'Compare origin and after-known outcomes.'}`;
+            status.textContent=`Pivot ${utc(item.pivot.origin_time)} · known ${utc(item.pivot.known_time)} · ${packet.bars.length} context candles · ${item.origin_hit_by_confirmation?`${report.config.threshold_pct}% was already reached by confirmation.`:'Compare origin and after-known outcomes.'}`;
             const actions=el('div','',detail),jump=el('button','Show pivot on chart',actions),save=el('button','Save case JSON',actions);
             jump.onclick=async()=>{
                 try{if(window.openAlertChart)await window.openAlertChart({symbol:report.symbol,interval:report.timeframe,bar_time:item.pivot.origin_time});window.dispatchEvent(new CustomEvent('pivot-research-case',{detail:{...packet,case:item,threshold_pct:report.config.threshold_pct}}));}

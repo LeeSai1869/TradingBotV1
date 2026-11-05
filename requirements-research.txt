@@ -1,0 +1,2 @@
+# Optional all-pivot feature comparison only; not a trading/runtime dependency.
+numpy>=1.26,<3

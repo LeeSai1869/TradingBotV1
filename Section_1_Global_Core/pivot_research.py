@@ -7,14 +7,15 @@ from . import data_policy,regime_inputs
 from .memory_storage.Storage import engine_store
 from Section_8_Decision_Engine.pivot_study import VERSION,measure,summarize
 
-TIMEFRAMES=('1m','5m','15m','30m','1h')
+TIMEFRAMES=('1m','5m','15m','30m','1h','4h','1d')
+DURATIONS={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000}
 FIELDS=('structure_events','structure_events_version','structure_event_status',
         'measurement_version','measurement_config_id','measurement_gap')
 
 
 def validate(symbol,interval):
     if not isinstance(symbol,str) or not re.fullmatch('[A-Z0-9]{2,30}USDT',symbol) or interval not in TIMEFRAMES:
-        raise ValueError('Choose a USDT symbol and 1m, 5m, 15m, 30m or 1h')
+        raise ValueError('Choose a USDT symbol and a supported pivot timeframe: 1m, 5m, 15m, 30m, 1h, 4h or 1d')
 
 
 def metadata(conn,symbol,interval):
@@ -125,7 +126,7 @@ def case_context(symbol,interval,pivot_id,known_time,*,source_id,before=12,after
             conn=regime_inputs.open_sources();source,cap=metadata(conn,symbol,interval)
             if engine_store.digest(source)!=source_id:raise regime_inputs.InputsUnavailable('Feature generation/config differs from the report; regenerate the cohort')
             row=conn.execute('''SELECT k.open_time,k.close_time,f.structure_events,f.formula_version,f.measurement_version,f.measurement_config_id,f.structure_events_version,f.structure_event_status FROM features f JOIN raw.klines k ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time
-                WHERE f.symbol=? AND f.interval=? AND f.open_time=? AND k.close_time=? AND k.open_time<=?''',(symbol,interval,known_time-{'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000}[interval],known_time-1,cap)).fetchone()
+                WHERE f.symbol=? AND f.interval=? AND f.open_time=? AND k.close_time=? AND k.open_time<=?''',(symbol,interval,known_time-DURATIONS[interval],known_time-1,cap)).fetchone()
             if row and (row[3]!=3 or row[4]!='shared-v1' or not row[5] or row[6]!='structure-events-v1' or row[7]!='READY'):
                 raise regime_inputs.InputsUnavailable('Pivot source row is incompatible')
             pivot=next((e for e in pivot_events(row[2],row[0],row[1]) if e['id']==pivot_id),None) if row else None

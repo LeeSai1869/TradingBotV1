@@ -1156,3 +1156,9 @@ censoring, gaps, reaction timing and real SQLite no-write checks.
 `python3 -m unittest discover -s tests -p 'test_structure_latest_types_preview.py'`
 reproduces the count>2 structure defect and validates a staged patch without
 changing production formulas. See `PIVOT_CONTEXT_AUDIT.md` for full-history runs.
+
+All-pivot 1% research: install `requirements-research.txt`, then run
+`python3 -m unittest discover -s tests -p 'test_all_pivot_features.py'`.
+Coverage includes every-pivot membership, missing-candle offsets, finite moments,
+source generation checks, actual 4h/daily SQLite scans/context exports and the
+five-timeframe 1% batch contract. NumPy remains research-only.

@@ -26,7 +26,7 @@ def analyze(report):
     if report.get('version')!='pivot-moves-v1':raise ValueError('Expected pivot-moves-v1 report')
     cases=report['cases'];lookup={c['id']:c for c in cases};profiles=[]
     if len(cases)!=report['summary']['pivots']:raise ValueError('Case count differs from exported summary')
-    step={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000}[report['timeframe']]
+    step={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000}[report['timeframe']]
     sides={};years=[]
     for side in ('BUY_SIDE','SELL_SIDE'):
         group=[c for c in cases if c['side']==side];hits=[c for c in group if c['origin']['status']=='HIT'];known=[c for c in group if c['after_known']['status']=='HIT']
@@ -90,7 +90,7 @@ def figures(report,out):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
-    lookup={c['id']:c for c in report['cases']};step={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000}[report['timeframe']]
+    lookup={c['id']:c for c in report['cases']};step={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000}[report['timeframe']]
     pairs=[('buy_comparison.png',['037049bebbe7','75608d42c90d']),('sell_comparison.png',['363d278bf4f5','a82bc1f6046f'])]
     for name,prefixes in pairs:
         ids=[next((id for id in report.get('contexts',{}) if id.startswith(prefix)),None) for prefix in prefixes]

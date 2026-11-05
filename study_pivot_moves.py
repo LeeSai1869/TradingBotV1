@@ -35,7 +35,7 @@ def main():
     parser.add_argument('--symbol',default='BTCUSDT');parser.add_argument('--timeframe',choices=pivot_research.TIMEFRAMES,default='15m')
     parser.add_argument('--since',type=utc,default=0);parser.add_argument('--until',type=utc)
     parser.add_argument('--horizon-bars',type=int,help='Optional alternative to the default next-opposite-pivot swing')
-    parser.add_argument('--threshold-pct',type=float,default=2.)
+    parser.add_argument('--threshold-pct',type=float,default=1.)
     parser.add_argument('--before-bars',type=int,default=12);parser.add_argument('--after-bars',type=int,default=24)
     parser.add_argument('--context-cases',type=int,default=20,help='Evenly spaced successful cases plus an equal number of complete failures to embed with ALL feature columns; 0 disables')
     parser.add_argument('--report',type=Path,help='Existing study report for --case-id export')
