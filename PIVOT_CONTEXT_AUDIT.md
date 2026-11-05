@@ -145,3 +145,26 @@ python3 -m unittest discover -s tests -p 'test_pivot_context*.py'
 python3 -m unittest discover -s tests -p 'test_structure_latest_types_preview.py'
 git apply --check research_fixes/structure_latest_types.patch
 ```
+
+## Refresh historical context after a live waiting checkpoint
+
+The original audit treated a waiting latest publication as unavailable for the
+entire history. Research now permits an earlier **indexed committed prefix from
+the same current producer**, after checking epoch, revision, run binding and
+feature generation/config. It never selects an arbitrary old run or fills missing
+candles. Live readiness logic is unchanged. This can recover existing history;
+it cannot create years of analytical history that have never been calculated.
+
+To update only the joins, preserving the previously exported scores/bands/outcomes:
+
+```sh
+for kind in context saved_decision; do
+  python3 audit_pivot_context.py \
+    --report research_reports/BTCUSDT_15m_all-history_2pct_pivots_v1.json.gz \
+    --refresh-context-from "research_reports/BTCUSDT_15m_${kind}_audit_v1.json.gz" \
+    --output "research_reports/BTCUSDT_15m_${kind}_audit_v1_context_refresh.json.gz" \
+    --push-report || break
+done
+```
+
+These are new files; the original audits remain available for comparison.

@@ -1,0 +1,800 @@
+{
+  "context": {
+    "cohort": "FULL_PIVOT_COHORT",
+    "cases": 103127,
+    "models": {
+      "confidence": "confidence-v2",
+      "opportunity": "opportunity-v6"
+    },
+    "engine_history_status": {
+      "15m:REGIME": "ENGINE_WAITING: Waiting for the latest closed candle feature checkpoint",
+      "15m:TREND": "ENGINE_WAITING: Waiting for the latest closed candle feature checkpoint",
+      "4h:REGIME": "READY",
+      "4h:TREND": "READY",
+      "1d:REGIME": "READY",
+      "1d:TREND": "READY"
+    },
+    "evidence_coverage": null,
+    "coverage": {
+      "15m:REGIME": {
+        "usable": 0,
+        "total": 103127,
+        "statuses": {
+          "UNAVAILABLE": 103127
+        },
+        "first_known_utc": null
+      },
+      "15m:TREND": {
+        "usable": 0,
+        "total": 103127,
+        "statuses": {
+          "UNAVAILABLE": 103127
+        },
+        "first_known_utc": null
+      },
+      "4h:REGIME": {
+        "usable": 175,
+        "total": 103127,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 102952,
+          "VALID": 175
+        },
+        "first_known_utc": "2026-10-29T08:15:00+00:00"
+      },
+      "4h:TREND": {
+        "usable": 175,
+        "total": 103127,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 102952,
+          "VALID": 175
+        },
+        "first_known_utc": "2026-10-29T08:15:00+00:00"
+      },
+      "1d:REGIME": {
+        "usable": 751,
+        "total": 103127,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 102376,
+          "VALID": 751
+        },
+        "first_known_utc": "2026-10-03T01:00:00+00:00"
+      },
+      "1d:TREND": {
+        "usable": 751,
+        "total": 103127,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 102376,
+          "VALID": 751
+        },
+        "first_known_utc": "2026-10-03T01:00:00+00:00"
+      }
+    },
+    "sides": {
+      "BUY_SIDE": {
+        "cases": 51564,
+        "status": {
+          "NO_HIT": 32181,
+          "NO_POST_CONFIRMATION_WINDOW": 17454,
+          "HIT": 1920,
+          "CENSORED": 9
+        },
+        "resolved": 34101,
+        "hit_rate_pct": 5.630333421307293,
+        "confidence_bins": [
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "20\u201330",
+            "n": 20,
+            "NO_POST_CONFIRMATION_WINDOW": 12,
+            "NO_HIT": 8,
+            "resolved": 8,
+            "hit_rate_pct": 0.0
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "30\u201340",
+            "n": 509,
+            "NO_POST_CONFIRMATION_WINDOW": 218,
+            "HIT": 25,
+            "NO_HIT": 266,
+            "resolved": 291,
+            "hit_rate_pct": 8.59106529209622
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "40\u201350",
+            "n": 3435,
+            "NO_POST_CONFIRMATION_WINDOW": 1354,
+            "NO_HIT": 1948,
+            "HIT": 133,
+            "resolved": 2081,
+            "hit_rate_pct": 6.391158097068717
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "50\u201360",
+            "n": 10186,
+            "NO_HIT": 6051,
+            "NO_POST_CONFIRMATION_WINDOW": 3770,
+            "HIT": 364,
+            "CENSORED": 1,
+            "resolved": 6415,
+            "hit_rate_pct": 5.674201091192518
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "60\u201370",
+            "n": 18249,
+            "NO_HIT": 11590,
+            "NO_POST_CONFIRMATION_WINDOW": 6015,
+            "HIT": 643,
+            "CENSORED": 1,
+            "resolved": 12233,
+            "hit_rate_pct": 5.256274012915883
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "70\u201380",
+            "n": 14910,
+            "NO_HIT": 9585,
+            "HIT": 577,
+            "NO_POST_CONFIRMATION_WINDOW": 4744,
+            "CENSORED": 4,
+            "resolved": 10162,
+            "hit_rate_pct": 5.678016138555402
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "80\u201390",
+            "n": 4049,
+            "NO_HIT": 2589,
+            "NO_POST_CONFIRMATION_WINDOW": 1287,
+            "HIT": 171,
+            "CENSORED": 2,
+            "resolved": 2760,
+            "hit_rate_pct": 6.195652173913044
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "90\u2013100",
+            "n": 201,
+            "NO_POST_CONFIRMATION_WINDOW": 52,
+            "NO_HIT": 142,
+            "HIT": 7,
+            "resolved": 149,
+            "hit_rate_pct": 4.697986577181208
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "UNAVAILABLE_OR_INSUFFICIENT",
+            "n": 5,
+            "NO_HIT": 2,
+            "NO_POST_CONFIRMATION_WINDOW": 2,
+            "CENSORED": 1,
+            "resolved": 2,
+            "hit_rate_pct": 0.0
+          }
+        ],
+        "confidence_modes": [
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "continuation",
+            "n": 33308,
+            "NO_HIT": 19314,
+            "NO_POST_CONFIRMATION_WINDOW": 12779,
+            "HIT": 1211,
+            "CENSORED": 4,
+            "resolved": 20525,
+            "hit_rate_pct": 5.900121802679659
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "reversal",
+            "n": 18251,
+            "NO_HIT": 12865,
+            "NO_POST_CONFIRMATION_WINDOW": 4673,
+            "HIT": 709,
+            "CENSORED": 4,
+            "resolved": 13574,
+            "hit_rate_pct": 5.223220863415353
+          }
+        ],
+        "median_observed_favorable_pct": 0.3359524047065854,
+        "median_bars_observed": 2,
+        "first_forward_area": {
+          "available": 19233,
+          "statuses": {
+            "NO_TOUCH": 12149,
+            "NO_POST_CONFIRMATION_WINDOW": 6344,
+            "TOUCHED": 737,
+            "CENSORED": 3
+          },
+          "resolved": 12886,
+          "touch_rate_pct": 5.719385379481608,
+          "median_distance_pct": 1.6693757627720038
+        }
+      },
+      "SELL_SIDE": {
+        "cases": 51563,
+        "status": {
+          "NO_POST_CONFIRMATION_WINDOW": 18220,
+          "NO_HIT": 31378,
+          "HIT": 1959,
+          "CENSORED": 6
+        },
+        "resolved": 33337,
+        "hit_rate_pct": 5.876353601103879,
+        "confidence_bins": [
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "00\u201310",
+            "n": 1,
+            "HIT": 1,
+            "resolved": 1,
+            "hit_rate_pct": 100.0
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "10\u201320",
+            "n": 122,
+            "NO_HIT": 49,
+            "NO_POST_CONFIRMATION_WINDOW": 69,
+            "HIT": 4,
+            "resolved": 53,
+            "hit_rate_pct": 7.547169811320755
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "20\u201330",
+            "n": 1437,
+            "NO_POST_CONFIRMATION_WINDOW": 801,
+            "NO_HIT": 596,
+            "HIT": 40,
+            "resolved": 636,
+            "hit_rate_pct": 6.289308176100629
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "30\u201340",
+            "n": 5831,
+            "HIT": 163,
+            "NO_POST_CONFIRMATION_WINDOW": 2891,
+            "NO_HIT": 2777,
+            "resolved": 2940,
+            "hit_rate_pct": 5.54421768707483
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "40\u201350",
+            "n": 14705,
+            "NO_HIT": 8578,
+            "HIT": 539,
+            "NO_POST_CONFIRMATION_WINDOW": 5585,
+            "CENSORED": 3,
+            "resolved": 9117,
+            "hit_rate_pct": 5.912032466820226
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "50\u201360",
+            "n": 16924,
+            "NO_HIT": 10638,
+            "NO_POST_CONFIRMATION_WINDOW": 5533,
+            "HIT": 752,
+            "CENSORED": 1,
+            "resolved": 11390,
+            "hit_rate_pct": 6.602282704126426
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "60\u201370",
+            "n": 9419,
+            "NO_HIT": 6467,
+            "NO_POST_CONFIRMATION_WINDOW": 2602,
+            "HIT": 349,
+            "CENSORED": 1,
+            "resolved": 6816,
+            "hit_rate_pct": 5.120305164319249
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "70\u201380",
+            "n": 2716,
+            "NO_POST_CONFIRMATION_WINDOW": 644,
+            "NO_HIT": 1972,
+            "HIT": 99,
+            "CENSORED": 1,
+            "resolved": 2071,
+            "hit_rate_pct": 4.78029937228392
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "80\u201390",
+            "n": 393,
+            "NO_POST_CONFIRMATION_WINDOW": 88,
+            "NO_HIT": 293,
+            "HIT": 12,
+            "resolved": 305,
+            "hit_rate_pct": 3.9344262295081966
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "90\u2013100",
+            "n": 12,
+            "NO_POST_CONFIRMATION_WINDOW": 4,
+            "NO_HIT": 8,
+            "resolved": 8,
+            "hit_rate_pct": 0.0
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "UNAVAILABLE_OR_INSUFFICIENT",
+            "n": 3,
+            "NO_POST_CONFIRMATION_WINDOW": 3,
+            "resolved": 0,
+            "hit_rate_pct": null
+          }
+        ],
+        "confidence_modes": [
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "continuation",
+            "n": 33415,
+            "NO_POST_CONFIRMATION_WINDOW": 13319,
+            "HIT": 1410,
+            "NO_HIT": 18683,
+            "CENSORED": 3,
+            "resolved": 20093,
+            "hit_rate_pct": 7.017369233066242
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "reversal",
+            "n": 18145,
+            "NO_HIT": 12695,
+            "NO_POST_CONFIRMATION_WINDOW": 4898,
+            "HIT": 549,
+            "CENSORED": 3,
+            "resolved": 13244,
+            "hit_rate_pct": 4.145273331319843
+          }
+        ],
+        "median_observed_favorable_pct": 0.34359896112433064,
+        "median_bars_observed": 2.0,
+        "first_forward_area": {
+          "available": 19311,
+          "statuses": {
+            "NO_POST_CONFIRMATION_WINDOW": 6852,
+            "NO_TOUCH": 11700,
+            "TOUCHED": 757,
+            "CENSORED": 2
+          },
+          "resolved": 12457,
+          "touch_rate_pct": 6.0769045516577025,
+          "median_distance_pct": 1.6543555756185633
+        }
+      }
+    }
+  },
+  "saved_decision": {
+    "cohort": "SAVED_CURRENT_EPOCH_DECISIONS",
+    "cases": 5061,
+    "models": {
+      "confidence": "confidence-v2",
+      "opportunity": "opportunity-v6"
+    },
+    "engine_history_status": {
+      "15m:REGIME": "ENGINE_WAITING: Waiting for the latest closed candle feature checkpoint",
+      "15m:TREND": "ENGINE_WAITING: Waiting for the latest closed candle feature checkpoint",
+      "4h:REGIME": "READY",
+      "4h:TREND": "READY",
+      "1d:REGIME": "READY",
+      "1d:TREND": "READY"
+    },
+    "evidence_coverage": {
+      "current_epoch": "[0,0,1,\"opportunity-v6\"]",
+      "stored_snapshots": 5061,
+      "stored_decision_rows": 5061,
+      "excluded": {},
+      "truncated": false
+    },
+    "coverage": {
+      "15m:REGIME": {
+        "usable": 0,
+        "total": 5061,
+        "statuses": {
+          "UNAVAILABLE": 5061
+        },
+        "first_known_utc": null
+      },
+      "15m:TREND": {
+        "usable": 0,
+        "total": 5061,
+        "statuses": {
+          "UNAVAILABLE": 5061
+        },
+        "first_known_utc": null
+      },
+      "4h:REGIME": {
+        "usable": 13,
+        "total": 5061,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 5048,
+          "VALID": 13
+        },
+        "first_known_utc": "2026-10-29T15:00:00+00:00"
+      },
+      "4h:TREND": {
+        "usable": 13,
+        "total": 5061,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 5048,
+          "VALID": 13
+        },
+        "first_known_utc": "2026-10-29T15:00:00+00:00"
+      },
+      "1d:REGIME": {
+        "usable": 51,
+        "total": 5061,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 5010,
+          "VALID": 51
+        },
+        "first_known_utc": "2026-10-03T12:45:00+00:00"
+      },
+      "1d:TREND": {
+        "usable": 51,
+        "total": 5061,
+        "statuses": {
+          "MISSING_EXACT_CLOSED_CANDLE": 5010,
+          "VALID": 51
+        },
+        "first_known_utc": "2026-10-03T12:45:00+00:00"
+      }
+    },
+    "sides": {
+      "BUY_SIDE": {
+        "cases": 2530,
+        "status": {
+          "NO_HIT": 2378,
+          "HIT": 152
+        },
+        "resolved": 2530,
+        "hit_rate_pct": 6.007905138339921,
+        "confidence_bins": [
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "30\u201340",
+            "n": 23,
+            "NO_HIT": 19,
+            "HIT": 4,
+            "resolved": 23,
+            "hit_rate_pct": 17.391304347826086
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "40\u201350",
+            "n": 238,
+            "NO_HIT": 222,
+            "HIT": 16,
+            "resolved": 238,
+            "hit_rate_pct": 6.722689075630252
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "50\u201360",
+            "n": 636,
+            "NO_HIT": 597,
+            "HIT": 39,
+            "resolved": 636,
+            "hit_rate_pct": 6.132075471698113
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "60\u201370",
+            "n": 902,
+            "NO_HIT": 848,
+            "HIT": 54,
+            "resolved": 902,
+            "hit_rate_pct": 5.986696230598669
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "70\u201380",
+            "n": 541,
+            "NO_HIT": 515,
+            "HIT": 26,
+            "resolved": 541,
+            "hit_rate_pct": 4.805914972273568
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "80\u201390",
+            "n": 174,
+            "NO_HIT": 161,
+            "HIT": 13,
+            "resolved": 174,
+            "hit_rate_pct": 7.471264367816092
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "90\u2013100",
+            "n": 16,
+            "NO_HIT": 16,
+            "resolved": 16,
+            "hit_rate_pct": 0.0
+          }
+        ],
+        "confidence_modes": [
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "continuation",
+            "n": 750,
+            "NO_HIT": 692,
+            "HIT": 58,
+            "resolved": 750,
+            "hit_rate_pct": 7.733333333333333
+          },
+          {
+            "side": "BUY_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "reversal",
+            "n": 1780,
+            "NO_HIT": 1686,
+            "HIT": 94,
+            "resolved": 1780,
+            "hit_rate_pct": 5.280898876404494
+          }
+        ],
+        "median_observed_favorable_pct": 0.3305238019953527,
+        "median_bars_observed": 3.0,
+        "first_forward_area": {
+          "available": 2461,
+          "statuses": {
+            "NO_TOUCH": 2220,
+            "TOUCHED": 241
+          },
+          "resolved": 2461,
+          "touch_rate_pct": 9.79276716781796,
+          "median_distance_pct": 1.184019621960456
+        }
+      },
+      "SELL_SIDE": {
+        "cases": 2531,
+        "status": {
+          "NO_HIT": 2377,
+          "HIT": 150,
+          "CENSORED": 4
+        },
+        "resolved": 2527,
+        "hit_rate_pct": 5.93589236248516,
+        "confidence_bins": [
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "00\u201310",
+            "n": 1,
+            "HIT": 1,
+            "resolved": 1,
+            "hit_rate_pct": 100.0
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "10\u201320",
+            "n": 35,
+            "NO_HIT": 32,
+            "HIT": 3,
+            "resolved": 35,
+            "hit_rate_pct": 8.571428571428571
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "20\u201330",
+            "n": 205,
+            "NO_HIT": 188,
+            "HIT": 17,
+            "resolved": 205,
+            "hit_rate_pct": 8.292682926829269
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "30\u201340",
+            "n": 310,
+            "NO_HIT": 287,
+            "HIT": 23,
+            "resolved": 310,
+            "hit_rate_pct": 7.419354838709677
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "40\u201350",
+            "n": 236,
+            "NO_HIT": 226,
+            "HIT": 10,
+            "resolved": 236,
+            "hit_rate_pct": 4.237288135593221
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "50\u201360",
+            "n": 390,
+            "NO_HIT": 370,
+            "HIT": 20,
+            "resolved": 390,
+            "hit_rate_pct": 5.128205128205129
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "60\u201370",
+            "n": 665,
+            "NO_HIT": 626,
+            "HIT": 38,
+            "CENSORED": 1,
+            "resolved": 664,
+            "hit_rate_pct": 5.72289156626506
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "70\u201380",
+            "n": 492,
+            "NO_HIT": 467,
+            "HIT": 24,
+            "CENSORED": 1,
+            "resolved": 491,
+            "hit_rate_pct": 4.887983706720978
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "80\u201390",
+            "n": 177,
+            "HIT": 13,
+            "NO_HIT": 164,
+            "resolved": 177,
+            "hit_rate_pct": 7.344632768361582
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "90\u2013100",
+            "n": 18,
+            "NO_HIT": 17,
+            "HIT": 1,
+            "resolved": 18,
+            "hit_rate_pct": 5.555555555555555
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence",
+            "label": "UNAVAILABLE_OR_INSUFFICIENT",
+            "n": 2,
+            "CENSORED": 2,
+            "resolved": 0,
+            "hit_rate_pct": null
+          }
+        ],
+        "confidence_modes": [
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "continuation",
+            "n": 728,
+            "NO_HIT": 678,
+            "HIT": 50,
+            "resolved": 728,
+            "hit_rate_pct": 6.868131868131868
+          },
+          {
+            "side": "SELL_SIDE",
+            "year": "ALL",
+            "dimension": "confidence_mode",
+            "label": "reversal",
+            "n": 1801,
+            "NO_HIT": 1699,
+            "HIT": 100,
+            "CENSORED": 2,
+            "resolved": 1799,
+            "hit_rate_pct": 5.558643690939411
+          }
+        ],
+        "median_observed_favorable_pct": 0.3483309489179742,
+        "median_bars_observed": 4,
+        "first_forward_area": {
+          "available": 2516,
+          "statuses": {
+            "NO_TOUCH": 2228,
+            "TOUCHED": 286,
+            "CENSORED": 2
+          },
+          "resolved": 2514,
+          "touch_rate_pct": 11.37629276054097,
+          "median_distance_pct": 1.1416252384616317
+        }
+      }
+    }
+  }
+}

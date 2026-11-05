@@ -44,6 +44,24 @@ def engine_point(conn,run,frame,as_of):
                 quality_flags=p.get('quality_flags'),availability='HISTORICAL_RECONSTRUCTION_NOT_ACTUAL_PUBLICATION')
 
 
+def select_history_run(conn,symbol,frame,name,policy,generation,*,at):
+    """Research may use a compatible committed prefix while its live head waits."""
+    run,status=intelligence_audit.select_run(conn,symbol,frame,name,policy,generation,at=at)
+    if run or not status.startswith('ENGINE_WAITING:'):return run,status
+    epoch=[policy['epochs'].get('symbol:'+symbol,0),policy['epochs'].get('interval:'+frame,0)]
+    query="""SELECT b.run_id,b.metadata,r.metadata,r.cursor FROM mtf_bindings b JOIN engine_runs r ON r.run_id=b.run_id
+        WHERE b.symbol=? AND b.timeframe=? AND b.engine=? AND b.generation=? AND b.known_ms<=?
+        ORDER BY b.known_ms DESC,b.id DESC"""
+    for row in conn.execute(query,(symbol,frame,name,generation,at)):
+        binding=json.loads(row[1]);metadata=json.loads(row[2])
+        if binding.get('raw_epoch')!=epoch or binding.get('revision')!='initial':continue
+        if any(binding.get(k)!=metadata.get(k) for k in ('identity','engine_version','config_hash','input_signature')):continue
+        identity=metadata.get('identity',{})
+        if metadata.get('engine')!=name or identity.get('symbol')!=symbol or identity.get('timeframe')!=frame:continue
+        return dict(run_id=row[0],metadata=metadata,cursor=row[3]),'COMMITTED_PREFIX; '+status
+    return None,status
+
+
 class LocalReader:
     """Existing snapshots only; missing engine histories never start a replay."""
     def __init__(self,source,engines,report):
@@ -54,7 +72,7 @@ class LocalReader:
         if engines:
             for frame in dict.fromkeys((self.frame,'4h','1d')):
                 for name in ('REGIME','TREND'):
-                    run,status=intelligence_audit.select_run(engines,self.symbol,frame,name,policy,aggregation_processor.generation(name),at=now)
+                    run,status=select_history_run(engines,self.symbol,frame,name,policy,aggregation_processor.generation(name),at=now)
                     if run:
                         try:
                             generation=regime_inputs.source_metadata(source,self.symbol,frame,'initial',())['feature_generation']
@@ -268,3 +286,20 @@ def audit_saved_decisions(report,reader,conn,*,max_cases=None,progress=None):
                 evidence_coverage=dict(current_epoch=epoch,stored_snapshots=available,stored_decision_rows=decisions,excluded=dict(excluded),truncated=max_cases is not None and available>max_cases),
                 interpretation='Saved BUY/SELL evidence audit, not a position backtest or probability calibration. Scores and bands are immutable stored snapshots, including their original inventory. Outcomes begin at next candle open and end at the next opposite pivot OR report cutoff (censored). Native pivot selection/endpoints are retrospective. SELL measures spot exit/rebuy declines, not short returns. Historical reconstruction is not actual original publication. Missing snapshots and censoring are explicit; touches do not prove rejection. No production rules or feature formulas changed.')
     return result
+
+
+def refresh_context(packet,report,reader,*,progress=None):
+    """Retain measured outcomes/scores/bands; refresh only analytical-history joins."""
+    validate_report(report)
+    if (packet.get('version')!=VERSION or packet.get('source_id')!=report['source_id']
+        or any(packet.get(k)!=report.get(k) for k in ('symbol','timeframe'))):raise ValueError('Context refresh requires the same source report and scope')
+    for i,row in enumerate(packet['cases']):
+        if not 0<=row['origin_time']<row['known_time']<=report['observed_as_of']:raise ValueError('Case times outside source cutoff')
+        row['context_before_origin']=reader.context(row['origin_time'])
+        row['context_at_recognition']=reader.context(row['known_time'])
+        row['alignment']=alignment(row['context_at_recognition'],report['timeframe'])
+        if progress and (i+1)%500==0:progress(i+1,len(packet['cases']))
+    packet['engine_history_status']=reader.run_status
+    packet['summary']=summarize(packet['cases'],report['timeframe'])
+    packet['context_refresh']='Compatible indexed committed prefixes allowed while live head waits; original scores, areas and outcomes preserved'
+    return packet

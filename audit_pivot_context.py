@@ -44,10 +44,12 @@ def dashboard(packet):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--report',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--embedded-only',action='store_true',help='Audit the selected embedded examples without opening any market database')
+    p.add_argument('--refresh-context-from',type=Path,help='Refresh only Regime/Trend joins in an existing audit, preserving scores/bands/outcomes')
     p.add_argument('--saved-decisions',action='store_true',help='Audit actual immutable BUY/SELL confidence and opportunity snapshots instead of pivot points')
     p.add_argument('--max-cases',type=int,help='Optional bounded prefix; omitted means all source cases')
     p.add_argument('--push-report',action='store_true');args=p.parse_args()
     if args.max_cases is not None and args.max_cases<1:p.error('--max-cases must be positive')
+    if args.refresh_context_from and (args.saved_decisions or args.embedded_only):p.error('--refresh-context-from uses local histories and preserves its input cohort')
     if args.saved_decisions and args.embedded_only:p.error('--saved-decisions requires local market/ADCN databases')
     try:
         import os
@@ -64,7 +66,10 @@ def main():
                 if cap<report['coverage']['last']:raise ValueError('Committed feature prefix does not cover the source report')
                 engines=stack.enter_context(intelligence_audit.reader());reader=audit.LocalReader(source,engines,report)
             progress=lambda n,total:print(f'Audited {n}/{total}',flush=True)
-            if args.saved_decisions:
+            if args.refresh_context_from:
+                prior=args.refresh_context_from.read_bytes();prior=json.loads(gzip.decompress(prior) if args.refresh_context_from.suffix=='.gz' else prior)
+                packet=audit.refresh_context(prior,report,reader,progress=progress)
+            elif args.saved_decisions:
                 from Section_1_Global_Core.memory_storage.Storage import adcn_store
                 snapshots=None
                 if adcn_store.DB_PATH.is_file():

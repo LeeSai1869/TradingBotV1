@@ -104,3 +104,29 @@ class ContextAudit(unittest.TestCase):
         out=a.band_outcome(area,rows,0,60000,60000,direction='resistance')
         self.assertAlmostEqual(out['post_touch_max_rejection_pct'],(1-104/105)*100)
         self.assertAlmostEqual(out['post_touch_max_breakthrough_pct'],(108/106-1)*100)
+
+    def test_context_refresh_preserves_scores_bands_and_outcomes(self):
+        report=self.report();reader=a.EmbeddedReader(report);packet=a.audit(report,reader,embedded_only=True)
+        old=copy.deepcopy(packet['cases'][0]);updated=a.refresh_context(packet,report,reader)
+        for key in ('confidence','opportunity','after_known','di_sequence'):
+            self.assertEqual(updated['cases'][0][key],old[key])
+        bad=copy.deepcopy(report);bad['source_id']='wrong'
+        with self.assertRaises(ValueError):a.refresh_context(packet,bad,reader)
+
+    def test_live_waiting_does_not_hide_compatible_committed_history(self):
+        from unittest.mock import patch
+        conn=sqlite3.connect(':memory:');conn.execute('CREATE TABLE mtf_bindings(id INTEGER,symbol TEXT,timeframe TEXT,engine TEXT,generation TEXT,known_ms INTEGER,run_id TEXT,metadata TEXT)')
+        conn.execute('CREATE TABLE engine_runs(run_id TEXT,metadata TEXT,cursor INTEGER)')
+        meta=dict(identity=dict(symbol='BTCUSDT',timeframe='1m'),engine='REGIME',engine_version='v',config_hash='c',input_signature='s')
+        binding={**meta,'raw_epoch':[0,0],'revision':'initial'}
+        conn.execute('INSERT INTO engine_runs VALUES (?,?,?)',('compatible',json.dumps(meta),60000))
+        for id,generation in ((1,'current'),(2,'outdated')):
+            conn.execute('INSERT INTO mtf_bindings VALUES (?,?,?,?,?,?,?,?)',(id,'BTCUSDT','1m','REGIME',generation,id,'compatible',json.dumps(binding)))
+        with patch.object(a.intelligence_audit,'select_run',return_value=(None,'ENGINE_WAITING: checkpoint')):
+            run,status=a.select_history_run(conn,'BTCUSDT','1m','REGIME',dict(epochs={}), 'current',at=10)
+            self.assertEqual(run['run_id'],'compatible');self.assertIn('COMMITTED_PREFIX',status)
+            run,_=a.select_history_run(conn,'BTCUSDT','1m','REGIME',dict(epochs={'symbol:BTCUSDT':1}), 'current',at=10)
+            self.assertIsNone(run)
+        with patch.object(a.intelligence_audit,'select_run',return_value=(None,'OUTDATED_PRODUCER')):
+            self.assertIsNone(a.select_history_run(conn,'BTCUSDT','1m','REGIME',dict(epochs={}), 'current',at=10)[0])
+        conn.close()
