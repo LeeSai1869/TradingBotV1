@@ -1,5 +1,7 @@
 import {getSeries} from '../candles/index.js';
 export const name='btc_strategy';
+const STORAGE='tradingbot.btc-strategy.v1';
+function savePreferences(){try{localStorage.setItem(STORAGE,JSON.stringify({enabled,days:Number(horizon.value)}));}catch{}}
 let primitive,label,toggle,horizon,lastKey,lastData,enabled=false,scope='',lastFetch=0,serial=0,pending=false;
 class StrategyVisual {
     attached({chart,series,requestUpdate}){Object.assign(this,{chart,series,requestUpdate});}
@@ -40,13 +42,22 @@ class StrategyVisual {
 }
 export function mount(){
     primitive=new StrategyVisual();getSeries().attachPrimitive(primitive);
-    const box=document.createElement('div');Object.assign(box.style,{position:'absolute',left:'8px',top:'45px',zIndex:4,fontSize:'11px',color:'#bdeaf2',maxWidth:'75%'});
-    const control=document.createElement('label');toggle=document.createElement('input');toggle.type='checkbox';control.append(toggle,document.createTextNode(' BTC strategy · experimental spot'));
+    let preferences={};try{preferences=JSON.parse(localStorage.getItem(STORAGE)||'{}')||{};}catch{}
+    enabled=preferences.enabled===true;
+    const box=document.createElement('div');box.id='btc-strategy-controls';
+    Object.assign(box.style,{display:'inline-flex',alignItems:'center',gap:'6px',flexWrap:'wrap'});
+    const toolbar=document.getElementById('toolbar');
+    if(toolbar)toolbar.append(box);
+    else{Object.assign(box.style,{position:'absolute',left:'8px',top:'45px',zIndex:29,color:'#bdeaf2'});document.getElementById('chart').append(box);}
+    const control=document.createElement('label');toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=enabled;toggle.setAttribute('aria-label','Show BTC strategy flags');control.append(toggle,document.createTextNode(' BTC strategy flags · experimental spot'));
     horizon=document.createElement('select');horizon.setAttribute('aria-label','BTC strategy history');
-    for(const days of [7,30,90,365]){const option=document.createElement('option');option.value=days;option.textContent=days+' days';option.selected=days===90;horizon.append(option);}
-    horizon.onchange=()=>{lastFetch=0;lastKey=null;serial++;pending=false;primitive.packet=null;primitive.requestUpdate?.();if(enabled&&lastData)update(null,lastData);};
-    label=document.createElement('div');box.append(control,horizon,label);document.getElementById('chart').append(box);
-    toggle.onchange=()=>{enabled=toggle.checked;lastKey=null;lastFetch=0;serial++;pending=false;primitive.packet=null;primitive.requestUpdate?.();if(!enabled)label.textContent='';else if(lastData)update(null,lastData);};
+    for(const days of [7,30,90,365]){const option=document.createElement('option');option.value=days;option.textContent=days+' days';option.selected=days===( [7,30,90,365].includes(preferences.days)?preferences.days:90);horizon.append(option);}
+    horizon.onchange=()=>{savePreferences();lastFetch=0;lastKey=null;serial++;pending=false;primitive.packet=null;primitive.requestUpdate?.();if(enabled&&lastData)update(null,lastData);};
+    box.append(control,horizon);
+    label=document.createElement('div');label.setAttribute('role','status');label.id='btc-strategy-status';
+    Object.assign(label.style,{position:'absolute',left:'8px',top:'45px',zIndex:29,fontSize:'11px',color:'#bdeaf2',maxWidth:'85%',pointerEvents:'none'});
+    document.getElementById('chart').append(label);
+    toggle.onchange=()=>{enabled=toggle.checked;savePreferences();lastKey=null;lastFetch=0;serial++;pending=false;primitive.packet=null;primitive.requestUpdate?.();if(!enabled)label.textContent='BTC strategy off — enable BTC strategy flags in the toolbar.';else if(lastData)update(null,lastData);};
 }
 export async function update(chart,data){
     lastData=data;
@@ -54,8 +65,8 @@ export async function update(chart,data){
     const supported=symbol==='BTCUSDT'&&['5m','15m','30m','1h'].includes(timeframe);
     const next=`${symbol}:${timeframe}:${data.atLiveEdge===false?'history':'latest'}`;
     if(scope!==next){scope=next;lastKey=null;serial++;pending=false;lastFetch=0;primitive.packet=null;primitive.requestUpdate?.();}
-    toggle.disabled=!supported;
-    if(!enabled)return;
+    toggle.disabled=!supported;horizon.disabled=!supported;
+    if(!enabled){label.textContent=supported?'BTC strategy off — enable BTC strategy flags in the toolbar.':'BTC strategy supports BTCUSDT · 5m / 15m / 30m / 1h';return;}
     if(!supported){label.textContent='Choose BTCUSDT · 5m / 15m / 30m / 1h';return;}
     const end=data.bars?.filter(b=>!b.provisional).at(-1);
     const requestKey=`${scope}:${end?.time}:${horizon.value}`;

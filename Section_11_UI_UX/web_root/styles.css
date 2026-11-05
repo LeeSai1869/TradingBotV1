@@ -301,3 +301,7 @@ button:hover { background: #333; }
 .alert-open span { font-size: 12px; }
 #alert-toasts { left: auto; bottom: auto; right: 20px; top: 80px; }
 .alert-toast { pointer-events: auto; }
+
+/* Keep strategy and chart controls reachable on narrower laptop screens. */
+#toolbar {height:auto; min-height:55px; flex-wrap:wrap;}
+#btc-strategy-controls label {display:inline-flex; align-items:center; white-space:nowrap;}

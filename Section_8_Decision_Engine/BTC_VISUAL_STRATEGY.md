@@ -6,7 +6,9 @@ Section 4 calculations are unchanged. No new database or historical replay is
 required. The standalone build already includes Section 8 and these UI assets.
 
 After updating and restarting the UI backend, choose BTCUSDT and 5m, 15m, 30m or
-1h. Check **BTC strategy · experimental spot** on the chart. Purple diamonds mark
+1h. Check **BTC strategy flags · experimental spot** in the main toolbar.
+The checkbox and selected period are remembered in this browser across reloads.
+A chart status explains when the layer is off, unsupported or awaiting data. Purple diamonds mark
 candidate-low observations, cyan markers show simulated buys, amber markers show
 exits. Cyan lines show entry, red lines hard stop, amber lines active stop (these
 overlap until trailing activates). Turn the checkbox off to hide the layer.
