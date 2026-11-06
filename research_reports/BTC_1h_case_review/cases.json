@@ -1,0 +1,850 @@
+{
+  "source_file": "BTCUSDT_1h_all-history_1pct_pivots_v1.json.gz",
+  "source_sha256": "46c28f60be8ae193466905bc417b1f010613d895a5317fbf4214632499687913",
+  "cutoff": 1793894400000,
+  "timezone": "Asia/Karachi",
+  "cases": [
+    {
+      "case": {
+        "id": "cf2cb3a663781cd64ef23d1c49902c93b4bc2e3675387d5d393497ffd928356c",
+        "side": "BUY_SIDE",
+        "pivot": {
+          "classification": "HIGHER_LOW",
+          "confirmation_time": 1793736000000,
+          "id": "cf2cb3a663781cd64ef23d1c49902c93b4bc2e3675387d5d393497ffd928356c",
+          "known_time": 1793739600000,
+          "origin_bar": 80647,
+          "origin_time": 1793732400000,
+          "previous_id": "34796f218eb0f21fbe0dfdcd7e62c9a88b8e7695a0f21cc28f589a36b69a24f9",
+          "price": 77512.01,
+          "source": "Section4.market_structure",
+          "source_version": "structure-events-v1",
+          "type": "PIVOT_LOW"
+        },
+        "origin": {
+          "status": "NO_HIT",
+          "reference": 77512.01,
+          "threshold_pct": 1.0,
+          "bars_observed": 2,
+          "first_hit": null,
+          "max_favorable_pct": 0.7112317175106186,
+          "max_adverse_pct": 0.0,
+          "complete": true,
+          "gap": false
+        },
+        "after_known": {
+          "status": "NO_HIT",
+          "reference": 77860.01,
+          "threshold_pct": 1.0,
+          "bars_observed": 1,
+          "first_hit": null,
+          "max_favorable_pct": 0.26109680694879067,
+          "max_adverse_pct": -0.05586950220016762,
+          "complete": true,
+          "gap": false
+        },
+        "next_opposite": {
+          "classification": "HIGHER_HIGH",
+          "confirmation_time": 1793743200000,
+          "id": "cbe88bf1762fbf46d6e794731cb55ad21446ab22f83cc66b3f296702efcce049",
+          "known_time": 1793746800000,
+          "origin_bar": 80649,
+          "origin_time": 1793739600000,
+          "previous_id": "1351c3396c406e925831a943c65d38bc21c36b077ca61432ac02121ae1dd119b",
+          "price": 78063.3,
+          "source": "Section4.market_structure",
+          "source_version": "structure-events-v1",
+          "type": "PIVOT_HIGH"
+        },
+        "origin_hit_by_confirmation": false
+      },
+      "origin_pkt": "2026-11-04T00:00:00+05:00",
+      "bars": [
+        {
+          "offset": -3,
+          "client": {
+            "open_time": 1793721600000,
+            "close_time": 1793725199999,
+            "open": 77688.47,
+            "high": 77750.22,
+            "low": 77380.0,
+            "close": 77732.0,
+            "volume": 577.25739
+          },
+          "features": {
+            "di_plus": 28.506349253920526,
+            "di_minus": 13.232527678168738,
+            "adx": 26.93593832086929,
+            "rsi": 74.95290113023296,
+            "relative_volume": 0.9975126414057264,
+            "atr": 407.95579407020773,
+            "ema50": 77440.10466835667,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": -2,
+          "client": {
+            "open_time": 1793725200000,
+            "close_time": 1793728799999,
+            "open": 77732.0,
+            "high": 77799.85,
+            "low": 77626.0,
+            "close": 77644.43,
+            "volume": 518.62733
+          },
+          "features": {
+            "di_plus": 28.508214101520434,
+            "di_minus": 12.634295051905367,
+            "adx": 28.10062133583103,
+            "rsi": 68.22718609450588,
+            "relative_volume": 0.882999422844886,
+            "atr": 384.54521466318755,
+            "ema50": 77448.11742646033,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": -1,
+          "client": {
+            "open_time": 1793728800000,
+            "close_time": 1793732399999,
+            "open": 77644.42,
+            "high": 77892.85,
+            "low": 77562.4,
+            "close": 77584.0,
+            "volume": 233.91761
+          },
+          "features": {
+            "di_plus": 28.476420906627236,
+            "di_minus": 11.533105458095646,
+            "adx": 29.52537950331273,
+            "rsi": 63.63035648791248,
+            "relative_volume": 0.40231295161077013,
+            "atr": 379.13569319686997,
+            "ema50": 77453.44615483444,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 0,
+          "client": {
+            "open_time": 1793732400000,
+            "close_time": 1793735999999,
+            "open": 77584.0,
+            "high": 77664.21,
+            "low": 77512.01,
+            "close": 77612.0,
+            "volume": 218.62816
+          },
+          "features": {
+            "di_plus": 27.260484020480085,
+            "di_minus": 12.4543381433798,
+            "adx": 30.300957422671477,
+            "rsi": 64.90843038996293,
+            "relative_volume": 0.37902923654910886,
+            "atr": 356.44212387718414,
+            "ema50": 77459.66395268407,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 1,
+          "client": {
+            "open_time": 1793736000000,
+            "close_time": 1793739599999,
+            "open": 77612.0,
+            "high": 77940.01,
+            "low": 77596.41,
+            "close": 77860.01,
+            "volume": 299.13878
+          },
+          "features": {
+            "di_plus": 32.388709269406405,
+            "di_minus": 11.249434508228168,
+            "adx": 32.11508119370373,
+            "rsi": 74.25682414472318,
+            "relative_volume": 0.5278289183359756,
+            "atr": 355.1579114894648,
+            "ema50": 77475.36379767687,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 2,
+          "client": {
+            "open_time": 1793739600000,
+            "close_time": 1793743199999,
+            "open": 77860.01,
+            "high": 78063.3,
+            "low": 77816.51,
+            "close": 77902.52,
+            "volume": 358.04679
+          },
+          "features": {
+            "di_plus": 33.64793799029225,
+            "di_minus": 10.443138356676345,
+            "adx": 34.16649735656429,
+            "rsi": 75.55886404026546,
+            "relative_volume": 0.6343963959405903,
+            "atr": 344.3211203405192,
+            "ema50": 77492.11502129739,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 3,
+          "client": {
+            "open_time": 1793743200000,
+            "close_time": 1793746799999,
+            "open": 77902.52,
+            "high": 77902.52,
+            "low": 77718.0,
+            "close": 77875.86,
+            "volume": 129.06628
+          },
+          "features": {
+            "di_plus": 31.757002237249257,
+            "di_minus": 12.856492738237286,
+            "adx": 34.98634814824765,
+            "rsi": 72.86247880805821,
+            "relative_volume": 0.2458566240640054,
+            "atr": 328.3410083064677,
+            "ema50": 77507.16384399161,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 4,
+          "client": {
+            "open_time": 1793746800000,
+            "close_time": 1793750399999,
+            "open": 77875.86,
+            "high": 77983.86,
+            "low": 77421.19,
+            "close": 77453.86,
+            "volume": 237.70826
+          },
+          "features": {
+            "di_plus": 26.677400803177235,
+            "di_minus": 19.237590583738726,
+            "adx": 33.10805779929566,
+            "rsi": 43.91910728869482,
+            "relative_volume": 0.5049721216799257,
+            "atr": 351.77390747582075,
+            "ema50": 77505.07349716841,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 5,
+          "client": {
+            "open_time": 1793750400000,
+            "close_time": 1793753999999,
+            "open": 77453.85,
+            "high": 77544.01,
+            "low": 76855.99,
+            "close": 77244.14,
+            "volume": 703.44039
+          },
+          "features": {
+            "di_plus": 21.91490574833913,
+            "di_minus": 30.468602393028505,
+            "adx": 31.430150797662016,
+            "rsi": 35.69749324945393,
+            "relative_volume": 1.4712792787256033,
+            "atr": 385.3985167282376,
+            "ema50": 77494.84081100495,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 6,
+          "client": {
+            "open_time": 1793754000000,
+            "close_time": 1793757599999,
+            "open": 77244.14,
+            "high": 77326.41,
+            "low": 76816.25,
+            "close": 77035.21,
+            "volume": 605.67613
+          },
+          "features": {
+            "di_plus": 19.104948417928146,
+            "di_minus": 27.560686103556897,
+            "adx": 30.099119584039478,
+            "rsi": 29.31848877459923,
+            "relative_volume": 1.2540478606403203,
+            "atr": 397.8746650554142,
+            "ema50": 77476.81607331848,
+            "candidate_pivot": -1.0
+          }
+        }
+      ],
+      "confirmation_delay_hours": 2.0
+    },
+    {
+      "case": {
+        "id": "0b6592609b13346f0c0d86f5bced1b3cc7d2aa187c414f32182c2ecf5ed64224",
+        "side": "BUY_SIDE",
+        "pivot": {
+          "classification": "LOWER_LOW",
+          "confirmation_time": 1793764800000,
+          "id": "0b6592609b13346f0c0d86f5bced1b3cc7d2aa187c414f32182c2ecf5ed64224",
+          "known_time": 1793768400000,
+          "origin_bar": 80655,
+          "origin_time": 1793761200000,
+          "previous_id": "cf2cb3a663781cd64ef23d1c49902c93b4bc2e3675387d5d393497ffd928356c",
+          "price": 75736.38,
+          "source": "Section4.market_structure",
+          "source_version": "structure-events-v1",
+          "type": "PIVOT_LOW"
+        },
+        "origin": {
+          "status": "HIT",
+          "reference": 75736.38,
+          "threshold_pct": 1.0,
+          "bars_observed": 12,
+          "first_hit": {
+            "candle_time": 1793764800000,
+            "known_by": 1793768400000,
+            "bars": 1
+          },
+          "max_favorable_pct": 7.2087284868909585,
+          "max_adverse_pct": 0.0,
+          "complete": true,
+          "gap": false
+        },
+        "after_known": {
+          "status": "HIT",
+          "reference": 77390.0,
+          "threshold_pct": 1.0,
+          "bars_observed": 11,
+          "first_hit": {
+            "candle_time": 1793768400000,
+            "known_by": 1793772000000,
+            "bars": 1
+          },
+          "max_favorable_pct": 4.917960976870384,
+          "max_adverse_pct": -0.14983848042383618,
+          "complete": true,
+          "gap": false
+        },
+        "next_opposite": {
+          "classification": "HIGHER_HIGH",
+          "confirmation_time": 1793880000000,
+          "id": "0351f8d8677b3848e1d8ea295308ede773d3dc89944270ac6f267a6e5adbfa75",
+          "known_time": 1793883600000,
+          "origin_bar": 80667,
+          "origin_time": 1793804400000,
+          "previous_id": "cbe88bf1762fbf46d6e794731cb55ad21446ab22f83cc66b3f296702efcce049",
+          "price": 81196.01,
+          "source": "Section4.market_structure",
+          "source_version": "structure-events-v1",
+          "type": "PIVOT_HIGH"
+        },
+        "origin_hit_by_confirmation": true
+      },
+      "origin_pkt": "2026-11-04T08:00:00+05:00",
+      "bars": [
+        {
+          "offset": -3,
+          "client": {
+            "open_time": 1793750400000,
+            "close_time": 1793753999999,
+            "open": 77453.85,
+            "high": 77544.01,
+            "low": 76855.99,
+            "close": 77244.14,
+            "volume": 703.44039
+          },
+          "features": {
+            "di_plus": 21.91490574833913,
+            "di_minus": 30.468602393028505,
+            "adx": 31.430150797662016,
+            "rsi": 35.69749324945393,
+            "relative_volume": 1.4712792787256033,
+            "atr": 385.3985167282376,
+            "ema50": 77494.84081100495,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": -2,
+          "client": {
+            "open_time": 1793754000000,
+            "close_time": 1793757599999,
+            "open": 77244.14,
+            "high": 77326.41,
+            "low": 76816.25,
+            "close": 77035.21,
+            "volume": 605.67613
+          },
+          "features": {
+            "di_plus": 19.104948417928146,
+            "di_minus": 27.560686103556897,
+            "adx": 30.099119584039478,
+            "rsi": 29.31848877459923,
+            "relative_volume": 1.2540478606403203,
+            "atr": 397.8746650554142,
+            "ema50": 77476.81607331848,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": -1,
+          "client": {
+            "open_time": 1793757600000,
+            "close_time": 1793761199999,
+            "open": 77035.21,
+            "high": 77208.79,
+            "low": 76154.13,
+            "close": 76170.85,
+            "volume": 858.38316
+          },
+          "features": {
+            "di_plus": 14.758257474691321,
+            "di_minus": 35.57375707582552,
+            "adx": 31.224845705498648,
+            "rsi": 15.741525385184971,
+            "relative_volume": 1.7227546427021068,
+            "atr": 463.5531985498717,
+            "ema50": 77425.60171750208,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 0,
+          "client": {
+            "open_time": 1793761200000,
+            "close_time": 1793764799999,
+            "open": 76170.86,
+            "high": 76600.01,
+            "low": 75736.38,
+            "close": 76496.04,
+            "volume": 1766.85474
+          },
+          "features": {
+            "di_plus": 12.227148637185628,
+            "di_minus": 37.76861307918516,
+            "adx": 33.21108706793845,
+            "rsi": 29.97479744550094,
+            "relative_volume": 3.1366329212991175,
+            "atr": 503.56087869488357,
+            "ema50": 77389.14831681573,
+            "candidate_pivot": -1.0
+          }
+        },
+        {
+          "offset": 1,
+          "client": {
+            "open_time": 1793764800000,
+            "close_time": 1793768399999,
+            "open": 76496.05,
+            "high": 77595.64,
+            "low": 76434.11,
+            "close": 77390.01,
+            "volume": 1000.78114
+          },
+          "features": {
+            "di_plus": 27.219619350496348,
+            "di_minus": 30.063549961269672,
+            "adx": 30.386447157292228,
+            "rsi": 54.58161311994766,
+            "relative_volume": 1.6860401548306645,
+            "atr": 569.3577908253951,
+            "ema50": 77389.18210831315,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 2,
+          "client": {
+            "open_time": 1793768400000,
+            "close_time": 1793771999999,
+            "open": 77390.0,
+            "high": 78164.0,
+            "low": 77274.04,
+            "close": 77748.09,
+            "volume": 881.08835
+          },
+          "features": {
+            "di_plus": 32.64207543363336,
+            "di_minus": 25.614837684429627,
+            "adx": 28.55405203033926,
+            "rsi": 60.98787336354614,
+            "relative_volume": 1.4383064353291823,
+            "atr": 601.4180117428563,
+            "ema50": 77403.256927595,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 3,
+          "client": {
+            "open_time": 1793772000000,
+            "close_time": 1793775599999,
+            "open": 77748.09,
+            "high": 78075.0,
+            "low": 77748.09,
+            "close": 78007.91,
+            "volume": 617.76669
+          },
+          "features": {
+            "di_plus": 30.782906358550044,
+            "di_minus": 24.155913475305912,
+            "adx": 26.90489641608159,
+            "rsi": 65.14914111313166,
+            "relative_volume": 0.9896737420027412,
+            "atr": 573.967210568571,
+            "ema50": 77426.96881278735,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 4,
+          "client": {
+            "open_time": 1793775600000,
+            "close_time": 1793779199999,
+            "open": 78007.91,
+            "high": 78374.42,
+            "low": 77890.8,
+            "close": 78140.0,
+            "volume": 718.11711
+          },
+          "features": {
+            "di_plus": 33.447785986891176,
+            "di_minus": 22.088005700161904,
+            "adx": 26.259894907737507,
+            "rsi": 67.2228211984663,
+            "relative_volume": 1.122065880037017,
+            "atr": 564.9324895117134,
+            "ema50": 77454.93082012903,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 5,
+          "client": {
+            "open_time": 1793779200000,
+            "close_time": 1793782799999,
+            "open": 78140.01,
+            "high": 78514.3,
+            "low": 78140.01,
+            "close": 78500.0,
+            "volume": 773.28809
+          },
+          "features": {
+            "di_plus": 33.71680530433779,
+            "di_minus": 20.57344142006419,
+            "adx": 26.05484926549595,
+            "rsi": 72.43748652230369,
+            "relative_volume": 1.1981632820696373,
+            "atr": 545.8692405605423,
+            "ema50": 77495.913925222,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 6,
+          "client": {
+            "open_time": 1793782800000,
+            "close_time": 1793786399999,
+            "open": 78499.99,
+            "high": 78556.01,
+            "low": 78305.24,
+            "close": 78400.0,
+            "volume": 441.31357
+          },
+          "features": {
+            "di_plus": 32.887118857471485,
+            "di_minus": 19.574291847275482,
+            "adx": 25.987006165835197,
+            "rsi": 68.88584480722585,
+            "relative_volume": 0.714502642584804,
+            "atr": 516.359316504487,
+            "ema50": 77531.36828109565,
+            "candidate_pivot": 1.0
+          }
+        }
+      ],
+      "confirmation_delay_hours": 2.0
+    },
+    {
+      "case": {
+        "id": "0351f8d8677b3848e1d8ea295308ede773d3dc89944270ac6f267a6e5adbfa75",
+        "side": "SELL_SIDE",
+        "pivot": {
+          "classification": "HIGHER_HIGH",
+          "confirmation_time": 1793880000000,
+          "id": "0351f8d8677b3848e1d8ea295308ede773d3dc89944270ac6f267a6e5adbfa75",
+          "known_time": 1793883600000,
+          "origin_bar": 80667,
+          "origin_time": 1793804400000,
+          "previous_id": "cbe88bf1762fbf46d6e794731cb55ad21446ab22f83cc66b3f296702efcce049",
+          "price": 81196.01,
+          "source": "Section4.market_structure",
+          "source_version": "structure-events-v1",
+          "type": "PIVOT_HIGH"
+        },
+        "origin": {
+          "status": "HIT",
+          "reference": 81196.01,
+          "threshold_pct": 1.0,
+          "bars_observed": 24,
+          "first_hit": {
+            "candle_time": 1793808000000,
+            "known_by": 1793811600000,
+            "bars": 1
+          },
+          "max_favorable_pct": 6.931387392065192,
+          "max_adverse_pct": 0.0,
+          "complete": false,
+          "gap": false
+        },
+        "after_known": {
+          "status": "HIT",
+          "reference": 79662.01,
+          "threshold_pct": 1.0,
+          "bars_observed": 3,
+          "first_hit": {
+            "candle_time": 1793887200000,
+            "known_by": 1793890800000,
+            "bars": 2
+          },
+          "max_favorable_pct": 5.139225083574961,
+          "max_adverse_pct": -0.25451278470125516,
+          "complete": false,
+          "gap": false
+        },
+        "next_opposite": null,
+        "origin_hit_by_confirmation": true
+      },
+      "origin_pkt": "2026-11-04T20:00:00+05:00",
+      "bars": [
+        {
+          "offset": -3,
+          "client": {
+            "open_time": 1793793600000,
+            "close_time": 1793797199999,
+            "open": 78477.24,
+            "high": 78500.0,
+            "low": 78001.77,
+            "close": 78298.0,
+            "volume": 810.82896
+          },
+          "features": {
+            "di_plus": 28.816602248790062,
+            "di_minus": 25.25976105074935,
+            "adx": 24.7116920997904,
+            "rsi": 60.015736303066596,
+            "relative_volume": 1.346489259193201,
+            "atr": 475.5378017317709,
+            "ema50": 77636.07650242084,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": -2,
+          "client": {
+            "open_time": 1793797200000,
+            "close_time": 1793800799999,
+            "open": 78298.0,
+            "high": 78531.58,
+            "low": 78290.0,
+            "close": 78364.01,
+            "volume": 610.07013
+          },
+          "features": {
+            "di_plus": 27.975380997522297,
+            "di_minus": 23.91012912456722,
+            "adx": 23.024027159768295,
+            "rsi": 61.7199013889707,
+            "relative_volume": 1.0054683725793863,
+            "atr": 452.142021558594,
+            "ema50": 77664.6229140906,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": -1,
+          "client": {
+            "open_time": 1793800800000,
+            "close_time": 1793804399999,
+            "open": 78364.01,
+            "high": 79665.66,
+            "low": 78210.0,
+            "close": 79347.33,
+            "volume": 1856.73093
+          },
+          "features": {
+            "di_plus": 41.13124887233801,
+            "di_minus": 17.610507782360525,
+            "adx": 24.72571666531616,
+            "rsi": 78.00905205604408,
+            "relative_volume": 2.6991571909769916,
+            "atr": 552.493819402735,
+            "ema50": 77730.61142726353,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 0,
+          "client": {
+            "open_time": 1793804400000,
+            "close_time": 1793807999999,
+            "open": 79347.33,
+            "high": 81196.01,
+            "low": 79311.53,
+            "close": 80296.01,
+            "volume": 3942.19555
+          },
+          "features": {
+            "di_plus": 52.14551416080277,
+            "di_minus": 12.770633825384074,
+            "adx": 28.318643577627682,
+            "rsi": 85.13077847521629,
+            "relative_volume": 4.510153711233314,
+            "atr": 685.692437462461,
+            "ema50": 77831.21529286104,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 1,
+          "client": {
+            "open_time": 1793808000000,
+            "close_time": 1793811599999,
+            "open": 80296.01,
+            "high": 80751.98,
+            "low": 80296.0,
+            "close": 80538.01,
+            "volume": 1678.79118
+          },
+          "features": {
+            "di_plus": 48.55768389786653,
+            "di_minus": 11.891960611532982,
+            "adx": 31.55227779870805,
+            "rsi": 86.43788551208777,
+            "relative_volume": 1.7801647281031665,
+            "atr": 662.7211937162145,
+            "ema50": 77937.3641049057,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 2,
+          "client": {
+            "open_time": 1793811600000,
+            "close_time": 1793815199999,
+            "open": 80538.01,
+            "high": 80578.5,
+            "low": 80236.2,
+            "close": 80427.66,
+            "volume": 907.32572
+          },
+          "features": {
+            "di_plus": 45.92222382405438,
+            "di_minus": 12.194710767728788,
+            "adx": 34.200438186714585,
+            "rsi": 82.576160305197,
+            "relative_volume": 0.9348882977966242,
+            "atr": 630.6790743445933,
+            "ema50": 78035.02276745843,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 3,
+          "client": {
+            "open_time": 1793815200000,
+            "close_time": 1793818799999,
+            "open": 80427.65,
+            "high": 80719.58,
+            "low": 80303.03,
+            "close": 80351.49,
+            "volume": 777.59286
+          },
+          "features": {
+            "di_plus": 45.09813369619235,
+            "di_minus": 11.360968957304788,
+            "adx": 36.75589931822636,
+            "rsi": 79.7084198689347,
+            "relative_volume": 0.7753102582144473,
+            "atr": 609.2661669101343,
+            "ema50": 78125.86461971496,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 4,
+          "client": {
+            "open_time": 1793818800000,
+            "close_time": 1793822399999,
+            "open": 80351.49,
+            "high": 80394.01,
+            "low": 79952.75,
+            "close": 79997.8,
+            "volume": 692.047
+          },
+          "features": {
+            "di_plus": 41.73928819582162,
+            "di_minus": 16.427062475619703,
+            "adx": 37.43200507093801,
+            "rsi": 67.08697731420925,
+            "relative_volume": 0.6747326510305401,
+            "atr": 592.4655502191204,
+            "ema50": 78199.27385031438,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 5,
+          "client": {
+            "open_time": 1793822400000,
+            "close_time": 1793825999999,
+            "open": 79997.79,
+            "high": 80356.01,
+            "low": 79952.0,
+            "close": 80138.0,
+            "volume": 460.00291
+          },
+          "features": {
+            "di_plus": 38.79952145735634,
+            "di_minus": 15.283152297154054,
+            "adx": 38.037030627323745,
+            "rsi": 69.3326818496636,
+            "relative_volume": 0.4538804364558103,
+            "atr": 573.6199951972078,
+            "ema50": 78275.30232677264,
+            "candidate_pivot": 1.0
+          }
+        },
+        {
+          "offset": 6,
+          "client": {
+            "open_time": 1793826000000,
+            "close_time": 1793829599999,
+            "open": 80138.0,
+            "high": 80320.01,
+            "low": 80090.0,
+            "close": 80240.18,
+            "volume": 308.52006
+          },
+          "features": {
+            "di_plus": 37.14460647180389,
+            "di_minus": 14.631280397372022,
+            "adx": 38.581553628070914,
+            "rsi": 71.01432169543361,
+            "relative_volume": 0.30894288742271325,
+            "atr": 539.2589956774866,
+            "ema50": 78352.35635317372,
+            "candidate_pivot": 1.0
+          }
+        }
+      ],
+      "confirmation_delay_hours": 22.0
+    }
+  ],
+  "note": "Three descriptive examples from frozen uploaded contexts, not a representative or predictive validation sample. Measurements are shown at their candle closes, never at candle open. Native known_time is reconstructed event recognition, not actual live delivery."
+}
