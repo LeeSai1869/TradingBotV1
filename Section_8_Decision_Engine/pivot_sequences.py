@@ -198,7 +198,7 @@ def analyze(packet,*,progress=None):
             measurements={k:r['features'].get(k) for k in ('rsi','atr','relative_volume','ema50','candidate_pivot','regime_state','trend_state','current_structure')},
             engine_refs=lookup.at(r['close_time']+1),
             latest_known_turns={kind:(indexes[bisect_right(indexes,index)-1] if bisect_right(indexes,index) else None) for kind,indexes in turn_indexes.items()})
-    cases=[];grouped=defaultdict(Counter);engine_coverage=defaultdict(Counter);case_by_origin={};turn_indexes=defaultdict(list,{kind:[] for kind in ('DI_PLUS_PEAK','DI_PLUS_TROUGH','DI_MINUS_PEAK','DI_MINUS_TROUGH','ABS_SPREAD_PEAK','ABS_SPREAD_TROUGH')})
+    cases=[];outcome_discrepancies=[];grouped=defaultdict(Counter);engine_coverage=defaultdict(Counter);case_by_origin={};turn_indexes=defaultdict(list,{kind:[] for kind in ('DI_PLUS_PEAK','DI_PLUS_TROUGH','DI_MINUS_PEAK','DI_MINUS_TROUGH','ABS_SPREAD_PEAK','ABS_SPREAD_TROUGH')})
     for i,events_ in enumerate(turns):
         for e in events_:turn_indexes[e['type']].append(i)
     for serial,case in enumerate(packet['pivots']):
@@ -212,7 +212,8 @@ def analyze(packet,*,progress=None):
         end_time=(case.get('next_opposite') or {}).get('origin_time')
         stop=bisect_right(times,end_time) if end_time is not None else len(rows)
         verified=measure(iter(rows[origin+1:stop]),p['price'],case['side'],p['origin_time']+STEP,end_time=end_time,threshold=1.)
-        if verified['status']!=case['origin']['status']:raise ValueError('Native pivot outcome differs from frozen raw sequence; regenerate the cohort')
+        if verified['status']!=case['origin']['status']:
+            outcome_discrepancies.append(dict(id=case['id'],original=case['origin'],exported_raw=verified))
 
         pressure='DI_MINUS_PEAK' if side=='BUY' else 'DI_PLUS_PEAK';begin=start if start is not None else origin;end=confirmation if confirmation is not None else origin
         interval={}
@@ -220,7 +221,7 @@ def analyze(packet,*,progress=None):
             indexes=turn_indexes[kind];interval[kind]=indexes[bisect_left(indexes,begin):bisect_right(indexes,end)] if begin is not None and end is not None else []
         di_turns=interval[pressure];sp_turns=interval['ABS_SPREAD_PEAK'];first=di_turns[0] if di_turns else None
         nearest_spread=min(sp_turns,key=lambda i:abs(i-first)) if first is not None and sp_turns else None
-        record=dict(id=case['id'],side=side,origin_time=p['origin_time'],price=p['price'],native_known_time=p['known_time'],outcome=verified,
+        record=dict(id=case['id'],side=side,origin_time=p['origin_time'],price=p['price'],native_known_time=p['known_time'],outcome=verified,original_outcome=case['origin'],
             next_opposite=case.get('next_opposite'),episode_id=episode['id'] if episode else None,left_censored_candidate=episode['left_censored'] if episode else None,
             stages=stages,candidate_observed_after_origin=(start>origin) if start is not None and origin is not None else None,
             recognition={name:dict(known_offset_hours=(snap['known_time']-p['origin_time'])/STEP,close_distance_from_eventual_extreme_pct=(snap['close']/p['price']-1)*100*(1 if side=='BUY' else -1),
@@ -228,7 +229,7 @@ def analyze(packet,*,progress=None):
             pressure_peak_seen_by_origin=any(i<=origin for i in di_turns) if origin is not None and episode else None,
             spread_peak_seen_by_origin=any(i<=origin for i in sp_turns) if origin is not None and episode else None,
             first_pressure_peak=dict(snapshot=snapshot(first),recognized_before_origin=first<origin if origin is not None else None,close_distance_from_eventual_extreme_pct=(rows[first]['close']/p['price']-1)*100*(1 if side=='BUY' else -1),
-                target_already_reached=bool(case['origin'].get('first_hit') and case['origin']['first_hit']['known_by']<=rows[first]['close_time']+1)) if first is not None else None)
+                target_already_reached=bool(verified.get('first_hit') and verified['first_hit']['known_by']<=rows[first]['close_time']+1)) if first is not None else None)
         if origin is not None:
             c=rows[origin];edge=c['low'] if side=='BUY' else c['high']
             if not math.isclose(edge,p['price'],rel_tol=1e-10,abs_tol=1e-8):raise ValueError('Pivot does not match raw candle extreme')
@@ -249,7 +250,7 @@ def analyze(packet,*,progress=None):
             dimensions['joint_DI_spread']=dimensions['independent_pressure_peak_now']+' / '+dimensions['spread_peak_now']+' / '+dimensions['spread_bin']
             dimensions['joint_context_DI']=' / '.join([dimensions['joint_DI_spread'],*(str(dimensions.get(k,'UNAVAILABLE')) for k in ('1h:REGIME:primary','1h:TREND:direction','1h:BIAS:direction','1h:LIQUIDITY:structural_side','4h:TREND:direction','1d:TREND:direction'))])
             for dim,label in dimensions.items():
-                for period in ('ALL',year):g=grouped[side,stage,dim,str(label),period];g['n']+=1;g[case['origin']['status']]+=1
+                for period in ('ALL',year):g=grouped[side,stage,dim,str(label),period];g['n']+=1;g[verified['status']]+=1
         if progress and (serial+1)%1000==0:progress(dict(stage='pivots',complete=serial+1,total=len(packet['pivots'])))
     # Explicit potential extrema that were subsequently updated away are retained.
     candidate_records=[]
@@ -314,6 +315,7 @@ def analyze(packet,*,progress=None):
             score=packet['definitions']['di_score'],industry_bias=packet['definitions']['industry_bias']),
         counts=dict(di_plus_down_runs=len(down_records),candles=len(rows),pivots=len(cases),candidate_phases=len(episodes),candidate_observations=len(candidate_records),dip_recoveries=len(dip_records),
             linked_candidate_pivots=sum(c['episode_id'] is not None for c in cases),unlinked_candidate_pivots=sum(c['episode_id'] is None for c in cases)),
+        outcome_discrepancies=outcome_discrepancies,
         archived_score_status=packet.get('archived_scores',{}).get('status','UNAVAILABLE'),
         archived_score_coverage={key:sum(row.get(key) is not None for row in packet.get('archived_scores',{}).get('rows',{}).values()) for key in packet.get('archived_scores',{}).get('fields',[])},
         engine_coverage=[dict(stage=k[0],scope=k[1],counts=dict(v)) for k,v in sorted(engine_coverage.items())],

@@ -74,7 +74,9 @@ def main():
         packet=analyze(source,progress=lambda r:print(r,flush=True))
         save(a.output_dir/'analysis_v1.json.gz',packet,a.push_report)
         page=a.output_dir/'analysis_v1.html';page.parent.mkdir(parents=True,exist_ok=True);page.write_text(visual(packet),encoding='utf-8')
-        if a.push_report:push_report(page)
+        if a.push_report:
+            # Full-cohort dashboards can approach GitHub's single-file limit.
+            compressed=page.with_suffix('.html.gz');compressed.write_bytes(gzip.compress(page.read_bytes(),mtime=0));push_report(compressed)
         print(json.dumps(packet['counts'],indent=2));print('Dashboard:',page)
     except (ValueError,OSError,RuntimeError,sqlite3.Error,subprocess.CalledProcessError) as error:p.exit(1,str(error)+'\n')
 

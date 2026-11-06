@@ -105,6 +105,9 @@ class Sequences(unittest.TestCase):
 
     def test_native_outcomes_and_extremes_are_checked_against_raw_candles(self):
         p=packet();p['pivots'][0]['origin']['status']='NO_HIT'
-        with self.assertRaisesRegex(ValueError,'outcome differs'):s.analyze(p)
+        result=s.analyze(p)
+        self.assertEqual(len(result['outcome_discrepancies']),1)
+        self.assertEqual(result['cases'][0]['original_outcome']['status'],'NO_HIT')
+        self.assertEqual(result['cases'][0]['outcome']['status'],'HIT')
         p=packet();p['pivots'][0]['pivot']['price']-=.01
         with self.assertRaisesRegex(ValueError,'raw candle extreme'):s.analyze(p)

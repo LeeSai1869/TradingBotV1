@@ -58,3 +58,6 @@ Section_1_Global_Core/feature_runtime.json
 /dist/
 /standalone-test-data/
 /.venv-build/
+
+# Full pivot dashboard is published as compressed HTML.
+research_reports/BTC_1h_sequences/analysis_v1.html

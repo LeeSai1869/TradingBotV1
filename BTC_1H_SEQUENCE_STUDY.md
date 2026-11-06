@@ -23,11 +23,14 @@ Each completed artifact is immediately committed and pushed independently under
   independent event sequences, grouped outcomes and context coverage.
 - `analysis_v1.html`: full-cohort comparison tables and a paginated every-pivot
   inspector with price and DI timelines. Open locally in a browser. Dates use PKT.
+  Git publishing uses `analysis_v1.html.gz` to keep the full dashboard compact;
+  `gzip -dk research_reports/BTC_1h_sequences/analysis_v1.html.gz` expands it.
 
 Publishing requires branch `main`; only the generated report is staged/committed.
 No databases, credentials or account records are included. A changed feature
-generation/config or inconsistent frozen outcome stops the study instead of
-mixing incompatible data. Earlier uploads contain all pivot outcomes and aggregate
+generation/config stops the study instead of mixing incompatible data. Native
+outcomes are checked against the exported raw path; discrepancies retain both
+versions and are reported explicitly. Grouped results use the exported raw path. Earlier uploads contain all pivot outcomes and aggregate
 feature profiles, but cannot establish per-candle joint event sequences.
 
 ## Comparisons

@@ -49,3 +49,10 @@ class RowSource(unittest.TestCase):
         self.assertEqual(len(raw['candles']),65);self.assertEqual(analysis['counts']['pivots'],3)
         self.assertEqual(len(analysis['snapshots']),65)
         self.assertIn('Every pivot',(output/'analysis_v1.html').read_text())
+
+    def test_publication_compresses_full_dashboard_and_publishes_each_artifact(self):
+        report=self.root/'publish-cohort.json.gz';report.write_bytes(gzip.compress(json.dumps(self.report).encode()))
+        output=self.root/'published-sequences'
+        with patch('sys.argv',['study_btc_hour_sequences.py','--report',str(report),'--output-dir',str(output),'--push-report']),patch('os.nice',return_value=0,create=True),patch.object(cli,'push_report') as publish,contextlib.redirect_stdout(io.StringIO()):cli.main()
+        self.assertEqual([c.args[0].name for c in publish.call_args_list],['source_v1.json.gz','analysis_v1.json.gz','analysis_v1.html.gz'])
+        self.assertEqual(gzip.decompress((output/'analysis_v1.html.gz').read_bytes()),(output/'analysis_v1.html').read_bytes())
