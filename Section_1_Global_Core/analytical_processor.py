@@ -3,14 +3,14 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
-from . import regime_research,aggregation_processor
+from . import regime_research,aggregation_processor,analytical_history
 
 _LOCK=threading.RLock()
 _cursor=0
 _status=OrderedDict()
 
 
-def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
+def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,history_time_budget=.5,history_max_bars=200):
     global _cursor
     pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS')]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
@@ -46,6 +46,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4):
                 break
             except Exception:
                 traceback.print_exc()  # Other processors/pairs still get their turns.
+    total+=analytical_history.maintenance(symbols,intervals,max_bars=history_max_bars,time_budget=history_time_budget)
     return total
 
 

@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import json
 import sqlite3
 import time
-from . import aggregation_processor,data_policy,regime_inputs
+from . import aggregation_processor,data_policy,regime_inputs,analytical_history
 from .Symbols import symbols as symbol_registry
 from .memory_storage.Storage import engine_store
 
@@ -46,7 +46,7 @@ def report(symbols=None,intervals=None,*,max_pairs=1000,now_ms=None):
     selected=sorted(set(symbols or data_policy.active_symbols()));timeframes=list(dict.fromkeys(intervals or data_policy.active_intervals()))
     if not set(timeframes)<=set(data_policy.INTERVALS):raise ValueError('Unregistered timeframe')
     engines=aggregation_processor.registry();generations={name:aggregation_processor.generation(name) for name in engines}
-    result=dict(as_of=now,pairs_requested=len(selected)*len(timeframes),pairs_checked=0,truncated=False,counts={},pairs=[],source='CURRENT_INDEXED_NORMAL_RUNNER_OUTPUTS',predictive_validation='NOT_ESTABLISHED_BY_OPERATIONAL_STATUS')
+    result=dict(as_of=now,symbols=selected,timeframes=timeframes,pairs_requested=len(selected)*len(timeframes),pairs_checked=0,truncated=False,counts={},history_counts={},pairs=[],source='CURRENT_INDEXED_NORMAL_RUNNER_OUTPUTS',predictive_validation='NOT_ESTABLISHED_BY_OPERATIONAL_STATUS')
     source=None
     with data_policy.snapshot_guard(timeout=1),reader() as conn:
         policy=data_policy.read()
@@ -63,6 +63,9 @@ def report(symbols=None,intervals=None,*,max_pairs=1000,now_ms=None):
                     pair=dict(symbol=symbol,timeframe=interval,active=enabled,engines={})
                     for engine in engines:
                         item=dict(status='DISABLED' if not enabled else 'ENGINE_MEMORY_UNAVAILABLE',classification=None,coverage=None,confidence=None,run_id=None)
+                        item['history']=analytical_history.progress(conn,source,symbol,interval,engine,policy,generations[engine],at=now) if enabled and conn else dict(status='DISABLED' if not enabled else 'ENGINE_MEMORY_UNAVAILABLE')
+                        history_counts=result['history_counts'].setdefault(engine,{})
+                        hs=item['history']['status'];history_counts[hs]=history_counts.get(hs,0)+1
                         if enabled and conn:
                             run,status=select_run(conn,symbol,interval,engine,policy,generations[engine],at=now);item['status']=status
                             if run:

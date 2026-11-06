@@ -1171,3 +1171,9 @@ independence, exact closed-time context, native-outcome verification, and real
 SQLite export/CLI no-write behavior. `python3 tests/browser_hour_pivot_sequences.py`
 checks cohort filters, every-pivot inspection, SVG timelines and narrow-screen
 layout. See `BTC_1H_SEQUENCE_STUDY.md` for the data contract and export command.
+# Section 5 historical scheduler
+
+`python3 -m unittest discover -s tests -p 'test_analytical*.py'` includes real
+ten-engine historical replay and Bias dependency joins, independent live bindings,
+resumable checkpoints, paused scopes, generation guards, pending-feature diagnostics
+and fair bounded turns. See `SECTION5_HISTORY.md`.

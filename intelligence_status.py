@@ -16,7 +16,16 @@ def main():
     if args.output:args.output.write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     if args.summary:
         print('Analytical readiness; status does not establish predictive performance.')
+        print('Selected symbols:',', '.join(report['symbols']))
+        print('Selected timeframes:',', '.join(report['timeframes']))
         for engine,counts in report['counts'].items():print(engine,json.dumps(counts,sort_keys=True))
+        print('Full-history calculation coverage (separate from live readiness):')
+        for engine,counts in report['history_counts'].items():
+            scopes=[pair['engines'][engine]['history'] for pair in report['pairs']]
+            rows=sum(scope.get('classified_candles',0) for scope in scopes)
+            pending=sum(scope.get('pending_candles',0) for scope in scopes)
+            unknown=sum('pending_candles' not in scope for scope in scopes)
+            print(engine,json.dumps(counts,sort_keys=True),f'classified={rows} pending={pending} scopes_without_target={unknown}')
         print('Pairs:',report['pairs_checked'],'of',report['pairs_requested'],'TRUNCATED' if report['truncated'] else '')
     else:print(json.dumps(report,indent=2,allow_nan=False))
 

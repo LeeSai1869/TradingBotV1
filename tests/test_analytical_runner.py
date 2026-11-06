@@ -57,7 +57,7 @@ class RunnerTurns(unittest.TestCase):
         with patch.object(research,'catch_up',side_effect=advance):
             # Adding an independent engine increases visits, never per-turn work.
             for _ in range(10):
-                self.assertLessEqual(worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],max_bars=120,time_budget=10),120)
+                self.assertLessEqual(worker.maintenance(['BTCUSDT','ETHUSDT'],['1m'],history_time_budget=0,max_bars=120,time_budget=10),120)
                 if any(row[0]=='ETHUSDT' for row in seen):break
         self.assertTrue(any(row[0]=='ETHUSDT' for row in seen));self.assertTrue(worker.process_bar(SimpleNamespace()))
         with patch.object(research,'catch_up') as call:worker.maintenance([],['1m']);call.assert_not_called()

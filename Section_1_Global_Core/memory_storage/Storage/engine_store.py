@@ -17,6 +17,10 @@ def open_db():
     conn=sqlite3.connect(DB_PATH,timeout=5);conn.row_factory=sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
     conn.executescript('''
+        CREATE TABLE IF NOT EXISTS engine_history_bindings (
+            symbol TEXT NOT NULL,timeframe TEXT NOT NULL,engine TEXT NOT NULL,
+            generation TEXT NOT NULL,run_id TEXT,metadata TEXT NOT NULL,status TEXT NOT NULL,updated_ms INTEGER NOT NULL,
+            PRIMARY KEY(symbol,timeframe,engine));
         CREATE TABLE IF NOT EXISTS engine_live_seeds (
             seed_key TEXT PRIMARY KEY, candle_time INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS engine_runs (

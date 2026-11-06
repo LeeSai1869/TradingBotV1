@@ -450,3 +450,13 @@ bounds valid in the loaded timeline. Its color is editable under Style. This
 presentation classification does not keep an engine-invalidated zone alive or
 change trading state. Dynamic/institutional classification and identity remain
 owned by the feature engine.
+# Section 5 history scheduling amendment — 2026-11-06
+
+The analytical processor now reserves a separate bounded historical lane after
+its live turn. Core owns the persistence/indexing adapter; Section 5 owns the
+unchanged analytical formulas. Historical runs and Bias dependencies have a
+separate `engine_history_bindings` index and do not replace live `mtf_bindings`.
+See [SECTION5_HISTORY.md](../SECTION5_HISTORY.md) for budgets, lineage and readiness
+semantics. This amendment does not change raw ingestion, Section 4 calculations,
+BarEvent or the production decision rules. It supersedes any implication that
+current live Section 5 publications certify all-history completion.

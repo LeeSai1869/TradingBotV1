@@ -46,7 +46,11 @@ def engine_point(conn,run,frame,as_of):
 
 def select_history_run(conn,symbol,frame,name,policy,generation,*,at):
     """Research may use a compatible committed prefix while its live head waits."""
+    from . import analytical_history
+    history,history_status=analytical_history.select(conn,symbol,frame,name,policy,generation,at=at)
     run,status=intelligence_audit.select_run(conn,symbol,frame,name,policy,generation,at=at)
+    # Never replace more recent live evidence with an unfinished old prefix.
+    if history and (run is None or history['cursor']>=run['cursor']):return history,'HISTORICAL_LANE: '+history_status
     if run or not status.startswith('ENGINE_WAITING:'):return run,status
     epoch=[policy['epochs'].get('symbol:'+symbol,0),policy['epochs'].get('interval:'+frame,0)]
     query="""SELECT b.run_id,b.metadata,r.metadata,r.cursor FROM mtf_bindings b JOIN engine_runs r ON r.run_id=b.run_id

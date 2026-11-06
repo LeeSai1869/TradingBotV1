@@ -9,10 +9,10 @@ from Section_5_Market_Regime.engines import regime
 from Section_5_Market_Regime import config as configuration
 
 
-def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME'):
+def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME',history_dependencies=False):
     if engine_name=='BIAS':
         from . import bias_processor
-        return bias_processor.catch_up(symbol,interval,limit=limit,since=since,config=config,revision=revision,now_ms=now_ms,lock_timeout=lock_timeout)
+        return bias_processor.catch_up(symbol,interval,limit=limit,since=since,config=config,revision=revision,now_ms=now_ms,lock_timeout=lock_timeout,history_dependencies=history_dependencies)
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Batch limit must be 1–200')
     if since is not None and (type(since) is not int or since<0):raise ValueError('Invalid history start')
     from Section_5_Market_Regime.engines import structure,trend,trend_config,momentum,momentum_config,volatility,volatility_config,participation,participation_config,phase,phase_config,liquidity,liquidity_config,sentiment,sentiment_config

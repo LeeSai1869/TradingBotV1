@@ -9,7 +9,7 @@ from Section_5_Market_Regime.engines import bias
 from Section_5_Market_Regime.engines.bias_config import BiasConfig
 
 
-def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2):
+def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,history_dependencies=False):
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Batch limit must be 1–200')
     if since is not None and (type(since) is not int or since<0):raise ValueError('Invalid history start')
     cfg=config or BiasConfig()
@@ -25,7 +25,10 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
             parameters=json.loads(versions['feature_parameters_json']);epochs=json.loads(versions['raw_epoch'])
             bindings={};common_seed=0
             for name in bias.DEPENDENCIES:
-                head=store.execute('SELECT generation,run_id,metadata FROM mtf_bindings WHERE symbol=? AND timeframe=? AND engine=? AND known_ms<=? ORDER BY known_ms DESC,id DESC LIMIT 1',(symbol,interval,name,now)).fetchone()
+                if history_dependencies:
+                    head=store.execute('SELECT generation,run_id,metadata FROM engine_history_bindings WHERE symbol=? AND timeframe=? AND engine=? AND updated_ms<=?',(symbol,interval,name,now)).fetchone()
+                else:
+                    head=store.execute('SELECT generation,run_id,metadata FROM mtf_bindings WHERE symbol=? AND timeframe=? AND engine=? AND known_ms<=? ORDER BY known_ms DESC,id DESC LIMIT 1',(symbol,interval,name,now)).fetchone()
                 if not head or not head['run_id']:return empty('Waiting for indexed '+name+' publication')
                 if head['generation']!=aggregation_processor.generation(name):return empty('Waiting for current '+name+' producer generation')
                 metadata=json.loads(head['metadata'])

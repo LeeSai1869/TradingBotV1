@@ -198,3 +198,8 @@ Transient market-data writer contention in analytical maintenance is deferred to
 next runner turn, preserving the scope cursor rather than waiting a full universe
 rotation. The repeated waiting status is logged once; it is not an engine exception
 traceback. This does not bypass the shared writer lock or feature-generation gates.
+# Automatic full-history coverage
+
+The runner now retains its recent live lane and separately advances full-history
+classification checkpoints for active scopes. See [SECTION5_HISTORY.md](../SECTION5_HISTORY.md)
+for deployment, bounded budgets and the separate live/history readiness report.

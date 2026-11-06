@@ -126,12 +126,12 @@ class AggregationHistory(unittest.TestCase):
         response=dict(processed=19,status='processed',latest={},symbol='BTCUSDT',timeframe='1m')
         worker._cursor=0;worker._status.clear()
         with patch.object(regime_research,'catch_up',return_value=response),patch.object(processor,'observe') as observe,patch.object(processor,'refresh',return_value=dict(processed=1)) as refresh:
-            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],max_bars=20,time_budget=10,max_pairs=1),20)
+            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],history_time_budget=0,max_bars=20,time_budget=10,max_pairs=1),20)
             observe.assert_called_once();refresh.assert_called_once()
             self.assertIn('deadline',refresh.call_args.kwargs)
         worker._cursor=0
         with patch.object(regime_research,'catch_up',return_value=dict(response,processed=20)),patch.object(processor,'observe') as observe:
-            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],max_bars=20,time_budget=10,max_pairs=1),20)
+            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],history_time_budget=0,max_bars=20,time_budget=10,max_pairs=1),20)
             observe.assert_not_called()
 
     def test_new_unindexed_gap_checkpoint_cannot_fall_back_to_good_label(self):
