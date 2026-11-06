@@ -1162,3 +1162,12 @@ All-pivot 1% research: install `requirements-research.txt`, then run
 Coverage includes every-pivot membership, missing-candle offsets, finite moments,
 source generation checks, actual 4h/daily SQLite scans/context exports and the
 five-timeframe 1% batch contract. NumPy remains research-only.
+
+Full BTC 1h sequence study:
+`python3 -m unittest discover -s tests -p 'test_hour*.py'` checks independent
+three-close events, sequential spread confirmation, candidate stages and every
+active observation, preserved/breached DI+ recovery paths, gaps, future-data
+independence, exact closed-time context, native-outcome verification, and real
+SQLite export/CLI no-write behavior. `python3 tests/browser_hour_pivot_sequences.py`
+checks cohort filters, every-pivot inspection, SVG timelines and narrow-screen
+layout. See `BTC_1H_SEQUENCE_STUDY.md` for the data contract and export command.

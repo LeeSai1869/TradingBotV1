@@ -121,6 +121,9 @@
     "compare_pivot_features.py": [
       "Section_1_Global_Core"
     ],
+    "study_btc_hour_sequences.py": [
+      "Section_1_Global_Core"
+    ],
     "audit_pivot_context.py": [
       "Section_1_Global_Core",
       "Section_1_Global_Core.memory_storage.Storage"
