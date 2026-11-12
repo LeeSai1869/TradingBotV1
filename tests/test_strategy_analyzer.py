@@ -209,5 +209,16 @@ class StrategyAnalyzer(unittest.TestCase):
             self.assertEqual(result['comparison']['counts']['failure_persisted'],1)
             self.assertTrue((root/'out/strategy_analysis.html').is_file());self.assertEqual(before,inp.read_bytes())
 
+    def test_report_inputs_and_progress_do_not_change_trading_results(self):
+        p=source();plain=a.analyze(p,config());progress=[]
+        rich=a.analyze(p,config(),report_fields=['feature.rsi','feature.absent'],progress=progress.append)
+        self.assertEqual(rich['summary'],plain['summary'])
+        self.assertEqual(rich['run_id'],plain['run_id'])
+        self.assertEqual([(s['side'],s['known_time']) for s in rich['signals']],[(s['side'],s['known_time']) for s in plain['signals']])
+        self.assertEqual(rich['trades'][0]['buy_inputs']['feature.rsi@lag0']['value'],50)
+        self.assertIsNone(rich['trades'][0]['buy_inputs']['feature.absent@lag0']['value'])
+        self.assertEqual(progress[-1]['complete'],8)
+        with self.assertRaises(ValueError):a.analyze(p,config(),report_fields=['future.price'])
+
 
 if __name__=='__main__':unittest.main()

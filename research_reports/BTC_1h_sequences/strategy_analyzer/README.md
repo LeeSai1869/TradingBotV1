@@ -1,5 +1,11 @@
 # First complete alternating strategy replay
 
+For the visual strategy editor and configurable reports, run
+`python3 analyze_btc_hour_strategy.py --serve` from the repository root. Strategy
+branches, AND/OR groups, input exports, dates, costs and baseline selection are
+configured inside that browser workspace. The HTML here remains an offline
+report with its own trade/indicator filters, selectable columns and CSV export.
+
 These are demonstration rules for validating the analyzer, not a selected or
 profitable strategy. The four-branch revision and independent DI baseline were
 replayed over every candle in `../source_v1.json.gz`, using the configs in

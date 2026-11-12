@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strategy research workspace</title>
+<link rel="stylesheet" href="/assets/style.css">
+<body>
+<header class="topbar"><div><span class="eyebrow">BTC · 1 HOUR · RESEARCH</span><h1>Strategy analyzer</h1><p>Build branches, replay stored candles, understand every trade.</p></div><span class="badge">Live trading unchanged</span></header>
+<main class="workspace">
+<nav class="workspace-nav" aria-label="Analyzer sections"><a href="#input-title">Input</a><a href="#strategy-title">Strategy</a><a href="#run-title">Run / compare</a><a href="#report-area">Results</a></nav>
+<section class="panel" aria-labelledby="input-title"><h2 id="input-title">1. Choose your input</h2><div class="controls">
+<label>Stored candle export<select id="input-source"></select></label>
+<button id="refresh-input" type="button">Refresh input</button>
+<label class="file-label">Add a different input<input type="file" id="input-upload" accept=".json,.gz"><small>BTC 1h row-source JSON or JSON.gz</small></label>
+</div><p id="input-status" role="status">Loading input catalog…</p><p class="muted compact">Choose a stored snapshot, or upload another one. Refresh reloads an export file that has been updated on disk; this does not start a live collector.</p><details><summary>Available memory and historical context</summary><div id="input-coverage"></div></details></section>
+<section class="panel" aria-labelledby="strategy-title"><h2 id="strategy-title">2. Configure your strategy</h2><div class="controls">
+<label>Start from<select id="strategy-preset"></select></label><button id="load-preset" type="button">Load strategy</button>
+<label>Strategy name<input id="strategy-name" value="My strategy" maxlength="120"></label>
+<button id="save-config" type="button">Save strategy</button><button id="export-config" type="button">Download strategy</button>
+<label class="file-label">Import strategy<input type="file" id="config-upload" accept=".json"></label>
+</div><p class="muted">Branches for the same side are alternatives. The first qualifying candle wins; branch order breaks ties. Each branch can contain nested AND / OR groups. Uncheck a branch to exclude it from the next replay.</p>
+<div id="branches-editor"></div><div class="controls"><button id="add-buy" type="button">+ BUY branch</button><button id="add-sell" type="button">+ SELL branch</button></div>
+</section>
+<section class="panel" aria-labelledby="run-title"><h2 id="run-title">3. Replay and compare</h2><div class="controls">
+<label>From (UTC, inclusive)<input id="replay-since" type="datetime-local"></label>
+<label>Until (UTC, exclusive)<input id="replay-until" type="datetime-local"></label>
+<label>Fee per side (bps)<input id="fee" type="number" min="0" max="9999" step="0.1" value="4"></label>
+<label>Slippage per side (bps)<input id="slippage" type="number" min="0" max="9999" step="0.1" value="2"></label>
+<label>Starting capital<input id="capital" type="number" min="0.01" step="0.01" value="100"></label>
+<label>Baseline strategy<select id="baseline-preset"><option value="">No comparison</option></select></label>
+</div><p class="muted">Both versions replay the same chosen input, dates and costs. Starts flat, then BUY → SELL. No repeated same-side entries.</p>
+<details><summary>Choose additional indicator values to record in the report</summary><p>These inputs are recorded at accepted BUY/SELL signals. They do not change trading conditions. Add them here to use them as report columns or filters.</p><label>Find report inputs<input id="report-field-search" placeholder="RSI, regime, EMA, 4h…"></label><div id="report-fields" class="field-picker"></div></details>
+<div class="controls"><button id="run-strategy" class="primary" type="button" disabled>Run strategy</button><progress id="run-progress" max="100" value="0" hidden></progress><span id="run-status" role="status"></span></div>
+<p id="workspace-error" role="alert" class="error" hidden></p></section>
+<section class="panel"><h2>Saved runs</h2><div class="controls"><label>Report<select id="saved-report"></select></label><button id="load-report" type="button">Open report</button><button id="use-report-config" type="button" disabled>Edit this report’s strategy</button><button id="pin-baseline" type="button" disabled>Use as baseline</button><a id="download-report" hidden>Download full report</a><a id="download-html" hidden>Download offline HTML</a></div><p id="result-scope" class="muted"></p></section>
+<section id="report-area" aria-live="polite"></section>
+</main>
+<script src="/assets/report.js"></script><script src="/assets/builder.js"></script>
+</body></html>

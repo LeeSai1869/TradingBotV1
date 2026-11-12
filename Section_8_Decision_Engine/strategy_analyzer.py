@@ -249,8 +249,14 @@ def summarize(trades, capital):
                 equity_scope='Full-balance fractional spot compounding of closed trades only; excludes open/censored positions; drawdown at completed trades, not intratrade')
 
 
-def analyze(source, config, *, since=None, until=None):
+def analyze(source, config, *, since=None, until=None, report_fields=None, progress=None):
     validate_config(config)
+    report_fields = sorted(set(report_fields or []))
+    if len(report_fields) > 100:
+        raise ValueError('Record at most 100 extra report inputs')
+    for field in report_fields:
+        probe = dict(config, branches=[dict(b, when=dict(field=field, op='available')) for b in config['branches']])
+        validate_config(probe)
     memory = Memory(source)
     rows = memory.rows
     execution = EXECUTION | config.get('execution', {})
@@ -284,7 +290,9 @@ def analyze(source, config, *, since=None, until=None):
             if reason not in position['censor_reasons']:
                 position['censor_reasons'].append(reason)
 
-    for i in selected:
+    for serial, i in enumerate(selected):
+        if progress and serial % 5000 == 0:
+            progress(dict(complete=serial, total=len(selected), signals=len(signals)))
         row = rows[i]
         valid = memory.price_valid(i)
         gap = i > selected[0] and rows[i - 1]['close_time'] + 1 != row['open_time']
@@ -332,6 +340,7 @@ def analyze(source, config, *, since=None, until=None):
         signal = dict(id=f'{side}:{row["close_time"] + 1}', side=side, candle_open_time=row['open_time'],
                       known_time=row['close_time'] + 1, branch_id=matches[0], matched_branches=matches, fill_status='PENDING')
         operands = set().union(*(expression_operands(b['when']) for b in config['branches'] if b['id'] in matches))
+        operands.update((field, 0) for field in report_fields)
         signal['inputs'] = {f'{field}@lag{lag}': dict(zip(('value', 'missing_reason'), memory.value(i, field, lag)))
                             for field, lag in sorted(operands)}
         signals.append(signal)
@@ -363,7 +372,7 @@ def analyze(source, config, *, since=None, until=None):
                   signals=signals, trades=trades, waiting_for=waiting, branch_diagnostics=diagnostics,
                   summary=summarize(trades, execution['initial_capital']), yearly=yearly,
                   invalid_price_candles=invalid_prices, price_gaps=gaps, unavailable_feature_fields=missing_features,
-                  fields_used=fields, available_feature_fields=sorted(memory.features),
+                  fields_used=fields, report_fields=report_fields, available_feature_fields=sorted(memory.features),
                   definitions=dict(expression='Three-valued AND/OR/NOT: false AND unknown is false; true OR unknown is true. Missing never becomes zero/neutral',
                                    branches='All branches evaluated at each valid candle close; configuration order breaks same-side ties. One accepted signal per candle, beginning with BUY, then strictly alternating',
                                    fills='Next contiguous valid candle open within the evaluation window; configurable spot fees/slippage, no shorts, stops or forced final exit',
@@ -371,6 +380,8 @@ def analyze(source, config, *, since=None, until=None):
                                    success='A completed BUY-to-SELL trade with net return >0 after configured costs',
                                    context='Exact last-closed compatible engine context; VALID/PARTIAL only. Reconstructed close-time knowledge, not proof of live publication',
                                    chronology='One continuous replay; yearly closed-trade summaries assigned by SELL fill year, no annual state reset. Inspected research data, not an untouched holdout'))
+    if progress:
+        progress(dict(complete=len(selected), total=len(selected), signals=len(signals)))
     return result
 
 

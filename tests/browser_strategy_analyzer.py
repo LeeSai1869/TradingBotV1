@@ -25,12 +25,27 @@ def main():
             page.locator('#view').select_option('failures')
             assert page.locator('#trades tr').count() == 2
             page.get_by_role('button', name='Inspect', exact=True).click()
-            assert 'feature.buy@lag0' in page.locator('#detail').inner_text()
-            assert 'LOSS' in page.locator('#detail').inner_text()
+            assert 'Input values at the accepted signals' in page.locator('#detail').inner_text()
+            assert 'Loss' in page.locator('#detail').inner_text()
+            assert 'Entry price' in page.locator('#detail').inner_text()
             page.locator('#view').select_option('comparison:failure_persisted')
             page.get_by_role('button', name='Inspect', exact=True).click()
             assert 'baseline' in page.locator('#detail').inner_text()
-            assert 'revision' in page.locator('#detail').inner_text()
+            assert 'revision' in page.locator('#detail').inner_text().lower()
+            page.locator('#view').select_option('trades')
+            page.get_by_text('Filter by a recorded indicator value',exact=True).click()
+            page.locator('#input-field').select_option('feature.buy@lag0')
+            page.locator('#input-op').select_option('eq')
+            page.locator('#input-value').fill('0');page.locator('#input-value').dispatch_event('change')
+            assert '0 records' in page.locator('#page').inner_text()
+            assert 'Completed trades' in page.locator('#summary').inner_text()
+            page.locator('#clear-filters').click()
+            page.get_by_text('Choose table columns',exact=True).click()
+            page.locator('#input-columns').select_option(['feature.buy@lag0'])
+            assert 'Buy · BUY → SELL' in page.locator('#trades').inner_text()
+            with page.expect_download() as download:
+                page.locator('#export-csv').click()
+            assert download.value.suggested_filename=='filtered_strategy_trades.csv'
             assert page.locator('#signals tr').count() == 51
             page.locator('#signal-next').click();page.locator('#signal-next').click()
             assert page.locator('#signals tr').count() == 21
@@ -40,7 +55,7 @@ def main():
             page.set_viewport_size(dict(width=390, height=844))
             assert page.evaluate('document.body.scrollWidth <= innerWidth')
             assert not errors, errors
-            print('PASS strategy failures, revision drilldown, signal evidence/pagination, missing inputs and mobile layout')
+            print('PASS readable trade explanations, revision drilldown, input filters/columns, CSV, signal pagination and mobile layout')
         finally:
             browser.close()
 

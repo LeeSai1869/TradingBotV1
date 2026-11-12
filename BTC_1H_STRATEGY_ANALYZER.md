@@ -5,6 +5,79 @@ hourly candle**, without conditioning on candidates, successful native pivots or
 future outcomes. It is an offline research tool. It does not change production
 strategy rules, the runner, checkpoints, alerts or databases.
 
+## Open the interactive analyzer
+
+From your existing repository folder:
+
+```sh
+python3 analyze_btc_hour_strategy.py --serve
+```
+
+This opens the browser workspace automatically. Keep the terminal running while
+using it; Ctrl+C stops the research workspace. It uses loopback port 8765,
+separately from the existing chart backend. If needed, choose another port with
+`--port 8766`. `--no-browser` starts it without opening a browser window.
+
+All normal configuration is available **in the analyzer**:
+
+1. Choose a stored candle export or upload a different row-source JSON/JSON.gz.
+   The input panel shows dates, candle counts, stored feature columns and engine
+   history coverage. Refresh reloads a file updated on disk. This is a snapshot
+   replay, not a live collector. Upload row sources, not analysis/pivot reports.
+2. Load an example or saved strategy. Rename, add, duplicate, reorder, disable or
+   delete BUY/SELL branches. Expand **Edit conditions** to select fields,
+   comparisons, values, other input fields and past-candle lags. Nest AND/OR/NOT
+   groups directly in the editor; no JSON editing is required.
+3. Set the UTC date range, fees, slippage and starting capital. Select a baseline
+   strategy for comparison. Both configurations are replayed on exactly the same
+   input, dates and selected costs, even if the saved baseline used other costs.
+4. Choose additional indicator values to record at BUY/SELL signals. These are
+   report inputs only; they do not change trading conditions. Up to 100 extra
+   inputs are supported, and missing values remain explicit.
+5. Click **Run strategy**. Progress distinguishes the strategy replay from the
+   baseline replay. Each run is saved separately, preserving earlier runs.
+
+Save/download/import strategy configurations from the editor. Saved executable
+configurations include enabled branches; the browser draft also retains disabled
+branches. The current draft, selected source, baseline, dates and report inputs
+survive browser reloads. **Use as baseline** pins a report's strategy for the next
+full replay; **Edit this report's strategy** loads its configuration into the
+editor without changing the displayed result until a new run completes.
+
+By default, local configurations, uploaded inputs and run files are stored under
+`~/.tradingbot/strategy_analyzer/`, or `strategy_analyzer/` inside
+`TRADINGBOT_DATA_DIR` when that profile override is set. They are kept outside the
+checkout and do not overwrite the committed example reports. `--workspace-dir`
+selects another research folder. `--input /path/to/source.json.gz --serve` makes
+an external export available directly without uploading it. There are no external
+CDNs, account setup or extra Python package requirements for this workspace.
+
+### Configure and inspect the report
+
+The workspace and downloaded standalone HTML share the same report controls:
+
+- Full-replay performance cards, a completed-trade balance chart, costs, input
+  scope and a side-by-side baseline performance comparison.
+- Case selection for successes, failures, open/censored positions and each
+  baseline revision group, with branch, entry-date and year filters.
+- Recorded indicator filters at BUY or SELL, plus configurable base/indicator
+  columns and rows per page. Indicator values can be filtered only when they were
+  recorded in that run; choose more report inputs before replaying if needed.
+- Entry/exit prices and fill times, net result, holding time, branch names and
+  readable rule explanations. **Inspect** shows the original and revised trade
+  together and the recorded input values at both signals, including missing reasons.
+- Filtered CSV export with full numeric indicator precision in separate BUY/SELL
+  columns and availability columns, plus offline HTML and full JSON downloads.
+
+Report filters affect only the selected cases and tables. Full-strategy totals
+stay unchanged and are visibly separated from filtered-case statistics. A
+failure-only view is not a new backtest. In revision views, selected-case totals
+refer to baseline trades; revision outcomes appear alongside them. A new input or
+rule set requires **Run strategy**, not just a report filter. Display timestamps
+can switch between Pakistan time and UTC; date filters and year grouping use UTC.
+An offline HTML supports all report filters/exports but does not run Python;
+launch `--serve` to edit and replay strategies.
+
 Several BUY branches and several SELL branches feed **one** alternating sequence:
 
 1. Start flat, waiting for BUY. Ignore SELL matches until the first BUY.
@@ -185,6 +258,8 @@ Validation:
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_strategy_analyzer.py' -v
+python3 -m unittest discover -s tests -p 'test_strategy_workspace.py' -v
 python3 -m unittest discover -s tests -p 'test_hour*.py' -v
 PYTHONPATH=. python3 tests/browser_strategy_analyzer.py
+PYTHONPATH=. python3 tests/browser_strategy_workspace.py
 ```
