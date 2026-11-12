@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+import hashlib
+import sqlite3
 from unittest.mock import patch
 from Section_4_Features.execution.engine import Engine
 from Section_4_Features.execution import checkpoint
@@ -67,3 +69,44 @@ class ProfileSnapshotTests(unittest.TestCase):
         with conn:conn.execute("UPDATE feature_engine_state SET state='{}'")
         conn.close()
         self.assertEqual(volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')['bins'],[])
+
+    def test_generation_change_invalidates_cached_bins_even_when_levels_match(self):
+        conn=features_store.open_db()
+        with conn:conn.execute('INSERT INTO feature_calculation_versions(symbol,interval,signature,generation) VALUES (?,?,?,?)',('ETHUSDT','1m','same',0))
+        conn.close()
+        before=volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')
+        saved=json.loads(checkpoint.dump(self.engine,(0,0)))
+        saved['state']['persistent']['vpVolumeBins']=[2*v for v in saved['state']['persistent']['vpVolumeBins']]
+        conn=features_store.open_db()
+        with conn:
+            conn.execute('UPDATE feature_engine_state SET state=?',(json.dumps(saved),))
+            conn.execute('UPDATE feature_calculation_versions SET generation=1')
+        conn.close()
+        after=volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')
+        self.assertEqual(after['status'],'ready')
+        self.assertEqual([b['volume'] for b in after['bins']],[2*b['volume'] for b in before['bins']])
+
+    def test_waiting_explains_checkpoint_and_repair_and_state_mismatch(self):
+        wrong=volume_profile.snapshot('ETHUSDT','1m',dict(self.latest,open_time=240000),'0:0')
+        self.assertIn('requested candle differ',wrong['reason'])
+        self.assertEqual(wrong['checkpoint_time'],180000)
+        saved=json.loads(checkpoint.dump(self.engine,(0,0)));saved['state']['last_time']=0
+        conn=features_store.open_db()
+        with conn:conn.execute('UPDATE feature_engine_state SET state=?',(json.dumps(saved),))
+        conn.close()
+        self.assertIn('state timestamp',volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')['reason'])
+
+    def test_read_only_node_diagnostic_reports_nonzero_hvn_and_lvn(self):
+        from Section_1_Global_Core.memory_storage.Storage import klines_store
+        import check_volume_profile
+        raw=Path(self.temp.name)/'klines.db';conn=sqlite3.connect(raw)
+        with conn:
+            conn.execute('CREATE TABLE klines(symbol TEXT,interval TEXT,open_time INTEGER,close_time INTEGER)')
+            conn.execute('INSERT INTO klines VALUES (?,?,?,?)',('ETHUSDT','1m',180000,239999))
+        conn.close();conn=features_store.open_db();features_store.insert_rows(conn,[self.result]);conn.close()
+        paths=(raw,features_store.DB_PATH);before=[hashlib.sha256(p.read_bytes()).hexdigest() for p in paths]
+        with patch.object(klines_store,'DB_PATH',raw),patch.object(check_volume_profile.data_policy,'enabled',return_value=True),patch.object(check_volume_profile.data_policy,'read',return_value={'epochs':{}}):
+            result=check_volume_profile.report('ETHUSDT',['1m'],now_ms=240000)
+        row=result['frames'][0]
+        self.assertEqual(row['status'],'ready');self.assertEqual(row['high_volume_nodes'],2);self.assertEqual(row['low_volume_nodes'],1)
+        self.assertEqual(row['bins'],4);self.assertEqual(before,[hashlib.sha256(p.read_bytes()).hexdigest() for p in paths])

@@ -16,6 +16,11 @@ def main():
     if args.output:args.output.write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     if args.summary:
         print('Analytical readiness; status does not establish predictive performance.')
+        from Section_1_Global_Core import data_policy,analytical_history
+        active_symbols=data_policy.active_symbols();active_intervals=data_policy.active_intervals()
+        pairs=len(active_symbols)*len(active_intervals)
+        print(f'Runner processing universe: {len(active_symbols)} symbols x {len(active_intervals)} timeframes = {pairs} pairs / {pairs*len(analytical_history.ENGINES)} engine scopes')
+        print('The --symbols/--intervals options filter this report; they do not reduce runner processing.')
         print('Selected symbols:',', '.join(report['symbols']))
         print('Selected timeframes:',', '.join(report['timeframes']))
         for engine,counts in report['counts'].items():print(engine,json.dumps(counts,sort_keys=True))
