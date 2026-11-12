@@ -28,7 +28,7 @@ def clean(value):
     return value
 
 
-def export(report,*,progress=None):
+def export(report,*,progress=None,include_all_features=False):
     if (report.get('version')!='pivot-moves-v1' or report.get('symbol')!='BTCUSDT' or report.get('timeframe')!='1h'
         or report['config']['threshold_pct']!=1 or report['config']['horizon_bars'] is not None):raise ValueError('Use the BTCUSDT 1h, 1%, next-opposite-pivot report')
     with ExitStack() as stack:
@@ -39,7 +39,9 @@ def export(report,*,progress=None):
         existing={r[1] for r in source.execute('PRAGMA table_info(features)')};fields=[f for f in FIELDS if f in existing]
         required=set(FIELDS[:10])|{'di_plus','di_minus','adx'}
         if not required<=set(fields):raise ValueError('Candidate/DI fields are not stored')
-        sql='''SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,k.volume,f.formula_version,'''+','.join('f.'+f for f in fields)+''' FROM raw.klines k LEFT JOIN features f
+        if include_all_features:
+            fields=sorted(existing-{'symbol','interval','open_time','formula_version'})
+        sql='''SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,k.volume,f.formula_version,'''+','.join('f."'+f.replace('"','""')+'"' for f in fields)+''' FROM raw.klines k LEFT JOIN features f
         ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time WHERE k.symbol=? AND k.interval=? AND k.open_time<=? AND k.close_time<? ORDER BY k.open_time'''
         rows=[]
         for values in source.execute(sql,('BTCUSDT','1h',report['coverage']['last'],report['observed_as_of'])):
@@ -77,7 +79,7 @@ def export(report,*,progress=None):
                     item['results'][str(opened)]=clean({k:p.get(k) for k in ('candle_open_time','candle_close_time','as_of','available_at','engine_version','classification','strength','confidence','coverage','data_quality','quality_flags','measurements','provenance')})
                 if progress:progress(dict(stage='engine_history',scope=key,rows=len(item['results']),status=item['status']))
         return dict(version=VERSION,symbol='BTCUSDT',timeframe='1h',threshold_pct=1.,source_id=report['source_id'],observed_as_of=report['observed_as_of'],coverage=report['coverage'],
-            source_metadata=metadata,missing_feature_columns=sorted(set(FIELDS)-existing),candles=clean(rows),pivots=report['cases'],engine_history=history,
+            source_metadata=metadata,missing_feature_columns=sorted(set(FIELDS)-existing),exported_feature_columns=fields,candles=clean(rows),pivots=report['cases'],engine_history=history,
             archived_scores=dict(status=score_status,fields=score_fields,rows=scores),
             definitions=dict(spread='abs(DI_plus-DI_minus), indicator points',signed_spread='DI_plus-DI_minus',dominance='(DI_plus-DI_minus)/(DI_plus+DI_minus), measurement not a probability',
                 di_score='Raw DI values and stored archived score fields are separate; the current production DI rule does not compute a DI probability/final score',

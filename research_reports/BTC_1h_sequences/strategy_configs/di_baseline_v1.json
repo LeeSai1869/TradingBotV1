@@ -1,0 +1,16 @@
+{
+  "version": "btc-hour-strategy-analyzer-v1",
+  "id": "di_baseline_v1",
+  "description": "Descriptive independent DI-turn baseline, not live production logic or an optimized strategy.",
+  "execution": {"fee_bps_per_side": 4, "slippage_bps_per_side": 2, "initial_capital": 100},
+  "branches": [
+    {"id": "buy_di_pressure_turn", "side": "BUY", "when": {"all": [
+      {"field": "event.di_minus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "MINUS"}
+    ]}},
+    {"id": "sell_di_pressure_turn", "side": "SELL", "when": {"all": [
+      {"field": "event.di_plus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "PLUS"}
+    ]}}
+  ]
+}

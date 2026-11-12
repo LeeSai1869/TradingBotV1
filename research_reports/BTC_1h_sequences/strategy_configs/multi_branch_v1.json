@@ -1,0 +1,48 @@
+{
+  "version": "btc-hour-strategy-analyzer-v1",
+  "id": "multi_branch_v1",
+  "description": "Four example five-condition branches. Engine Trend OR close/EMA50 explicitly defines context alternatives; no implicit missing-data fallback or optimized claim.",
+  "execution": {"fee_bps_per_side": 4, "slippage_bps_per_side": 2, "initial_capital": 100},
+  "branches": [
+    {"id": "buy_up_context", "side": "BUY", "when": {"all": [
+      {"field": "event.di_minus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "MINUS"},
+      {"field": "di.abs_spread", "op": "gte", "value": 5},
+      {"field": "feature.rsi", "op": "lte", "value": 70},
+      {"any": [
+        {"field": "context.1h.TREND.direction", "op": "eq", "value": "BULLISH"},
+        {"field": "price.close", "op": "gte", "other_field": "feature.ema50"}
+      ]}
+    ]}},
+    {"id": "buy_down_context", "side": "BUY", "when": {"all": [
+      {"field": "event.di_minus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "MINUS"},
+      {"field": "di.abs_spread", "op": "gte", "value": 10},
+      {"field": "feature.rsi", "op": "lte", "value": 40},
+      {"any": [
+        {"field": "context.1h.TREND.direction", "op": "eq", "value": "BEARISH"},
+        {"field": "price.close", "op": "lt", "other_field": "feature.ema50"}
+      ]}
+    ]}},
+    {"id": "sell_up_context", "side": "SELL", "when": {"all": [
+      {"field": "event.di_plus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "PLUS"},
+      {"field": "di.abs_spread", "op": "gte", "value": 5},
+      {"field": "feature.rsi", "op": "gte", "value": 55},
+      {"any": [
+        {"field": "context.1h.TREND.direction", "op": "eq", "value": "BULLISH"},
+        {"field": "price.close", "op": "gte", "other_field": "feature.ema50"}
+      ]}
+    ]}},
+    {"id": "sell_down_context", "side": "SELL", "when": {"all": [
+      {"field": "event.di_plus_peak", "op": "eq", "value": true},
+      {"field": "di.dominant", "op": "eq", "value": "PLUS"},
+      {"field": "di.abs_spread", "op": "gte", "value": 5},
+      {"field": "feature.rsi", "op": "gte", "value": 30},
+      {"any": [
+        {"field": "context.1h.TREND.direction", "op": "eq", "value": "BEARISH"},
+        {"field": "price.close", "op": "lt", "other_field": "feature.ema50"}
+      ]}
+    ]}}
+  ]
+}

@@ -1,5 +1,11 @@
 # BTC one-hour candidate and DI sequence study
 
+For configurable AND/OR rules over **every candle**, with multiple strategy
+branches, alternating BUY/SELL trades and revision/failure comparisons, use
+[`analyze_btc_hour_strategy.py`](analyze_btc_hour_strategy.py) as documented in
+[`BTC_1H_STRATEGY_ANALYZER.md`](BTC_1H_STRATEGY_ANALYZER.md). The pivot/candidate
+comparisons below are a separate descriptive research workflow.
+
 Run from the project folder on the Mac holding the market databases:
 
 ```sh
@@ -103,3 +109,68 @@ Once exported, analysis can run without the market databases:
 python3 study_btc_hour_sequences.py \
   --input research_reports/BTC_1h_sequences/source_v1.json.gz
 ```
+
+## Four/five-condition combination filtering
+
+The research CLI now writes a separate `combination_filter` dimension to
+`combinations_v1.json` and a self-contained `combinations_v1.html`. Normal source
+analysis also embeds this dimension in the full dashboard and JSON. Existing
+single-condition, pivot, candidate and recovery comparisons remain available.
+To reuse the already exported analysis without databases or rewriting it:
+
+```sh
+python3 study_btc_hour_sequences.py \
+  --analysis-input research_reports/BTC_1h_sequences/analysis_v1.json.gz
+```
+
+Four fixed named conditions are ANDed for each research side:
+
+1. Absolute DI spread is at least 10 indicator points.
+2. Pressure-side DI dominates: DI− for BUY, DI+ for SELL.
+3. Local 1h Trend direction is BULLISH for BUY, BEARISH for SELL.
+4. Both last-closed 4h and daily Trend directions agree with that direction.
+
+The five-condition version adds local 1h Regime `primary == TRENDING`. The higher
+timeframe condition explicitly contains two required predicates; named condition
+counts are not counts of independent evidence. These are fixed descriptive
+assumptions, not selected or optimized trading thresholds.
+
+`--combination-filters path/to/filters.json` accepts a nonempty list of definitions.
+Each definition has a unique `id`, `side` (`BUY`/`SELL`) and exactly four or five
+named `conditions`. Each condition contains a nonempty `all` list of predicates.
+For example, the spread condition is:
+
+```json
+{"name":"DI spread","all":[{"field":"di.abs_spread","min":10,"max":35}]}
+```
+
+Numeric `min` is inclusive and `max` exclusive. Classification predicates use
+`eq` or `in`, e.g. `{"field":"1h:REGIME:primary","in":["TRENDING","RANGING"]}`.
+Allowed fields are `di.abs_spread`, `di.dominant`, and
+`<1h|4h|1d>:<REGIME|TREND>:<primary|direction|strength_band>`. Unsupported fields
+fail before any export. To write the full default definitions for editing:
+
+```sh
+python3 -c 'import json; from study_btc_hour_sequences import default_combination_filters; print(json.dumps(default_combination_filters(), indent=2))' > /tmp/hour-filters.json
+```
+
+Native-pivot stages and all active candidate observations have separate tables.
+Candidate outcomes use next-open 12-hour windows without selecting eventual
+native pivots. Each table includes unfiltered N, missing-data exclusions, eligible
+N, matched N and nonmatching N; both unfiltered and same-required-data baselines
+are retained. Native hit rates use HIT + NO_HIT only. Candidate means use complete
+windows only; censored observations and zero-sample results remain explicit.
+
+Missing required fields exclude a row even if another predicate already fails.
+Per-field and per-reason exclusions overlap and must not be summed as disjoint
+counts. UNKNOWN classifications, invalid quality and missing, stale or forming
+context are unavailable, never neutral. VALID/PARTIAL engine classifications are
+accepted only for the exact last-closed candle at each stage's knowledge time.
+This remains reconstructed historical context, not proof of live publication.
+
+UTC calendar-year rows use stage knowledge time (candidate observation close),
+including years with zero matches. For absent native stages, origin close is used
+only to place their missing-stage exclusions. Chronological matched observation
+IDs are exported for audit. These inspected yearly slices are descriptive and
+overlap; no untouched holdout or execution backtest is claimed. Open the separate
+HTML directly; it has no external chart/CDN dependency.

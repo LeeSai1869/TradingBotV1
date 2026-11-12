@@ -41,6 +41,19 @@ class RowSource(unittest.TestCase):
         self.report['source_id']='changed'
         with self.assertRaises(ValueError):source.export(self.report)
 
+    def test_analyzer_can_export_every_stored_feature_read_only(self):
+        paths=(klines_store.DB_PATH,features_store.DB_PATH)
+        before=[hashlib.sha256(p.read_bytes()).hexdigest() for p in paths]
+        packet=source.export(self.report,include_all_features=True)
+        conn=features_store.open_db()
+        columns={r[1] for r in conn.execute('PRAGMA table_info(features)')}-{'symbol','interval','open_time','formula_version'}
+        conn.close()
+        self.assertEqual(set(packet['exported_feature_columns']),columns)
+        self.assertEqual(set(packet['candles'][0]['features']),columns)
+        self.assertIn('structure_events',packet['candles'][0]['features'])
+        self.assertEqual(before,[hashlib.sha256(p.read_bytes()).hexdigest() for p in paths])
+        json.dumps(packet,allow_nan=False)
+
     def test_cli_complete_export_analysis_and_dashboard(self):
         report=self.root/'cohort.json.gz';report.write_bytes(gzip.compress(json.dumps(self.report).encode()))
         output=self.root/'sequences'
@@ -54,5 +67,5 @@ class RowSource(unittest.TestCase):
         report=self.root/'publish-cohort.json.gz';report.write_bytes(gzip.compress(json.dumps(self.report).encode()))
         output=self.root/'published-sequences'
         with patch('sys.argv',['study_btc_hour_sequences.py','--report',str(report),'--output-dir',str(output),'--push-report']),patch('os.nice',return_value=0,create=True),patch.object(cli,'push_report') as publish,contextlib.redirect_stdout(io.StringIO()):cli.main()
-        self.assertEqual([c.args[0].name for c in publish.call_args_list],['source_v1.json.gz','analysis_v1.json.gz','analysis_v1.html.gz'])
+        self.assertEqual([c.args[0].name for c in publish.call_args_list],['source_v1.json.gz','combinations_v1.json','analysis_v1.json.gz','analysis_v1.html.gz','combinations_v1.html'])
         self.assertEqual(gzip.decompress((output/'analysis_v1.html.gz').read_bytes()),(output/'analysis_v1.html').read_bytes())
