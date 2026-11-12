@@ -139,13 +139,27 @@ def maintenance(symbols,intervals,*,max_bars=None,time_budget=None):
         service=(work_priority.service_pair(symbols,intervals,owner,'features',owner_interval=priority_interval)
                  if priority_interval else work_priority.service_pair(symbols,intervals,owner,'features'))
         if service:
+            current_service=service
             try:
                 print(f'[processor] background feature turn: {service[0]} {service[1]}',flush=True)
                 cap=max(1,max_bars//4)
                 serviced=_advance(*service,cap,min(deadline,start+time_budget*.25));count+=serviced
                 service_extra=max(0,serviced-cap)
+                # Use the remaining reserved background slice for several
+                # one-candle updates before bulk ownership resumes.
+                # Preserve the original historical service turn and
+                # never admit targeted repairs or long backlogs to this burst.
+                service_rows=serviced;seen={service};service_deadline=min(deadline,start+time_budget*.25)
+                for _ in range(3):
+                    if serviced>12 or service_rows>=cap or time.monotonic()>=service_deadline:break
+                    near=work_priority.service_pair(symbols,intervals,owner,'features',owner_interval=priority_interval,live_only=True,exclude=seen)
+                    if near is None or near in seen or time.monotonic()>=service_deadline:break
+                    seen.add(near);current_service=near
+                    print(f'[processor] recent feature turn: {near[0]} {near[1]}',flush=True)
+                    advanced=_advance(*near,cap-service_rows,service_deadline);count+=advanced;service_rows+=advanced
+                    service_extra=max(0,service_rows-cap)
             except Exception:
-                reset_pair(*service);traceback.print_exc()
+                reset_pair(*current_service);traceback.print_exc()
         owner_intervals=[priority_interval] if priority_interval else list(intervals)
         for _ in range(len(owner_intervals)):
             if count-service_extra>=max_bars or time.monotonic()>=deadline:break

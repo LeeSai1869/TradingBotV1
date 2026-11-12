@@ -50,10 +50,13 @@ export function mount(){
 export function update(chart,data){
     const config=styles(),enabled=['vp_histogram','vp_hvn_nodes','vp_lvn_nodes'].some(key=>config[key]?.visible);
     const latest=(data.bars||[]).findLast(b=>!b.provisional),candidate=data.volumeProfile;
-    profile=enabled&&candidate?.status==='ready'&&candidate.as_of===latest?.open_time?candidate:null;
+    const matching=candidate?.as_of===latest?.open_time;
+    const updating=candidate?.stale===true&&candidate.as_of<latest?.open_time&&candidate.requested_time===latest?.open_time;
+    profile=enabled&&candidate?.status==='ready'&&(matching||updating)?candidate:null;
     status.hidden=!enabled;
-    status.title=profile?`Volume profile · ${profile.lookback} closed candles`:(candidate?.reason||'Waiting for closed-candle volume profile');
-    status.textContent=profile?`VP · ${profile.lookback}`:'VP · —';
+    const stamp=time=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(time))+' PKT';
+    status.title=profile?`Volume profile · ${profile.lookback} closed candles · source candle ${stamp(profile.as_of)}${profile.stale?`; updating toward ${stamp(profile.requested_time)}`:''}`:(candidate?.reason||'Waiting for closed-candle volume profile');
+    status.textContent=profile?`VP · ${profile.lookback}${profile.stale?' · updating':''}`:'VP · —';
     primitive.requestUpdate?.();
 }
 export function updateLive(){/* Current profile changes on committed closed candles only. */}

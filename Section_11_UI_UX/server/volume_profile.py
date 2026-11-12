@@ -16,17 +16,19 @@ def snapshot(symbol,interval,latest,epoch):
         conn.execute('BEGIN')
         row=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
         if not row:return waiting('Feature checkpoint has not been created')
-        if row[0]!=latest['open_time']:return waiting('Histogram checkpoint and requested candle differ',checkpoint_time=row[0],requested_time=latest['open_time'])
+        if row[0]>latest['open_time']:return waiting('Histogram checkpoint is newer than the requested candle',checkpoint_time=row[0],requested_time=latest['open_time'])
         task=features_store.pending_replay(conn,symbol,interval)
         if task and any(c.startswith('vp_') for c in task[2]):return waiting('Volume Profile recalculation is pending')
         revision=None
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_calculation_versions'").fetchone():
             revision=conn.execute('SELECT signature,generation FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
-        f=latest.get('features') or {}
+        stale=row[0]<latest['open_time']
+        f=(features_store.read_row(conn,symbol,interval,row[0]) or {}) if stale else (latest.get('features') or {})
         levels={k:f.get(k) for k in ('vp_poc','vp_va_low','vp_va_high')}
         if not all(isinstance(v,(int,float)) and math.isfinite(v) for v in levels.values()):return waiting('Stored POC or value-area levels are unavailable')
         key=(str(features_store.DB_PATH),symbol,interval,epoch,row[0],revision,tuple(levels.values()))
-        if key in _CACHE:return _CACHE[key]
+        freshness=dict(stale=stale,requested_time=latest['open_time'])
+        if key in _CACHE:return {**_CACHE[key],**freshness}
         state=conn.execute('SELECT state FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
         saved=json.loads(state[0]);values=saved['state'];params=saved['parameters']
         if saved.get('version')!=3 or ':'.join(map(str,saved.get('epoch',())))!=epoch:return waiting('Histogram checkpoint version or data epoch differs')
@@ -45,6 +47,6 @@ def snapshot(symbol,interval,latest,epoch):
         result={'status':'ready','as_of':row[0],'lookback':lookback,'value_area_pct':params['vpValueAreaPct'],'bins':bins,'levels':levels}
         _CACHE[key]=result
         while len(_CACHE)>16:_CACHE.popitem(last=False)
-        return result
+        return {**result,**freshness}
     except (KeyError,ValueError,TypeError,sqlite3.OperationalError) as error:return waiting('Histogram checkpoint could not be read',error_type=type(error).__name__)
     finally:conn.close()

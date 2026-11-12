@@ -83,7 +83,7 @@ _service_cursors={}
 _live_cursors={}
 _service_phases={}
 
-def service_pair(symbols,intervals,owner,kind,*,owner_interval=None):
+def service_pair(symbols,intervals,owner,kind,*,owner_interval=None,live_only=False,exclude=()):
     """Give non-owner pairs bounded turns without changing bulk ownership.
 
     Only indexed existence checks are used. Every connection closes even when a
@@ -91,6 +91,7 @@ def service_pair(symbols,intervals,owner,kind,*,owner_interval=None):
     """
     from contextlib import ExitStack
     if kind not in ('downloads','features'):raise ValueError('Unknown service kind')
+    if live_only and kind!='features':raise ValueError('The near-current lane is for features only')
     symbols=list(symbols);intervals=list(intervals)
     pairs=[(s,t) for s in symbols for t in reversed(intervals) if s!=owner or owner_interval is not None and t!=owner_interval]
     if not pairs or not klines_store.DB_PATH.exists():return None
@@ -118,13 +119,13 @@ def service_pair(symbols,intervals,owner,kind,*,owner_interval=None):
         # entire rotation just to calculate its next closed candle.
         phase=_service_phases.get(identity,0)
         if len(_service_phases)>8:_service_phases.clear();_live_cursors.clear()
-        _service_phases[identity]=phase+1
-        if kind=='features' and versions is not None and phase%2==0:
+        if not live_only:_service_phases[identity]=phase+1
+        if kind=='features' and versions is not None and (live_only or phase%2==0):
             live_cursor=_live_cursors.get(identity,0)
             for _ in pairs:
                 pair=pairs[live_cursor%len(pairs)];live_cursor+=1
                 _live_cursors[identity]=live_cursor
-                if pair in waiting or pair in jobs or pair not in checkpoints or versions.get(pair)!=signature:continue
+                if pair in exclude or pair in waiting or pair in jobs or pair not in checkpoints or versions.get(pair)!=signature:continue
                 s,t=pair;through=checkpoints[pair]
                 # At most thirteen indexed rows: no full-history COUNT scans.
                 rows=raw.execute('SELECT open_time FROM klines WHERE symbol=? AND interval=? AND open_time>? ORDER BY open_time LIMIT 13',(s,t,through)).fetchall()
@@ -133,6 +134,7 @@ def service_pair(symbols,intervals,owner,kind,*,owner_interval=None):
                 limit=history.get(pair)
                 if limit is not None and rows[0][0]>=limit:continue
                 return pair
+        if live_only:return None
         for _ in pairs:
             pair=pairs[cursor%len(pairs)];cursor+=1;_service_cursors[identity]=cursor
             s,t=pair

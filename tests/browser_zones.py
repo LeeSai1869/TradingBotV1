@@ -157,6 +157,19 @@ async def exercise(base,library):
 
         assert await page.evaluate('Composer.config.featureStyles.vp_histogram.lengthPercent')==55
         assert await page.evaluate("import('/overlays/volume_profile/index.js').then(x=>x.getProfile().levels.vp_poc)")==profiles[rows[-1][2]]['vp_poc']
+        # A new raw candle may arrive before its feature checkpoint. Retain the
+        # last completed histogram with a visible freshness label, not a blank.
+        await page.evaluate('''async()=>{
+            const overlay=await import('/overlays/volume_profile/index.js');
+            const previous=overlay.getProfile(),latest=DataCache.bars.at(-1);
+            const next={...latest,open_time:latest.open_time+900000};
+            overlay.update(Canvas.chart,{bars:[latest,next],volumeProfile:{...previous,stale:true,requested_time:next.open_time}});
+            if(overlay.getProfile()?.as_of!==previous.as_of)throw Error('Last completed histogram disappeared');
+            if(!document.querySelector('.volume-profile-status').textContent.includes('updating'))throw Error('Missing freshness label');
+            overlay.update(Canvas.chart,{bars:[latest],volumeProfile:{...previous,as_of:next.open_time,stale:true,requested_time:latest.open_time}});
+            if(overlay.getProfile()!==null)throw Error('Future histogram accepted');
+            overlay.update(Canvas.chart,{bars:DataCache.bars,volumeProfile:DataCache.volumeProfile});
+        }''')
         assert await page.evaluate('Composer.config.featureStyles.support_zones.opacity')==45
         assert await page.evaluate('Composer.config.featureStyles.support_zones.scores') is False
         assert await page.evaluate('Composer.config.featureStyles.bull_fvg_zones.color')=='#abcdef'

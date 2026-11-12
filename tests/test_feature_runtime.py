@@ -24,7 +24,8 @@ class RuntimeConfig(unittest.TestCase):
         with patch.object(runtime,'read',return_value=config),patch.object(processor,'_recover_runtime_format_job'),patch.object(work_priority,'pending_feature_pair',return_value=True),patch.object(work_priority,'work_symbol') as bulk,patch.object(work_priority,'service_pair',return_value=('BTC','1h')) as background,patch.object(processor,'_advance',side_effect=advance),patch.object(processor,'_repair_daily'):
             processor.maintenance(['BTC','ENA'],['5m','1h'])
             self.assertEqual([row[:2] for row in calls],[('BTC','1h'),('BTC','5m')]);self.assertEqual(calls[0][2],750)
-            self.assertEqual(background.call_args.kwargs,dict(owner_interval='5m'));bulk.assert_not_called()
+            self.assertEqual(background.call_args_list[0].kwargs,dict(owner_interval='5m'));bulk.assert_not_called()
+            self.assertIn(('BTC','1h'),background.call_args.kwargs['exclude'])
 
     def test_completed_or_inactive_priority_returns_to_normal_owner(self):
         config=dict(time_budget=1.,max_bars=1000,priority=dict(symbol='BTC',timeframe='5m'))

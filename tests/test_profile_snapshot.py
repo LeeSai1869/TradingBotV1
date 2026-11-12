@@ -55,7 +55,7 @@ class ProfileSnapshotTests(unittest.TestCase):
         self.assertAlmostEqual(rows[1]['vp_va_high'],10.1)
 
     def test_wrong_candle_epoch_or_inconsistent_levels_withholds_histogram(self):
-        for latest,epoch in [({'open_time':240000,'features':self.result},'0:0'),(self.latest,'1:0'),({'open_time':180000,'features':{**self.result,'vp_poc':99}},'0:0')]:
+        for latest,epoch in [({'open_time':120000,'features':self.result},'0:0'),(self.latest,'1:0'),({'open_time':180000,'features':{**self.result,'vp_poc':99}},'0:0')]:
             self.assertNotEqual(volume_profile.snapshot('ETHUSDT','1m',latest,epoch)['status'],'ready')
 
     def test_targeted_profile_repair_withholds_old_bins(self):
@@ -87,14 +87,30 @@ class ProfileSnapshotTests(unittest.TestCase):
         self.assertEqual([b['volume'] for b in after['bins']],[2*b['volume'] for b in before['bins']])
 
     def test_waiting_explains_checkpoint_and_repair_and_state_mismatch(self):
-        wrong=volume_profile.snapshot('ETHUSDT','1m',dict(self.latest,open_time=240000),'0:0')
-        self.assertIn('requested candle differ',wrong['reason'])
+        wrong=volume_profile.snapshot('ETHUSDT','1m',dict(self.latest,open_time=120000),'0:0')
+        self.assertIn('newer than the requested candle',wrong['reason'])
         self.assertEqual(wrong['checkpoint_time'],180000)
         saved=json.loads(checkpoint.dump(self.engine,(0,0)));saved['state']['last_time']=0
         conn=features_store.open_db()
         with conn:conn.execute('UPDATE feature_engine_state SET state=?',(json.dumps(saved),))
         conn.close()
         self.assertIn('state timestamp',volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')['reason'])
+
+    def test_last_completed_histogram_survives_a_new_candle_without_relabeling_it(self):
+        conn=features_store.open_db();features_store.insert_rows(conn,[self.result]);conn.close()
+        current=volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')
+        behind=volume_profile.snapshot('ETHUSDT','1m',{'open_time':240000,'features':{}},'0:0')
+        self.assertEqual(behind['status'],'ready');self.assertTrue(behind['stale'])
+        self.assertEqual(behind['as_of'],180000);self.assertEqual(behind['requested_time'],240000)
+        self.assertEqual(behind['bins'],current['bins']);self.assertEqual(behind['levels'],current['levels'])
+        fresh=volume_profile.snapshot('ETHUSDT','1m',self.latest,'0:0')
+        self.assertFalse(fresh['stale']);self.assertFalse(current['stale'])
+        # Wrong epochs and active VP repairs remain blocked, even for fallback.
+        self.assertNotEqual(volume_profile.snapshot('ETHUSDT','1m',{'open_time':240000},'1:0')['status'],'ready')
+        conn=features_store.open_db()
+        with conn:conn.execute('INSERT INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',('ETHUSDT','1m','test',180000,0,'[]',None,json.dumps(['vp_poc'])))
+        conn.close()
+        self.assertNotEqual(volume_profile.snapshot('ETHUSDT','1m',{'open_time':240000},'0:0')['status'],'ready')
 
     def test_read_only_node_diagnostic_reports_nonzero_hvn_and_lvn(self):
         from Section_1_Global_Core.memory_storage.Storage import klines_store

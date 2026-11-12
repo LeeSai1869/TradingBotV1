@@ -123,3 +123,40 @@ class FairService(unittest.TestCase):
         with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('BTC','1m')")
         self.assertTrue(work_priority.pending_feature_pair('BTC','1m'))
         self.assertFalse(work_priority.pending_feature_pair('MISSING','1m'))
+
+    def _current_versions(self):
+        from Section_4_Features.execution.components import current_signature
+        with sqlite3.connect(self.features) as c:
+            c.execute('CREATE TABLE feature_calculation_versions(symbol,interval,signature)')
+            c.executemany('INSERT INTO feature_calculation_versions VALUES (?,?,?)',[(s,'1m',current_signature()) for s in ('BTC','ENA','SUI')])
+            c.execute('CREATE TABLE feature_replay_jobs(symbol,interval)')
+        work_priority._live_cursors.clear();work_priority._service_phases.clear()
+
+    def test_recent_feature_burst_finishes_multiple_small_updates_before_bulk(self):
+        self._current_versions();calls=[]
+        def advance(s,t,cap,deadline):
+            calls.append((s,cap))
+            if s!='BTC':
+                with sqlite3.connect(self.features) as c:c.execute('UPDATE feature_engine_state SET last_open_time=4 WHERE symbol=?',(s,))
+                return 1
+            return 10
+        with patch.object(processor,'_recover_runtime_format_job'),patch.object(processor,'_advance',side_effect=advance),patch.object(processor,'_repair_daily'),patch.object(work_priority,'work_symbol',return_value='BTC'):
+            count=processor.maintenance(['BTC','ENA','SUI'],['1m'],max_bars=200,time_budget=10)
+        self.assertEqual([s for s,_ in calls],['ENA','SUI','BTC'])
+        self.assertEqual(count,12);self.assertEqual(calls[-1][1],198)
+
+    def test_recent_lane_cannot_admit_repairs_long_backlogs_or_excluded_pairs(self):
+        self._current_versions()
+        with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('ENA','1m')")
+        with sqlite3.connect(self.raw) as c:c.executemany('INSERT INTO klines VALUES (?,?,?)',[('SUI','1m',i) for i in range(5,20)])
+        self.assertIsNone(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True))
+        with sqlite3.connect(self.raw) as c:c.execute("DELETE FROM klines WHERE symbol='SUI' AND open_time>=5")
+        self.assertEqual(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True),('SUI','1m'))
+        self.assertIsNone(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True,exclude={('SUI','1m')}))
+
+    def test_slow_first_service_keeps_burst_inside_existing_time_slice(self):
+        self._current_versions();clock=[0.];calls=[]
+        def advance(s,t,*args):calls.append(s);clock[0]+=.3;return 1
+        with patch.object(processor,'_recover_runtime_format_job'),patch.object(processor,'_advance',side_effect=advance),patch.object(processor,'_repair_daily'),patch.object(work_priority,'work_symbol',return_value='BTC'),patch.object(processor.time,'monotonic',side_effect=lambda:clock[0]):
+            processor.maintenance(['BTC','ENA','SUI'],['1m'],max_bars=200,time_budget=1)
+        self.assertEqual(calls,['ENA','BTC'])

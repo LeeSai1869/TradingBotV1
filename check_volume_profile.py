@@ -41,7 +41,7 @@ def report(symbol,intervals,*,now_ms=None):
                 snapshot=volume_profile.snapshot(symbol,interval,latest,key)
                 bins=snapshot.get('bins',[]);positive=[b for b in bins if b['volume']>0]
                 nodes=Counter(b['node'] for b in positive)
-                row.update(status=snapshot['status'],reason=snapshot.get('reason'),as_of=snapshot.get('as_of'),lookback=snapshot.get('lookback'),
+                row.update(status=snapshot['status'],stale=snapshot.get('stale',False),reason=snapshot.get('reason'),as_of=snapshot.get('as_of'),lookback=snapshot.get('lookback'),
                            levels=snapshot.get('levels') or {key:(f or {}).get(key) for key in ('vp_poc','vp_va_low','vp_va_high')},
                            bins=len(bins),positive_bins=len(positive),high_volume_nodes=nodes['high'],low_volume_nodes=nodes['low'],
                            zero_volume_bins=len(bins)-len(positive))
@@ -62,10 +62,11 @@ def main():
     print('Feature database:',value['feature_database'])
     print('VP histogram/node checkpoint diagnostics (closed candles only; no data written):')
     for row in value['frames']:
-        print(f'{row["timeframe"]}: {row["status"]} | {"ACTIVE" if row["active"] else "PAUSED"}')
+        print(f'{row["timeframe"]}: {row["status"]}{" (last completed profile; updating)" if row.get("stale") else ""} | {"ACTIVE" if row["active"] else "PAUSED"}')
         print(f'  Closed candle: {stamp(row["latest_closed"])} | feature checkpoint: {stamp(row["feature_checkpoint"])}')
         if row.get('reason'):print('  Reason:',row['reason'])
         else:print(f'  Histogram: {row["bins"]} bins; nonzero HVN={row["high_volume_nodes"]}, LVN={row["low_volume_nodes"]}; zero-volume bins={row["zero_volume_bins"]}; lookback={row["lookback"]}')
+        if row.get('as_of') is not None:print('  Profile source candle:',stamp(row['as_of']))
         print('  Levels:',json.dumps(row.get('levels',{}),sort_keys=True))
     print('Ready bins with missing chart nodes indicate a display/settings/backend-profile issue, not absent VP calculation. Zero-volume bins have no histogram width.')
 

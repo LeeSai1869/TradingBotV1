@@ -25,6 +25,21 @@ generation in its profile-cache identity. Previously a same-candle recalculation
 could leave stale histogram bins cached when its POC/VAH/VAL were unchanged. No
 Volume Profile formula or live trading logic was changed.
 
+If the newest raw candle arrives before its features, the last validated stored
+histogram is retained with **updating** in the status and its actual source
+candle in the tooltip. It is not relabeled as the newest candle. The backend
+reads its levels from that same checkpoint's feature row; future checkpoints,
+wrong epochs, missing levels and pending VP repairs still withhold the histogram.
+The diagnostic marks this as `ready (last completed profile; updating)`.
+
+Feature maintenance can now use the remainder of its existing background
+quarter-budget for up to three additional near-current pairs (at most four
+background visits total). This burst requires current feature versions, no
+pending repair, a downloaded historical prefix and at most twelve pending rows.
+It shares the original time/row allocation and retains the original historical
+background turn and bulk owner. It does not increase global budgets or reset
+feature checkpoints. A slow transaction can still exceed the soft time slice.
+
 For Section 5, `python3 intelligence_status.py --summary` also reports the actual
 runner processing universe. Command-line symbol/timeframe filters limit the
 diagnostic report only; they do not limit processing.
