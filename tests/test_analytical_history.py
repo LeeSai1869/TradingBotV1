@@ -117,3 +117,60 @@ class Scheduling(unittest.TestCase):
             self.assertEqual(history.maintenance([],['1h']),0);step.assert_not_called()
             self.assertEqual(history.maintenance(['BTC'],['1h'],time_budget=10),0)
             self.assertEqual(step.call_count,1);self.assertEqual(history._cursor,1)
+
+class HierarchicalReplay(unittest.TestCase):
+    setUp=fixtures.RegimeHistory.setUp
+
+    def test_real_all_engine_replay_releases_decisions_only_after_catchup(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from Section_1_Global_Core import pipeline_scheduler as pipeline
+        runner=object.__new__(pipeline.PipelineScheduler)
+        runner.state={'__pipeline_existing__':['BTCUSDT']}
+        decisions=Mock(return_value=0)
+        runner.modules={pipeline.FEATURES:SimpleNamespace(maintenance=Mock(return_value=0)),
+            pipeline.ANALYTICS:live,pipeline.DECISIONS:SimpleNamespace(maintenance=decisions)}
+        runner.existing=[];runner.new=[];runner.events_allowed=False;runner.stage=None;runner.frontiers={}
+        hashes=lambda:tuple(hashlib.sha256(p.read_bytes()).hexdigest() for p in (features_store.DB_PATH,klines_store.DB_PATH))
+        before=hashes()
+        with patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(pipeline.time,'time',return_value=3910):
+            for _ in range(20):
+                runner.maintain()
+                if decisions.called:break
+            self.assertTrue(decisions.called,'All ten real engines must finish and release the decision stage')
+            self.assertTrue(runner.events_allowed)
+            # Same source prefix keeps completion; a repaired feature generation
+            # invalidates it even when no new candle has arrived.
+            key=('BTCUSDT','1m','REGIME')
+            self.assertIn(key,live._status)
+            self.assertEqual(hashes(),before)
+            conn=features_store.open_db()
+            with conn:conn.execute('UPDATE feature_calculation_versions SET generation=generation+1')
+            conn.close()
+            runner.invalidate_frontiers(['BTCUSDT'],['1m'],live)
+            self.assertNotIn(key,live._status)
+        # The only source mutation above was our explicit generation change.
+        self.assertEqual(hashlib.sha256(klines_store.DB_PATH.read_bytes()).hexdigest(),before[1])
+
+    def test_readiness_uses_checkpoints_repairs_history_and_freshness(self):
+        from Section_1_Global_Core import pipeline_scheduler as pipeline
+        from Section_1_Global_Core.memory_storage.Storage import klines_store
+        with patch.object(pipeline.time,'time',return_value=3910):
+            self.assertEqual(pipeline.pending_sources(['BTCUSDT'],['1m']),[])
+            conn=features_store.open_db()
+            with conn:conn.execute('INSERT INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',('BTCUSDT','1m','next',64*60000,-1,'[]',None,'[]'))
+            conn.close()
+            self.assertEqual(pipeline.pending_sources(['BTCUSDT'],['1m']),[('BTCUSDT','1m')])
+            conn=features_store.open_db()
+            with conn:conn.execute('DELETE FROM feature_replay_jobs')
+            conn.close()
+            conn=klines_store.open_db()
+            klines_store.ensure_history_progress(conn)
+            with conn:conn.execute('INSERT OR REPLACE INTO history_progress(symbol,interval,next_open_time) VALUES (?,?,?)',('BTCUSDT','1m',60000))
+            conn.close()
+            self.assertEqual(pipeline.pending_sources(['BTCUSDT'],['1m']),[('BTCUSDT','1m')])
+        conn=klines_store.open_db()
+        with conn:conn.execute('DELETE FROM history_progress')
+        conn.close()
+        with patch.object(pipeline.time,'time',return_value=10000):
+            self.assertEqual(pipeline.pending_sources(['BTCUSDT'],['1m']),[('BTCUSDT','1m')])

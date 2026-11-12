@@ -10,7 +10,7 @@ _cursor=0
 _status=OrderedDict()
 
 
-def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,history_time_budget=.5,history_max_bars=200):
+def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,history_time_budget=.5,history_max_bars=200,history_max_pairs=4,skip_complete=False):
     global _cursor
     pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS')]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
@@ -19,6 +19,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,his
         for _ in range(min(max_pairs,len(pairs))):
             if total>=max_bars or time.monotonic()-started>=time_budget:break
             symbol,interval,engine=pairs[_cursor%len(pairs)];_cursor+=1
+            if skip_complete and _status.get((symbol,interval,engine)) in ('caught up to committed feature prefix','caught up to common committed dependency prefix'):continue
             try:
                 row=regime_research.catch_up(symbol,interval,limit=min(100,max_bars-total),since=None,engine_name=engine,lock_timeout=.02)
                 total+=row['processed']+row.get('dependency_processed',0);key=(symbol,interval,engine)
@@ -46,7 +47,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,his
                 break
             except Exception:
                 traceback.print_exc()  # Other processors/pairs still get their turns.
-    total+=analytical_history.maintenance(symbols,intervals,max_bars=history_max_bars,time_budget=history_time_budget)
+    total+=analytical_history.maintenance(symbols,intervals,max_bars=history_max_bars,time_budget=history_time_budget,max_pairs=history_max_pairs,skip_complete=skip_complete)
     return total
 
 

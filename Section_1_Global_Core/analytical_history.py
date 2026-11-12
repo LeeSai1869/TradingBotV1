@@ -33,16 +33,21 @@ def advance(symbol,interval,engine,*,limit=100,now_ms=None):
         return row
 
 
-def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4):
+def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4,skip_complete=False):
     global _cursor
     pairs=[(s,t,e) for s in symbols for t in intervals for e in ENGINES]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
-    total=0;deadline=time.monotonic()+time_budget
+    total=0;quiet=0;deadline=time.monotonic()+time_budget
     with _lock:
-        for _ in range(min(max_pairs,len(pairs))):
+        for _ in range(max_pairs):
             remaining=max_bars-total
             if remaining<5 or time.monotonic()>=deadline:break
             symbol,interval,engine=pairs[_cursor%len(pairs)];_cursor+=1
+            key=(symbol,interval,engine)
+            if skip_complete and _messages.get(key) in ('caught up to committed feature prefix','caught up to common committed dependency prefix'):
+                quiet+=1
+                if quiet>=len(pairs):break
+                continue
             try:
                 row=advance(symbol,interval,engine,limit=min(100,remaining))
                 total+=row['processed']+row.get('dependency_processed',0)
@@ -50,6 +55,8 @@ def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4):
                 if row['processed'] or _messages.get(key)!=message:
                     print(f'[history:{engine.lower()}] {symbol} {interval}: +{row["processed"]}; {message}; through={(row.get("latest") or {}).get("candle_open_time")}',flush=True)
                 _messages[key]=message
+                quiet=0 if row['processed']+row.get('dependency_processed',0) else quiet+1
+                if quiet>=len(pairs):break
             except TimeoutError:
                 # Rotate rather than allowing one contended history scope to
                 # starve the rest. Live work has its own retry policy/budget.

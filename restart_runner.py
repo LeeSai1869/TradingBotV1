@@ -118,7 +118,12 @@ def stop_existing(service):
 def main():
     if sys.platform != 'darwin':
         raise SystemExit('This installer is for macOS launchd. Run the live_runner module directly on other systems.')
-    subprocess.run([sys.executable, '-c', 'import pandas, numpy, requests; import Section_4_Features.processor'], cwd=ROOT, check=True)
+    try:
+        subprocess.run([sys.executable, '-c', 'import pandas, numpy, requests; import Section_4_Features.processor'], cwd=ROOT, check=True)
+    except subprocess.CalledProcessError:
+        raise SystemExit('Runner dependency preflight failed; the existing runner was left running.\n'
+            f'Install runtime dependencies with:\n  "{sys.executable}" -m pip install -r requirements-runtime.txt\n'
+            'Then run restart_runner.py again.')
     domain = f'gui/{os.getuid()}'
     service = f'{domain}/{LABEL}'
     logs = Path.home()/'Library'/'Logs'/'TradingBotV1'

@@ -157,6 +157,8 @@ class GlobalCoreOrchestrator:
         self._stop = False
         self._processors = _load_processors()
         self._state = _load_state()
+        from .pipeline_scheduler import PipelineScheduler
+        self._pipeline = PipelineScheduler.create(self._processors, self._state)
         self._event_cursor = 0
         self.event_pair_limit = 12
         self.event_time_budget = 2.0
@@ -173,7 +175,7 @@ class GlobalCoreOrchestrator:
         # 1) Ingest
         print("[orchestrator] download phase starting",flush=True)
         try:
-            inserted = update_klines_all()
+            inserted = self._pipeline.download() if self._pipeline else update_klines_all()
         except Exception as e:
             print(f"[orchestrator] ingest error: {e}", flush=True)
             traceback.print_exc()
@@ -186,7 +188,7 @@ class GlobalCoreOrchestrator:
         # Each processor owns a bounded budget; downloads stay in this runner.
         maintained = set()
         maintenance_rows={}
-        for name, fn in self._processors:
+        for name, fn in ([] if self._pipeline else self._processors):
             module_name = name.rsplit('.', 1)[0]
             if module_name in maintained:
                 continue
@@ -203,6 +205,9 @@ class GlobalCoreOrchestrator:
                 except Exception as error:
                     print(f'[orchestrator] maintenance failed {module_name}; continuing other processors and pairs: {error}',flush=True)
                     traceback.print_exc()
+
+        if self._pipeline:
+            maintenance_rows = self._pipeline.maintain()
 
         # 3) Process new bars
         #
@@ -275,6 +280,9 @@ class GlobalCoreOrchestrator:
                         break
                     for name, fn in self._processors:
                         try:
+                            if self._pipeline and not self._pipeline.allow_event(name, s):
+                                success = False
+                                break
                             if name=='Section_4_Features.processor.process_bar':
                                 from Section_1_Global_Core import work_priority
                                 result=fn(ev,historical_replay=work_priority.owns_history(s))
@@ -300,6 +308,7 @@ class GlobalCoreOrchestrator:
             f"audit_pass={audit_pass}, events={events_fired}, "
             f"maintenance_features={maintenance_rows.get('Section_4_Features.processor',0)}, "
             f"maintenance_decisions={maintenance_rows.get('Section_8_Decision_Engine.processor',0)}, "
+            f"maintenance_classifications={maintenance_rows.get('Section_1_Global_Core.analytical_processor',0)}, "
             f"{dt:.1f}s",
             flush=True,
         )
@@ -323,29 +332,32 @@ class GlobalCoreOrchestrator:
         # Give newly approved pairs their first download page before a potentially
         # lengthy feature backlog on existing pairs. Normal cycles continue ingest.
         print("[orchestrator] active downloads:", data_policy.active_symbols(), data_policy.active_intervals(), flush=True)
-        print("[orchestrator] startup download pass...", flush=True)
-        try:
-            update_klines_all()
-        except Exception:
-            traceback.print_exc()
-        print("[orchestrator] startup catch-up...", flush=True)
-        for name, fn in self._processors:
+        if self._pipeline:
+            print("[orchestrator] hierarchical catch-up runs in bounded normal cycles", flush=True)
+        else:
+            print("[orchestrator] startup download pass...", flush=True)
             try:
-                mod = importlib.import_module(name.rsplit(".", 1)[0])
-                maintenance = getattr(mod, "maintenance", None)
-                if maintenance:
-                    # One global budget, regardless of the number of approved pairs.
-                    maintenance(data_policy.active_symbols(), data_policy.active_intervals())
-                    continue
-                catch_fn = getattr(mod, "catch_up", None)
-                if catch_fn:
-                    for s in data_policy.active_symbols():
-                        for iv in data_policy.active_intervals():
-                            if data_policy.enabled(s, iv):
-                                catch_fn(s, iv)
-            except Exception as e:
-                print(f"[orchestrator] {name} startup catch-up failed: {e}", flush=True)
+                update_klines_all()
+            except Exception:
                 traceback.print_exc()
+            print("[orchestrator] startup catch-up...", flush=True)
+            for name, fn in self._processors:
+                try:
+                    mod = importlib.import_module(name.rsplit(".", 1)[0])
+                    maintenance = getattr(mod, "maintenance", None)
+                    if maintenance:
+                        # One global budget, regardless of the number of approved pairs.
+                        maintenance(data_policy.active_symbols(), data_policy.active_intervals())
+                        continue
+                    catch_fn = getattr(mod, "catch_up", None)
+                    if catch_fn:
+                        for s in data_policy.active_symbols():
+                            for iv in data_policy.active_intervals():
+                                if data_policy.enabled(s, iv):
+                                    catch_fn(s, iv)
+                except Exception as e:
+                    print(f"[orchestrator] {name} startup catch-up failed: {e}", flush=True)
+                    traceback.print_exc()
         print("[orchestrator] catch-up done", flush=True)
         print(flush=True)
 

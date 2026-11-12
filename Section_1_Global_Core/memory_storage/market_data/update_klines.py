@@ -240,7 +240,7 @@ def update_one(symbol, interval, conn, *, latest_only=False):
     return total+n
 
 
-def update_all(*, max_pairs=512, time_budget=2.0):
+def update_all(*, max_pairs=512, time_budget=2.0, symbols=None):
     """
     Update a bounded round-robin slice of pairs. Returns total bars inserted.
 
@@ -258,7 +258,7 @@ def update_all(*, max_pairs=512, time_budget=2.0):
     total = 0
     try:
         from Section_1_Global_Core import work_priority
-        symbols=data_policy.active_symbols();intervals=data_policy.active_intervals()
+        symbols=data_policy.active_symbols() if symbols is None else list(symbols);intervals=data_policy.active_intervals()
         pairs=[(symbol,interval) for symbol in symbols for interval in intervals]
         deadline=time.monotonic()+time_budget
         visited=0
