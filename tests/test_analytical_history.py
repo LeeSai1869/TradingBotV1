@@ -121,24 +121,25 @@ class Scheduling(unittest.TestCase):
 class HierarchicalReplay(unittest.TestCase):
     setUp=fixtures.RegimeHistory.setUp
 
-    def test_real_all_engine_replay_releases_decisions_only_after_catchup(self):
+    def test_real_engine_replay_and_decisions_use_the_same_ready_pair(self):
         from types import SimpleNamespace
         from unittest.mock import Mock
         from Section_1_Global_Core import pipeline_scheduler as pipeline
         runner=object.__new__(pipeline.PipelineScheduler)
         runner.state={'__pipeline_existing__':['BTCUSDT']}
         decisions=Mock(return_value=0)
-        runner.modules={pipeline.FEATURES:SimpleNamespace(maintenance=Mock(return_value=0)),
+        runner.modules={pipeline.FEATURES:SimpleNamespace(maintenance=Mock(return_value=0),maintain_recent=Mock(return_value=0)),
             pipeline.ANALYTICS:live,pipeline.DECISIONS:SimpleNamespace(maintenance=decisions)}
-        runner.existing=[];runner.new=[];runner.events_allowed=False;runner.stage=None;runner.frontiers={}
+        runner.existing=[];runner.new=[];runner.ready_pairs=set();runner.stage=None;runner.frontiers={}
         hashes=lambda:tuple(hashlib.sha256(p.read_bytes()).hexdigest() for p in (features_store.DB_PATH,klines_store.DB_PATH))
         before=hashes()
-        with patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(pipeline.time,'time',return_value=3910):
+        with patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(pipeline.time,'time',return_value=3910),patch.object(pipeline.update_klines,'update_all',return_value=0):
             for _ in range(20):
                 runner.maintain()
                 if decisions.called:break
-            self.assertTrue(decisions.called,'All ten real engines must finish and release the decision stage')
-            self.assertTrue(runner.events_allowed)
+            self.assertTrue(decisions.called)
+            self.assertEqual(decisions.call_args.kwargs['pairs'],[('BTCUSDT','1m')])
+            self.assertTrue(runner.allow_event(pipeline.DECISIONS+'.process_bar','BTCUSDT','1m'))
             # Same source prefix keeps completion; a repaired feature generation
             # invalidates it even when no new candle has arrived.
             key=('BTCUSDT','1m','REGIME')

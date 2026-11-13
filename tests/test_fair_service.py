@@ -160,3 +160,24 @@ class FairService(unittest.TestCase):
         with patch.object(processor,'_recover_runtime_format_job'),patch.object(processor,'_advance',side_effect=advance),patch.object(processor,'_repair_daily'),patch.object(work_priority,'work_symbol',return_value='BTC'),patch.object(processor.time,'monotonic',side_effect=lambda:clock[0]):
             processor.maintenance(['BTC','ENA','SUI'],['1m'],max_bars=200,time_budget=1)
         self.assertEqual(calls,['ENA','BTC'])
+
+    def test_dedicated_recent_turn_includes_owner_and_excludes_selective_repairs(self):
+        self._current_versions()
+        with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('ENA','1m')")
+        with patch.object(processor,'_advance',return_value=4) as advance:
+            self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=10),8)
+        self.assertEqual({c.args[:2] for c in advance.call_args_list},{('BTC','1m'),('SUI','1m')})
+        self.assertTrue(all(c.args[2]<=12 for c in advance.call_args_list))
+
+    def test_dedicated_recent_turn_retains_raw_prefix_and_time_budget(self):
+        self._current_versions()
+        with sqlite3.connect(self.raw) as c:c.execute("UPDATE history_progress SET next_open_time=1")
+        with patch.object(processor,'_advance') as advance:
+            self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=10),0)
+            advance.assert_not_called()
+        with sqlite3.connect(self.raw) as c:c.execute("UPDATE history_progress SET next_open_time=5")
+        clock=[0.]
+        def slow(*a):clock[0]+=1;return 1
+        with patch.object(processor.time,'monotonic',side_effect=lambda:clock[0]),patch.object(processor,'_advance',side_effect=slow) as advance:
+            self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=.5),1)
+            self.assertEqual(advance.call_count,1)

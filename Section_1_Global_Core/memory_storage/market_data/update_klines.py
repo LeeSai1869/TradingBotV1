@@ -240,7 +240,7 @@ def update_one(symbol, interval, conn, *, latest_only=False):
     return total+n
 
 
-def update_all(*, max_pairs=512, time_budget=2.0, symbols=None):
+def update_all(*, max_pairs=512, time_budget=2.0, symbols=None, include_recent=True, include_history=True):
     """
     Update a bounded round-robin slice of pairs. Returns total bars inserted.
 
@@ -265,7 +265,7 @@ def update_all(*, max_pairs=512, time_budget=2.0, symbols=None):
         # Current candles for every existing symbol take priority. A separate cursor
         # prevents a large history owner from delaying their interval-boundary refresh.
         refresh_deadline=time.monotonic()+time_budget/2
-        for _ in range(min(max_pairs,len(pairs))):
+        for _ in range(min(max_pairs,len(pairs)) if include_recent else 0):
             symbol,interval=pairs[_DOWNLOAD_CURSOR%len(pairs)]
             _DOWNLOAD_CURSOR+=1;visited+=1
             total+=update_one(symbol,interval,conn,latest_only=True)
@@ -274,8 +274,8 @@ def update_all(*, max_pairs=512, time_budget=2.0, symbols=None):
         # Alternate who goes first: one slow request may exceed the soft time
         # budget, but cannot permanently deny either bulk or background work.
         order=('background','owner') if _HISTORY_PHASE%2==0 else ('owner','background')
-        _HISTORY_PHASE+=1
-        for phase in order:
+        if include_history:_HISTORY_PHASE+=1
+        for phase in order if include_history else ():
             if time.monotonic()>=deadline:break
             if phase=='background':
                 service=work_priority.service_pair(symbols,intervals,owner,'downloads')

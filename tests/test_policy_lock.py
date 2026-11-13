@@ -47,6 +47,7 @@ with TemporaryDirectory() as directory,ExitStack() as stack:
     db.write_klines([dict(symbol='BTCUSDT',interval='5m',open_time=i*300000,close_time=(i+1)*300000-1,open=100.,high=102.,low=98.,close=100.+i%2,volume=5.) for i in range(205)])
     runner=orchestrator.GlobalCoreOrchestrator()
     runner._processors=[('Section_4_Features.processor.process_bar',processor.process_bar),('Section_8_Decision_Engine.processor.process_bar',decisions.process_bar)]
+    runner._pipeline=None  # This fixture configures an ad-hoc subset of processors.
     runner._state={'BTCUSDT|5m':199*300000}
     runner.event_time_budget=10
     for _ in range(3):runner.cycle()

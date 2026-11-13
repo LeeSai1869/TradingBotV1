@@ -30,6 +30,30 @@ class DownloadSchedulingTests(TestCase):
                 self.assertEqual(updater.update_all(time_budget=1),1000)
                 self.assertEqual(update.call_args.args[:2],('B','5m'))
 
+    def test_recent_only_download_turn_never_starts_bulk_history(self):
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/'klines.db';path.touch()
+            with patch.object(updater,'DB_PATH',path),patch.object(updater,'_DOWNLOAD_CURSOR',0),patch.object(updater,'_open_db',return_value=MagicMock()),patch.object(updater,'_audit_runner',None),patch('Section_1_Global_Core.work_priority.work_symbol',return_value='A'),patch('Section_1_Global_Core.work_priority.service_pair',return_value=('B','5m')),patch.object(updater.data_policy,'active_intervals',return_value=['5m']),patch.object(updater,'update_one',return_value=1) as update:
+                self.assertEqual(updater.update_all(symbols=['A','B'],include_history=False,time_budget=10),2)
+                self.assertTrue(all(c.kwargs.get('latest_only') for c in update.call_args_list))
+                update.reset_mock()
+                updater.update_all(symbols=['A','B'],include_recent=False,time_budget=10)
+                self.assertTrue(update.called)
+                self.assertTrue(all(not c.kwargs.get('latest_only') for c in update.call_args_list))
+
+    def test_recent_pass_does_not_pin_history_service_to_one_phase(self):
+        clock=[0.];history=[]
+        def download(symbol,interval,conn,*,latest_only=False):
+            if not latest_only:history.append(symbol);clock[0]+=1
+            return 1
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/'klines.db';path.touch()
+            with patch.object(updater,'DB_PATH',path),patch.object(updater,'_DOWNLOAD_CURSOR',0),patch.object(updater,'_HISTORY_PHASE',0),patch.object(updater,'_open_db',return_value=MagicMock()),patch.object(updater,'_audit_runner',None),patch('Section_1_Global_Core.work_priority.work_symbol',return_value='A'),patch('Section_1_Global_Core.work_priority.service_pair',return_value=('B','5m')),patch.object(updater.data_policy,'active_intervals',return_value=['5m']),patch.object(updater.time,'monotonic',side_effect=lambda:clock[0]),patch.object(updater,'update_one',side_effect=download):
+                for _ in range(4):
+                    updater.update_all(symbols=['A','B'],include_history=False,time_budget=.5)
+                    updater.update_all(symbols=['A','B'],include_recent=False,time_budget=.5)
+                self.assertEqual(history,['B','A','B','A'])
+
 
 class EventSchedulingTests(TestCase):
     def test_event_deadline_retains_cursor_and_next_pair_gets_a_turn(self):
@@ -47,3 +71,15 @@ class EventSchedulingTests(TestCase):
             runner.cycle()
             self.assertEqual(received[-1],('A',120000))
             self.assertEqual(runner._state['B|5m'],60000)
+
+    def test_pipeline_maintenance_failure_does_not_abort_healthy_events(self):
+        pipeline=MagicMock()
+        pipeline.download.return_value=0
+        pipeline.maintain.side_effect=RuntimeError('injected pipeline failure')
+        pipeline.allow_event.return_value=True
+        received=[]
+        with patch('Section_1_Global_Core.pipeline_scheduler.PipelineScheduler.create',return_value=pipeline),patch.object(orchestrator,'_load_state',return_value={'A|5m':0}),patch.object(orchestrator,'_load_processors',return_value=[('ad_hoc.processor',lambda ev:received.append(ev.open_time))]),patch.object(orchestrator,'_save_state'),patch.object(orchestrator,'_fetch_bars_since',return_value=[(60000,119999,10,12,9,11,5)]),patch.object(orchestrator.data_policy,'active_symbols',return_value=['A']),patch.object(orchestrator.data_policy,'active_intervals',return_value=['5m']),patch.object(orchestrator.data_policy,'enabled',return_value=True),patch.object(orchestrator.data_policy,'read',return_value={'epochs':{}}),patch.object(orchestrator.data_policy,'locked',side_effect=nullcontext):
+            runner=orchestrator.GlobalCoreOrchestrator()
+            runner.cycle()
+            self.assertEqual(received,[60000])
+            self.assertEqual(runner._state['A|5m'],60000)

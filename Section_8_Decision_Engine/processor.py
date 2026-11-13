@@ -102,9 +102,9 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
     return len(rows)
 
 
-def maintenance(symbols,intervals,*,max_bars=BATCH,time_budget=.25):
+def maintenance(symbols,intervals,*,max_bars=BATCH,time_budget=.25,pairs=None):
     global _cursor
-    pairs=[(symbol,interval) for symbol in symbols for interval in intervals]
+    pairs=[(symbol,interval) for symbol in symbols for interval in intervals] if pairs is None else list(pairs)
     deadline=time.monotonic()+time_budget;count=0
     with _LOCK:
         for _ in range(len(pairs)):

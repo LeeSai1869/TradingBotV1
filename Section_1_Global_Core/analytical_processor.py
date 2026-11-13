@@ -10,9 +10,10 @@ _cursor=0
 _status=OrderedDict()
 
 
-def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,history_time_budget=.5,history_max_bars=200,history_max_pairs=4,skip_complete=False):
+def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,history_time_budget=.5,history_max_bars=200,history_max_pairs=4,skip_complete=False,pairs=None):
     global _cursor
-    pairs=[(symbol,interval,engine) for symbol in symbols for interval in intervals for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS')]
+    source_pairs=[(s,t) for s in symbols for t in intervals] if pairs is None else list(pairs)
+    pairs=[(symbol,interval,engine) for symbol,interval in source_pairs for engine in ('REGIME','STRUCTURE','TREND','MOMENTUM','VOLATILITY','PARTICIPATION','PHASE','LIQUIDITY','SENTIMENT','BIAS')]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
     started=time.monotonic();total=0
     with _LOCK:
@@ -47,7 +48,7 @@ def maintenance(symbols,intervals,*,max_bars=200,time_budget=.20,max_pairs=4,his
                 break
             except Exception:
                 traceback.print_exc()  # Other processors/pairs still get their turns.
-    total+=analytical_history.maintenance(symbols,intervals,max_bars=history_max_bars,time_budget=history_time_budget,max_pairs=history_max_pairs,skip_complete=skip_complete)
+    total+=analytical_history.maintenance(symbols,intervals,max_bars=min(history_max_bars,max(0,max_bars-total)),time_budget=history_time_budget,max_pairs=history_max_pairs,skip_complete=skip_complete,pairs=source_pairs)
     return total
 
 

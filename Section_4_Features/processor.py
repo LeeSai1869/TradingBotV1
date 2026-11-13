@@ -117,6 +117,27 @@ def catch_up(symbol,interval):
             reset_pair(symbol,interval);raise
 
 
+def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768):
+    """Advance small current-generation tails before bulk work, including its owner.
+
+    The normal chronological writer owns all commits. Repairs and incomplete
+    history prefixes remain on the existing selective/bulk replay path.
+    """
+    from Section_1_Global_Core import work_priority
+    deadline=time.monotonic()+time_budget;count=0;seen=set()
+    with _LOCK:
+        for _ in range(max_pairs):
+            if count>=max_bars or time.monotonic()>=deadline:break
+            pair=work_priority.service_pair(symbols,intervals,None,'features',
+                live_only=True,exclude=seen)
+            if pair is None or pair in seen:break
+            seen.add(pair)
+            try:count+=_advance(*pair,min(12,max_bars-count),deadline)
+            except Exception:
+                reset_pair(*pair);traceback.print_exc()
+    return count
+
+
 def maintenance(symbols,intervals,*,max_bars=None,time_budget=None):
     """Keep bulk symbol priority while reserving progress for other active pairs."""
     global _cursor

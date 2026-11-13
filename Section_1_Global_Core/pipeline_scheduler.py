@@ -2,7 +2,7 @@
 
 Existing means a coin with a committed feature checkpoint on first deployment,
 then the persisted cohort. Newly enabled coins join after full source/feature
-catch-up. Paused intervals never participate in readiness barriers.
+catch-up. Readiness and downstream work are scoped to each active pair.
 """
 from contextlib import closing
 import importlib
@@ -24,7 +24,7 @@ def checkpoint_symbols():
         return {r[0] for r in db.execute('SELECT DISTINCT symbol FROM feature_engine_state WHERE last_open_time IS NOT NULL')}
 
 
-def pending_sources(symbols, intervals):
+def pending_sources(symbols, intervals, *, require_history=True):
     """Only indexed endpoints/checkpoints; never scan historical candle payloads."""
     pending=[]
     if not symbols or not intervals:return pending
@@ -51,7 +51,7 @@ def pending_sources(symbols, intervals):
                 pair=(s,t)
                 latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',pair).fetchone()[0]
                 checkpoint=checkpoints.get(pair)
-                if (latest is None or pair in histories or now-latest>2*work_priority.interval_milliseconds(t)
+                if (latest is None or (require_history and (pair in histories or now-latest>2*work_priority.interval_milliseconds(t)))
                     or checkpoint is None or checkpoint<latest or pair in repairs or versions.get(pair)!=signature):
                     pending.append(pair)
     return pending
@@ -67,7 +67,7 @@ class PipelineScheduler:
     def __init__(self,state):
         self.state=state
         self.modules={name:importlib.import_module(name) for name in (FEATURES,ANALYTICS,DECISIONS)}
-        self.existing=[];self.new=[];self.events_allowed=False
+        self.existing=[];self.new=[];self.ready_pairs=set()
         self.stage=None
         self.frontiers={}
 
@@ -86,7 +86,7 @@ class PipelineScheduler:
     def download(self):
         existing,new=self.cohorts()
         # Cold bootstrap gets one coin, not the entire new-listing universe.
-        return update_klines.update_all(symbols=existing or new[:1])
+        return update_klines.update_all(symbols=existing or new[:1], include_history=False)
 
     def announce(self,stage,pending=0,examples=()):
         message=(stage,pending,len(self.existing),len(self.new),tuple(examples))
@@ -97,43 +97,46 @@ class PipelineScheduler:
 
     def maintain(self):
         self.cohorts();intervals=data_policy.active_intervals();rows={}
-        self.events_allowed=False
+        self.ready_pairs=set()
         existing=self.existing
         if not existing:
             self.initialize(intervals,rows)
             return rows
-        # Finish only pending source/formula/targeted repairs. _advance preserves
-        # complete rows and resumes persisted checkpoints; no reset is requested.
-        pending=pending_sources(existing,intervals)
-        rows[FEATURES]=self.modules[FEATURES].maintenance(existing,intervals,max_bars=100000,time_budget=3 if pending else .3)
-        pending=pending_sources(existing,intervals)
-        if pending:
-            self.announce('downloads/features',len(pending),pending[:5]);return rows
-        self.announce('section5')
-        analytics=self.modules[ANALYTICS]
-        self.invalidate_frontiers(existing,intervals,analytics)
-        rows[ANALYTICS]=analytics.maintenance(existing,intervals,max_bars=10000,time_budget=.5,max_pairs=1000,
-            history_time_budget=3,history_max_bars=100000,history_max_pairs=10000,skip_complete=True)
-        # Every engine must have reached the committed prefix. Dependency waits,
-        # contention and errors are not completion, even if a turn produced zero.
-        scopes=[(s,t,e) for s in existing for t in intervals
-            if self.frontiers.get((s,t),(True,))[0] is not None
-            for e in analytics.analytical_history.ENGINES]
-        done={'caught up to committed feature prefix','caught up to common committed dependency prefix'}
-        complete=all(analytics.analytical_history._messages.get(key) in done and analytics._status.get(key) in done for key in scopes)
-        if not complete:
-            waiting=sum(analytics.analytical_history._messages.get(key) not in done or analytics._status.get(key) not in done for key in scopes)
-            print(f'[pipeline] section5 unfinished_scopes={waiting}/{len(scopes)}; classifications_this_turn={rows[ANALYTICS]}',flush=True)
-            return rows
-        self.events_allowed=True
-        self.announce('buy/sell')
-        rows[DECISIONS]=self.modules[DECISIONS].maintenance(existing,intervals,max_bars=100000,time_budget=1)
-        if rows[DECISIONS]==0:self.initialize(intervals,rows)
+        # Recent closes get a dedicated turn before any bulk download/replay.
+        features=self.modules[FEATURES]
+        rows[FEATURES]=features.maintain_recent(existing,intervals,time_budget=.5)
+        pending=set(pending_sources(existing,intervals,require_history=False))
+        ready=[(s,t) for s in existing for t in intervals if (s,t) not in pending]
+        self.ready_pairs=set(ready)
+        self.announce('per-pair catch-up',len(pending),sorted(pending)[:5])
+        if ready:
+            analytics=self.modules[ANALYTICS]
+            self.invalidate_frontiers(existing,intervals,analytics)
+            # Explicit pairs avoid admitting a blocked frame through a Cartesian
+            # product. Dependency readers still validate their own stored inputs.
+            rows[ANALYTICS]=analytics.maintenance(existing,intervals,pairs=ready,
+                max_bars=10000,time_budget=.5,max_pairs=1000,
+                history_time_budget=.5,history_max_bars=10000,
+                history_max_pairs=1000,skip_complete=True)
+            # DI decisions require committed features, not completion of every
+            # analytical engine or another symbol's historical classifications.
+            rows[DECISIONS]=self.modules[DECISIONS].maintenance(existing,intervals,
+                pairs=ready,max_bars=100000,time_budget=.5)
+        rows['history_downloads']=update_klines.update_all(symbols=existing,
+            include_recent=False,time_budget=.5)
+        rows[FEATURES]+=features.maintenance(existing,intervals,
+            max_bars=100000,time_budget=.5)
+        # Bulk repairs may change readiness after the recent turn. Events must
+        # use the resulting committed state, not the earlier snapshot.
+        pending=set(pending_sources(existing,intervals,require_history=False))
+        self.ready_pairs={(s,t) for s in existing for t in intervals if (s,t) not in pending}
+        if not pending and rows.get(DECISIONS,0)==0:
+            self.initialize(intervals,rows)
         return rows
 
     def invalidate_frontiers(self,symbols,intervals,analytics):
-        # A prior "caught up" belongs to a specific source prefix and producer.
-        # Never release the decision barrier using yesterday's completion flags.
+        # Skip-complete analytical flags belong to a source prefix and producer.
+        # Changed inputs must get another turn, even at the same candle time.
         from . import aggregation_processor
         generations=tuple(aggregation_processor.generation(e) for e in analytics.analytical_history.ENGINES)
         epoch=data_policy.read()['epochs']
@@ -160,8 +163,7 @@ class PipelineScheduler:
             self.state['__pipeline_existing__'].append(symbol)
             print(f'[pipeline] {symbol}: full candle/feature history ready; promoted to existing cohort',flush=True)
 
-    def allow_event(self,name,symbol):
-        # Event-driven downstream catch-up must respect the same global barrier.
-        # Existing feature workers still own their normal bounded per-bar turns.
+    def allow_event(self,name,symbol,interval):
+        module=name.rsplit('.',1)[0]
         if symbol not in self.existing:return False
-        return name.rsplit('.',1)[0]!=DECISIONS or self.events_allowed
+        return module!=DECISIONS or (symbol,interval) in self.ready_pairs

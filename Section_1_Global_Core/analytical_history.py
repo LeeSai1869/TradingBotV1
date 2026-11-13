@@ -33,9 +33,10 @@ def advance(symbol,interval,engine,*,limit=100,now_ms=None):
         return row
 
 
-def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4,skip_complete=False):
+def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4,skip_complete=False,pairs=None):
     global _cursor
-    pairs=[(s,t,e) for s in symbols for t in intervals for e in ENGINES]
+    source_pairs=[(s,t) for s in symbols for t in intervals] if pairs is None else list(pairs)
+    pairs=[(s,t,e) for s,t in source_pairs for e in ENGINES]
     if not pairs or max_bars<=0 or time_budget<=0:return 0
     total=0;quiet=0;deadline=time.monotonic()+time_budget
     with _lock:

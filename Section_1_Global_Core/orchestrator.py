@@ -207,7 +207,11 @@ class GlobalCoreOrchestrator:
                     traceback.print_exc()
 
         if self._pipeline:
-            maintenance_rows = self._pipeline.maintain()
+            try:
+                maintenance_rows = self._pipeline.maintain()
+            except Exception as error:
+                print(f'[orchestrator] pipeline maintenance failed; retry next cycle: {error}',flush=True)
+                traceback.print_exc()
 
         # 3) Process new bars
         #
@@ -280,7 +284,7 @@ class GlobalCoreOrchestrator:
                         break
                     for name, fn in self._processors:
                         try:
-                            if self._pipeline and not self._pipeline.allow_event(name, s):
+                            if self._pipeline and not self._pipeline.allow_event(name, s, iv):
                                 success = False
                                 break
                             if name=='Section_4_Features.processor.process_bar':

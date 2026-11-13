@@ -137,6 +137,7 @@ class DataAdminTests(unittest.TestCase):
         order=[]
         orch=orchestrator.GlobalCoreOrchestrator(poll_seconds=0)
         orch._processors=[('Section_4_Features.processor.process_bar',processor.process_bar)]
+        orch._pipeline=None  # This fixture configures an ad-hoc subset of processors.
         def cycle():
             order.append('cycle');orch.stop()
         with patch.object(orchestrator,'update_klines_all',side_effect=lambda:order.append('download')), patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']), patch.object(data_policy,'active_intervals',return_value=['1m']), patch.object(processor,'maintenance',side_effect=lambda *args:order.append('features')), patch.object(orch,'cycle',side_effect=cycle), patch.object(orchestrator._signal,'signal'):
@@ -220,6 +221,7 @@ class DataAdminTests(unittest.TestCase):
         orch._state={'BTCUSDT|1m':0}
         def fail(ev): raise RuntimeError('expected test failure')
         orch._processors=[('test.processor',fail)]
+        orch._pipeline=None  # This fixture configures an ad-hoc subset of processors.
         with patch.object(orchestrator,'update_klines_all',return_value=0),patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']):
             orch.cycle()
         self.assertEqual(orch._state['BTCUSDT|1m'],0)
@@ -230,6 +232,7 @@ class DataAdminTests(unittest.TestCase):
         orch._state={'BTCUSDT|1m':0}
         received=[]
         orch._processors=[('Section_4_Features.processor.process_bar',lambda ev,**options:received.append(ev.open_time))]
+        orch._pipeline=None  # This fixture configures an ad-hoc subset of processors.
         with patch.object(orchestrator,'update_klines_all',return_value=0),patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(processor,'maintenance',side_effect=RuntimeError('injected maintenance error')):
             orch.cycle()
         self.assertTrue(received)
