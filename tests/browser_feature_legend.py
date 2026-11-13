@@ -53,6 +53,10 @@ async def exercise(base,library):
         await settings.get_by_label('WMA 50',exact=True).check()
         await settings.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         await legend.get_by_role('button',name='Hide WMA on chart',exact=True).wait_for()
+        layout=await legend.evaluate('node=>({left:parseFloat(getComputedStyle(node).left),gap:getComputedStyle(node).gap,rows:[...node.children].map(row=>({height:row.getBoundingClientRect().height,background:getComputedStyle(row).backgroundColor}))})')
+        assert layout['left']==12 and layout['gap']=='0px',layout
+        assert all(row['height']<=20 and row['background']=='rgba(0, 0, 0, 0)' for row in layout['rows']),layout
+        await page.wait_for_function('''()=>{const legend=document.getElementById('feature-legend'),hud=document.querySelector('.chart-hud');return !hud||hud.hidden||hud.dataset.position!=='top-left'||hud.getBoundingClientRect().top>=legend.getBoundingClientRect().bottom;}''')
         await page.screenshot(path='/tmp/tradingbot-feature-legend-desktop.png')
         await page.set_viewport_size({'width':420,'height':850});await settle(page)
         bounds=await legend.bounding_box();assert bounds and bounds['x']>=0 and bounds['x']+bounds['width']<=420

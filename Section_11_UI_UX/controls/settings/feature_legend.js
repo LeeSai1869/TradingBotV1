@@ -38,7 +38,9 @@ export function changeFeature(preferences,name,action){
 export function renderLegend(preferences,onChange){
     const chart=document.getElementById('chart');if(!chart)return;
     let legend=document.getElementById('feature-legend');
-    if(!legend){legend=document.createElement('div');legend.id='feature-legend';legend.setAttribute('role','region');legend.setAttribute('aria-label','Chart features');chart.append(legend);}
+    if(!legend){legend=document.createElement('div');legend.id='feature-legend';legend.setAttribute('role','region');legend.setAttribute('aria-label','Chart features');chart.append(legend);
+        new ResizeObserver(()=>chart.style.setProperty('--feature-legend-bottom',`${legend.hidden?76:legend.offsetTop+legend.offsetHeight+6}px`)).observe(legend);
+    }
     // Keep controls stable during candle updates and preserve keyboard focus.
     const entries=legendEntries(preferences);
     const identity=JSON.stringify(entries);

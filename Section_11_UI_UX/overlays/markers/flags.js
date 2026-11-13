@@ -27,15 +27,15 @@ export class SignalFlags {
                     const up=shape==='arrowUp',top=Math.min(tip,base),bottom=Math.max(tip,base);
                     context.moveTo(x,up?top:bottom);context.lineTo(x-4,up?bottom:top);context.lineTo(x+4,up?bottom:top);context.closePath();
                 }
-                context.fill();
+                context.stroke();
                 if(style.label===false)continue;
                 const lines=confidenceLabel(bar,side,this.styles||{}).split('\n');
                 const width=Math.max(42,...lines.map(text=>context.measureText(text).width+12)),height=lines.length*14+6;
                 const left=Math.max(1,Math.min(mediaSize.width-width-1,x-width/2));
                 const wanted=buy?base+8:base-8-height,top=Math.max(1,Math.min(mediaSize.height-height-1,wanted));
                 context.beginPath();context.moveTo(x,base);context.lineTo(left+width/2,buy?top:top+height);context.stroke();
-                context.beginPath();context.roundRect(left,top,width,height,3);context.fill();
-                context.fillStyle='#fff';
+                // Labels and marker interiors stay transparent over candles.
+                context.fillStyle=color;
                 lines.forEach((text,i)=>context.fillText(text,left+width/2,top+10+i*14));
             }
             context.restore();

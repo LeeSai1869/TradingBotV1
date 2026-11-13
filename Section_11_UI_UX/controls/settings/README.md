@@ -127,10 +127,13 @@ continues to control Timeframes/Coins permissions.
 
 ## Chart feature list
 
-The chart lists enabled feature families at the top right. Click a name to open
+The chart lists enabled feature families at the top left. Click a name to open
 its settings, the eye to hide/show it, or × to remove it from the displayed list.
 Hidden features retain a dimmed row and restore exactly the previously selected
 outputs. Removing a feature turns off its outputs; enable it again in Features
 settings. Colors, widths and other styles survive both actions. These preferences
 are browser-local and do not change downloads, calculations or stored data.
 The same catalog covers price overlays, zones, profiles and lower-pane indicators.
+
+Feature names use compact, transparent rows. BUY/SELL markers use colored
+text and outlines with transparent interiors, preserving their candle anchors.

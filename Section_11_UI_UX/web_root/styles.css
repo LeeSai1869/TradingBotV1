@@ -308,13 +308,15 @@ button:hover { background: #333; }
 /* The BTC controls may wrap as a group on small screens. */
 #btc-strategy-controls {max-width:100%; min-width:0;}
 
-#feature-legend {position:absolute;top:48px;right:76px;z-index:29;max-width:calc(100% - 100px);max-height:35%;overflow:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;}
+#feature-legend {position:absolute;top:68px;left:12px;z-index:29;max-width:calc(100% - 100px);max-height:35%;overflow:auto;display:flex;flex-direction:column;align-items:flex-start;gap:0;pointer-events:none;}
 #feature-legend[hidden] {display:none;}
-.feature-legend-row {display:flex;align-items:center;gap:2px;max-width:100%;border-radius:4px;background:#171c24e6;pointer-events:auto;}
-.feature-legend-row button {background:transparent;border:0;border-radius:3px;min-width:25px;height:25px;padding:2px 6px;color:#cbd5e1;cursor:pointer;}
+.feature-legend-row {display:flex;align-items:center;gap:0;max-width:100%;background:transparent;pointer-events:auto;}
+.feature-legend-row button {background:transparent;border:0;border-radius:3px;min-width:20px;height:20px;padding:0 3px;color:#cbd5e1;cursor:pointer;}
 .feature-legend-row .feature-legend-name {font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;min-width:0;}
 .feature-legend-row[data-hidden="true"] .feature-legend-name {opacity:.55;}
-.feature-legend-row button:hover {background:#344155;color:#fff;}
+.feature-legend-row button:hover {background:transparent;color:#fff;}
 .feature-legend-row button:focus-visible {outline:2px solid #60a5fa;outline-offset:-2px;}
 
 .feature-legend-row svg {display:block;margin:auto;}
+
+#chart:has(#feature-legend:not([hidden])) .chart-hud[data-position="top-left"] {top:max(76px,var(--feature-legend-bottom,76px));max-height:calc(100% - var(--feature-legend-bottom,76px) - 35px);}

@@ -107,3 +107,19 @@ test('signal flag renderer draws confidence on its own line without price string
     flag.draw({useMediaCoordinateSpace:draw=>draw({context:ctx,mediaSize:{width:300,height:300}})});
     assert.deepEqual(text.map(x=>x.t),['BUY','88%']);assert.ok(text[1].y>text[0].y);assert.deepEqual(prices,[90]);
 });
+
+test('BUY and SELL flags keep colored text and outlines without opaque fills',async()=>{
+    const {SignalFlags}=await import('../Section_11_UI_UX/overlays/markers/flags.js');
+    for(const side of ['buy','sell'])for(const shape of ['arrowUp','circle','square']){
+        const text=[];let strokes=0;
+        const ctx={save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},arc(){},rect(){},stroke(){strokes++;},
+            fill(){assert.fail('Marker interiors must remain transparent');},roundRect(){assert.fail('Labels must have no background');},
+            measureText:t=>({width:t.length*6}),fillText(t){text.push([t,this.fillStyle]);}};
+        const flag=new SignalFlags();
+        flag.attached({chart:{timeScale:()=>({timeToCoordinate:()=>100})},series:{priceToCoordinate:()=>100},requestUpdate(){}});
+        flag.signals=[{side,bar:{time:1,client:{low:90,high:110}}}];
+        flag.styles={[`momentum_${side}`]:{shape,label:true}};
+        flag.draw({useMediaCoordinateSpace:draw=>draw({context:ctx,mediaSize:{width:300,height:300}})});
+        assert.equal(strokes,2);assert.deepEqual(text,[[side.toUpperCase(),side==='buy'?'#26a69a':'#ef5350']]);
+    }
+});
