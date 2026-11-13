@@ -50,13 +50,18 @@ function apply() {
     config.featureStyles = saved.outputs;
     config.candleStyle=saved.candleStyle;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
-    renderLegend(saved,(feature,action)=>{
-        const next=changeFeature(saved,feature,action);
-        try{localStorage.setItem(STORAGE,JSON.stringify(next));}
-        catch{window.alert('Could not save chart feature preferences in this browser.');return;}
-        saved=next;apply();window.dispatchEvent(new Event('chart-settings-change'));
-        const row=[...document.querySelectorAll('.feature-legend-row')].find(node=>node.dataset.feature===feature);
-        (row?.querySelector('button[aria-pressed]')||document.querySelector('#feature-legend button'))?.focus();
+    config.hiddenFeatures=saved.hiddenFeatures;
+    renderLegend(saved,changeDisplayedFeature);
+}
+
+function changeDisplayedFeature(feature,action){
+    const next=changeFeature(saved,feature,action);
+    try{localStorage.setItem(STORAGE,JSON.stringify(next));}
+    catch{window.alert('Could not save chart feature preferences in this browser.');return;}
+    saved=next;apply();window.dispatchEvent(new Event('chart-settings-change'));
+    requestAnimationFrame(()=>{
+        const row=[...document.querySelectorAll('.feature-legend-row,.indicator-pane-header')].find(node=>node.dataset.feature===feature);
+        (row?.querySelector('[data-feature-toggle]')||document.querySelector('#feature-legend button'))?.focus();
     });
 }
 
@@ -489,6 +494,7 @@ export async function mount() {
         if(!FEATURE_STYLES[event.detail])return;
         section='features';item=event.detail;featureTab='Style';gear.click();
     });
+    window.addEventListener('feature-legend-action',event=>changeDisplayedFeature(event.detail.feature,event.detail.action));
     window.addEventListener('feature-visibility-change',event=>{
         const feature=FEATURE_STYLES[event.detail.feature];if(!feature)return;
         for(const [key] of feature.outputs)saved.outputs[key].visible=event.detail.visible===true;

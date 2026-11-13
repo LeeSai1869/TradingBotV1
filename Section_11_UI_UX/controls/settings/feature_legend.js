@@ -1,4 +1,5 @@
 import {FEATURE_STYLES} from './feature_styles.js';
+export const PANE_FEATURES=['RSI','ADX','DI','ATR','Volume'];
 
 export function hiddenFeatures(value,outputs){
     const result={};
@@ -42,7 +43,7 @@ export function renderLegend(preferences,onChange){
         new ResizeObserver(()=>chart.style.setProperty('--feature-legend-bottom',`${legend.hidden?76:legend.offsetTop+legend.offsetHeight+6}px`)).observe(legend);
     }
     // Keep controls stable during candle updates and preserve keyboard focus.
-    const entries=legendEntries(preferences);
+    const entries=legendEntries(preferences).filter(({name})=>!PANE_FEATURES.includes(name));
     const identity=JSON.stringify(entries);
     if(legend.dataset.entries===identity)return;
     legend.dataset.entries=identity;legend.replaceChildren();legend.hidden=!entries.length;
@@ -54,7 +55,7 @@ export function renderLegend(preferences,onChange){
         for(const [action,text,label] of [[hidden?'show':'hide',hidden?'◉':'◎',`${hidden?'Show':'Hide'} ${name} on chart`],['remove','×',`Remove ${name} from chart`]]){
             const button=document.createElement('button');button.type='button';button.textContent=text;button.title=label;button.setAttribute('aria-label',label);
             if(action!=='remove'){
-                button.textContent='';button.setAttribute('aria-pressed',String(!hidden));
+                button.dataset.featureToggle='';button.textContent='';button.setAttribute('aria-pressed',String(!hidden));
                 const ns='http://www.w3.org/2000/svg',icon=document.createElementNS(ns,'svg');
                 for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'15',height:'15',fill:'none',stroke:'currentColor','stroke-width':'1.6','aria-hidden':'true'}))icon.setAttribute(key,value);
                 for(const d of ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z','M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',...(hidden?['M3 3l18 18']:[])]){

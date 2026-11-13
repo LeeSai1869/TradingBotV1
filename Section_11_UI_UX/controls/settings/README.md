@@ -137,3 +137,9 @@ The same catalog covers price overlays, zones, profiles and lower-pane indicator
 
 Feature names use compact, transparent rows. BUY/SELL markers use colored
 text and outlines with transparent interiors, preserving their candle anchors.
+
+The price-chart list appears while hovering that section or focusing its controls
+with the keyboard. RSI, ADX, DI, ATR and Volume have their own pane headers, with
+the current/crosshair numbers beside their names. Their actions appear on pane
+hover or keyboard focus. Hidden indicators retain their pane and selected outputs
+for restoration; removing closes the pane. Touch devices show controls directly.

@@ -2,9 +2,11 @@
 import sys
 from pathlib import Path
 from playwright.async_api import async_playwright
-from browser_smoke import run,sign_in,settle
+from browser_smoke import run,sign_in,settle,db
 
 async def exercise(base,library):
+    rows=db.read_last_klines('BTCUSDT','15m',100)
+    db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=row[2],ema50=row[6]-.5,wma50=row[6]-.3,rsi=61.) for row in rows])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1500,'height':1000})
@@ -26,20 +28,40 @@ async def exercise(base,library):
             print(await page.evaluate('({mounted:window.Composer?.mounted,bars:window.DataCache?.bars?.length,status:document.getElementById("status")?.textContent})'),errors,flush=True)
             raise
         legend=page.get_by_role('region',name='Chart features',exact=True)
-        assert sorted(await legend.locator('.feature-legend-name').all_text_contents())==['EMA','FVG','RSI','WMA']
+        async def hover_main():
+            position=await page.evaluate('()=>{const r=Canvas.chart.panes()[0].getHTMLElement().getBoundingClientRect();return {x:r.left+r.width*.6,y:r.top+r.height*.5}}')
+            await page.mouse.move(position['x'],position['y']);await settle(page)
+        await page.mouse.move(1,1);await settle(page)
+        assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='0'
+        await hover_main()
+        assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='1'
+        assert sorted(await legend.locator('.feature-legend-name').all_text_contents())==['EMA','FVG','WMA']
         await page.get_by_role('group',name='RSI pane controls',exact=True).wait_for()
-        await legend.get_by_role('button',name='Hide RSI on chart',exact=True).click();await settle(page)
-        assert await page.get_by_role('group',name='RSI pane controls',exact=True).count()==0
-        await legend.get_by_role('button',name='Show RSI on chart',exact=True).wait_for()
+        pane=page.get_by_role('group',name='RSI pane controls',exact=True)
+        await pane.hover();await settle(page)
+        assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='0'
+        assert await pane.locator('.indicator-values').inner_text()=='RSI 61.00'
+        point=await page.evaluate('()=>{const r=Canvas.chart.panes()[1].getHTMLElement().getBoundingClientRect();return {x:r.left+r.width*.6,y:r.top+r.height*.5}}')
+        await page.mouse.move(point['x'],point['y']);await settle(page)
+        assert await pane.get_by_role('button',name='Hide RSI on chart',exact=True).evaluate('node=>getComputedStyle(node).opacity')=='1'
+        await page.mouse.move(1,1);await settle(page)
+        assert await pane.get_by_role('button',name='Hide RSI on chart',exact=True).evaluate('node=>getComputedStyle(node).opacity')=='0'
+        await pane.hover()
+        await pane.get_by_role('button',name='Hide RSI on chart',exact=True).click();await settle(page)
+        assert await pane.count()==1
+        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').options().visible;})()") is False
+        await pane.get_by_role('button',name='Show RSI on chart',exact=True).wait_for()
         await page.reload();await sign_in(page,'user')
         try:
             await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length>=2000 && !DataCache._olderPromise')
         except Exception:
             print(await page.evaluate('({mounted:window.Composer?.mounted,bars:window.DataCache?.bars?.length,status:document.getElementById("status")?.textContent})'),errors,flush=True)
             raise
-        await legend.get_by_role('button',name='Show RSI on chart',exact=True).click();await settle(page)
+        await pane.hover()
+        await pane.get_by_role('button',name='Show RSI on chart',exact=True).click();await settle(page)
         await page.get_by_role('group',name='RSI pane controls',exact=True).wait_for()
         assert await page.evaluate("Composer.config.featureStyles.rsi.color")=='#123abc'
+        await hover_main()
         await legend.get_by_role('button',name='Hide EMA on chart',exact=True).click();await settle(page)
         assert await page.evaluate("Composer.config.ema.periods.length")==0
         await legend.get_by_role('button',name='Show EMA on chart',exact=True).click();await settle(page)
@@ -60,11 +82,28 @@ async def exercise(base,library):
         await page.screenshot(path='/tmp/tradingbot-feature-legend-desktop.png')
         await page.set_viewport_size({'width':420,'height':850});await settle(page)
         bounds=await legend.bounding_box();assert bounds and bounds['x']>=0 and bounds['x']+bounds['width']<=420
+        await hover_main()
         await legend.get_by_role('button',name='Hide FVG on chart',exact=True).click();await settle(page)
         assert await page.evaluate("Composer.config.featureStyles.bull_fvg_zones.visible") is False
         await page.screenshot(path='/tmp/tradingbot-feature-legend.png')
+        await page.mouse.move(1,1)
+        await legend.get_by_role('button',name='EMA feature settings',exact=True).focus()
+        await page.keyboard.press('Tab');await settle(page)
+        assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='1'
+        await pane.hover()
+        await pane.get_by_role('button',name='Close RSI',exact=True).click();await settle(page)
+        assert await pane.count()==0
+        assert await legend.locator('[data-feature="RSI"]').count()==0
         assert not errors,errors
+        touch=await browser.new_page(viewport={'width':420,'height':850},is_mobile=True,has_touch=True)
+        await touch.add_init_script("localStorage.setItem('tradingbot.chart-settings.v1',JSON.stringify({outputs:{rsi:{visible:true}}}))")
+        await touch.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
+        await touch.goto(base);await sign_in(touch,'user')
+        await touch.wait_for_function('window.Composer?.mounted && DataCache.bars.length>=2000 && !DataCache._olderPromise')
+        assert await touch.evaluate("matchMedia('(hover:none)').matches")
+        assert await touch.locator('#feature-legend').evaluate('node=>getComputedStyle(node).opacity')=='1'
+        assert await touch.get_by_role('button',name='Hide RSI on chart',exact=True).evaluate('node=>getComputedStyle(node).opacity')=='1'
         await browser.close()
-        print('PASS: all catalog families, hide/show panes and overlays, exact EMA restoration, remove/re-enable, persistence and mobile layout',flush=True)
+        print('PASS: per-pane hover and values, hide/show/remove, persistence, keyboard and touch access',flush=True)
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

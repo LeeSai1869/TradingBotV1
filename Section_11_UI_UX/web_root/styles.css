@@ -320,3 +320,23 @@ button:hover { background: #333; }
 .feature-legend-row svg {display:block;margin:auto;}
 
 #chart:has(#feature-legend:not([hidden])) .chart-hud[data-position="top-left"] {top:max(76px,var(--feature-legend-bottom,76px));max-height:calc(100% - var(--feature-legend-bottom,76px) - 35px);}
+
+/* Reveal actions in the pane under the pointer; keyboard and touch stay usable. */
+#feature-legend {opacity:0;}
+#feature-legend .feature-legend-row {pointer-events:none;}
+#chart:has([data-main-pane]:hover) #feature-legend, #feature-legend:hover, #feature-legend:has(:focus-visible) {opacity:1;}
+#chart:has([data-main-pane]:hover) #feature-legend .feature-legend-row, #feature-legend:hover .feature-legend-row, #feature-legend:has(:focus-visible) .feature-legend-row {pointer-events:auto;}
+.indicator-pane-header {background:transparent;padding:0;gap:4px;}
+.indicator-pane-header button {height:20px;min-width:20px;padding:0 2px;opacity:0;pointer-events:auto;}
+.indicator-pane-header:hover button, .indicator-pane-header:has(:focus-visible) button {opacity:1;pointer-events:auto;}
+.indicator-pane-header[data-hidden="true"] strong, .indicator-pane-header[data-hidden="true"] .indicator-values {opacity:.5;}
+@media (hover:none) {
+    #feature-legend, .indicator-pane-header button {opacity:1;}
+    #feature-legend .feature-legend-row, .indicator-pane-header button {pointer-events:auto;}
+}
+
+#chart:has([data-feature-pane="RSI"]:hover) .indicator-pane-header[data-feature="RSI"] button,
+#chart:has([data-feature-pane="ADX"]:hover) .indicator-pane-header[data-feature="ADX"] button,
+#chart:has([data-feature-pane="DI"]:hover) .indicator-pane-header[data-feature="DI"] button,
+#chart:has([data-feature-pane="ATR"]:hover) .indicator-pane-header[data-feature="ATR"] button,
+#chart:has([data-feature-pane="Volume"]:hover) .indicator-pane-header[data-feature="Volume"] button {opacity:1;pointer-events:auto;}
