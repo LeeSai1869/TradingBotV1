@@ -124,3 +124,13 @@ users.json; passwords are not saved in the browser. They survive backend restart
 expire after 30 days and are revoked by Sign out or a password change. Without
 Remember me, reopening/reloading still requires sign-in. The account's server role
 continues to control Timeframes/Coins permissions.
+
+## Chart feature list
+
+The chart lists enabled feature families at the top right. Click a name to open
+its settings, the eye to hide/show it, or × to remove it from the displayed list.
+Hidden features retain a dimmed row and restore exactly the previously selected
+outputs. Removing a feature turns off its outputs; enable it again in Features
+settings. Colors, widths and other styles survive both actions. These preferences
+are browser-local and do not change downloads, calculations or stored data.
+The same catalog covers price overlays, zones, profiles and lower-pane indicators.

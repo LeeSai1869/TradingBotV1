@@ -1,5 +1,6 @@
 // Chart preferences are browser-local. Runner policies remain owned by Core.
 import { FEATURE_STYLES, migrateStyles } from "./feature_styles.js";
+import {hiddenFeatures,changeFeature,renderLegend} from "./feature_legend.js";
 import {normalizeHud} from "../workspace/preferences.js";
 import {renderHudSettings} from "../workspace/settings.js";
 import * as admin from "./admin_controls.js";
@@ -31,6 +32,7 @@ function validated(value) {
         if (typeof value[key] === "boolean") result[key] = value[key];
     }
     result.outputs = migrateStyles(value);
+    result.hiddenFeatures=hiddenFeatures(value.hiddenFeatures,result.outputs);
     result.candleStyle=normalizeCandleStyle(value.candleStyle);
     result.hud = normalizeHud(value.hud);
     result.momentumSounds=normalizeMomentum(value.momentumSounds);
@@ -48,6 +50,14 @@ function apply() {
     config.featureStyles = saved.outputs;
     config.candleStyle=saved.candleStyle;
     config.ema = { periods: PERIODS.filter(p => saved.outputs[`ema${p}`].visible) };
+    renderLegend(saved,(feature,action)=>{
+        const next=changeFeature(saved,feature,action);
+        try{localStorage.setItem(STORAGE,JSON.stringify(next));}
+        catch{window.alert('Could not save chart feature preferences in this browser.');return;}
+        saved=next;apply();window.dispatchEvent(new Event('chart-settings-change'));
+        const row=[...document.querySelectorAll('.feature-legend-row')].find(node=>node.dataset.feature===feature);
+        (row?.querySelector('button[aria-pressed]')||document.querySelector('#feature-legend button'))?.focus();
+    });
 }
 
 function el(tag, text, parent, className) {
@@ -482,6 +492,7 @@ export async function mount() {
     window.addEventListener('feature-visibility-change',event=>{
         const feature=FEATURE_STYLES[event.detail.feature];if(!feature)return;
         for(const [key] of feature.outputs)saved.outputs[key].visible=event.detail.visible===true;
+        delete saved.hiddenFeatures[event.detail.feature];
         try{localStorage.setItem(STORAGE,JSON.stringify(saved));}catch{}
         apply();window.dispatchEvent(new Event('chart-settings-change'));
     });
