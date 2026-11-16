@@ -47,15 +47,46 @@ current. Consult the live readiness/market-data diagnostics for that separately.
 
 ## Boundaries and budgets
 
-The history scheduler uses bounded turns after live analytical maintenance. Defaults
-are 200 rows and a 0.5-second soft budget, with at most four scope visits per
-history turn; each call requests at most 100 rows including nested dependency work.
-The existing live budget remains separate. These are soft deadlines checked
+The history scheduler uses bounded turns after live analytical maintenance. The
+analytical worker's standalone defaults reserve 200 history rows and a 0.5-second
+soft budget, with at most four scope visits. The normal hierarchical pipeline
+explicitly allows up to 10,000 live rows and 10,000 history rows in separate
+0.5-second turns, up to 1,000 scope visits per lane; each classifier transaction
+requests at most 200 rows including nested dependency work. Exhausting the live
+row allowance does not subtract from the history allowance. These are soft deadlines checked
 between calls, not interruption of a running SQLite transaction or evaluation.
 The runner remains one process; this is not a second unbounded background writer.
 History adds bounded work and disk usage, so completion time depends on actual
 candle volume and other workloads, not just the count of active coins. No two-day
 completion guarantee is made.
+
+## One coin through the hierarchy
+
+The normal pipeline now persists `__pipeline_focus__` in its existing state.
+It resumes that active coin until its source/feature work, all ten compatible
+historical engine cursors and decision-rule checkpoints reach their targets.
+It then selects the next unfinished existing coin in configured order. Pausing
+or removing the owner releases it. Recent download/feature/analytical updates
+remain available to all active coins; their unfinished bulk histories do not
+receive a second historical allowance. New-coin initialization waits until the
+existing focus is complete.
+
+Ready timeframes of the focus can advance immediately while another timeframe
+of that coin still needs feature repair. A ready pair on another coin can still
+receive live classifications and small recent decision updates. Historical
+decision tails on other coins wait for their turn. Missing or incompatible
+features are never bypassed just because old feature rows physically exist.
+
+Structure feeds Trend; Trend, Structure and Participation feed Phase; all nine
+base engines feed Bias. Advancing a child clears dependent cached completion
+flags, so a parent cannot remain asleep at an older committed dependency prefix.
+This scheduling change does not alter classifier formulas or their input/run
+identities. Existing compatible histories resume rather than starting over.
+
+Runner logs identify the bulk focus and print per-engine rows/s, calculation
+time per candle, projection time and commit time for processed batches. Raw
+classification speed and time spent waiting for a scheduler turn are different
+measurements. No features or ADCN fields are deleted by this change.
 
 Trend/Phase reuse their existing versioned dependency contracts. Historical Bias
 joins the separately indexed historical runs for all nine dependencies, rather

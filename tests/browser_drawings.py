@@ -1,4 +1,4 @@
-"""Compact icon tools, style/lock/timeframe editing and account memory across browsers."""
+"""Single drawing-tools button, style editing and account memory across browsers."""
 from pathlib import Path
 import sys
 from playwright.async_api import async_playwright
@@ -14,10 +14,10 @@ async def exercise(base,library):
         await context.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'user')
         await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000 && !DataCache._olderPromise')
-        await page.get_by_role('button',name='Trend line',exact=True).wait_for(state='visible')
+        await page.get_by_role('button',name='Drawings',exact=True).wait_for(state='visible')
         await page.wait_for_function("!document.querySelector('[aria-label=\"Trend line\"]').disabled")
         await settle(page)
-        chart=await page.locator('#chart').bounding_box();tools=await page.locator('.drawing-tools').bounding_box()
+        chart=await page.locator('#chart').bounding_box();tools=await page.locator('#drawings-button').bounding_box()
         assert tools['y']<chart['y']
         assert not await page.locator('#candle-details strong').count()
         overlay=page.locator('#drawing-overlay')
@@ -30,6 +30,7 @@ async def exercise(base,library):
             else:await route.continue_()
         await page.route('**/api/drawings',transient_failure)
         for kind,points in [('Trend line',[(250,200),(550,300)]),('Rectangle zone',[(650,350),(850,450)]),('Horizontal line',[(400,550)]),('Fib retracement',[(1000,200),(1200,500)]),('Fib extension',[(250,350),(450,200),(600,400)])]:
+            await page.get_by_role('button',name='Drawings',exact=True).click()
             await page.get_by_role('button',name=kind,exact=True).click()
             for x,y in points:await click(x,y)
             await settle(page)
@@ -38,6 +39,7 @@ async def exercise(base,library):
                 await notice.wait_for(state='visible')
                 assert 'unsaved' in await notice.inner_text()
                 assert (await page.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())"))['drawings']==[]
+                await page.get_by_role('button',name='Drawings',exact=True).click()
                 await page.get_by_role('button',name='Retry saving drawings',exact=True).click()
                 await page.wait_for_function("document.querySelector('.drawing-notice').textContent==='Drawings saved to your account.'")
         assert await overlay.locator(':scope > g').count()==5
@@ -75,7 +77,7 @@ async def exercise(base,library):
         assert (await third.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json())"))['drawings']==[]
         await page.screenshot(path='/tmp/tradingbot-account-drawings.png')
         assert not errors,errors
-        print('PASS: compact icons; popup color/width/pattern/lock/timeframes; account storage across clean browsers; cross-timeframe projection and account isolation',flush=True)
+        print('PASS: single drawing-tools button; popup color/width/pattern/lock/timeframes; account storage across clean browsers; cross-timeframe projection and account isolation',flush=True)
         await browser.close()
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

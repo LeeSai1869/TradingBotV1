@@ -267,7 +267,8 @@ class Catalog:
                 u=self.by_id[uid]
                 required.update(self.fallback[uid])
                 for field in u.reads|u.history:
-                    if field in self.export or field.startswith(('mtfData.','barstate.','timeframe.','syminfo.')):continue
+                    derived={'emaGap7_25','emaGap25_50','emaGap50_100','emaGap7_25Pct','emaGap25_50Pct','emaGap50_100Pct','emaCompression'}
+                    if (field in self.export and field not in derived) or field.startswith(('mtfData.','barstate.','timeframe.','syminfo.')):continue
                     required.update(self.requires[uid].get(field,()))
             if required==execute:break
             execute=required

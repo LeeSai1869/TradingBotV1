@@ -1,6 +1,7 @@
 """MTF metadata/history in the existing intelligence database; no base rewrites."""
 import json
 from .memory_storage.Storage import engine_store as memory
+from .memory_storage.Storage import json_storage
 
 
 def open_db():
@@ -42,7 +43,7 @@ def source(conn,result,run_id,observed_ms):
     old=conn.execute('SELECT payload FROM mtf_sources WHERE ref=?',(ref,)).fetchone()
     encoded=memory.encode(projection)
     if old and old[0]!=encoded:raise ValueError('Divergent aggregation source reference')
-    conn.execute('INSERT OR IGNORE INTO mtf_sources VALUES (?,?,?,?,?)',(ref,run_id,result['candle_open_time'],observed_ms,encoded))
+    conn.execute('INSERT OR IGNORE INTO mtf_sources VALUES (?,?,?,?,?)',(ref,run_id,result['candle_open_time'],observed_ms,json_storage.pack(conn,encoded)))
     conn.execute('UPDATE mtf_sources SET run_id=?,observed_ms=? WHERE ref=? AND run_id IS NULL',(run_id,observed_ms,ref))
     return ref
 
@@ -60,7 +61,7 @@ def persist(conn,snapshot,result,metadata,*,force=False):
             ref=slot['result_ref'];encoded=memory.encode(slot['result'])
             old=conn.execute('SELECT payload FROM mtf_sources WHERE ref=?',(ref,)).fetchone()
             if old and old[0]!=encoded:raise ValueError('Input/reference mismatch')
-            conn.execute('INSERT OR IGNORE INTO mtf_sources VALUES (?,?,?,?,?)',(ref,None,slot['result']['candle_open_time'],snapshot['computed_at'],encoded))
+            conn.execute('INSERT OR IGNORE INTO mtf_sources VALUES (?,?,?,?,?)',(ref,None,slot['result']['candle_open_time'],snapshot['computed_at'],json_storage.pack(conn,encoded)))
         bundle['timeframes'].append(small)
     bundle_id=memory.digest(bundle);result_id=memory.digest(dict(scope=scope,as_of=result['as_of'],input_signature=result['input_signature']))
     encoded=memory.encode(result)
@@ -68,9 +69,9 @@ def persist(conn,snapshot,result,metadata,*,force=False):
     if existing:
         stable=lambda row:{key:value for key,value in row.items() if key not in ('computed_at','available_at')}
         if stable(json.loads(existing[0]))!=stable(result):raise ValueError('Divergent aggregation at the same key')
-    conn.execute('INSERT OR IGNORE INTO mtf_scopes VALUES (?,?)',(scope,memory.encode(metadata)))
-    conn.execute('INSERT OR IGNORE INTO mtf_input_bundles VALUES (?,?)',(bundle_id,memory.encode(bundle)))
-    conn.execute('INSERT OR IGNORE INTO mtf_results VALUES (?,?,?,?,?)',(result_id,scope,result['as_of'],bundle_id,encoded))
+    conn.execute('INSERT OR IGNORE INTO mtf_scopes VALUES (?,?)',(scope,json_storage.pack(conn,memory.encode(metadata))))
+    conn.execute('INSERT OR IGNORE INTO mtf_input_bundles VALUES (?,?)',(bundle_id,json_storage.pack(conn,memory.encode(bundle))))
+    conn.execute('INSERT OR IGNORE INTO mtf_results VALUES (?,?,?,?,?)',(result_id,scope,result['as_of'],bundle_id,json_storage.pack(conn,encoded)))
     conn.execute('INSERT OR REPLACE INTO mtf_latest VALUES (?,?,?)',(scope,result['input_signature'],result_id))
     return result_id,not bool(existing)
 

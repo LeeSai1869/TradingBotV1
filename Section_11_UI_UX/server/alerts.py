@@ -68,7 +68,7 @@ def epoch(symbol, interval):
 
 def validate(data,owner=None):
     known={r['symbol'] for key in ('approved','disapproved','staged','pending','top50') for r in data_admin.catalog().get(key,[])}
-    if data.get('symbol') not in known or data.get('interval') not in data_policy.INTERVALS:
+    if data.get('symbol') not in known|{'ALL'} or data.get('interval') not in set(data_policy.INTERVALS)|{'ALL'}:
         raise ValueError('Choose a registered coin and supported timeframe')
     if data.get('field') not in FIELDS or data.get('operator') not in OPERATORS:
         raise ValueError('Choose a supported field and condition')
@@ -95,49 +95,66 @@ def validate(data,owner=None):
 def list_rules(owner):
     conn=open_db()
     try:
-        return [json.loads(r['spec']) | {'id':r['id'],'status':r['status']} for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id NOT LIKE 'auto:%' ORDER BY created DESC",(owner,))]
+        return [json.loads(r['spec']) | {'id':r['id'],'status':r['status']} for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id NOT LIKE 'auto:%' AND id NOT LIKE 'scope:%' ORDER BY created DESC",(owner,))]
     finally: conn.close()
+
+
+def scoped(spec):
+    return spec['symbol']=='ALL' or spec['interval']=='ALL'
+
+
+def scope_prefix(owner,key):
+    return 'scope:'+uuid.uuid5(uuid.NAMESPACE_URL,owner+'|'+key).hex+':'
+
+
+def clear_scopes(conn,owner,key):
+    prefix=scope_prefix(owner,key)+'%'
+    conn.execute('DELETE FROM live_state WHERE rule_id IN (SELECT id FROM rules WHERE owner=? AND id LIKE ?)',(owner,prefix))
+    conn.execute('DELETE FROM rules WHERE owner=? AND id LIKE ?',(owner,prefix))
 
 
 def save(owner,data):
     spec=validate(data,owner); key=data.get('id') or uuid.uuid4().hex
-    if not isinstance(key,str) or key.startswith('auto:'): raise ValueError('Invalid rule ID')
+    if not isinstance(key,str) or key.startswith(('auto:','scope:')): raise ValueError('Invalid rule ID')
     with data_policy.snapshot_guard():
-        last=db.last_kline_time(spec['symbol'],spec['interval']) or 0
-        version=epoch(spec['symbol'],spec['interval'])
+        last=0 if scoped(spec) else db.last_kline_time(spec['symbol'],spec['interval']) or 0
+        version='' if scoped(spec) else epoch(spec['symbol'],spec['interval'])
     conn=open_db()
     try:
         with conn:
             conn.execute('BEGIN IMMEDIATE')
             old=conn.execute('SELECT owner FROM rules WHERE id=?',(key,)).fetchone()
             if old and old['owner']!=owner: raise ValueError('Unknown alert')
-            if not old and conn.execute("SELECT COUNT(*) FROM rules WHERE owner=? AND id NOT LIKE 'auto:%'",(owner,)).fetchone()[0]>=50:
+            if not old and conn.execute("SELECT COUNT(*) FROM rules WHERE owner=? AND id NOT LIKE 'auto:%' AND id NOT LIKE 'scope:%'",(owner,)).fetchone()[0]>=50:
                 raise ValueError('Maximum 50 alert rules per account')
             conn.execute('DELETE FROM live_state WHERE rule_id=?',(key,))
+            clear_scopes(conn,owner,key)
             conn.execute('INSERT OR REPLACE INTO rules VALUES (?,?,?,?,?,?,?,?)',(key,owner,json.dumps(spec),last,version,int(time.time()*1000),uuid.uuid4().hex,('Armed for live price' if spec['mode']=='live' else 'Armed for new closed candles') if spec['enabled'] else 'Paused'))
+        if scoped(spec):sync_scoped_rules()
         return key
     finally: conn.close()
 
 
 def delete(owner,key):
-    if not isinstance(key,str) or key.startswith('auto:'):raise ValueError('Invalid rule ID')
+    if not isinstance(key,str) or key.startswith(('auto:','scope:')):raise ValueError('Invalid rule ID')
     conn=open_db()
     try:
         with conn:
             conn.execute('BEGIN IMMEDIATE')
             if conn.execute('SELECT 1 FROM rules WHERE owner=? AND id=?',(owner,key)).fetchone():
+                clear_scopes(conn,owner,key)
                 conn.execute('DELETE FROM live_state WHERE rule_id=?',(key,))
                 conn.execute('DELETE FROM rules WHERE owner=? AND id=?',(owner,key))
     finally: conn.close()
 
 
-def events(owner,after,*,history_before=None,history_limit=20):
+def events(owner,after,*,history_before=None,history_limit=20,history_since=None,history_until=None,history_source='all'):
     conn=open_db()
     try:
         row=conn.execute('SELECT spec FROM signal_preferences WHERE owner=?',(owner,)).fetchone()
         prefs=dict(SIGNAL_DEFAULTS)|(json.loads(row[0]) if row else {})
         def packet(row):
-            event=json.loads(row['packet'])|{'seq':row['seq']}
+            event=json.loads(row['packet'])|{'seq':row['seq'],'source':'signal' if row['rule_id'].startswith('auto:') else 'custom'}
             timeframe=prefs.get('timeframes',{}).get(event['interval'],{})
             coin=prefs.get('coins',{}).get(event['symbol'],{})
             desktop=prefs['notify'] and timeframe.get('desktop',True) and coin.get('desktop',True)
@@ -151,12 +168,17 @@ def events(owner,after,*,history_before=None,history_limit=20):
             return event
         latest=conn.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE owner=?',(owner,)).fetchone()[0]
         if after is None:
+            if history_source not in {'all','custom'}:raise ValueError('Invalid history source')
             if not 1<=history_limit<=100 or history_before is not None and (type(history_before) is not int or history_before<1):raise ValueError('Invalid history page')
-            sql='SELECT seq,packet FROM events WHERE owner=?'+(' AND seq<?' if history_before is not None else '')+' ORDER BY seq DESC LIMIT ?'
-            args=(owner,history_before,history_limit+1) if history_before is not None else (owner,history_limit+1)
+            if any(value is not None and (type(value) is not int or not 0<=value<=9223372036854775807) for value in (history_since,history_until)) or history_since is not None and history_until is not None and history_since>history_until:raise ValueError('Invalid history time range')
+            sql='SELECT seq,rule_id,packet FROM events WHERE owner=?';args=[owner]
+            if history_source=='custom':sql+=" AND rule_id NOT LIKE 'auto:%'"
+            for clause,value in (('seq<?',history_before),('created>=?',history_since),('created<=?',history_until)):
+                if value is not None:sql+=' AND '+clause;args.append(value)
+            sql+=' ORDER BY seq DESC LIMIT ?';args.append(history_limit+1)
             rows=conn.execute(sql,args).fetchall();history=rows[:history_limit]
             return {'events':[],'cursor':latest,'history':[packet(r) for r in reversed(history)],'has_more':len(rows)>history_limit,'next_before':history[-1]['seq'] if history else None}
-        rows=conn.execute('SELECT seq,packet FROM events WHERE owner=? AND seq>? ORDER BY seq LIMIT 100',(owner,after)).fetchall()
+        rows=conn.execute('SELECT seq,rule_id,packet FROM events WHERE owner=? AND seq>? ORDER BY seq LIMIT 100',(owner,after)).fetchall()
         return {'events':[packet(r) for r in rows],'cursor':rows[-1]['seq'] if rows else max(after,latest)}
     finally: conn.close()
 
@@ -224,16 +246,19 @@ def evaluate_live(rule,spec):
 
 def evaluate_rule(rule,details_cache=None):
     spec=json.loads(rule['spec'])
-    if not spec['enabled']: return
+    if not spec['enabled'] or scoped(spec): return
     if spec.get('mode')=='live':
         evaluate_live(rule,spec); return
     symbol,iv=spec['symbol'],spec['interval']
     cursor=rule['cursor']; created=rule['created']; updates=[]; status='Waiting for next closed candle'
-    with data_policy.locked():
+    # Preparing a notification is a read. It must not hold the market writer
+    # lock across wide candle reads and opportunity/context calculations.
+    with data_policy.snapshot_guard():
         version=epoch(symbol,iv)
+        active=data_policy.enabled(symbol,iv)
         if version!=rule['epoch']:
             cursor=0;created=int(time.time()*1000)
-        if not data_policy.enabled(symbol,iv):
+        if not active:
             status='Suspended: coin or timeframe inactive'
         else:
             if rule['status'].startswith('Suspended'):
@@ -280,6 +305,10 @@ def evaluate_rule(rule,details_cache=None):
                     updates.append({'details':cache[key],'name':spec['name'],'message':message,'symbol':symbol,'interval':iv,'field':spec['field'],'value':value,'target':target,'bar_time':bar['open_time'],'sound':spec['sound'],'notify':spec['notify'],'created':int(time.time()*1000),'mode':'closed'})
                     status='Triggered'
                     if spec['repeat']=='once': spec['enabled']=False; break
+    # Release the reader guard before acquiring the writer lock: deletion takes
+    # these in the opposite phases. Revalidate the prepared snapshot at commit.
+    with data_policy.locked():
+        if epoch(symbol,iv)!=version or data_policy.enabled(symbol,iv)!=active:return
         conn=open_db()
         try:
             with conn:
@@ -294,6 +323,7 @@ def evaluate_rule(rule,details_cache=None):
 
 def evaluate_once():
     sync_signal_rules()
+    sync_scoped_rules()
     conn=open_db()
     try: rules=conn.execute('SELECT * FROM rules').fetchall()
     finally: conn.close()
@@ -319,6 +349,43 @@ def start():
             stop.wait(1)
     thread=threading.Thread(target=work,name='stored-alerts',daemon=True);thread.start()
     return stop
+
+
+def sync_scoped_rules():
+    """Keep one private evaluation cursor per pair; ALL remains one editable rule.
+
+    New active pairs start at their current stored candle. Existing children keep
+    their watermarks and once-only state across restarts and policy changes.
+    Saving/deleting the parent invalidates its children in the same transaction.
+    """
+    conn=open_db()
+    try:
+        parents=conn.execute("SELECT * FROM rules WHERE id NOT LIKE 'auto:%' AND id NOT LIKE 'scope:%'").fetchall()
+        parents=[row for row in parents if scoped(json.loads(row['spec'])) and json.loads(row['spec'])['enabled']]
+        if not parents:return
+        with data_policy.snapshot_guard():
+            symbols=set(data_policy.active_symbols());intervals=set(data_policy.active_intervals())
+        for parent in parents:
+            spec=json.loads(parent['spec']);prefix=scope_prefix(parent['owner'],parent['id'])
+            existing={row['id']:row for row in conn.execute('SELECT * FROM rules WHERE owner=? AND id LIKE ?',(parent['owner'],prefix+'%'))}
+            pairs={(symbol,iv) for symbol in (symbols if spec['symbol']=='ALL' else {spec['symbol']} & symbols)
+                   for iv in (intervals if spec['interval']=='ALL' else {spec['interval']} & intervals)}
+            pending=[];watching=0
+            with data_policy.snapshot_guard():
+                for symbol,iv in sorted(pairs):
+                    key=prefix+uuid.uuid5(uuid.NAMESPACE_URL,symbol+'|'+iv).hex
+                    if key in existing:
+                        watching+=bool(json.loads(existing[key]['spec'])['enabled']);continue
+                    child=dict(spec,symbol=symbol,interval=iv)
+                    pending.append((key,parent['owner'],json.dumps(child),db.last_kline_time(symbol,iv) or 0,epoch(symbol,iv),int(time.time()*1000),uuid.uuid4().hex,'Armed for new candles'))
+                    watching+=1
+            with conn:
+                conn.execute('BEGIN IMMEDIATE')
+                current=conn.execute('SELECT revision FROM rules WHERE id=?',(parent['id'],)).fetchone()
+                if not current or current['revision']!=parent['revision']:continue
+                conn.executemany('INSERT OR IGNORE INTO rules VALUES (?,?,?,?,?,?,?,?)',pending)
+                conn.execute('UPDATE rules SET status=? WHERE id=?',(f'{watching} of {len(pairs)} active coin/timeframe pairs watching',parent['id']))
+    finally:conn.close()
 
 
 SIGNAL_DEFAULTS={'enabled':True,'buy':'chime','sell':'bell','notify':True,'app':True,'buy_notify':True,'sell_notify':True,'timeframes':{},'coins':{},'mobile':False}
@@ -369,27 +436,43 @@ def sync_signal_rules():
     try:
         subscriptions=conn.execute('SELECT * FROM signal_preferences').fetchall()
         if not subscriptions:return
-        pairs=[(s,iv) for s in data_policy.active_symbols() for iv in data_policy.active_intervals()]
-        active=set(pairs)
+        active={(s,iv) for s in data_policy.active_symbols() for iv in data_policy.active_intervals()}
+        occupied={r['id'] for r in conn.execute("SELECT id FROM rules WHERE id LIKE 'auto:%'")}
         for account in subscriptions:
             owner=account['owner'];prefs=dict(SIGNAL_DEFAULTS)|json.loads(account['spec'])
-            existing={r['id']:r for r in conn.execute("SELECT * FROM rules WHERE owner=? AND id LIKE 'auto:%'",(owner,))}
-            for symbol,iv in active|{(json.loads(r['spec'])['symbol'],json.loads(r['spec'])['interval']) for r in existing.values()}:
+            # Account renaming can leave an old deterministic ID under another
+            # owner. Match subscriptions by their actual owner/pair/side, not ID.
+            existing={}
+            for row in conn.execute("SELECT * FROM rules WHERE owner=? AND id LIKE 'auto:%'",(owner,)):
+                if row['status']=='Superseded signal subscription':continue
+                saved=json.loads(row['spec'])
+                existing.setdefault((saved['symbol'],saved['interval'],saved['field']),[]).append(row)
+            for symbol,iv in active|{key[:2] for key in existing}:
                 for side in ('buy','sell'):
-                    key='auto:'+uuid.uuid5(uuid.NAMESPACE_URL,owner+'|'+symbol+'|'+iv+'|'+side).hex
+                    preferred='auto:'+uuid.uuid5(uuid.NAMESPACE_URL,owner+'|'+symbol+'|'+iv+'|'+side).hex
+                    group=existing.get((symbol,iv,'decision.'+side),[])
+                    # Keep the furthest watermark when legacy duplicates exist.
+                    old=max(group,key=lambda row:(row['cursor'],row['created'],row['id']==preferred,row['id'])) if group else None
+                    key=old['id'] if old else preferred if preferred not in occupied else 'auto:'+uuid.uuid4().hex
                     enabled=prefs['enabled'] and (symbol,iv) in active
                     spec=dict(name=side.upper(),symbol=symbol,interval=iv,field='decision.'+side,operator='equals',value=1,target_field=None,repeat='per_bar',sound=prefs[side],notify=prefs['notify'] and prefs[side+'_notify'],enabled=enabled,mode='closed')
-                    old=existing.get(key)
-                    if old and json.loads(old['spec'])==spec:continue
+                    duplicates=[row for row in group if row['id']!=key]
+                    if old and json.loads(old['spec'])==spec and not duplicates:continue
                     now=int(time.time()*1000)
                     with conn:
+                        for duplicate in duplicates:
+                            paused=dict(json.loads(duplicate['spec']),enabled=False)
+                            conn.execute('UPDATE rules SET spec=?,revision=?,status=? WHERE id=? AND owner=? AND revision=?',
+                                         (json.dumps(paused),uuid.uuid4().hex,'Superseded signal subscription',duplicate['id'],owner,duplicate['revision']))
                         if old:
                             if enabled and not json.loads(old['spec'])['enabled']:
                                 conn.execute('UPDATE rules SET created=?,cursor=? WHERE id=?',(now,db.last_kline_time(symbol,iv) or 0,key))
-                            conn.execute('UPDATE rules SET spec=?,revision=? WHERE id=?',(json.dumps(spec),uuid.uuid4().hex,key))
+                            if json.loads(old['spec'])!=spec:
+                                conn.execute('UPDATE rules SET spec=?,revision=? WHERE id=? AND owner=?',(json.dumps(spec),uuid.uuid4().hex,key,owner))
                         elif enabled:
                             last=db.last_kline_time(symbol,iv) or 0
                             conn.execute('INSERT OR IGNORE INTO rules VALUES (?,?,?,?,?,?,?,?)',(key,owner,json.dumps(spec),last,epoch(symbol,iv),now,uuid.uuid4().hex,'Armed for new decisions'))
+                            occupied.add(key)
     finally:conn.close()
 
 

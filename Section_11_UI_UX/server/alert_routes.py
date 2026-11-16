@@ -16,8 +16,11 @@ def handle_get(path,query,server):
     if path=='/api/alerts/history':
         try:
             qs=parse_qs(query);before=qs.get('before',[None])[0];limit=int(qs.get('limit',['50'])[0])
-            return 200,alerts.events(identity['username'],None,history_before=int(before) if before is not None else None,history_limit=limit)
-        except (ValueError,TypeError):return 400,{'error':'Choose a valid history page (1–100 messages)'}
+            since=qs.get('since',[None])[0];until=qs.get('until',[None])[0]
+            return 200,alerts.events(identity['username'],None,history_before=int(before) if before is not None else None,history_limit=limit,
+                                    history_since=int(since) if since is not None else None,history_until=int(until) if until is not None else None,
+                                    history_source=qs.get('source',['all'])[0])
+        except (ValueError,TypeError):return 400,{'error':'Choose a valid history page (1–100 messages) and time range'}
     if path=='/api/alerts/signals':return 200,alerts.signal_preferences(identity['username'])
     if path=='/api/alerts/catalog':
         registry=data_admin.catalog()

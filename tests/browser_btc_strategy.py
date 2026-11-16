@@ -52,6 +52,7 @@ window.data={symbol:'BTCUSDT',timeframe:'5m',atLiveEdge:true};strategy.mount();w
             await page.screenshot(path='/tmp/btc-strategy.png')
             await page.evaluate("data.symbol='ETHUSDT';change()")
             assert await page.get_by_role('checkbox').is_disabled()
+            assert await page.locator('#btc-strategy-status').text_content()==''
             assert len(requests)==3
             assert not errors,errors
             print('PASS real chart overlay, toggle, BTC scope, bounded polling, unchanged autoscale')

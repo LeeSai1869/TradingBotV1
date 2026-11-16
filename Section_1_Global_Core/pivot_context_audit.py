@@ -71,7 +71,7 @@ class LocalReader:
     def __init__(self,source,engines,report):
         self.source=source;self.engines=engines;self.report=report;self.symbol=report['symbol'];self.frame=report['timeframe']
         self.runs={};self.run_status={};now=int(time.time()*1000);policy=data_policy.read()
-        existing={r[1] for r in source.execute('PRAGMA table_info(features)')};self.fields=[f for f in FIELDS if f in existing]
+        existing={r[1] for r in source.execute('PRAGMA table_xinfo(features)')};self.fields=[f for f in FIELDS if f in existing]
         self.generations={}
         if engines:
             for frame in dict.fromkeys((self.frame,'4h','1d')):

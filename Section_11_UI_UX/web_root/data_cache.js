@@ -28,6 +28,8 @@ const DataCache = {
     _refreshPromise: null,
     _latestSignature: null,
     _refreshCount: 0,
+    _fullRefreshVersion: 0,
+    _appliedFullRefreshVersion: 0,
     _storageEpoch: "0:0",
     listeners: [],
 
@@ -139,6 +141,7 @@ const DataCache = {
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
+            _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
             historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
@@ -198,15 +201,20 @@ const DataCache = {
         return work;
     },
 
-    refreshStored() {
+    refreshStored({full=false}={}) {
+        if(full)++this._fullRefreshVersion;
         if (this.loading || !this.atLiveEdge) return Promise.resolve(false);
         if (this._refreshPromise) return this._refreshPromise;
         const generation = this._reloadGeneration;
-        // Poll only the closed edge; occasionally refresh the full window for replayed features.
-        const limit=++this._refreshCount%12===0?WINDOW_BARS:2;
+        // Healthy live charts need only the edge. A full 1,000-row response can
+        // exceed 30 MB; refresh history only during replay or on explicit demand.
+        const fullVersion=this._fullRefreshVersion;
+        const replaying=this.historyPending||this.featureProgress?.status!=='features current';
+        const limit=fullVersion>this._appliedFullRefreshVersion||(++this._refreshCount%12===0&&replaying)?WINDOW_BARS:2;
         const request = this._fetchPage(this.symbol, this.timeframe, limit);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
+            if(limit===WINDOW_BARS)this._appliedFullRefreshVersion=fullVersion;
             if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
                 return this.loadInitial(this.symbol, this.timeframe);
             }
@@ -219,6 +227,7 @@ const DataCache = {
                 return this.loadInitial(this.symbol,this.timeframe);
             }
             const progressChanged=JSON.stringify(this.featureProgress)!==JSON.stringify(packet.feature_progress??null);
+            if(limit<WINDOW_BARS&&this.featureProgress&&this.featureProgress.status!=='features current'&&packet.feature_progress?.status==='features current')++this._fullRefreshVersion;
             this.featureProgress=packet.feature_progress??null;
             const srChanged=JSON.stringify([this.srSnapshot,this.srFrames])!==JSON.stringify([packet.sr_snapshot??null,packet.sr_frames??{}]);
             this.srSnapshot=packet.sr_snapshot??null;

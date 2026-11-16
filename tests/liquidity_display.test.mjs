@@ -81,3 +81,12 @@ test('health display preference preserves existing liquidity styles',()=>{
     const hidden=normalizeStyles({liquidity_bids:{visible:true,details:false,lengthPercent:35}});
     assert.equal(hidden.liquidity_bids.details,false);assert.equal(hidden.liquidity_bids.lengthPercent,35);
 });
+
+test('subpixel observed profile bins stay legible without changing price bounds or notional widths',()=>{
+    const band={side:'bid',low:100,high:100.01,notional_usdt:50};
+    const row={low:band.low,high:band.high,bid:50,ask:0,total:50,bidBand:band};
+    const [segment]=stackedSegments(row,100,p=>1000-p,1000,40);
+    assert.equal(segment.height,1);assert.equal(segment.width,200);
+    assert.equal(segment.band,band);assert.equal(band.high,100.01);assert.equal(band.notional_usdt,50);
+    assert.ok(Math.abs(segment.y+segment.height/2-(1000-(row.low+row.high)/2))<1e-10);
+});

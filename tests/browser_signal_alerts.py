@@ -46,7 +46,7 @@ async def exercise(base,library):
             await page.get_by_role('button',name='Open settings',exact=True).click()
             await settings.get_by_role('tab',name='Notifications',exact=True).click()
             await settings.get_by_role('button',name='New notification',exact=True).click()
-            editor=page.get_by_role('dialog',name='Create alert',exact=True)
+            editor=page.get_by_role('dialog',name='Alerts',exact=True)
             await editor.get_by_role('button',name='SELL signal',exact=True).click()
             assert await editor.get_by_label('Field',exact=True).input_value()=='decision.sell'
             assert not await editor.get_by_label('Threshold (signed numbers allowed)',exact=True).is_visible()

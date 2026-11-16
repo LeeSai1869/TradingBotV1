@@ -8,6 +8,7 @@ from datetime import datetime,timezone
 import json
 import math
 from . import pivot_research
+from .memory_storage.Storage import features_store
 
 VERSION='all-pivot-features-v1'
 CATEGORIES=('regime_state','trend_state','current_structure','current_swing_direction','swing_direction','transition_state','energy_state','control_state')
@@ -107,7 +108,7 @@ def compare(source,report,*,before=12,after=24,batch_size=24,progress=None,conte
     if not len(times):raise ValueError('No candles in frozen source coverage')
     origins=[c['pivot']['origin_time'] for c in cases]
     idx,valid=exact_indices(times,origins,offsets,pivot_research.DURATIONS[report['timeframe']]);groups=memberships(cases,labels)
-    schema=list(source.execute('PRAGMA table_info(features)'))
+    schema=list(source.execute('PRAGMA table_xinfo(features)'))
     numeric=[r[1] for r in schema if r[1] not in EXCLUDE and any(t in r[2].upper() for t in ('INT','REAL','FLOAT','DOUBLE','NUMERIC'))]
     features={};categories={};existing={r[1] for r in schema}
     def store(names,values):
@@ -116,7 +117,7 @@ def compare(source,report,*,before=12,after=24,batch_size=24,progress=None,conte
                 features.setdefault(name,[]).append({k:v for k,v in group.items() if k not in ('count','mean','stddev','minimum','maximum')}|
                     {key:[None if not math.isfinite(row[j]) else row[j] for row in group[key]] for key in ('count','mean','stddev','minimum','maximum')})
     for begin in range(0,len(numeric),batch_size):
-        names=numeric[begin:begin+batch_size];quoted=','.join('f."'+n.replace('"','""')+'"' for n in names)
+        names=numeric[begin:begin+batch_size];quoted=','.join(features_store.read_expression(n) for n in names)
         sql='''SELECT '''+quoted+''',f.formula_version,f.measurement_version,f.measurement_config_id FROM raw.klines k LEFT JOIN features f
           ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time WHERE k.symbol=? AND k.interval=? AND k.open_time<=? AND k.close_time<? ORDER BY k.open_time'''
         values=np.full((len(times),len(names)),np.nan)

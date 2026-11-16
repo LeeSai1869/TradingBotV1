@@ -4,7 +4,7 @@ import math
 import re
 import time
 from . import data_policy,regime_inputs
-from .memory_storage.Storage import engine_store
+from .memory_storage.Storage import engine_store,features_store
 from Section_8_Decision_Engine.pivot_study import VERSION,measure,summarize
 
 TIMEFRAMES=('1m','5m','15m','30m','1h','4h','1d')
@@ -19,7 +19,8 @@ def validate(symbol,interval):
 
 
 def metadata(conn,symbol,interval):
-    columns=[row[1] for row in conn.execute('PRAGMA table_info(features)')]
+    existing={row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
+    columns=[name for name in features_store.COLUMNS if name in existing]
     if not set(FIELDS)<=set(columns):raise regime_inputs.InputsUnavailable('Pivot event columns are unavailable')
     from Section_4_Features.execution.components import catalog
     feature_catalog=catalog()
@@ -146,6 +147,7 @@ def case_context(symbol,interval,pivot_id,known_time,*,source_id,before=12,after
                 cursor=conn.execute(sql,[symbol,interval,*sorted(times)]);names=[d[0] for d in cursor.description]
                 for values in cursor:
                     record=dict(zip(names,values));client={key:record.pop('raw_'+key) for key in ('open_time','close_time','open','high','low','close','volume')}
+                    record=features_store.resolve_derived(record)
                     invalid=[key for key,value in record.items() if isinstance(value,float) and not math.isfinite(value)]
                     for key in invalid:record[key]=None
                     bars.append(dict(client=client,features=record,nonfinite_fields=invalid,

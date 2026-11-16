@@ -3,7 +3,7 @@ import {TOOLS,fibLevels,normalizeDrawings} from './geometry.js';
 export const name='drawings';
 const NS='http://www.w3.org/2000/svg';
 let capture;
-let chart,svg,select={value:'pointer'},hint,popup,buttons=[],drawings=[],draft=[],selected=-1,key='',drag=null,undo=[],frame=0,state,toolStatus;
+let chart,svg,select={value:'pointer'},hint,popup,menu,menuButton,buttons=[],drawings=[],draft=[],selected=-1,key='',drag=null,undo=[],frame=0,state,toolStatus,clipboard=null,interactionOptions;
 const collections=new Map();
 const INTERVALS=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'];
 let width=0,height=0,paneNode,observer,lastTimeframe='';
@@ -60,22 +60,30 @@ async function store(){
         while(current.pending){const snapshot=current.pending;current.pending=null;
             const result=await request(current.symbol,{revision:current.revision,drawings:snapshot});current.revision=result.revision;
         }
-        if(state===current){toolStatus.setAttribute('aria-label','Reload drawings');buttons.forEach(b=>b.disabled=false);feedback('Drawings saved to your account.');}
-    }catch(error){current.error=true;current.conflict=error.status===409;current.pending=JSON.parse(JSON.stringify(current.drawings));if(state===current){mode();buttons.forEach(b=>b.disabled=true);toolStatus.setAttribute('aria-label',current.conflict?'Reload drawings':'Retry saving drawings');feedback(error.message+(current.conflict?' Reload drawings to use the server version.':' Drawing is unsaved. Use Retry saving drawings.'));}}
+        if(state===current){toolStatus.setAttribute('aria-label','Reload drawings');toolStatus.textContent='↻ Reload drawings';buttons.forEach(b=>b.disabled=false);feedback('Drawings saved to your account.');}
+    }catch(error){current.error=true;current.conflict=error.status===409;current.pending=JSON.parse(JSON.stringify(current.drawings));if(state===current){mode();buttons.forEach(b=>b.disabled=true);const label=current.conflict?'Reload drawings':'Retry saving drawings';toolStatus.setAttribute('aria-label',label);toolStatus.textContent='↻ '+label;feedback(error.message+(current.conflict?' Reload drawings to use the server version.':' Drawing is unsaved. Use Retry saving drawings.'));}}
     finally{current.saving=false;}
 }
 function remember(){undo.push(JSON.stringify(drawings));if(undo.length>50)undo.shift();}
+function closeMenu(){if(menu)menu.hidden=true;menuButton?.setAttribute('aria-expanded','false');}
+function navigation(enabled){
+    if(!enabled){
+        if(!interactionOptions){const options=chart.options();interactionOptions={handleScroll:structuredClone(options.handleScroll),handleScale:structuredClone(options.handleScale)};}
+        chart.applyOptions({handleScroll:false,handleScale:false});
+    }else if(interactionOptions){chart.applyOptions(interactionOptions);interactionOptions=null;}
+}
 function mode(value='pointer'){
     select.value=value;draft=[];svg.dataset.active=String(value!=='pointer');if(capture)capture.hidden=value==='pointer';
     buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===value)));
-    chart.applyOptions({handleScroll:value==='pointer',handleScale:value==='pointer'});
+    navigation(value==='pointer');
+    if(menuButton){menuButton.dataset.active=String(value!=='pointer');menuButton.title=value==='pointer'?'Drawing tools, including Fibonacci':`Drawing: ${value}. Escape cancels.`;}
     feedback(value==='pointer'?'Select a drawing to style it.':`Click ${TOOLS[value]} ${TOOLS[value]===1?'point':'points'} on the chart. Escape cancels.`);schedule();
 }
 function market(){
     const cache=window.DataCache;if(!cache?.symbol)return;
-    if(cache.timeframe!==lastTimeframe){lastTimeframe=cache.timeframe;selected=-1;popup?.close();if(svg)mode();}
+    if(cache.timeframe!==lastTimeframe){lastTimeframe=cache.timeframe;cancelDrag();selected=-1;popup?.close();closeMenu();if(svg)mode();}
     if(cache.symbol===key)return;
-    key=cache.symbol;popup?.close();state=collections.get(key);
+    cancelDrag();key=cache.symbol;popup?.close();closeMenu();state=collections.get(key);
     if(!state){state={symbol:key,drawings:[],revision:0,ready:false};collections.set(key,state);}
     drawings=state.drawings;selected=-1;drag=null;undo=[];mode();buttons.forEach(b=>b.disabled=!state.ready||state.error);if(!state.ready)feedback('Loading account drawings…');void load(state);
 }
@@ -94,7 +102,7 @@ function point(a){
     return x==null || y==null?null:{x:x+((a.time-base.time)/seconds+a.offset)*chart.timeScale().options().barSpacing,y,price:a.price};
 }
 function stroke(a,b,parent,color='#58b9ff',hit=false,style={}){
-    return node('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:hit?'transparent':color,'stroke-width':hit?12:(style.width||2),'stroke-dasharray':style.pattern==='dashed'?'8 5':style.pattern==='dotted'?'2 4':'',
+    return node('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:hit?'transparent':color,'stroke-width':hit?14:(style.width||2),'stroke-dasharray':hit?'':style.pattern==='dashed'?'8 5':style.pattern==='dotted'?'2 4':'',
         class:hit?'drawing-hit':'','pointer-events':hit?'stroke':'none'},parent);
 }
 function render(){
@@ -114,10 +122,10 @@ function render(){
         else if(d.type==='line')segment(a,b);
         else if(d.type==='rectangle'){
             const corners=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];
-            node('rect',{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(b.x-a.x),height:Math.abs(b.y-a.y),fill:color,'fill-opacity':style.fillOpacity??.1,'pointer-events':'none'},group);
+            node('rect',{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(b.x-a.x),height:Math.abs(b.y-a.y),fill:color,'fill-opacity':style.fillOpacity??.1,'pointer-events':hit?'all':'none',class:hit?'drawing-body':''},group);
             corners.forEach((p,i)=>segment(p,corners[(i+1)%4]));
         }else{
-            for(let i=1;i<points.length;i++)stroke(points[i-1],points[i],group,'#718096');
+            for(let i=1;i<points.length;i++){stroke(points[i-1],points[i],group,'#718096');if(hit)stroke(points[i-1],points[i],group,color,true);}
             const left=Math.min(...points.map(p=>p.x)), right=Math.max(...points.map(p=>p.x))+(d.type==='extension'?120:0);
             for(const level of fibLevels(d.type,points)){
                 const y=getSeries().priceToCoordinate(level.price);if(y==null)continue;
@@ -136,6 +144,24 @@ function render(){
     }
 }
 function local(event){const bounds=svg.getBoundingClientRect();return {x:event.clientX-bounds.left,y:event.clientY-bounds.top};}
+function copyDrawing(){
+    if(selected<0||!drawings[selected])return;
+    clipboard=structuredClone(drawings[selected]);popup.close();feedback('Drawing copied. Use ⌘V / Ctrl+V to paste.');
+}
+function pasteDrawing(source=clipboard){
+    if(!source||!state?.ready||state.error||drag)return;
+    if(drawings.length>=500){feedback('Drawing limit reached. Delete a drawing before copying.');return;}
+    const points=source.anchors.map(point);if(points.some(p=>!p))return;
+    const anchors=points.map(p=>anchor(p.x+24,p.y+24));if(anchors.some(a=>!a))return;
+    remember();drawings.push({...structuredClone(source),anchors,locked:false});selected=drawings.length-1;popup.close();void store();schedule();
+}
+function releaseDrag(){
+    const gesture=drag;drag=null;
+    if(gesture&&svg.hasPointerCapture(gesture.pointerId))svg.releasePointerCapture(gesture.pointerId);
+    navigation(select.value==='pointer');
+    return gesture;
+}
+function cancelDrag(event){if(drag&&(event?.pointerId==null||event.pointerId===drag.pointerId)){const before=drag.before;releaseDrag();drawings=JSON.parse(before);if(state)state.drawings=drawings;schedule();}}
 function edit(){
     const drawing=drawings[selected];if(!drawing)return;
     popup.replaceChildren();
@@ -172,6 +198,8 @@ function edit(){
         void store();popup.close();schedule();
     });
     action('Delete drawing',()=>{if(!state.ready||state.error)return;remember();drawings.splice(selected,1);selected=-1;void store();popup.close();schedule();});
+    action('Duplicate drawing',()=>pasteDrawing(drawing));
+    action('Copy drawing',copyDrawing);
     action('Close',()=>popup.close());
     form.onsubmit=event=>event.preventDefault();
     popup.onkeydown=event=>{if(event.key==='Escape'){event.stopPropagation();popup.close();}};
@@ -179,23 +207,34 @@ function edit(){
 }
 export function mount(instance){
     chart=instance;
-    const controls=document.createElement('div');controls.className='drawing-tools';controls.setAttribute('aria-label','Drawing tools');document.getElementById('toolbar').append(controls);
-    function button(label,symbol,action){const b=document.createElement('button');b.textContent=symbol;b.setAttribute('aria-label',label);b.title=label;b.onclick=action;controls.append(b);return b;}
+    const toolbar=document.getElementById('toolbar');
+    menuButton=document.createElement('button');menuButton.id='drawings-button';menuButton.textContent='Drawings';menuButton.setAttribute('aria-controls','drawing-tools-menu');menuButton.setAttribute('aria-expanded','false');menuButton.setAttribute('aria-haspopup','dialog');toolbar.append(menuButton);
+    const alerts=document.getElementById('alerts-button');if(alerts)menuButton.after(alerts);
+    menu=document.createElement('div');menu.id='drawing-tools-menu';menu.className='drawing-tools';menu.hidden=true;menu.setAttribute('role','dialog');menu.setAttribute('aria-label','Drawing tools');document.body.append(menu);
+    menuButton.onclick=()=>{
+        if(!menu.hidden){closeMenu();return;}
+        popup.close();menu.hidden=false;menuButton.setAttribute('aria-expanded','true');
+        const bounds=menuButton.getBoundingClientRect(),menuWidth=Math.min(260,window.innerWidth-16),top=bounds.bottom+4;
+        Object.assign(menu.style,{left:Math.max(8,Math.min(bounds.left,window.innerWidth-menuWidth-8))+'px',top:top+'px',width:menuWidth+'px',maxHeight:Math.max(70,window.innerHeight-top-8)+'px'});
+        menu.querySelector('button:not(:disabled)')?.focus();
+    };
+    function button(label,symbol,action){const b=document.createElement('button');b.textContent=symbol;b.setAttribute('aria-label',label);b.title=label;b.onclick=()=>{closeMenu();action();};menu.append(b);return b;}
     for(const [value,label,icon] of [['pointer','Select drawing','↖'],['line','Trend line','╱'],['rectangle','Rectangle zone','▭'],['horizontal','Horizontal line','―'],['retracement','Fib retracement','≋'],['extension','Fib extension','↗']]){
         const b=button(label,'',()=>{popup.close();mode(select.value===value?'pointer':value);});b.dataset.tool=value;buttons.push(b);
         const iconSvg=node('svg',{viewBox:'0 0 24 24',width:18,height:18,'aria-hidden':'true'},b);
         const paths={pointer:'M5 3 L5 18 L10 13 L14 21 L17 19 L13 12 L20 12 Z',line:'M4 20 L20 4 M3 18 L6 21 M18 3 L21 6',rectangle:'M3 5 H21 V19 H3 Z',horizontal:'M2 12 H22',retracement:'M3 4 H21 M3 9 H17 M3 14 H21 M3 20 H14',extension:'M3 20 L8 12 L12 16 L19 4 M12 4 H22 M12 9 H22 M12 14 H22'};
         node('path',{d:paths[value],fill:'none',stroke:'currentColor','stroke-width':1.5,'stroke-linecap':'round','stroke-linejoin':'round'},iconSvg);
+        const text=document.createElement('span');text.textContent=label;b.append(text);
     }
-    button('Undo drawing','↶',()=>{if(!state?.ready||state.error||!undo.length)return;drawings=JSON.parse(undo.pop());selected=-1;popup.close();void store();schedule();});
-    toolStatus=button('Reload drawings','↻',()=>{if(!state||state.saving)return;if(state.error&&!state.conflict&&state.pending){state.error=false;void store();return;}state.pending=null;state.ready=false;buttons.forEach(b=>b.disabled=true);void load(state);});
+    button('Undo drawing','↶ Undo drawing',()=>{if(!state?.ready||state.error||!undo.length)return;drawings=JSON.parse(undo.pop());selected=-1;popup.close();void store();schedule();});
+    toolStatus=button('Reload drawings','↻ Reload drawings',()=>{if(!state||state.saving)return;if(state.error&&!state.conflict&&state.pending){state.error=false;void store();return;}state.pending=null;state.ready=false;buttons.forEach(b=>b.disabled=true);void load(state);});
     hint=document.createElement('span');hint.className='drawing-notice';hint.setAttribute('role','status');document.getElementById('chart').append(hint);
     popup=document.createElement('dialog');popup.className='drawing-popup';popup.setAttribute('aria-label','Drawing style');document.body.append(popup);
     svg=node('svg',{'id':'drawing-overlay','aria-label':'Chart drawings'},document.getElementById('chart'));
     capture=document.createElement('div');capture.id='drawing-input';capture.hidden=true;document.getElementById('chart').append(capture);
     const down=event=>{
-        if(event.button!==0 || !state?.ready || state.error)return;
-        const p=local(event);if(p.y<0 || p.y>height)return;
+        if(event.button!==0 || !state?.ready || state.error || drag)return;
+        const p=local(event);if(p.x<0 || p.x>width || p.y<0 || p.y>height)return;
         if(select.value!=='pointer'){
             event.preventDefault();event.stopPropagation();
             const a=anchor(p.x,p.y);if(!a){feedback('No candle coordinates available yet. Wait for the chart to load.');return;}draft.push(a);
@@ -205,25 +244,39 @@ export function mount(instance){
         const target=event.target.closest('[data-drawing]');if(!target)return;
         event.preventDefault();event.stopPropagation();selected=Number(target.dataset.drawing);popup.close();
         if(drawings[selected].locked){edit();schedule();return;}
-        drag={start:p,before:JSON.stringify(drawings),points:drawings[selected].anchors.map(point),handle:event.target.hasAttribute('data-anchor')?Number(event.target.dataset.anchor):null};
+        drag={start:p,before:JSON.stringify(drawings),points:drawings[selected].anchors.map(point),moved:false,pointerId:event.pointerId,handle:event.target.hasAttribute('data-anchor')?Number(event.target.dataset.anchor):null};
+        navigation(false);
         svg.setPointerCapture(event.pointerId);schedule();
     };
     svg.addEventListener('pointerdown',down);capture.addEventListener('pointerdown',down);
     svg.addEventListener('pointermove',event=>{
-        if(!drag)return;
-        const p=local(event),updated=drawings[selected].anchors.map((a,i)=>{
+        if(!drag||event.pointerId!==drag.pointerId)return;
+        const p=local(event);if(!drag.moved&&Math.hypot(p.x-drag.start.x,p.y-drag.start.y)<4)return;
+        drag.moved=true;
+        const updated=drawings[selected].anchors.map((a,i)=>{
             if(drag.handle!==null && i!==drag.handle)return a;
             const original=drag.points[i];return anchor(original.x+p.x-drag.start.x,original.y+p.y-drag.start.y)||a;
         });drawings[selected].anchors=updated;schedule();
     });
-    function finish(){if(!drag)return;const changed=drag.before!==JSON.stringify(drawings);if(changed){undo.push(drag.before);if(undo.length>50)undo.shift();}drag=null;if(changed)void store();else edit();schedule();}
-    svg.addEventListener('pointerup',finish);svg.addEventListener('pointercancel',()=>{if(drag){drawings=JSON.parse(drag.before);drag=null;schedule();}});
+    function finish(event){if(!drag||event.pointerId!==drag.pointerId)return;const gesture=releaseDrag(),changed=gesture.before!==JSON.stringify(drawings);if(changed){undo.push(gesture.before);if(undo.length>50)undo.shift();void store();}else if(!gesture.moved)edit();schedule();}
+    svg.addEventListener('pointerup',finish);svg.addEventListener('pointercancel',cancelDrag);svg.addEventListener('lostpointercapture',cancelDrag);
+    document.addEventListener('pointerdown',event=>{
+        if(popup.open&&!popup.contains(event.target))popup.close();
+        if(!menu.contains(event.target)&&!menuButton.contains(event.target))closeMenu();
+        if(!drag&&!svg.contains(event.target)&&!popup.contains(event.target)&&!menu.contains(event.target)&&event.target!==capture){selected=-1;schedule();}
+    },true);
     document.addEventListener('keydown',event=>{
-        if(event.key==='Escape' && !document.querySelector('dialog[open]')){if(drag){drawings=JSON.parse(drag.before);drag=null;}mode();}
-        if((event.key==='Delete'||event.key==='Backspace') && selected>=0 && state?.ready && !state.error && !document.querySelector('dialog[open]') && !/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)){
+        const typing=event.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName);
+        if(event.key==='Escape' && !document.querySelector('dialog[open]')){closeMenu();cancelDrag();mode();}
+        if(!typing&&(event.metaKey||event.ctrlKey)&&!event.altKey&&!document.querySelector('dialog[open]:not(.drawing-popup)')){
+            if(event.key.toLowerCase()==='c'&&selected>=0){event.preventDefault();copyDrawing();}
+            if(event.key.toLowerCase()==='v'&&clipboard){event.preventDefault();pasteDrawing();}
+        }
+        if((event.key==='Delete'||event.key==='Backspace') && selected>=0 && state?.ready && !state.error && !document.querySelector('dialog[open]') && !typing){
             event.preventDefault();remember();drawings.splice(selected,1);selected=-1;store();schedule();
         }
     });
+    window.addEventListener('resize',closeMenu);window.addEventListener('blur',cancelDrag);toolbar.addEventListener('scroll',closeMenu,{passive:true});
     chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);chart.subscribeCrosshairMove(schedule);
     observer=new ResizeObserver(schedule);observer.observe(document.getElementById('chart'));
     window.addEventListener('pointermove',schedule,{passive:true});window.addEventListener('wheel',schedule,{passive:true});

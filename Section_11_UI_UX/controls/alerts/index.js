@@ -3,8 +3,10 @@ import {notificationCard,notificationView,TOAST_LIFETIME_MS} from '../../web_roo
 import {formatValue} from '../../web_root/value_format.js';
 import {createAlertFeed,watchAlertFeed} from './feed.js';
 export const name = 'alerts';
-let editor, editorTitle, editorStatus, form, activity, status, catalog, audio, volume=0.35, eventCursor=null;
-let signalPrefs=null, deliveryButton, notificationPanel, newButton;
+let editor, editorTitle, editorStatus, editorOpener, form, activity, status, catalog, audio, volume=0.35, eventCursor=null;
+let signalPrefs=null, deliveryButton, deliveryFeedback, notificationPanel, newButton;
+let alertTabs,createPanel,editPanel,historyPanel,editFormHost,historyPage=null;
+let tabGeneration=0,historyGeneration=0;
 const customBuffers=new Map();
 let customLibrary=[];
 let soundEnabled=true;
@@ -68,8 +70,9 @@ function enqueueSound(key){
 function renderActivity() {
     if(!activity)return;
     activity.replaceChildren();
-    if(!recent.length)el('p','No alerts triggered yet.',activity,'settings-note');
-    for(const event of recent.slice(-10).reverse()){
+    const custom=recent.filter(event=>event.source!=='signal');
+    if(!custom.length)el('p','No alerts triggered yet.',activity,'settings-note');
+    for(const event of custom.slice(-10).reverse()){
         const row=el('div','',activity,'alert-rule');
         const link=el('a',`${event.name} · ${event.symbol} ${event.interval}`,row);link.href=notificationView(event).url;link.onclick=click=>{if(click.ctrlKey||click.metaKey)return;click.preventDefault();openEventChart(event);};
         el('span',` · ${new Date(event.created).toLocaleTimeString()}`,row);
@@ -78,6 +81,15 @@ function renderActivity() {
     }
 }
 function openEventChart(event){window.focus();if(window.openAlertChart)void window.openAlertChart(event).catch(error=>{const target=document.getElementById('status');if(target)target.textContent=error.message;});else window.location.assign(notificationView(event).url);}
+function desktopError(error){
+    if(deliveryFeedback){deliveryFeedback.textContent=String(error.message||error);deliveryFeedback.hidden=false;}
+}
+async function allowDesktopNotifications(){
+    if(!('Notification' in window))throw new Error('Desktop notifications are unavailable. Update the Trading Indicator desktop app or use a supported browser.');
+    const result=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+    updateDeliveryStatus();
+    if(result!=='granted')throw new Error(`Desktop notifications ${result}. Allow Trading Indicator in macOS System Settings → Notifications, or allow notifications in your browser site settings.`);
+}
 function receive(event,deliver=true) {
     if(recent.some(row=>row.seq===event.seq))return;
     recent.push(event);if(recent.length>100)recent.shift();renderActivity();
@@ -90,11 +102,78 @@ function receive(event,deliver=true) {
     }
     enqueueSound(event.sound);
     if(event.notify&&'Notification' in window&&Notification.permission==='granted') {
-        try {const notice=new Notification(view.title,{body:view.lines.join('\n'),tag:`stored-alert-${event.seq}`});notice.onclick=()=>{notice.close?.();open();};setTimeout(()=>notice.close?.(),TOAST_LIFETIME_MS);}catch{ /* In-app activity remains available. */ }
+        const options={title:view.title,body:view.lines.join('\n')};
+        // Awaitable native delivery exposes IPC failures that the Web API polyfill hides.
+        if(window.__TAURI__?.core?.invoke){
+            void window.__TAURI__.core.invoke('plugin:notification|notify',{options}).catch(desktopError);
+        }else{
+            try {const notice=new Notification(view.title,{body:options.body,tag:`stored-alert-${event.seq}`});notice.onclick=()=>{notice.close?.();open();};notice.onerror=()=>desktopError(new Error('Desktop notification failed. Check browser and system notification settings.'));setTimeout(()=>notice.close?.(),TOAST_LIFETIME_MS);}catch(error){desktopError(error);}
+        }
     }
 }
 
 async function refresh(){if(notificationPanel?.marker.isConnected)await renderNotificationSettings(notificationPanel.parent);}
+async function renderEditableAlerts(){
+    const generation=++tabGeneration;
+    editPanel.replaceChildren();const list=el('section','',editPanel);editFormHost=el('section','',editPanel);editFormHost.hidden=true;
+    const packet=await request('/api/alerts');if(generation!==tabGeneration)return;
+    if(!packet.rules.length)el('p','No saved alerts.',list,'settings-note');
+    for(const rule of packet.rules){
+        const row=el('div','',list,'settings-row notification-rule');
+        const check=input(rule.name,rule.id,'checkbox',row);check.checked=rule.enabled;
+        check.onchange=async()=>{check.disabled=true;try{await request('/api/alerts',{...rule,enabled:check.checked});rule.enabled=check.checked;}catch(error){check.checked=!check.checked;editorStatus.textContent=error.message;}finally{check.disabled=false;}};
+        el('span',`${rule.symbol} · ${rule.interval}`,row);el('span',rule.status||'',row,'settings-note');
+        const edit=el('button','Edit',row);edit.setAttribute('aria-label',`Edit ${rule.name}`);edit.onclick=()=>{form.elements.field_search.value='';form.elements.field_search.oninput();reset();fill(rule);editFormHost.replaceChildren(form);editFormHost.hidden=false;form.elements.name.focus();editorStatus.textContent='';};
+        const remove=el('button','Remove',row);remove.setAttribute('aria-label',`Remove ${rule.name}`);remove.onclick=async()=>{remove.disabled=true;try{await request('/api/alerts/delete',{id:rule.id});if(editing===rule.id){reset();createPanel.append(form);editFormHost.hidden=true;}row.remove();if(!list.children.length)el('p','No saved alerts.',list,'settings-note');void refresh().catch(()=>{});}catch(error){editorStatus.textContent=error.message;remove.disabled=false;}};
+    }
+}
+function historyRange(period){
+    const now=Date.now(),day=new Date(now);day.setHours(0,0,0,0);
+    if(period==='today')return {since:day.getTime(),until:now};
+    if(period==='yesterday'){const end=day.getTime()-1;day.setDate(day.getDate()-1);return {since:day.getTime(),until:end};}
+    return {since:now-24*60*60*1000,until:now};
+}
+async function renderAlertHistory(){
+    const generation=++historyGeneration;
+    historyPanel.replaceChildren();
+    const controls=el('div','',historyPanel,'settings-coin-actions');
+    const period=select('History period','history_period',[['24h','Past 24 hours'],['today','Today'],['yesterday','Yesterday']],controls);
+    period.value=historyPage?.period||'24h';
+    const reload=el('button','Refresh history',controls),summary=el('p','',historyPanel,'settings-note'),rows=el('section','',historyPanel,'alert-activity');
+    summary.setAttribute('role','status');
+    const more=el('button','Load more alerts',historyPanel);more.hidden=true;
+    let before=null,count=0,range=historyRange(period.value),loading=false,requestVersion=0;
+    async function load(resetPage=false){
+        if(loading&&!resetPage)return;
+        const version=++requestVersion;loading=true;more.disabled=true;reload.disabled=true;
+        if(resetPage){before=null;count=0;rows.replaceChildren();range=historyRange(period.value);}
+        historyPage={period:period.value};summary.textContent='Loading alert history…';
+        try{
+            const query=new URLSearchParams({limit:'100',since:String(range.since),until:String(range.until),source:'custom'});if(before!==null)query.set('before',String(before));
+            const packet=await request('/api/alerts/history?'+query);if(generation!==historyGeneration||version!==requestVersion)return;
+            for(const event of [...packet.history].reverse()){
+                const row=el('article','',rows,'alert-rule'),link=el('a',`${event.name} · ${event.symbol} ${event.interval}`,row);
+                link.href=notificationView(event).url;link.onclick=click=>{if(click.ctrlKey||click.metaKey)return;click.preventDefault();editor.close();openEventChart(event);};
+                el('p',new Date(event.created).toLocaleString(),row,'settings-note');el('p',event.message||notificationView(event).lines.join(' · '),row);
+            }
+            count+=packet.history.length;before=packet.next_before;more.hidden=!packet.has_more;
+            summary.textContent=`${count} alert${count===1?'':'s'} · ${new Date(range.since).toLocaleString()} – ${new Date(range.until).toLocaleString()}`;
+            if(!count)el('p','No alerts in this period.',rows,'settings-note');
+        }catch(error){if(generation===historyGeneration&&version===requestVersion)summary.textContent=error.message;}
+        finally{if(version===requestVersion){loading=false;more.disabled=false;reload.disabled=false;}}
+    }
+    period.onchange=()=>void load(true);reload.onclick=()=>void load(true);more.onclick=()=>void load();
+    await load(true);
+}
+async function showAlertTab(key){
+    if(saving)return;
+    editorStatus.textContent='';
+    for(const button of alertTabs.querySelectorAll('[role=tab]')){const selected=button.dataset.tab===key;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;}
+    createPanel.hidden=key!=='create';editPanel.hidden=key!=='edit';historyPanel.hidden=key!=='history';
+    if(key==='create'){reset();createPanel.append(form);}
+    if(key==='edit'){reset();createPanel.append(form);await renderEditableAlerts();}
+    if(key==='history')await renderAlertHistory();
+}
 function syncMode() {
     const decision=form.elements.field.value.startsWith('decision.');
     for(const key of ['operator','value','target_field','mode'])form.elements[key].parentElement.hidden=decision;
@@ -102,6 +181,7 @@ function syncMode() {
     const features=[form.elements.field.value,form.elements.target_field.value].some(field=>field && !(catalog.live_fields || ['client.high','client.low','client.close']).includes(field));
     form.elements.mode.querySelector('[value="live"]').disabled=features;
     if(features)form.elements.mode.value='closed';
+    form.elements.repeat.querySelector('[value=once]').textContent=form.elements.symbol.value==='ALL'||form.elements.interval.value==='ALL'?'Once per coin/timeframe, then pause':'Once, then pause';
 }
 function fill(rule) {
     editing=rule.id||null;
@@ -126,15 +206,25 @@ async function build() {
     if(form)return;
     catalog=await request('/api/alerts/catalog');
     editor=el('dialog','',document.body,'alerts-dialog alert-editor');editor.setAttribute('aria-labelledby','alert-editor-title');
-    const header=el('header','',editor);editorTitle=el('h2','Create alert',header);editorTitle.id='alert-editor-title';
+    const header=el('header','',editor);editorTitle=el('h2','Alerts',header);editorTitle.id='alert-editor-title';
     const close=el('button','Close alert editor',header);close.onclick=()=>{if(!saving)editor.close();};
     editor.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
-    editor.addEventListener('close',()=>{if(!saving)reset();newButton?.focus();});
+    editor.addEventListener('close',()=>{if(!saving)reset();(editorOpener?.isConnected?editorOpener:deliveryButton)?.focus();});
     editorStatus=el('p','',editor,'settings-note');editorStatus.setAttribute('role','status');
-    form=el('form','',editor,'alert-form');
+    alertTabs=el('div','',editor,'alert-tabs');alertTabs.setAttribute('role','tablist');alertTabs.setAttribute('aria-label','Alert settings');
+    const panels={};
+    for(const [key,label] of [['create','Create Alert'],['edit','Edit Alerts'],['history','Recent Alert History']]){
+        const button=el('button',label,alertTabs);button.type='button';button.dataset.tab=key;button.id='alert-tab-'+key;button.setAttribute('role','tab');button.setAttribute('aria-controls','alert-panel-'+key);
+        const panel=el('section','',editor);panel.id='alert-panel-'+key;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',button.id);panels[key]=panel;
+        button.onclick=()=>void showAlertTab(key).catch(error=>editorStatus.textContent=error.message);
+        button.onkeydown=event=>{const keys=['ArrowLeft','ArrowRight','Home','End'];if(!keys.includes(event.key))return;event.preventDefault();const buttons=[...alertTabs.children],index=buttons.indexOf(button);buttons[event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length].click();alertTabs.querySelector('[aria-selected=true]')?.focus();};
+    }
+    createPanel=panels.create;editPanel=panels.edit;historyPanel=panels.history;
+    form=el('form','',createPanel,'alert-form');
     const title=input('Alert name','name','text',form);title.required=true;title.maxLength=120;
-    select('Coin','symbol',catalog.symbols.map(value=>[value,value]),form);
-    select('Timeframe','interval',catalog.intervals.map(value=>[value,value]),form);
+    select('Coin','symbol',[['ALL','ALL'],...catalog.symbols.map(value=>[value,value])],form).onchange=syncMode;
+    select('Timeframe','interval',[['ALL','ALL'],...catalog.intervals.map(value=>[value,value])],form).onchange=syncMode;
+    el('p','ALL follows every active coin/timeframe with available market data. Newly activated pairs are included automatically.',form,'settings-note');
     select('Evaluation','mode',[['live','Live candle / provisional EMA / RSI'],['closed','Closed candle / stored features']],form);
     const search=input('Search fields','field_search','search',form);
     const fields=select('Field','field',Object.entries(catalog.fields),form);fields.onchange=syncMode;
@@ -157,9 +247,9 @@ async function build() {
         try{
             const packet=Object.fromEntries(new FormData(form));delete packet.field_search;packet.value=Number(packet.value);packet.notify=form.elements.notify.checked;packet.enabled=form.elements.enabled.checked;if(editing)packet.id=editing;
             await request('/api/alerts',packet);
-            completed=true;editor.close();reset();status.textContent='Alert saved. Watching the selected evaluation mode.';
+            completed=true;reset();editorStatus.textContent='';
         }catch(error){editorStatus.textContent=error.message;}finally{saving=false;save.disabled=false;close.disabled=false;cancel.disabled=false;}
-        if(completed)void refresh().catch(error=>{status.textContent='Alert saved. Could not refresh the list: '+error.message;});
+        if(completed){await showAlertTab('edit').catch(error=>editorStatus.textContent=error.message);void refresh().catch(()=>{});}
     };
     reset();
 }
@@ -169,11 +259,15 @@ export function mount() {
     const resumeOnGesture=()=>{if(soundEnabled&&audio?.state!=='running')void unlock().catch(()=>{});};
     document.addEventListener('pointerdown',resumeOnGesture,{capture:true});
     document.addEventListener('keydown',resumeOnGesture,{capture:true});
-    const toolbar=document.getElementById('toolbar'), open=el('button','Notifications',toolbar);open.id='alerts-button';
+    const toolbar=document.getElementById('toolbar'), open=el('button','Alerts',toolbar);open.id='alerts-button';
     const gear=document.getElementById('settings-button');if(gear)gear.before(open);
+    deliveryFeedback=el('span','',toolbar,'settings-note');deliveryFeedback.id='alerts-status';deliveryFeedback.setAttribute('role','status');deliveryFeedback.hidden=true;open.after(deliveryFeedback);
     el('div','',document.body).id='alert-toasts';
-    open.disabled=true;
-    open.onclick=async()=>{open.disabled=true;try{const prefs=await getSignalPreferences();await saveSignalPreferences({notify:!prefs.notify});}catch(error){open.title=error.message;}finally{open.disabled=false;}};
+    open.setAttribute('aria-haspopup','dialog');
+    open.onclick=async()=>{
+        open.disabled=true;deliveryFeedback.hidden=true;
+        try{await openEditor(null,open);}catch(error){desktopError(error);}finally{open.disabled=false;}
+    };
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
     const feed=createAlertFeed({request,
@@ -183,16 +277,18 @@ export function mount() {
     });
     watchAlertFeed(feed);
     deliveryButton=open;
-    void getSignalPreferences().then(updateDeliveryStatus).catch(error=>{open.title=error.message;}).finally(()=>{open.disabled=false;});
+    window.addEventListener('focus',updateDeliveryStatus);
+    void getSignalPreferences().then(updateDeliveryStatus).catch(desktopError);
 }
 
 function updateDeliveryStatus(){
     if(!deliveryButton)return;
     const ready=audio?.state==='running';
-    deliveryButton.textContent=`Notifications: ${signalPrefs?.notify?'on':'off'}`;
-    deliveryButton.setAttribute('aria-label','Toggle desktop notifications');deliveryButton.setAttribute('aria-pressed',String(signalPrefs?.notify===true));
+    const permission=globalThis.Notification?.permission||'unavailable';
+    deliveryButton.textContent='Alerts';
+    deliveryButton.setAttribute('aria-label','Alerts');
     for(const node of document.querySelectorAll('[data-delivery-status]'))node.textContent=node.dataset.audio==='true'?`Sound: ${!soundEnabled?'off':ready?(volume===0?'volume is 0':'ready'):'blocked — click Enable sound or interact with the app'}`:`Desktop permission: ${globalThis.Notification?.permission||'unavailable'}`;
-    deliveryButton.title=`Desktop notification toggle; configure rules in Settings → Notifications. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Live feed: ${feedError?'retrying — '+feedError.message:'connected'} · Notifications: ${globalThis.Notification?.permission||'unavailable'}`;
+    deliveryButton.title=`Create, edit and review alert history. Automatic monitoring: ${signalPrefs?.enabled?'on':'off'} · Live feed: ${feedError?'retrying — '+feedError.message:'connected'} · Notifications: ${permission}`;
 }
 export async function getSignalPreferences(){return signalPrefs=await request('/api/alerts/signals');}
 export async function saveSignalPreferences(value){
@@ -204,10 +300,12 @@ export function setSignalVolume(level){
     try{localStorage.setItem(`alerts.volume.${window.AppSession.username}`,String(volume));}catch{}
 }
 
-async function openEditor(rule=null){
+async function openEditor(rule=null,opener=document.activeElement){
+    editorOpener=opener;
     await build();form.elements.field_search.value='';form.elements.field_search.oninput();reset();
-    if(rule)fill(rule);
-    editorTitle.textContent=rule?'Edit alert':'Create alert';editorStatus.textContent='';editor.showModal();
+    await showAlertTab(rule?'edit':'create');
+    if(rule){fill(rule);editFormHost.append(form);editFormHost.hidden=false;}
+    if(!editor.open)editor.showModal();
 }
 function deliveryState(parent,showAudio=false){const node=el('p','',parent,'settings-note');node.dataset.deliveryStatus='';node.dataset.audio=String(showAudio);updateDeliveryStatus();const feedback=el('p','',parent,'settings-note');feedback.setAttribute('role','status');return feedback;}
 export async function renderNotificationSettings(parent){
@@ -215,15 +313,21 @@ export async function renderNotificationSettings(parent){
     const feedback=deliveryState(parent);status=feedback;
     el('p','Choose which events notify you. Sound choices are in Settings → Sounds. Changes save immediately.',parent,'settings-note');
     const allow=el('button','Allow desktop notifications',parent);
-    allow.onclick=async()=>{try{
-        if(!('Notification' in window))throw new Error('Desktop notifications are unavailable in this browser.');
-        const result=await Notification.requestPermission();updateDeliveryStatus();
-        feedback.textContent=result==='granted'?'Desktop notifications allowed.':`Notifications ${result}. Check browser site permissions and macOS System Settings → Notifications.`;
-    }catch(error){feedback.textContent=error.message;}};
+    let desktopToggle;
+    allow.onclick=async()=>{allow.disabled=true;try{
+        await allowDesktopNotifications();await saveSignalPreferences({notify:true});
+        if(desktopToggle)desktopToggle.checked=true;
+        feedback.textContent='Desktop notifications allowed and enabled.';
+        if(deliveryFeedback)deliveryFeedback.hidden=true;
+    }catch(error){feedback.textContent=String(error.message||error);}finally{allow.disabled=false;}};
     try{
         const [prefs,mobile]=await Promise.all([getSignalPreferences(),mobileConfig()]);if(!marker.isConnected)return;
-        function toggle(label,key){const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;check.onchange=async()=>{try{await saveSignalPreferences({[key]:check.checked});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};}
-        toggle('Desktop notifications','notify');
+        function toggle(label,key){const check=input(label,key,'checkbox',parent);check.checked=prefs[key]!==false;check.onchange=async()=>{try{await saveSignalPreferences({[key]:check.checked});}catch(error){check.checked=!check.checked;feedback.textContent=error.message;}};return check;}
+        desktopToggle=toggle('Desktop notifications','notify');
+        desktopToggle.onchange=async()=>{desktopToggle.disabled=true;try{
+            if(desktopToggle.checked)await allowDesktopNotifications();
+            await saveSignalPreferences({notify:desktopToggle.checked});feedback.textContent='';
+        }catch(error){desktopToggle.checked=!desktopToggle.checked;feedback.textContent=String(error.message||error);}finally{desktopToggle.disabled=false;}};
         toggle('Mobile notifications','mobile');
         const mobileToggle=parent.querySelector('[name=mobile]');mobileToggle.disabled=!mobile.ready;mobileToggle.title=mobile.reason;
         const install=el('a','Open mobile app / installation',parent);install.href=mobile.origin?mobile.origin+'/web_root/mobile.html':'/web_root/mobile.html';install.target='_blank';install.rel='noopener';

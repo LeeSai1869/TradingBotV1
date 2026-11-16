@@ -10,6 +10,7 @@ from Section_5_Market_Regime import config as configuration
 
 
 def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',now_ms=None,lock_timeout=2,engine_name='REGIME',history_dependencies=False):
+    started=time.monotonic()
     if engine_name=='BIAS':
         from . import bias_processor
         return bias_processor.catch_up(symbol,interval,limit=limit,since=since,config=config,revision=revision,now_ms=now_ms,lock_timeout=lock_timeout,history_dependencies=history_dependencies)
@@ -87,7 +88,9 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
                 identity=identity,config=cfg_values,config_hash=cfg_hash,input_signature=signature,
                 source_versions=versions,history_start=since,source_archive=code,feature_parameters=parameters)
             run_id=engine_store.digest(metadata);cursor,state=engine_store.load(store,run_id)
+            project_started=time.monotonic()
             snapshots,reason=regime_inputs.project(source,symbol,interval,max(cursor,since-1),limit//5 if engine_name=='PHASE' else limit//2 if engine_name=='TREND' else limit,identity,signature,versions,parameters,now,module.FIELDS,module.UNITS)
+            project_seconds=time.monotonic()-project_started;evaluation_seconds=0.
             dependency_run=None
             if engine_name=='TREND' and snapshots:
                 dependency=catch_up(symbol,interval,limit=limit//2,since=since,revision=revision,now_ms=now,lock_timeout=lock_timeout,engine_name='STRUCTURE')
@@ -135,10 +138,15 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
 
                 if engine_name=='LIQUIDITY':snapshot['observations']=liquidity_inputs.project(observations,snapshot,cfg)
                 if engine_name=='SENTIMENT':snapshot['sentiment_sources']=sentiment_inputs.project(observations,snapshot)
+                evaluation_started=time.monotonic()
                 result,state=module.evaluate(snapshot,None if engine_name=='STRUCTURE' else cfg,state);batch.append((snapshot,result))
+                evaluation_seconds+=time.monotonic()-evaluation_started
+            commit_started=time.monotonic()
             if batch:engine_store.commit_batch(store,metadata,cursor,batch,state)
+            commit_seconds=time.monotonic()-commit_started
             latest=engine_store.latest(store,run_id)
-            return dict(symbol=symbol,timeframe=interval,run_id=run_id,status=reason or ('processed' if batch else 'caught up to committed feature prefix'),processed=len(batch),dependency_processed=dependency_processed,latest=latest)
+            return dict(symbol=symbol,timeframe=interval,run_id=run_id,status=reason or ('processed' if batch else 'caught up to committed feature prefix'),processed=len(batch),dependency_processed=dependency_processed,latest=latest,
+                timings=dict(total_seconds=time.monotonic()-started,project_seconds=project_seconds,evaluate_seconds=evaluation_seconds,commit_seconds=commit_seconds))
         except regime_inputs.InputsUnavailable as error:
             return dict(symbol=symbol,timeframe=interval,status=str(error),processed=0,dependency_processed=dependency_processed)
         finally:

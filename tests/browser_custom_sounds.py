@@ -17,11 +17,13 @@ async def exercise(base,library):
         await page.add_init_script("window.customPlays=0;const create=AudioContext.prototype.createBufferSource;AudioContext.prototype.createBufferSource=function(){customPlays++;return create.call(this);};")
         await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'admin');await page.wait_for_function('Composer?.mounted')
-        toggle=page.get_by_role('button',name='Toggle desktop notifications',exact=True)
-        await toggle.wait_for();await page.wait_for_function("!document.getElementById('alerts-button').disabled")
-        before=alerts.signal_preferences('admin')['notify'];await toggle.click()
-        await page.wait_for_function("!document.getElementById('alerts-button').disabled")
-        assert alerts.signal_preferences('admin')['notify'] is not before
+        add_alert=page.get_by_role('button',name='Alerts',exact=True)
+        await add_alert.wait_for()
+        before=alerts.signal_preferences('admin');await add_alert.click()
+        editor=page.get_by_role('dialog',name='Alerts',exact=True)
+        await editor.wait_for()
+        assert alerts.signal_preferences('admin')==before
+        await editor.get_by_role('button',name='Cancel',exact=True).click()
         assert not await page.get_by_role('dialog',name='Settings',exact=True).is_visible()
         await page.get_by_role('button',name='Open settings',exact=True).click();settings=page.get_by_role('dialog',name='Settings',exact=True)
         await settings.get_by_role('tab',name='Features',exact=True).click()
@@ -54,6 +56,6 @@ async def exercise(base,library):
         assert alerts.sounds('admin')['sounds']==[]
         assert not errors,errors
         await browser.close()
-        print('PASS: top-level menus; toolbar toggle; upload/preview/assign/delete real WAV; per-timeframe/per-coin Desktop switches; Mobile deferred; sound unchanged by notification scopes')
+        print('PASS: top-level menus; toolbar alert editor; upload/preview/assign/delete real WAV; per-timeframe/per-coin Desktop switches; Mobile deferred; sound unchanged by notification scopes')
 
 if __name__=='__main__':run(Path(sys.argv[1]).resolve(),exercise)

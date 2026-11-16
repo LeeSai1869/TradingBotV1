@@ -20,7 +20,7 @@ def history(symbol,interval,*,limit=250,before=None,now_ms=None):
         try:
             source=regime_inputs.open_sources()
             meta=regime_inputs.source_metadata(source,symbol,interval,'initial',catalog.FIELDS)
-            columns={row[1] for row in source.execute('PRAGMA table_info(features)')}
+            columns={row[1] for row in source.execute('PRAGMA table_xinfo(features)')}
             if not set(catalog.FIELDS)<=columns:raise regime_inputs.InputsUnavailable('Event source fields are not available')
             cap=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
             if not cap:raise regime_inputs.InputsUnavailable('No committed feature checkpoint')

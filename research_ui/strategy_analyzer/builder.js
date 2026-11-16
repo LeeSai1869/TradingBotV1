@@ -22,12 +22,12 @@
   }
   function guard(action) { return async (...args) => { try { error(); await action(...args); } catch (e) { error(e.message); } }; }
   function remember() {
-    try { localStorage.setItem(draftKey, JSON.stringify({model, reportFields: [...reportFields],inputId:$('input-source').value,baselineKey:$('baseline-preset').value,since:$('replay-since').value,until:$('replay-until').value})); } catch (_) { /* Downloads remain available if storage is unavailable. */ }
+    try { localStorage.setItem(draftKey, JSON.stringify({model, reportFields: [...reportFields],inputId:$('input-source').value,symbols:[...$('memory-coins').selectedOptions].map(o=>o.value),baselineKey:$('baseline-preset').value,since:$('replay-since').value,until:$('replay-until').value})); } catch (_) { /* Downloads remain available if storage is unavailable. */ }
   }
   function configuration() {
     const config = {version: 'btc-hour-strategy-analyzer-v1', id: $('strategy-name').value.trim(),
-      execution: {fee_bps_per_side: Number($('fee').value), slippage_bps_per_side: Number($('slippage').value), initial_capital: Number($('capital').value)},
-      branches: model.branches.filter(b => b.enabled !== false).map(({id, side, when}) => ({id, side, when: copy(when)}))};
+      execution: {fee_bps_per_side: Number($('fee').value), slippage_bps_per_side: Number($('slippage').value), initial_capital: Number($('capital').value),intrabar_path:$('intrabar-path').value},
+      branches: model.branches.filter(b => b.enabled !== false).map(({id, side, when,action,trail,target_profit_pct}) => ({id, side, when: copy(when),...(side==='SELL'&&action?{action,...(trail?{trail:copy(trail)}:{}),...(target_profit_pct!==undefined?{target_profit_pct}:{})}:{})}))};
     if (!config.id) throw Error('Give your strategy a name.');
     if (!config.branches.some(b => b.side === 'BUY') || !config.branches.some(b => b.side === 'SELL')) throw Error('Enable at least one BUY and one SELL branch.');
     return config;
@@ -35,15 +35,19 @@
   function setModel(config) {
     model = copy(config); $('strategy-name').value = model.id;
     $('fee').value = model.execution?.fee_bps_per_side ?? 4; $('slippage').value = model.execution?.slippage_bps_per_side ?? 2; $('capital').value = model.execution?.initial_capital ?? 100;
+    $('intrabar-path').value=model.execution?.intrabar_path||'low_first';
     renderBranches(); remember();
   }
   function fieldSelect(selected, parent, changed) {
+    const search=node('input',undefined,parent,{type:'search',placeholder:'Find a field…','aria-label':'Find condition field'});
     const select = node('select', undefined, parent); select.setAttribute('aria-label', 'Condition field');
-    const grouped = new Map();
-    for (const info of fields()) { if (!grouped.has(info.group)) grouped.set(info.group, []); grouped.get(info.group).push(info); }
-    if (selected && !fieldInfo(selected)) node('option', human(selected) + ' · absent from selected input', select, {value: selected});
-    for (const [group, infos] of grouped) { const optgroup = node('optgroup', undefined, select, {label: group}); for (const info of infos) node('option', human(info.id), optgroup, {value: info.id}); }
-    select.value = selected; select.onchange = () => changed(select.value); return select;
+    const note=node('small','',parent);
+    const render=()=>{select.replaceChildren();const words=search.value.toLowerCase().replace(/previous/g,'prev').replace(/di\+/g,'di_plus').replace(/di[-−]/g,'di_minus').replaceAll('_',' ').split(/\s+/).filter(Boolean),found=fields().filter(f=>{const text=(f.id+' '+human(f.id)).toLowerCase().replaceAll('_',' ');return words.every(w=>text.includes(w));});const shown=found.slice(0,200);const current=fieldInfo(selected);if(current&&!shown.includes(current))shown.unshift(current);const grouped=new Map();
+      for(const info of shown){if(!grouped.has(info.group))grouped.set(info.group,[]);grouped.get(info.group).push(info);}
+      if(selected&&!current)node('option',human(selected)+' · absent from selected input',select,{value:selected});
+      for(const [group,infos]of grouped){const g=node('optgroup',undefined,select,{label:group});for(const info of infos)node('option',human(info.id),g,{value:info.id});}
+      select.value=selected;note.textContent=found.length>200?`${found.length.toLocaleString()} fields match · type to narrow the first 200`:'';};
+    search.oninput=render;render();select.onchange=()=>{selected=select.value;changed(select.value);};return select;
   }
   function defaultLeaf() { return {field: 'di.abs_spread', op: 'gte', value: 10}; }
   function expressionText(expr) {
@@ -94,7 +98,7 @@
       const operand = node('label', 'Value / input', row, {class: 'operand'});
       if (expr.other_field) {
         fieldSelect(expr.other_field, operand, value => { expr.other_field = value; changed(); });
-        const lag = node('input', undefined, node('label', 'Other lag', row, {class: 'lag'}), {type: 'number', min: 0, max: 1000}); lag.value = expr.other_lag || 0; lag.onchange = () => { expr.other_lag = Number(lag.value); changed(); };
+        const lag = node('input', undefined, node('label', 'Other candle: 0=current, 1=previous, 2=two ago', row, {class: 'lag'}), {type: 'number', min: 0, max: 1000,'aria-label':'Other lag'}); lag.value = expr.other_lag || 0; lag.onchange = () => { expr.other_lag = Number(lag.value); changed(); };
       } else {
         const info = fieldInfo(expr.field); let value;
         if (info?.kind === 'boolean' && expr.op !== 'in') { value = node('select', undefined, operand); node('option', 'true', value); node('option', 'false', value); value.value = String(expr.value); }
@@ -105,7 +109,7 @@
         };
       }
     }
-    const lag = node('input', undefined, node('label', 'Lag (candles)', row, {class: 'lag'}), {type: 'number', min: 0, max: 1000}); lag.value = expr.lag || 0; lag.onchange = () => { expr.lag = Number(lag.value); changed(); };
+    const lag = node('input', undefined, node('label', 'Candle: 0=current, 1=previous, 2=two ago', row, {class: 'lag'}), {type: 'number', min: 0, max: 1000,'aria-label':'Lag (candles)'}); lag.value = expr.lag || 0; lag.onchange = () => { expr.lag = Number(lag.value); changed(); };
     button('Group AND', row, () => { replace({all: [copy(expr), defaultLeaf()]}); redraw(); });
     button('Group OR', row, () => { replace({any: [copy(expr), defaultLeaf()]}); redraw(); });
     if (remove) button('Remove', row, () => { remove(); redraw(); });
@@ -119,7 +123,16 @@
       enabled.onchange = () => { branch.enabled = enabled.checked; renderBranches(); remember(); };
       const name = node('input', undefined, node('label', 'Branch name', heading, {class: 'branch-name'})); name.value = branch.id; name.onchange = () => { branch.id = name.value.trim(); remember(); };
       const side = node('select', undefined, label('Signal', heading)); node('option', 'BUY', side); node('option', 'SELL', side); side.value = branch.side;
-      side.onchange = () => { branch.side = side.value; renderBranches(); remember(); };
+      side.onchange = () => { branch.side = side.value;if(branch.side==='BUY'){delete branch.action;delete branch.trail;delete branch.target_profit_pct;}renderBranches(); remember(); };
+      if(branch.side==='SELL'){
+        const action=node('select',undefined,label('Sell action',heading));node('option','SELL at next open',action,{value:'MARKET_SELL'});node('option','Trailing SELL',action,{value:'TRAILING_SELL'});node('option','Take profit',action,{value:'TAKE_PROFIT'});action.value=branch.action||'MARKET_SELL';
+        action.onchange=()=>{branch.action=action.value;if(branch.action==='TRAILING_SELL')branch.trail=branch.trail||{distance_pct:.5,activation_profit_pct:1};else delete branch.trail;if(branch.action==='TAKE_PROFIT')branch.target_profit_pct=branch.target_profit_pct??1;else delete branch.target_profit_pct;renderBranches();remember();};
+        if(branch.action==='TAKE_PROFIT'){const value=node('input',undefined,label('Take profit at net (%)',heading),{type:'number',min:.001,step:.1});value.value=branch.target_profit_pct??1;value.onchange=()=>{branch.target_profit_pct=Number(value.value);remember();};}
+        if(branch.action==='TRAILING_SELL'){
+          branch.trail=branch.trail||{distance_pct:.5,activation_profit_pct:1};
+          for(const [key,title,min]of[['activation_profit_pct','Activate at net profit (%)',0],['distance_pct','Trail below highest since entry (%)',.001]]){const value=node('input',undefined,label(title,heading),{type:'number',min,step:.1});value.value=branch.trail[key];value.onchange=()=>{branch.trail[key]=Number(value.value);remember();};}
+        }
+      }
       button('Move up', heading, () => { if (index) { [model.branches[index-1], model.branches[index]] = [branch, model.branches[index-1]]; renderBranches(); remember(); } }).disabled = !index;
       button('Duplicate', heading, () => { const b = copy(branch); b.id += '_copy_' + Date.now().toString(36); model.branches.splice(index+1, 0, b); renderBranches(); remember(); });
       button('Delete branch', heading, () => { model.branches.splice(index, 1); renderBranches(); remember(); });
@@ -129,7 +142,9 @@
   }
   function renderFields() {
     const root = $('report-fields'), search = $('report-field-search').value.toLowerCase(); root.replaceChildren();
-    [...fields(),...[...reportFields].filter(id=>!fieldInfo(id)).map(id=>({id,absent:true}))].filter(f => (f.id + ' ' + human(f.id)).toLowerCase().includes(search)).forEach(f => {
+    const matching=[...fields(),...[...reportFields].filter(id=>!fieldInfo(id)).map(id=>({id,absent:true}))].filter(f => (f.id + ' ' + human(f.id)).toLowerCase().includes(search));
+    node('p',`${matching.length.toLocaleString()} fields match · showing up to 200; type to find any stored field.`,root,{class:'muted compact'});
+    matching.slice(0,200).forEach(f => {
       const l = node('label', undefined, root, {class: 'field-choice'}), c = node('input', undefined, l, {type: 'checkbox', value: f.id}); c.checked = reportFields.has(f.id);
       node('span', human(f.id)+(f.absent?' (not in this input export)':''), l); c.onchange = () => { if (c.checked) reportFields.add(f.id); else reportFields.delete(f.id); remember(); };
     });
@@ -143,6 +158,11 @@
     const input = $('input-source').value, preset = $('strategy-preset').value, baseline = $('baseline-preset').value, report = $('saved-report').value;
     catalog = await api('/api/catalog');
     selectOptions($('input-source'), catalog.inputs.map(i => [i.id, i.name]), input || catalog.default_input);
+    const oldSymbols=new Set([...$('memory-coins').selectedOptions].map(o=>o.value));
+    selectOptions($('memory-symbol'),(catalog.memory?.symbols||[]).map(s=>[s,s]),$('memory-symbol').value||'BTCUSDT');
+    selectOptions($('memory-timeframe'),(catalog.memory?.timeframes||[]).map(s=>[s,s]),$('memory-timeframe').value||'15m');
+    selectOptions($('memory-coins'),(catalog.memory?.symbols||[]).map(s=>[s,s]));for(const o of $('memory-coins').options)o.selected=oldSymbols.has(o.value);
+    $('memory-universe').textContent=catalog.memory?.error||`${catalog.memory?.symbols.length||0} stored coins · ${catalog.memory?.feature_columns||0} feature columns · ${catalog.memory?.adcn_columns||0} ADCN columns`;
     const configs = catalog.configurations.map(c => [c.key, c.config.id + ' · ' + c.key.slice(0,6)]);
     selectOptions($('strategy-preset'), configs, preset || catalog.configurations.find(c => c.config.id === 'multi_branch_v1')?.key);
     selectOptions($('baseline-preset'), configs, baseline, 'No comparison');
@@ -152,8 +172,18 @@
     const token = ++inputToken; $('run-strategy').disabled = true; $('input-status').textContent = 'Reading selected input…';
     const result = await api('/api/input?id=' + encodeURIComponent($('input-source').value)); if (token !== inputToken) return;
     metadata = result; $('input-status').textContent = `${result.symbol} · ${result.timeframe} · ${result.candles.toLocaleString()} candles · ${new Date(result.first).toISOString().slice(0,10)} to ${new Date(result.last).toISOString().slice(0,10)} · ${result.feature_columns} stored feature columns`;
+    $('input-heading').textContent = `${result.symbol} · ${result.timeframe} · SPOT RESEARCH`;
+    $('memory-batch').hidden=result.mode!=='memory';
+    if(result.mode==='memory'){$('memory-symbol').value=result.symbol;$('memory-timeframe').value=result.timeframe;if(!$('memory-coins').selectedOptions.length)for(const o of $('memory-coins').options)o.selected=o.value===result.symbol;}
+    $('risk-scope').textContent = result.risk_budget_pct == null ? 'Legacy snapshot: original signal-rule replay, without the 0.5% stop. Choose a new spot research snapshot for the loss-budget replay.' : 'A 0.5% net loss budget is active from entry, including configured costs. Candle OHLC models stop touches; adverse opens can exceed the budget. SELL branches define your other exits.';
+    if(currentReport && (currentReport.contract.source_id!==result.source_id || currentReport.contract.observed_as_of!==result.last)) {
+      currentReport=currentReportId=null;$('report-area').replaceChildren();
+      $('result-scope').textContent='Run a replay for this input, or explicitly open a saved report.';
+      $('use-report-config').disabled=$('pin-baseline').disabled=true;$('download-report').hidden=$('download-html').hidden=true;
+    }
+    window.dispatchEvent(new CustomEvent('research-input', {detail: {id: $('input-source').value, metadata: result}}));
     const coverage = $('input-coverage'); coverage.replaceChildren(); node('p', result.note, coverage);
-    const t = node('table', undefined, node('div', undefined, coverage, {class: 'scroll'})); let tr = node('tr', undefined, t); ['Context history','Stored rows'].forEach(v=>node('th',v,tr));
+    const t = node('table', undefined, node('div', undefined, coverage, {class: 'scroll'})); let tr = node('tr', undefined, t); ['Context history',result.mode==='memory'?'Rows in recent preview':'Stored rows'].forEach(v=>node('th',v,tr));
     Object.entries(result.context_rows).forEach(([key,count]) => { const r=node('tr',undefined,t); node('td',key,r); node('td',count.toLocaleString(),r); });
     if (model) renderBranches(); renderFields(); $('run-strategy').disabled = running;
   }
@@ -168,6 +198,7 @@
   async function poll(id) {
     const job = await api('/api/job?id=' + encodeURIComponent(id)); $('run-status').textContent = job.stage + (job.total ? ` · ${job.complete.toLocaleString()} / ${job.total.toLocaleString()} candles` : '');
     $('run-progress').value = job.total ? job.complete/job.total*100 : 0;
+    if(job.coins){const root=$('batch-results');root.replaceChildren();const t=node('table',undefined,root),head=node('tr',undefined,t);['Coin','Status','Closed trades','Win rate','Average net','Report'].forEach(v=>node('th',v,head));for(const coin of job.coins){const tr=node('tr',undefined,t);[coin.symbol,coin.error||coin.state,coin.summary?.closed??'—',coin.summary?.win_rate_pct==null?'—':coin.summary.win_rate_pct.toFixed(2)+'%',coin.summary?.mean_net_pct==null?'—':coin.summary.mean_net_pct.toFixed(3)+'%'].forEach(v=>node('td',String(v),tr));const cell=node('td',undefined,tr);if(coin.report_id)button('Open report',cell,guard(()=>loadReport(coin.report_id)));}}
     if (job.state === 'failed') throw Error(job.error);
     if (job.state === 'complete') { await refreshCatalog(); $('saved-report').value = job.report_id; await loadReport(job.report_id); return; }
     await new Promise(resolve => setTimeout(resolve, 600)); return poll(id);
@@ -175,8 +206,13 @@
   $('load-preset').onclick = guard(() => { setModel(catalog.configurations.find(c => c.key === $('strategy-preset').value).config); });
   $('add-buy').onclick = () => { model.branches.push({id:'buy_branch_'+Date.now().toString(36),side:'BUY',when:{all:[defaultLeaf()]}});renderBranches();remember(); };
   $('add-sell').onclick = () => { model.branches.push({id:'sell_branch_'+Date.now().toString(36),side:'SELL',when:{all:[defaultLeaf()]}});renderBranches();remember(); };
+  $('add-trailing-sell').onclick=()=>{model.branches.push({id:'trailing_sell_'+Date.now().toString(36),side:'SELL',action:'TRAILING_SELL',trail:{distance_pct:.5,activation_profit_pct:1},when:{field:'price.close',op:'available'}});renderBranches();remember();};
+  $('load-memory').onclick=guard(async()=>{$('input-source').value=`memory:${$('memory-symbol').value}:${$('memory-timeframe').value}`;if(!$('input-source').value)throw Error('This coin/timeframe has no stored feature scope yet.');await loadInput();remember();});
+  $('memory-all').onclick=()=>{for(const o of $('memory-coins').options)o.selected=true;remember();};
+  $('memory-current').onclick=()=>{for(const o of $('memory-coins').options)o.selected=o.value===metadata?.symbol;remember();};
+  $('memory-coins').onchange=remember;
   $('strategy-name').onchange = () => { model.id = $('strategy-name').value;remember(); };
-  for (const id of ['fee','slippage','capital']) $(id).onchange = () => { model.execution=configuration().execution;remember(); };
+  for (const id of ['fee','slippage','capital','intrabar-path']) $(id).onchange = () => { model.execution=configuration().execution;remember(); };
   $('save-config').onclick = guard(async () => { const saved=await api('/api/config',{config:configuration()});await refreshCatalog();$('strategy-preset').value=saved.key;$('run-status').textContent='Strategy saved. Previous versions are retained.'; });
   $('export-config').onclick = guard(() => download(configuration(), $('strategy-name').value.replace(/[^a-z0-9_-]/gi,'_')+'.json'));
   $('config-upload').onchange = guard(async e => { const file=e.target.files[0];if(file){const saved=await api('/api/config',{config:JSON.parse(await file.text())});await refreshCatalog();setModel(saved.config);$('strategy-preset').value=saved.key;} });
@@ -189,12 +225,15 @@
     const config=configuration();const baseline=catalog.configurations.find(c=>c.key===$('baseline-preset').value)?.config;
     const date=id=>$(id).value?Date.parse($(id).value+'Z'):null;
     running=true;$('run-status').textContent='Starting replay…';$('run-strategy').disabled=true;$('run-progress').hidden=false;
-    try { const job=await api('/api/run',{config,baseline_config:baseline,input_id:$('input-source').value,since:date('replay-since'),until:date('replay-until'),report_fields:[...reportFields]});await poll(job.id); }
+    try { const body={config,baseline_config:baseline,input_id:$('input-source').value,since:date('replay-since'),until:date('replay-until'),report_fields:[...reportFields]};if(metadata.mode==='memory'){body.symbols=[...$('memory-coins').selectedOptions].map(o=>o.value);if(!body.symbols.length)throw Error('Select at least one coin to replay.');}$('batch-results').replaceChildren();const job=await api('/api/run',body);await poll(job.id); }
     finally { running=false;$('run-strategy').disabled=!metadata;$('run-progress').hidden=true; }
   });
   guard(async () => {
     await refreshCatalog();let draft;try{draft=JSON.parse(localStorage.getItem(draftKey));}catch(_){}
     setModel(draft?.model || catalog.configurations.find(c=>c.key===$('strategy-preset').value)?.config || {version:'btc-hour-strategy-analyzer-v1',id:'My strategy',branches:[]});
-    reportFields=new Set(draft?.reportFields || []);if(catalog.inputs.some(i=>i.id===draft?.inputId))$('input-source').value=draft.inputId;if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();remember();if(catalog.reports.length)await loadReport($('saved-report').value);
+    reportFields=new Set(draft?.reportFields || []);if(catalog.inputs.some(i=>i.id===draft?.inputId))$('input-source').value=draft.inputId;
+    const requested = new URLSearchParams(location.search).get('input');
+    if(requested){const id=requested==='default'?catalog.default_input:requested;if(catalog.inputs.some(i=>i.id===id))$('input-source').value=id;history.replaceState(null,'',location.pathname+location.hash);}
+    if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();if(draft?.symbols?.length)for(const o of $('memory-coins').options)o.selected=draft.symbols.includes(o.value);remember();if(catalog.reports.length&&metadata.risk_budget_pct==null)await loadReport($('saved-report').value);
   })();
 })();

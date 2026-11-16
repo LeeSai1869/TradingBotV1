@@ -86,5 +86,5 @@ class SentimentHistory(unittest.TestCase):
         from Section_1_Global_Core import analytical_processor as worker
         worker._cursor=8;worker._status.clear()
         with patch.object(research,'catch_up',return_value=dict(processed=20,status='processed',latest={})) as call:
-            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],max_bars=20,time_budget=10,max_pairs=1),20)
+            self.assertEqual(worker.maintenance(['BTCUSDT'],['1m'],max_bars=20,time_budget=10,max_pairs=1,history_time_budget=0),20)
             self.assertEqual(call.call_args.kwargs['engine_name'],'SENTIMENT')

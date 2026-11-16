@@ -50,7 +50,7 @@ async def exercise_admin(base, library):
         await sign_in(page,'user')
         await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
         await settle(page)
-        assert 'Normal user' in await page.locator('#account-button').inner_text()
+        assert await page.locator('#account-button').inner_text()=='user'
         await page.get_by_role('button',name='Open settings').click()
         dialog=page.get_by_role('dialog',name='Settings')
         assert await dialog.get_by_role('tab',name='Timeframes',exact=True).count()==0
@@ -70,7 +70,7 @@ async def exercise_admin(base, library):
         await sign_in(page,'admin')
         await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
         await settle(page)
-        assert 'Administrator' in await page.locator('#account-button').inner_text()
+        assert await page.locator('#account-button').inner_text()=='admin'
         await page.get_by_role('button',name='Open settings').click()
         await dialog.get_by_role('tab',name='Timeframes',exact=True).click()
         section=dialog.locator('.settings-policy-item').filter(has=page.get_by_text('15m',exact=True))

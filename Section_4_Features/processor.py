@@ -5,6 +5,7 @@ preserved while the runner progressively replaces them from the first raw bar.
 Market downloads remain owned by the existing orchestrator.
 """
 from pathlib import Path
+from contextlib import closing
 import threading
 import time
 import traceback
@@ -39,6 +40,8 @@ def _load(symbol,interval,epoch):
 
 def _backup_legacy():
     path=Path(features_store.DB_PATH);backup=path.with_name(path.stem+'.pre-pine-v3.db')
+    if backup.with_suffix(backup.suffix+'.retired').exists():
+        _BACKUP_CHECKED.add(str(path));return
     if str(path) in _BACKUP_CHECKED:return
     if backup.exists():_BACKUP_CHECKED.add(str(path));return
     conn=features_store.open_db()
@@ -89,8 +92,9 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
     # is CPU work; rows and this exact checkpoint still commit atomically.
     serialize_started=time.monotonic()
     state_text=checkpoint.dump(engine,epoch)
-    columns=features_store.COLUMNS
-    values=[[r.get(c) for c in columns] for r in output]
+    with closing(features_store.open_db()) as storage_conn:
+        columns=features_store.storage_columns(storage_conn)
+    values=[features_store.storage_values(r,columns) for r in output]
     signature=current_signature()
     serialize_seconds=time.monotonic()-serialize_started;write_started=time.monotonic()
     with data_policy.locked():
@@ -118,7 +122,7 @@ def catch_up(symbol,interval):
 
 
 def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768):
-    """Advance small current-generation tails before bulk work, including its owner.
+    """Recover current-generation live tails before bulk work, including its owner.
 
     The normal chronological writer owns all commits. Repairs and incomplete
     history prefixes remain on the existing selective/bulk replay path.
@@ -129,10 +133,10 @@ def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768
         for _ in range(max_pairs):
             if count>=max_bars or time.monotonic()>=deadline:break
             pair=work_priority.service_pair(symbols,intervals,None,'features',
-                live_only=True,exclude=seen)
+                live_only=True,exclude=seen,recover_recent=True)
             if pair is None or pair in seen:break
             seen.add(pair)
-            try:count+=_advance(*pair,min(12,max_bars-count),deadline)
+            try:count+=_advance(*pair,min(200,max_bars-count),deadline)
             except Exception:
                 reset_pair(*pair);traceback.print_exc()
     return count
@@ -384,7 +388,9 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
         output.append(result)
     compute_seconds=time.monotonic()-compute_started;serialize_started=time.monotonic()
     last=partial.context.last_time;complete=last>=job['target']
-    columns=sorted(set(plan.columns)&set(features_store.COLUMNS)-{'symbol','interval','open_time','formula_version'})
+    with closing(features_store.open_db()) as storage_conn:
+        writable=set(features_store.storage_columns(storage_conn))
+    columns=sorted(set(plan.columns)&writable-{'symbol','interval','open_time','formula_version'})
     merged=selective.merge(base,partial) if complete else None
     state_text=checkpoint.dump(merged if complete else partial,epoch)
     values=[[r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output]

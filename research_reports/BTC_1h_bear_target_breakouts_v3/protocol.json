@@ -1,0 +1,46 @@
+{
+  "version": "btc-bear-target-breakout-crash-v3",
+  "scope": "Offline spot research only, same frozen 1h and 5m price source as v2",
+  "exit_policy": {
+    "bearish": "Fixed +1% net take-profit",
+    "bullish": "Profit >=1% net AND latest known 1h DI+ >50 arms 0.5% highest-since-entry trail",
+    "protection": "0.5% intended net loss budget; literal 0.5% price-stop sensitivity",
+    "regime": "Latest closed 1h Section5 REGIME; entry-frozen sensitivity",
+    "timeout": null,
+    "fee_bps_each_side": 4,
+    "slippage_bps_each_side": 2
+  },
+  "features_frozen_before_evaluation": {
+    "range_boundary": "High/low of previous 12 completed 5m bars, excluding current",
+    "micro_boundary": "High of previous 3 completed 5m bars, excluding current",
+    "atr": "Previous 5m ATR(14), excluding current bar",
+    "relative_volume": "Current completed 5m base volume / mean previous 20 completed 5m base volumes",
+    "volume_breakout": "Close above prior-12 high; bullish close in upper 30%; TR >=1.2 prior ATR; RVOL >=1.5",
+    "volume_breakdown": "Close below prior-12 low; bearish close in lower 30%; TR >=1.5 prior ATR; RVOL >=1.5",
+    "rapid_breakdown_crash": "Volume breakdown plus <=-0.5% close-to-close in 5m or <=-1% in 15m",
+    "crash_recent": "Crash confirmed now or within previous 3 bars (15m)",
+    "crash_unrecovered": "Crash within last 12 bars (1h), and no completed close above its recorded high",
+    "micro_reclaim": "Close above prior-3 high, bullish body, upper 40% close",
+    "range_low_reclaim": "Low below prior-12 low, close back above that known low, upper 35% close, RVOL >=1.2",
+    "breakout_retest": "Within 6 bars after volume breakout, low touches known breakout level within 0.05%, closes above level in upper 40%, and no fresh crash",
+    "pending_di_setup": "Wait at most 6 additional completed bars (30m) for price confirmation; new rapid breakdown cancels pending entry"
+  },
+  "tests": [
+    "same entry / old bearish trailing vs new bearish fixed TP",
+    "immediate DI entry",
+    "DI entry with recent-crash veto",
+    "DI entry with unrecovered-crash veto",
+    "DI setup then micro-high reclaim",
+    "DI setup then range-low reclaim",
+    "DI setup then volume breakout",
+    "bullish volume-breakout branch without oversold DI entry gate",
+    "bullish breakout-retest branch without oversold DI entry gate"
+  ],
+  "validation": {
+    "discovery": "2017-2023",
+    "validation": "2024",
+    "chronological_check": "2025-2026; already viewed history, not prospective validation",
+    "candidate_screen": "Require >=50 discovery trades, discovery mean net >0 and PF>1 before considering a general-use gate; report all candidates even when failing",
+    "no_optimization": "One predefined feature setting per rule; no threshold grid search"
+  }
+}

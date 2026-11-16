@@ -8,13 +8,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 from pathlib import Path
+import re
+import sqlite3
 import threading
+import time
 from urllib.parse import parse_qs, urlparse
 import uuid
 import webbrowser
 
 from Section_1_Global_Core.paths import data_path
 from Section_8_Decision_Engine import strategy_analyzer as analyzer
+from Section_8_Decision_Engine.pivot_candle_source import unpack
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT / 'research_ui' / 'strategy_analyzer'
@@ -47,10 +51,12 @@ def write(path, value):
 
 
 def field_catalog(source):
+    source = unpack(source)
     rows = source.get('candles', [])
-    if (source.get('version') != 'btc-hour-sequence-source-v1' or source.get('symbol') != 'BTCUSDT'
-            or source.get('timeframe') != '1h' or not rows):
-        raise ValueError('Choose a nonempty BTCUSDT 1h row-source export, not an analysis or pivot report')
+    legacy = source.get('version') == 'btc-hour-sequence-source-v1' and source.get('symbol') == 'BTCUSDT' and source.get('timeframe') == '1h'
+    general = source.get('version') in ('pivot-candle-source-v1','memory-candle-source-v1') and re.fullmatch(r'[A-Z0-9]{2,30}USDT', source.get('symbol', '')) and source.get('timeframe') in analyzer.FRAMES
+    if not ((legacy or general) and rows):
+        raise ValueError('Choose a nonempty spot candle row-source export, not an analysis or pivot report')
     sample = rows if len(rows) <= 2000 else rows[:1000] + rows[-1000:]
     fields = []
 
@@ -70,10 +76,16 @@ def field_catalog(source):
     for name in sorted(analyzer.EVENT_FIELDS):
         add('event.' + name, [True, False], group='DI events')
     histories = source.get('engine_history', {})
-    for frame in ('1h', '4h', '1d'):
+    context_rows = {key: len(value.get('results', {})) for key, value in histories.items()}
+    for frame in dict.fromkeys((source['timeframe'], '1h', '4h', '1d', *[key.split(':')[0] for key in histories])):
         for engine in ('REGIME', 'TREND', 'STRUCTURE', 'MOMENTUM', 'VOLATILITY', 'PARTICIPATION', 'PHASE', 'LIQUIDITY', 'SENTIMENT', 'BIAS'):
             history = histories.get(frame + ':' + engine, {})
             results = list(history.get('results', {}).values())
+            if frame == source['timeframe']:
+                inline = [r['context'][engine] for r in sample if engine in r.get('context', {})]
+                results.extend(inline)
+                if inline:
+                    context_rows[frame + ':' + engine] = sum(engine in r.get('context', {}) for r in rows)
             values = {}
             for payload in results[:100] + results[-100:]:
                 def walk(value, prefix=''):
@@ -88,18 +100,20 @@ def field_catalog(source):
                 values.setdefault(name, [])
             for name, samples in sorted(values.items()):
                 add(f'context.{frame}.{engine}.{name}', samples, group=frame + ' ' + engine.title(), history_rows=len(history.get('results', {})))
-    return dict(symbol='BTCUSDT', timeframe='1h', candles=len(rows), source_id=source['source_id'],
+    return dict(symbol=source['symbol'], timeframe=source['timeframe'], candles=len(rows), source_id=source['source_id'],
+                risk_budget_pct=.5 if general else None,
                 first=rows[0]['open_time'], last=rows[-1]['close_time'] + 1, fields=fields,
-                feature_columns=len(names), context_rows={key: len(value.get('results', {})) for key, value in histories.items()},
+                feature_columns=len(names), context_rows=context_rows,
                 note='Field choices come from this input. Sample availability uses up to 2,000 candles; replay diagnostics give exact unknown counts. Context is exact last-closed historical context, not today’s classification.')
 
 
 class Workspace:
     def __init__(self, directory=None, input_path=None):
+        self.explicit_input=bool(input_path)
         self.directory = Path(directory) if directory else data_path('strategy_analyzer', Path.home() / '.tradingbot' / 'strategy_analyzer')
         self.directory.mkdir(parents=True, exist_ok=True)
         self.input_paths = {}
-        for path in sorted(set(REPORTS.rglob('source*.json*')) | set(REPORTS.rglob('memory_source.json*'))):
+        for path in sorted(set(REPORTS.rglob('source*.json*')) | set(REPORTS.rglob('memory_source.json*')) | set((ROOT / 'research_reports' / 'pivot_discovery').glob('*_source.json.gz'))):
             if not path.name.endswith('.partial'):
                 self.input_paths['input-' + hashlib.sha256(str(path).encode()).hexdigest()[:16]] = path
         if input_path:
@@ -111,9 +125,13 @@ class Workspace:
         for key, path in self.input_paths.items():
             meta = path.with_name(path.name + '.meta.json')
             self.input_names[key] = read(meta).get('name', path.name) if meta.is_file() else str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name
-        self.default_input = 'selected-input' if input_path else next((key for key, path in self.input_paths.items() if path == REPORTS / 'source_v1.json.gz'), next(iter(self.input_paths), None))
+        preferred = ROOT / 'research_reports' / 'pivot_discovery' / 'BTCUSDT_15m_source.json.gz'
+        self.default_input = 'selected-input' if input_path else next((key for key, path in self.input_paths.items() if path == preferred), next((key for key, path in self.input_paths.items() if path == REPORTS / 'source_v1.json.gz'), next(iter(self.input_paths), None)))
         self.cache = OrderedDict()
         self.lock = threading.Lock()
+        self.discovery_lock = threading.Lock()
+        self.discovery_cache = OrderedDict()
+        self.memory_discovery = {}
         self.jobs = {}
         self.active_job = None
 
@@ -140,12 +158,25 @@ class Workspace:
             meta = read(meta_path) if meta_path.exists() else {}
             name = 'Published example' if key == 'published' else meta.get('name', key)
             reports.append(dict(id=key, name=name))
-        return dict(default_input=self.default_input,
-                    inputs=[dict(id=key, name=self.input_names[key]) for key in self.input_paths],
+        from Section_8_Decision_Engine import strategy_memory
+        try:memory=strategy_memory.universe()
+        except (OSError,ValueError,RuntimeError,sqlite3.Error) as error:memory=dict(symbols=[],timeframes=[],pairs=[],error=str(error))
+        memory_inputs=[dict(id=strategy_memory.key(p['symbol'],p['timeframe']),name=p['symbol']+' · '+p['timeframe']+' · Memory') for p in memory['pairs']]
+        preferred='memory:BTCUSDT:15m'
+        default=preferred if not self.explicit_input and any(i['id']==preferred for i in memory_inputs) else self.default_input
+        return dict(kind='pivot-strategy-workspace-v1', default_input=default, memory=memory,
+                    inputs=memory_inputs+[dict(id=key, name=self.input_names[key]) for key in self.input_paths],
                     configurations=self.configurations(),
                     reports=reports)
 
     def source(self, key):
+        if key.startswith('memory:'):
+            from Section_8_Decision_Engine import strategy_memory
+            symbol,frame=strategy_memory.parse(key)
+            requested=['feature.'+f for f in ('rsi','rsi_change','natr_pct','efficiency_ratio','relative_volume','volume_ratio','atr_ma_ratio','atr_change','candle_range_atr','displacement_atr','body_percent','close_location','ema50','ema200','ema50_slope_atr','ema200_slope_atr','bb_width_percentile','bb_width_change_fraction','positive_return_fraction','negative_return_fraction')]
+            requested += [f'context.{frame}.{engine}.direction' for engine in ('REGIME','TREND')]
+            source=strategy_memory.load(symbol,frame,fields=requested,include_pivots=True)
+            return source,field_catalog(source)
         if key not in self.input_paths:
             raise ValueError('Unknown input selection')
         path = self.input_paths[key]
@@ -153,13 +184,28 @@ class Workspace:
         with self.lock:
             item = self.cache.get(signature)
         if item is None:
-            source = read(path)
+            source = unpack(read(path))
             item = (source, field_catalog(source))
             with self.lock:
                 self.cache[signature] = item
                 while len(self.cache) > 2:
                     self.cache.popitem(last=False)
         return item
+
+    def discovery(self, key):
+        from Section_8_Decision_Engine.pivot_discovery import Dataset
+        if key.startswith('memory:') and key in self.memory_discovery:return self.memory_discovery[key]
+        source, _ = self.source(key)
+        signature = (key, source['source_id'], source['observed_as_of'])
+        with self.discovery_lock:
+            if signature not in self.discovery_cache:
+                self.discovery_cache[signature] = Dataset(source)
+                while len(self.discovery_cache) > 2:
+                    self.discovery_cache.popitem(last=False)
+            dataset=self.discovery_cache[signature]
+            if key.startswith('memory:'):
+                self.memory_discovery={key:dataset}
+            return dataset
 
     def upload(self, body):
         try:
@@ -189,7 +235,16 @@ class Workspace:
         if baseline:
             # Both rule sets are re-evaluated with the user's selected costs.
             baseline = dict(baseline, execution=analyzer.EXECUTION | config.get('execution', {}))
-        if body.get('input_id') not in self.input_paths:
+        memory_input=str(body.get('input_id','')).startswith('memory:')
+        if memory_input:
+            from Section_8_Decision_Engine import strategy_memory
+            symbol,frame=strategy_memory.parse(body['input_id'])
+            symbols=body.get('symbols',[symbol])
+            if not isinstance(symbols,list) or not symbols or len(symbols)>500 or len(symbols)!=len(set(symbols)):
+                raise ValueError('Choose one or more distinct stored coins')
+            available=strategy_memory.universe()['symbols']
+            if any(s not in available for s in symbols):raise ValueError('Choose coins available in memory')
+        elif body.get('input_id') not in self.input_paths:
             raise ValueError('Choose an available input')
         since, until = body.get('since'), body.get('until')
         if any(value is not None and type(value) is not int for value in (since, until)) or since is not None and until is not None and since >= until:
@@ -203,9 +258,57 @@ class Workspace:
             key = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
             self.jobs[key] = dict(id=key, state='running', stage='Loading input', complete=0, total=0)
             self.active_job = key
-        thread = threading.Thread(target=self.run, args=(key, body['input_id'], config, baseline, since, until, fields), daemon=True)
+        target=self.run_memory if memory_input else self.run
+        args=(key,symbols,frame,config,baseline,since,until,fields) if memory_input else (key,body['input_id'],config,baseline,since,until,fields)
+        thread = threading.Thread(target=target, args=args, daemon=True)
         thread.start()
         return dict(id=key)
+
+    def run_memory(self,key,symbols,frame,config,baseline,since,until,fields):
+        from Section_8_Decision_Engine import strategy_memory
+        import gc
+        try:
+            market_cutoff=min(until,int(time.time()*1000)) if until is not None else int(time.time()*1000)
+            requested=set(fields)
+            lag=2
+            for strategy in [config]+([baseline] if baseline else []):
+                for branch in strategy['branches']:
+                    requested.update(analyzer.expression_fields(branch['when']))
+                    lag=max(lag,*(n for _,n in analyzer.expression_operands(branch['when'])))
+            summaries=[]
+            for index,symbol in enumerate(symbols):
+                def progress(stage,counts=None):
+                    with self.lock:self.jobs[key].update(stage=f'{symbol} ({index+1}/{len(symbols)}) · '+stage,coin=symbol,coin_index=index+1,coin_total=len(symbols),**(counts or {}))
+                try:
+                    source=strategy_memory.load(symbol,frame,fields=requested,since=since,until=market_cutoff,warmup=lag,
+                                                progress=lambda counts:progress(counts['stage'],{k:v for k,v in counts.items() if k=='complete'}))
+                    progress('Replaying stored memory',dict(complete=0,total=len(source['candles'])))
+                    result=analyzer.analyze(source,config,since=since,until=until,report_fields=fields,progress=lambda counts:progress('Replaying strategy',counts))
+                    if baseline:
+                        original=analyzer.analyze(source,baseline,since=since,until=until,report_fields=fields)
+                        result['comparison']=analyzer.compare(original,result)
+                    report_id=key+'-'+symbol
+                    result['workspace']=dict(input_id=strategy_memory.key(symbol,frame),input_name=symbol+' '+frame+' · stored memory',run_id=report_id)
+                    result['memory']=source['memory']
+                    directory=self.directory/'runs'/report_id
+                    write(directory/'strategy_analysis.json.gz',result)
+                    write(directory/'metadata.json',dict(name=config['id']+' · '+symbol+' '+frame+' · memory'))
+                    from analyze_btc_hour_strategy import visual
+                    (directory/'strategy_analysis.html').write_text(visual(result),encoding='utf-8')
+                    summaries.append(dict(symbol=symbol,timeframe=frame,state='complete',report_id=report_id,summary=result['summary'],candles=result['candles_scanned']))
+                    del source,result
+                    if baseline:del original
+                    gc.collect()
+                except Exception as error:
+                    summaries.append(dict(symbol=symbol,timeframe=frame,state='failed',error=str(error)))
+                with self.lock:self.jobs[key]['coins']=list(summaries)
+            write(self.directory/'runs'/key/'batch_summary.json',dict(config=config,timeframe=frame,coins=summaries,market_cutoff=market_cutoff,capital_model='Each coin is replayed independently with its own starting capital; no combined portfolio return'))
+            successful=[s for s in summaries if s['state']=='complete']
+            with self.lock:self.jobs[key].update(state='complete' if successful else 'failed',stage='Complete' if successful else 'Replay failed',report_id=successful[0]['report_id'] if successful else None,error=None if successful else summaries[0]['error'])
+        except Exception as error:
+            with self.lock:self.jobs[key].update(state='failed',stage='Replay failed',error=str(error))
+        finally:
+            with self.lock:self.active_job=None
 
     def run(self, key, input_id, config, baseline, since, until, fields):
         def progress(stage, counts=None):
@@ -268,14 +371,39 @@ def make_server(workspace, port=8765):
             parsed = urlparse(self.path)
             qs = parse_qs(parsed.query)
             try:
-                if parsed.path in ('/', '/assets/style.css', '/assets/builder.js', '/assets/report.js'):
+                if parsed.path == '/assets/lightweight-charts.js':
+                    return self.send(200, (ROOT / 'packaging' / 'vendor' / 'lightweight-charts.js').read_bytes(), 'text/javascript; charset=utf-8')
+                if parsed.path in ('/', '/assets/style.css', '/assets/builder.js', '/assets/report.js', '/assets/pivot.js'):
                     path = ASSETS / ('index.html' if parsed.path == '/' else parsed.path.rsplit('/', 1)[1])
                     kind = 'text/html' if path.suffix == '.html' else 'text/css' if path.suffix == '.css' else 'text/javascript'
                     return self.send(200, path.read_bytes(), kind + '; charset=utf-8')
                 if parsed.path == '/api/catalog':
                     return self.send(200, workspace.catalog())
                 if parsed.path == '/api/input':
+                    if qs.get('id',[''])[0].startswith('memory:'):
+                        from Section_8_Decision_Engine import strategy_memory
+                        workspace.memory_discovery.pop(qs['id'][0],None)
+                        return self.send(200,strategy_memory.metadata(*strategy_memory.parse(qs['id'][0])))
                     return self.send(200, workspace.source(qs.get('id', [''])[0])[1])
+                if parsed.path in ('/api/discovery', '/api/chart'):
+                    if parsed.path=='/api/chart' and qs.get('id',[''])[0].startswith('memory:'):
+                        from Section_8_Decision_Engine import strategy_memory
+                        from Section_8_Decision_Engine.pivot_discovery import Dataset
+                        symbol,frame=strategy_memory.parse(qs['id'][0]);center=int(qs['center'][0]) if 'center' in qs else None
+                        source=strategy_memory.load(symbol,frame,limit=260,center=center,all_fields=True,all_context=True,include_pivots=True)
+                        packet=Dataset(source).chart(center=center,feature=qs.get('feature',['rsi'])[0])
+                        packet.update(first=source['memory']['first'],last=source['memory']['last'])
+                        return self.send(200,packet)
+                    dataset = workspace.discovery(qs.get('id', [''])[0])
+                    if parsed.path == '/api/chart':
+                        return self.send(200, dataset.chart(center=int(qs['center'][0]) if 'center' in qs else None,
+                                                            feature=qs.get('feature', ['rsi'])[0]))
+                    return self.send(200, dataset.compare(side=qs.get('side', ['BUY'])[0],
+                                                          control=qs.get('control', ['ordinary'])[0],
+                                                          regime=qs.get('regime', ['ALL'])[0], trend=qs.get('trend', ['ALL'])[0],
+                                                          offset=int(qs.get('offset', ['0'])[0]), page=int(qs.get('page', ['0'])[0]),
+                                                          since=int(qs['since'][0]) if 'since' in qs else None,
+                                                          until=int(qs['until'][0]) if 'until' in qs else None))
                 if parsed.path == '/api/job':
                     with workspace.lock:
                         job = dict(workspace.jobs.get(qs.get('id', [''])[0], {}))
@@ -291,7 +419,7 @@ def make_server(workspace, port=8765):
                         return self.send(200, visual(read(path)).encode(), 'text/html; charset=utf-8', 'strategy_analysis.html')
                     return self.send(200, path.read_bytes(), 'application/gzip', 'strategy_analysis.json.gz')
                 return self.send(404, dict(error='Not found'))
-            except (ValueError, KeyError, TypeError, OSError) as error:
+            except (ValueError, KeyError, TypeError, OSError, sqlite3.Error, RuntimeError) as error:
                 return self.send(400, dict(error=str(error)))
 
         def do_POST(self):
@@ -316,7 +444,7 @@ def make_server(workspace, port=8765):
                 return self.send(404, dict(error='Not found'))
             except RuntimeError as error:
                 return self.send(409, dict(error=str(error)))
-            except (ValueError, KeyError, TypeError, OSError) as error:
+            except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as error:
                 return self.send(400, dict(error=str(error)))
 
     return ThreadingHTTPServer(('127.0.0.1', port), Handler)

@@ -167,7 +167,7 @@ class FairService(unittest.TestCase):
         with patch.object(processor,'_advance',return_value=4) as advance:
             self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=10),8)
         self.assertEqual({c.args[:2] for c in advance.call_args_list},{('BTC','1m'),('SUI','1m')})
-        self.assertTrue(all(c.args[2]<=12 for c in advance.call_args_list))
+        self.assertTrue(all(c.args[2]<=200 for c in advance.call_args_list))
 
     def test_dedicated_recent_turn_retains_raw_prefix_and_time_budget(self):
         self._current_versions()

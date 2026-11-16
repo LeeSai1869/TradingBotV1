@@ -1,6 +1,8 @@
 """Bounded closed-DI decisions in the existing runner and ADCN memory."""
+from contextlib import closing
 import json
 import math
+import sqlite3
 import threading
 import time
 import traceback
@@ -12,6 +14,7 @@ from .sequence import alternate
 _LOCK=threading.RLock()
 _CACHE={}
 _cursor=0
+_bulk_cursor=0
 BATCH=200
 
 
@@ -52,8 +55,11 @@ def _record(item):
     return {key:(value if not isinstance(value,float) or math.isfinite(value) else None) for key,value in result.items()}
 
 
-def _advance(symbol,interval,limit=BATCH,deadline=None):
+def _advance(symbol,interval,limit=BATCH,deadline=None,*,recent_only=False):
     if not data_policy.enabled(symbol,interval):return 0
+    # A turn can own many pages; the public raw reader accepts at most 1,000.
+    limit=min(1000,limit)
+    if limit<=0:return 0
     state=_load(symbol,interval);epoch=state['epoch']
     # Work on a copy. A failed transaction must never move the cached cursor.
     previous=list(state['previous']);rows=[];last=state['last'];now=int(time.time()*1000)
@@ -68,7 +74,13 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
             if previous and previous[-1]['close_time']+1!=record['open_time']:previous=[]
             previous.append(record)
         if previous:last=previous[-1]['open_time']
-    inputs=db.read_decision_inputs(symbol,interval,last,limit)
+    recover_recent=False
+    if recent_only:
+        from Section_1_Global_Core import work_priority
+        recover_recent=bool(previous and now-previous[-1]['close_time']<=work_priority.recent_recovery_window(interval))
+    inputs=db.read_decision_inputs(symbol,interval,last,min(200,limit) if recover_recent else 13 if recent_only else limit)
+    if recent_only and not recover_recent and len(inputs)>12:return 0
+    if recent_only:inputs=inputs[:limit]
     for item in inputs:
         if rows and deadline is not None and time.monotonic()>=deadline:break
         if item['close_time']>=now or item['features'] is None:break
@@ -102,22 +114,32 @@ def _advance(symbol,interval,limit=BATCH,deadline=None):
     return len(rows)
 
 
-def maintenance(symbols,intervals,*,max_bars=BATCH,time_budget=.25,pairs=None):
-    global _cursor
+def maintenance(symbols,intervals,*,max_bars=BATCH,time_budget=.25,pairs=None,bulk_symbol=None):
+    global _cursor,_bulk_cursor
     pairs=[(symbol,interval) for symbol in symbols for interval in intervals] if pairs is None else list(pairs)
-    deadline=time.monotonic()+time_budget;count=0
+    started=time.monotonic();deadline=started+time_budget;count=0
+    phases=[(pairs,deadline,False)] if bulk_symbol is None else [
+        ([p for p in pairs if p[0]!=bulk_symbol],started+time_budget*.25,True),
+        ([p for p in pairs if p[0]==bulk_symbol],deadline,False)]
     with _LOCK:
-        for _ in range(len(pairs)):
-            symbol,interval=pairs[_cursor%len(pairs)];_cursor+=1
-            try:count+=_advance(symbol,interval,max_bars-count,deadline)
-            except Exception:
-                reset_pair(symbol,interval);traceback.print_exc()
-            if time.monotonic()<deadline:
+        for lane,lane_deadline,recent_only in phases:
+            for _ in lane:
+                if count>=max_bars or time.monotonic()>=lane_deadline:break
+                if bulk_symbol is not None and not recent_only:
+                    symbol,interval=lane[_bulk_cursor%len(lane)];_bulk_cursor+=1
+                else:symbol,interval=lane[_cursor%len(lane)];_cursor+=1
+                advanced=0
                 try:
-                    from Section_1_Global_Core.global_packet import recover_decision_evidence
-                    recover_decision_evidence(symbol,interval,deadline=deadline)
-                except Exception:traceback.print_exc()
-            if count>=max_bars or time.monotonic()>=deadline:break
+                    if recent_only:advanced=_advance(symbol,interval,max_bars-count,lane_deadline,recent_only=True)
+                    else:advanced=_advance(symbol,interval,max_bars-count,lane_deadline)
+                    count+=advanced
+                except Exception:
+                    reset_pair(symbol,interval);traceback.print_exc()
+                if time.monotonic()<lane_deadline and (not recent_only or advanced):
+                    try:
+                        from Section_1_Global_Core.global_packet import recover_decision_evidence
+                        recover_decision_evidence(symbol,interval,deadline=lane_deadline)
+                    except Exception:traceback.print_exc()
     return count
 
 
@@ -130,5 +152,23 @@ def process_bar(ev):
     with _LOCK:
         state=_load(ev.symbol,ev.timeframe)
         if state['last']<ev.open_time:
-            _advance(ev.symbol,ev.timeframe,deadline=time.monotonic()+.15)
+            from Section_1_Global_Core import work_priority
+            _advance(ev.symbol,ev.timeframe,deadline=time.monotonic()+.15,recent_only=not work_priority.owns_history(ev.symbol))
         return state['last']>=ev.open_time
+
+
+def pending_history(symbol,intervals):
+    """Read indexed rule checkpoints without creating or rewriting ADCN stores."""
+    if not adcn_store.DB_PATH.is_file():return True
+    try:
+        with closing(sqlite3.connect(adcn_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=.2)) as conn:
+            if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='decision_rule_state'").fetchone():return True
+            for interval in intervals:
+                with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=.2)) as source:
+                    target=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                if not target or target[0] is None:continue
+                row=conn.execute('SELECT state FROM decision_rule_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                state=json.loads(row[0]) if row else {}
+                if state.get('version')!=rule.VERSION or state.get('epoch')!=_epoch(symbol,interval) or state.get('last',-1)<target[0]:return True
+        return False
+    except sqlite3.Error:return True

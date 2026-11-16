@@ -11,6 +11,24 @@ _lock=threading.RLock()
 _messages={}
 
 
+def invalidate_dependents(cache,symbol,interval,engine):
+    """A child advancing invalidates a dependent's cached complete-prefix flag."""
+    entries=aggregation_processor.registry();changed={engine}
+    while True:
+        expanded=changed|{name for name,entry in entries.items() if changed.intersection(entry['dependencies'])}
+        if expanded==changed:break
+        changed=expanded
+    for name in changed-{engine}:cache.pop((symbol,interval,name),None)
+
+
+def performance(row):
+    timings=row.get('timings',{});seconds=timings.get('total_seconds',0)
+    if not row['processed'] or not timings:return ''
+    return (f'; {row["processed"]/max(.001,seconds):.1f} rows/s; '
+            f'compute={1000*timings["evaluate_seconds"]/row["processed"]:.3f} ms/bar; '
+            f'project={timings["project_seconds"]:.3f}s; commit={timings["commit_seconds"]:.3f}s')
+
+
 def advance(symbol,interval,engine,*,limit=100,now_ms=None):
     now=int(time.time()*1000) if now_ms is None else now_ms
     with data_policy.locked(timeout=.02):
@@ -50,11 +68,12 @@ def maintenance(symbols,intervals,*,max_bars=400,time_budget=.5,max_pairs=4,skip
                 if quiet>=len(pairs):break
                 continue
             try:
-                row=advance(symbol,interval,engine,limit=min(100,remaining))
+                row=advance(symbol,interval,engine,limit=min(200,remaining))
                 total+=row['processed']+row.get('dependency_processed',0)
+                if row['processed'] or row.get('dependency_processed',0):invalidate_dependents(_messages,symbol,interval,engine)
                 message=row['status'];key=(symbol,interval,engine)
                 if row['processed'] or _messages.get(key)!=message:
-                    print(f'[history:{engine.lower()}] {symbol} {interval}: +{row["processed"]}; {message}; through={(row.get("latest") or {}).get("candle_open_time")}',flush=True)
+                    print(f'[history:{engine.lower()}] {symbol} {interval}: +{row["processed"]}; {message}; through={(row.get("latest") or {}).get("candle_open_time")}{performance(row)}',flush=True)
                 _messages[key]=message
                 quiet=0 if row['processed']+row.get('dependency_processed',0) else quiet+1
                 if quiet>=len(pairs):break

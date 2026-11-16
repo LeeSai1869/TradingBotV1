@@ -47,10 +47,13 @@ export function stackedSegments(row,maximum,coordinate,paneWidth,lengthPercent=4
     const top=coordinate(row.high),bottom=coordinate(row.low);
     if(top===null||bottom===null||top===bottom||!(maximum>0)||!(row.total>0))return [];
     const width=paneWidth*lengthPercent/100*row.total/maximum;
+    // Keep genuinely narrow observed price bins legible when zoomed out.
+    // Price bounds/notional in the sample and tooltip remain exact.
+    const rawHeight=Math.abs(bottom-top),height=Math.max(1,rawHeight),y=(top+bottom-height)/2;
     let x=paneWidth-5-width;const result=[];
     for(const side of ['bid','ask']){
         const size=width*row[side]/row.total;
-        if(size>0)result.push({x,width:size,y:Math.min(top,bottom),height:Math.abs(bottom-top),band:row[side+'Band']});
+        if(size>0)result.push({x,width:size,y,height,band:row[side+'Band']});
         x+=size;
     }
     return result;
@@ -59,7 +62,7 @@ export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Rest
 class Liquidity {
     attached({chart,series,requestUpdate}){
         Object.assign(this,{chart,series,requestUpdate});
-        this.views=['heatmap','profile'].map(layer=>({zOrder:()=>'bottom',renderer:()=>({draw:target=>this.draw(target,layer)})}));
+        this.views=['heatmap','profile'].map(layer=>({zOrder:()=>layer==='profile'?'normal':'bottom',renderer:()=>({draw:target=>this.draw(target,layer)})}));
     }
     detached(){this.chart=this.series=this.requestUpdate=null;}
     paneViews(){return this.views||[];}
@@ -112,7 +115,7 @@ class Liquidity {
                 const maximum=Math.max(0,...rows.map(row=>row.total));
                 for(const row of rows)for(const segment of stackedSegments(row,maximum,value=>this.series.priceToCoordinate(value),mediaSize.width,config.liquidity_bids?.lengthPercent??45)){
                     const {band,...box}=segment;
-                    if(paint(band,box,(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
+                    for(const span of heatmapSpans(box.x,box.width,protectedX,spacing))if(paint(band,{...box,...span},(config[`liquidity_${band.side==='bid'?'bids':'asks'}`].opacity??65)/100,latest.book_received_ms))painted++;
                 }
             }
             if(layer==='profile'){
@@ -129,7 +132,7 @@ export function mount(){
     Object.assign(status.style,{position:'absolute',right:'8px',top:'52px',fontSize:'11px',color:'#c3ccd6',pointerEvents:'none',zIndex:2,background:'#101820cc',padding:'3px',maxWidth:'75%',whiteSpace:'normal'});
     tooltip=document.createElement('div');tooltip.className='liquidity-tooltip';tooltip.hidden=true;
     Object.assign(tooltip.style,{position:'absolute',left:'8px',bottom:'30px',background:'#101820ee',color:'#fff',fontSize:'12px',padding:'6px',pointerEvents:'none',zIndex:3});
-    document.getElementById('chart').append(status,tooltip);
+    document.getElementById('chart').append(tooltip);
     primitive.chart?.subscribeCrosshairMove(param=>{
         const hit=param.point?[...(primitive.hitboxes||[])].reverse().find(b=>param.point.x>=b.x&&param.point.x<=b.x+b.width&&param.point.y>=b.y&&param.point.y<=b.y+b.height):null;
         tooltip.hidden=!hit;if(hit)tooltip.textContent=bandLabel(hit.band);

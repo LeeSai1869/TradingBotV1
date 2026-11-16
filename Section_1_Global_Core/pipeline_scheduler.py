@@ -17,6 +17,27 @@ ANALYTICS='Section_1_Global_Core.analytical_processor'
 DECISIONS='Section_8_Decision_Engine.processor'
 
 
+def pending_intelligence(symbol,intervals):
+    """Indexed compatible history cursors, without full-history COUNT scans."""
+    from . import analytical_history,aggregation_processor,regime_inputs
+    from .memory_storage.Storage import engine_store
+    if not engine_store.DB_PATH.is_file():return True
+    now=int(time.time()*1000);policy=data_policy.read()
+    try:
+        with closing(regime_inputs.open_sources()) as source,closing(engine_store.open_readonly(timeout=.2)) as conn:
+            for interval in intervals:
+                target=source.execute('SELECT MAX(open_time) FROM raw.klines WHERE symbol=? AND interval=? AND close_time<?',(symbol,interval,now)).fetchone()[0]
+                if target is None:continue  # A first forming candle has no history target.
+                version=source.execute('SELECT generation FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+                if not version:return True
+                for engine in analytical_history.ENGINES:
+                    run,_=analytical_history.select(conn,symbol,interval,engine,policy,aggregation_processor.generation(engine),at=now)
+                    if not run or run['cursor']<target or run['metadata']['source_versions']['feature_generation']!=str(version[0]):return True
+        return False
+    except (regime_inputs.InputsUnavailable,sqlite3.Error):
+        return True
+
+
 def checkpoint_symbols():
     if not features_store.DB_PATH.exists():return set()
     with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True)) as db:
@@ -70,6 +91,23 @@ class PipelineScheduler:
         self.existing=[];self.new=[];self.ready_pairs=set()
         self.stage=None
         self.frontiers={}
+        self.focus=None
+        self._focus_message=None
+
+    def select_focus(self,intervals):
+        """Resume one coin until sources, features and all history cursors finish."""
+        def pending(symbol):
+            return (bool(pending_sources([symbol],intervals)) or pending_intelligence(symbol,intervals)
+                    or self.modules[DECISIONS].pending_history(symbol,intervals))
+        saved=self.state.get('__pipeline_focus__')
+        if saved in self.existing and pending(saved):self.focus=saved
+        else:self.focus=next((s for s in self.existing if pending(s)),None)
+        self.state['__pipeline_focus__']=self.focus
+        work_priority.set_bulk_symbol(self.focus)
+        if self.focus!=self._focus_message:
+            print(f'[pipeline] bulk focus={self.focus}; retain coin through downloads, features and full intelligence history; recent closes remain serviced',flush=True)
+            self._focus_message=self.focus
+        return self.focus
 
     def cohorts(self):
         active=data_policy.active_symbols()
@@ -85,6 +123,7 @@ class PipelineScheduler:
 
     def download(self):
         existing,new=self.cohorts()
+        self.select_focus(data_policy.active_intervals())
         # Cold bootstrap gets one coin, not the entire new-listing universe.
         return update_klines.update_all(symbols=existing or new[:1], include_history=False)
 
@@ -102,9 +141,15 @@ class PipelineScheduler:
         if not existing:
             self.initialize(intervals,rows)
             return rows
+        self.select_focus(intervals)
         # Recent closes get a dedicated turn before any bulk download/replay.
         features=self.modules[FEATURES]
         rows[FEATURES]=features.maintain_recent(existing,intervals,time_budget=.5)
+        recovering_recent=rows[FEATURES]>0
+        if recovering_recent:
+            # Borrow the historical analytical slice for interrupted live
+            # calculations. Deep research resumes when recent work goes quiet.
+            rows[FEATURES]+=features.maintain_recent(existing,intervals,time_budget=.5)
         pending=set(pending_sources(existing,intervals,require_history=False))
         ready=[(s,t) for s in existing for t in intervals if (s,t) not in pending]
         self.ready_pairs=set(ready)
@@ -115,22 +160,24 @@ class PipelineScheduler:
             # Explicit pairs avoid admitting a blocked frame through a Cartesian
             # product. Dependency readers still validate their own stored inputs.
             rows[ANALYTICS]=analytics.maintenance(existing,intervals,pairs=ready,
+                history_pairs=[pair for pair in ready if pair[0]==self.focus],
                 max_bars=10000,time_budget=.5,max_pairs=1000,
-                history_time_budget=.5,history_max_bars=10000,
+                history_time_budget=0 if recovering_recent else .5,history_max_bars=10000,
                 history_max_pairs=1000,skip_complete=True)
             # DI decisions require committed features, not completion of every
             # analytical engine or another symbol's historical classifications.
             rows[DECISIONS]=self.modules[DECISIONS].maintenance(existing,intervals,
-                pairs=ready,max_bars=100000,time_budget=.5)
-        rows['history_downloads']=update_klines.update_all(symbols=existing,
-            include_recent=False,time_budget=.5)
-        rows[FEATURES]+=features.maintenance(existing,intervals,
-            max_bars=100000,time_budget=.5)
+                pairs=ready,max_bars=100000,time_budget=.5,bulk_symbol=self.focus)
+        if self.focus:
+            rows['history_downloads']=update_klines.update_all(symbols=[self.focus],
+                include_recent=False,time_budget=.5)
+            rows[FEATURES]+=features.maintenance([self.focus],intervals,
+                max_bars=100000,time_budget=.5)
         # Bulk repairs may change readiness after the recent turn. Events must
         # use the resulting committed state, not the earlier snapshot.
         pending=set(pending_sources(existing,intervals,require_history=False))
         self.ready_pairs={(s,t) for s in existing for t in intervals if (s,t) not in pending}
-        if not pending and rows.get(DECISIONS,0)==0:
+        if self.focus is None and not pending and rows.get(DECISIONS,0)==0:
             self.initialize(intervals,rows)
         return rows
 
@@ -166,4 +213,5 @@ class PipelineScheduler:
     def allow_event(self,name,symbol,interval):
         module=name.rsplit('.',1)[0]
         if symbol not in self.existing:return False
+        if module==FEATURES and self.focus is not None and symbol!=self.focus and (symbol,interval) not in self.ready_pairs:return False
         return module!=DECISIONS or (symbol,interval) in self.ready_pairs

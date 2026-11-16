@@ -77,10 +77,15 @@ class Writer(threading.Thread):
                         closed=minutes.setdefault(payload['symbol'],Minutes(payload['symbol'])).add(stored)
                         if closed:store.write_candle(conn,closed)
                 if control_changed:conn.commit()
+                # Archive throughput must not keep newly queued book samples
+                # behind a full raw batch (measured >1s during active feeds).
+                # Return to control commits frequently without dropping raw data.
+                raw_deadline=time.monotonic()+.05
                 for _ in range(1000):
                     try:symbol,record=self.raw_queue.get(timeout=.02)
                     except queue.Empty:break
                     archive.append(symbol,record)
+                    if time.monotonic()>=raw_deadline:break
                 now=time.time()
                 if now-last_flush>=.5:conn.commit();archive.flush();last_flush=now
                 if now-last_prune>=60:

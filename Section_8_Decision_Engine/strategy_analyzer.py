@@ -5,8 +5,11 @@ from functools import lru_cache
 import hashlib
 import json
 import math
+import re
 
 from . import pivot_sequences
+from . import strategy_exits
+from .candle_calendar import FRAMES, end as candle_end, latest_closed
 
 VERSION = 'btc-hour-strategy-analyzer-v1'
 STEP = 3600000
@@ -14,7 +17,7 @@ UNKNOWN = None
 OPS = {'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'available', 'missing'}
 DI_FIELDS = {'di_plus', 'di_minus', 'abs_spread', 'signed_spread', 'dominance', 'dominant', 'adx'}
 EVENT_FIELDS = {'di_minus_peak', 'di_plus_peak', 'spread_peak', 'di_only_buy_turn', 'di_only_sell_turn'}
-EXECUTION = dict(fee_bps_per_side=4., slippage_bps_per_side=2., initial_capital=100.)
+EXECUTION = dict(fee_bps_per_side=4., slippage_bps_per_side=2., initial_capital=100., intrabar_path='low_first')
 
 
 def number(value):
@@ -60,11 +63,11 @@ def validate_config(config):
                 name = node[key]
                 parts = name.split('.') if isinstance(name, str) else []
                 valid = (len(parts) == 2 and (
-                    parts[0] == 'feature' and parts[1].isidentifier()
+                    parts[0] in ('feature', 'adcn') and parts[1].isidentifier()
                     or parts[0] == 'price' and parts[1] in ('open', 'high', 'low', 'close', 'volume')
                     or parts[0] == 'di' and parts[1] in DI_FIELDS
                     or parts[0] == 'event' and parts[1] in EVENT_FIELDS))
-                valid |= (len(parts) >= 4 and parts[0] == 'context' and parts[1] in ('1h', '4h', '1d')
+                valid |= (len(parts) >= 4 and parts[0] == 'context' and parts[1] in FRAMES
                           and parts[2] in ('REGIME', 'TREND', 'STRUCTURE', 'MOMENTUM', 'VOLATILITY', 'PARTICIPATION', 'PHASE', 'LIQUIDITY', 'SENTIMENT', 'BIAS')
                           and all(part.isidentifier() for part in parts[3:]))
                 if not valid:
@@ -93,12 +96,26 @@ def validate_config(config):
                 raise ValueError('Ordered comparisons require numeric operands')
 
     for branch in branches:
-        if (not isinstance(branch, dict) or set(branch) != {'id', 'side', 'when'}
+        if (not isinstance(branch, dict) or not {'id', 'side', 'when'} <= set(branch) or set(branch)-{'id','side','when','action','trail','target_profit_pct'}
                 or not isinstance(branch.get('id'), str) or not branch['id'] or branch['id'] in ids):
             raise ValueError('Branches require unique id, side and when')
         ids.add(branch['id'])
         if branch['side'] not in ('BUY', 'SELL'):
             raise ValueError('Branch side must be BUY or SELL')
+        action = branch.get('action','MARKET_SELL')
+        if action not in ('MARKET_SELL','TRAILING_SELL','TAKE_PROFIT') or branch['side']=='BUY' and ('action' in branch or 'trail' in branch or 'target_profit_pct' in branch):
+            raise ValueError('Trailing sell is only available on SELL branches')
+        if action=='TRAILING_SELL':
+            trail=branch.get('trail',{})
+            if set(trail)!={'distance_pct','activation_profit_pct'} or not number(trail['distance_pct']) or not 0<trail['distance_pct']<100 or not number(trail['activation_profit_pct']) or not 0<=trail['activation_profit_pct']<=1000:
+                raise ValueError('Trailing sell needs distance_pct >0 and <100, and activation_profit_pct from 0 to 1000')
+        elif 'trail' in branch:
+            raise ValueError('Trail settings require a trailing-sell branch')
+        if action=='TAKE_PROFIT':
+            if not number(branch.get('target_profit_pct')) or not 0<branch['target_profit_pct']<=1000:
+                raise ValueError('Take profit needs target_profit_pct >0 and <=1000')
+        elif 'target_profit_pct' in branch:
+            raise ValueError('Profit target requires a take-profit branch')
         expression(branch['when'])
     if {b['side'] for b in branches} != {'BUY', 'SELL'}:
         raise ValueError('Provide at least one BUY and one SELL branch')
@@ -106,6 +123,9 @@ def validate_config(config):
     if not isinstance(execution, dict) or set(execution) - set(EXECUTION):
         raise ValueError('Unknown execution options')
     for key, value in (EXECUTION | execution).items():
+        if key=='intrabar_path':
+            if value not in ('low_first','high_first'):raise ValueError('Choose low_first or high_first OHLC order')
+            continue
         if not number(value) or (value <= 0 if key == 'initial_capital' else not 0 <= value < 10000):
             raise ValueError('Invalid execution value: ' + key)
     return config
@@ -114,9 +134,16 @@ def validate_config(config):
 class Memory:
     """Resolve only values known by a closed candle, with explicit missing reasons."""
     def __init__(self, source):
-        if (source.get('version') != 'btc-hour-sequence-source-v1'
-                or source.get('symbol') != 'BTCUSDT' or source.get('timeframe') != '1h'):
-            raise ValueError('Use a row-level BTCUSDT 1h source export')
+        from .pivot_candle_source import unpack
+        source = unpack(source)
+        legacy = (source.get('version') == 'btc-hour-sequence-source-v1'
+                  and source.get('symbol') == 'BTCUSDT' and source.get('timeframe') == '1h')
+        general = (source.get('version') in ('pivot-candle-source-v1','memory-candle-source-v1')
+                   and re.fullmatch(r'[A-Z0-9]{2,30}USDT', source.get('symbol', ''))
+                   and source.get('timeframe') in FRAMES)
+        if not (legacy or general):
+            raise ValueError('Use a supported row-level spot candle source export')
+        self.step = FRAMES[source['timeframe']]
         self.source = source
         self.rows = source['candles']
         prior = None
@@ -129,20 +156,19 @@ class Memory:
             prior = row['open_time']
         self.flags = pivot_sequences.events(self.rows)[1]
         self.features = {key for row in self.rows for key in row['features']}
+        self.value = lru_cache(maxsize=65536)(self._value)
 
     def price_valid(self, index):
         r = self.rows[index]
-        return (r['close_time'] == r['open_time'] + STEP - 1
+        return (r['close_time'] == candle_end(r['open_time'],self.source['timeframe']) - 1
                 and all(number(r[k]) and r[k] > 0 for k in ('open', 'high', 'low', 'close'))
                 and r['low'] <= min(r['open'], r['close']) <= max(r['open'], r['close']) <= r['high'])
 
-    @lru_cache(maxsize=65536)
-    def value(self, index, field, lag=0):
+    def _value(self, index, field, lag=0):
         at = index - lag
         if at < 0:
             return None, 'INSUFFICIENT_HISTORY'
-        if (self.rows[index]['open_time'] - self.rows[at]['open_time'] != lag * STEP
-                or any(self.rows[j - 1]['close_time'] + 1 != self.rows[j]['open_time'] for j in range(at + 1, index + 1))):
+        if any(self.rows[j - 1]['close_time'] + 1 != self.rows[j]['open_time'] for j in range(at + 1, index + 1)):
             return None, 'GAP_IN_LAG'
         row = self.rows[at]
         if not self.price_valid(at):
@@ -150,6 +176,8 @@ class Memory:
         parts = field.split('.')
         if parts[0] == 'price':
             value = row.get(parts[1]) if self.price_valid(at) else None
+        elif parts[0] == 'adcn':
+            value = row.get('adcn',{}).get(parts[1])
         elif parts[0] in ('feature', 'di', 'event'):
             if not row.get('feature_valid') or row['features'].get('measurement_gap'):
                 return None, 'INVALID_FEATURE_CANDLE'
@@ -162,19 +190,22 @@ class Memory:
         else:
             frame, engine = parts[1:3]
             history = self.source.get('engine_history', {}).get(frame + ':' + engine, {})
-            step = {'1h': STEP, '4h': 4 * STEP, '1d': 24 * STEP}[frame]
             known = row['close_time'] + 1
-            opened = known // step * step - step
+            opened = latest_closed(known,frame)
+            boundary = candle_end(opened,frame)
             payload = history.get('results', {}).get(str(opened))
+            if frame == self.source['timeframe'] and opened == row['open_time']:
+                payload = row.get('context', {}).get(engine) or payload
             if not payload:
                 return None, 'MISSING_EXACT_CLOSED_CONTEXT'
-            if (payload.get('candle_open_time') != opened or payload.get('candle_close_time') != opened + step - 1
-                    or payload.get('as_of') != opened + step):
+            if (payload.get('candle_open_time') != opened or payload.get('candle_close_time') != boundary - 1
+                    or payload.get('as_of') != boundary):
                 return None, 'INVALID_CONTEXT_TIME'
             if payload.get('data_quality') not in ('VALID', 'PARTIAL'):
                 return None, 'INVALID_CONTEXT_QUALITY'
-            value = payload.get('classification') or {}
-            for key in parts[3:]:
+            output = parts[3]=='output'
+            value = payload if output else payload.get('classification') or {}
+            for key in parts[4:] if output else parts[3:]:
                 value = value.get(key) if isinstance(value, dict) else None
         if value is None or isinstance(value, (dict, list)) or isinstance(value, float) and not math.isfinite(value):
             return None, 'MISSING_VALUE'
@@ -259,6 +290,9 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
         validate_config(probe)
     memory = Memory(source)
     rows = memory.rows
+    trailing = [b for b in config['branches'] if b.get('action')=='TRAILING_SELL']
+    standing = [b for b in config['branches'] if b.get('action') in ('TRAILING_SELL','TAKE_PROFIT')]
+    risk_budget = .5 if source.get('version') in ('pivot-candle-source-v1','memory-candle-source-v1') or standing else None
     execution = EXECUTION | config.get('execution', {})
     for value in (since, until):
         if value is not None and type(value) is not int:
@@ -269,11 +303,15 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                 and (until is None or r['close_time'] + 1 < until)]
     # Fingerprint only analyzer inputs, never retrospective pivot/outcome labels.
     hasher = hashlib.sha256()
-    for row in rows:
+    if hasattr(rows, 'packed'):
+        hasher.update(digest(dict(columns=rows.columns, contexts=rows.contexts)).encode())
+    for row in (rows.packed if hasattr(rows, 'packed') else rows):
         hasher.update(json.dumps(row, sort_keys=True, separators=(',', ':'), allow_nan=False).encode())
         hasher.update(b'\n')
     hasher.update(digest(source.get('engine_history', {})).encode())
     contract = dict(source_id=source['source_id'], memory_digest=hasher.hexdigest(), observed_as_of=source['observed_as_of'],
+                    symbol=source['symbol'], timeframe=source['timeframe'],
+                    risk_budget_pct=risk_budget,
                     since=since, until=until, execution=execution, fill='NEXT_CANDLE_OPEN', initial_state='WAIT_BUY')
     config_id = digest(config)
     signals, trades = [], []
@@ -283,6 +321,8 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
     position = pending = None
     invalid_prices = gaps = 0
     fee, slip = execution['fee_bps_per_side'] / 10000, execution['slippage_bps_per_side'] / 10000
+    if risk_budget is not None and 1 - (1-fee)*(1-slip)/((1+fee)*(1+slip)) >= risk_budget/100:
+        raise ValueError('Configured round-trip costs exhaust the 0.5% loss budget before any price movement')
 
     def censor(reason):
         if position is not None:
@@ -313,6 +353,10 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                 position.update({key: fill, key + '_time': row['open_time']})
                 if pending['side'] == 'BUY' and position['status'] != 'CENSORED':
                     position['status'] = 'OPEN'
+                    if risk_budget is not None:
+                        # Exit trigger accounts for both fees and exit slippage.
+                        # Entry already includes its modeled slippage.
+                        position['stop_price'] = fill * (1 + fee) * (1 - risk_budget / 100) / ((1 - fee) * (1 - slip))
                 if pending['side'] == 'SELL' and position['status'] != 'CENSORED':
                     net = (fill * (1 - fee) / (position['entry'] * (1 + fee)) - 1) * 100
                     position.update(status='CLOSED', net_pct=net, outcome='WIN' if net > 0 else 'LOSS' if net < 0 else 'BREAKEVEN')
@@ -321,7 +365,34 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             pending = None
         if not valid:
             continue
-        matches = []
+        automatic_exit = None
+        if risk_budget is not None and position is not None and position['status']=='OPEN':
+            eligible = [b for b in standing if i>0 and rows[i-1]['close_time']+1==row['open_time'] and memory.evaluate(b['when'],i-1,set()) is True]
+            was_armed=position.get('trail_branch')
+            automatic_exit = strategy_exits.walk(position,row,eligible,fee,slip,execution['intrabar_path'])
+            if position.get('trail_branch') and not was_armed:
+                selected_branch=next(b for b in trailing if b['id']==position['trail_branch'])
+                position['trail_condition_known_time']=rows[i-1]['close_time']+1
+                position['trail_inputs']={f'{field}@lag{lag}':dict(zip(('value','missing_reason'),memory.value(i-1,field,lag))) for field,lag in expression_operands(selected_branch['when'])}
+        if automatic_exit:
+            exit_price = automatic_exit['raw_price'] * (1 - slip)
+            net = (exit_price * (1 - fee) / (position['entry'] * (1 + fee)) - 1) * 100
+            known = automatic_exit['time']
+            signal = dict(id=f'STOP:{row["open_time"]}', side='SELL', candle_open_time=row['open_time'],
+                          known_time=known, branch_id=automatic_exit['branch'], matched_branches=[automatic_exit['branch']],
+                          fill_status='FILLED', fill_time=known, fill_price=exit_price,
+                          fill_time_precision=automatic_exit['precision'], reason=automatic_exit['reason'],
+                          inputs={'risk.stop_price': dict(value=strategy_exits.stop(position)[0], missing_reason=None)})
+            signals.append(signal)
+            if automatic_exit['branch'] in diagnostics:
+                diagnostics[automatic_exit['branch']]['accepted']+=1
+            position.update(status='CLOSED', net_pct=net, outcome='WIN' if net > 0 else 'LOSS' if net < 0 else 'BREAKEVEN',
+                            sell_signal_time=known, sell_branch=automatic_exit['branch'], sell_inputs=signal['inputs'], exit_reason=automatic_exit['reason'],
+                            exit=exit_price, exit_time=known, exit_time_precision=signal['fill_time_precision'])
+            position = pending = None
+            waiting = 'BUY'
+            continue
+        matches, trail_matches = [], []
         for branch in config['branches']:
             stats = diagnostics[branch['id']]
             stats['evaluated'] += 1
@@ -331,9 +402,21 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             stats['unknown' if result is UNKNOWN else 'true' if result else 'false'] += 1
             if result is True:
                 if branch['side'] == waiting:
-                    matches.append(branch['id'])
+                    if branch.get('action')=='TAKE_PROFIT':
+                        pass  # A new close-time condition applies from the next candle.
+                    elif branch.get('action')=='TRAILING_SELL':
+                        trail_matches.append(branch)
+                    else:
+                        matches.append(branch['id'])
                 else:
                     stats['same_side_suppressed'] += 1
+        if trail_matches and position is not None and position['status']=='OPEN':
+            was_armed=position.get('trail_branch')
+            strategy_exits.arm_at_close(position,row,trail_matches,fee,slip)
+            if position.get('trail_branch') and not was_armed:
+                selected_branch=next(b for b in trailing if b['id']==position['trail_branch'])
+                position['trail_condition_known_time']=row['close_time']+1
+                position['trail_inputs']={f'{field}@lag{lag}':dict(zip(('value','missing_reason'),memory.value(i,field,lag))) for field,lag in expression_operands(selected_branch['when'])}
         if not matches:
             continue
         side = waiting
@@ -375,7 +458,9 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                   fields_used=fields, report_fields=report_fields, available_feature_fields=sorted(memory.features),
                   definitions=dict(expression='Three-valued AND/OR/NOT: false AND unknown is false; true OR unknown is true. Missing never becomes zero/neutral',
                                    branches='All branches evaluated at each valid candle close; configuration order breaks same-side ties. One accepted signal per candle, beginning with BUY, then strictly alternating',
-                                   fills='Next contiguous valid candle open within the evaluation window; configurable spot fees/slippage, no shorts, stops or forced final exit',
+                                   fills='Rule signals fill at the next contiguous valid candle open within the evaluation window; configurable spot fees/slippage, no shorts or forced final exit. New spot candle sources additionally execute the standing risk stop described below',
+                                   risk='New spot candle sources enforce a 0.5% net stop budget from entry, adjusted for configured fees/slippage. OHLC stop touches have unknown intrabar timing; adverse opens use the actual modeled open, without clipping losses. Legacy BTC 1h sources retain their original signal-only replay.',
+                                   trailing='Trailing SELL branches arm when net liquidation profit reaches the activation threshold AND their condition is known true. Intrabar eligibility uses the previous closed candle; newly true close-time conditions arm for the next candle. Once armed, never disarm. Trail follows the highest raw price since entry. OHLC path is an explicit assumption, not tick reconstruction.',
                                    gaps='Missing prices censor held trades and missing next-open fills; preserve alternating signal state, never manufacture a SELL to reset',
                                    success='A completed BUY-to-SELL trade with net return >0 after configured costs',
                                    context='Exact last-closed compatible engine context; VALID/PARTIAL only. Reconstructed close-time knowledge, not proof of live publication',

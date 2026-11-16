@@ -147,6 +147,34 @@ def _pair_epoch(symbol,interval):
     return epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)
 
 
+def _reconcile_recent_prefix(conn,symbol,interval,cursor,now_ms,epoch):
+    """Advance a stale live-gap cursor only across actually stored contiguous bars.
+
+    Latest-page ingestion can already have filled the entire interruption. MAX
+    alone cannot prove that; verify the closed path from the prior prefix first.
+    """
+    from Section_1_Global_Core import work_priority
+    if now_ms-cursor>work_priority.recent_recovery_window(interval):return cursor
+    previous=conn.execute('SELECT open_time,close_time FROM klines WHERE symbol=? AND interval=? AND open_time<? ORDER BY open_time DESC LIMIT 1',(symbol,interval,cursor)).fetchone()
+    if not previous:return cursor
+    expected=previous[1]+1;last=None;gap=False
+    for opened,closed in conn.execute('SELECT open_time,close_time FROM klines WHERE symbol=? AND interval=? AND open_time>=? AND close_time<? ORDER BY open_time LIMIT ?',(symbol,interval,expected,now_ms,PAGE_LIMIT)):
+        if opened!=expected or closed<opened:gap=True;break
+        last=(opened,closed);expected=closed+1
+    if not last or last[0]+1<=cursor:return cursor
+    with data_policy.locked():
+        if not data_policy.enabled(symbol,interval) or epoch!=_pair_epoch(symbol,interval):return cursor
+        current=klines_store.history_cursor(conn,symbol,interval)
+        if current!=cursor:return current
+        with conn:
+            if not gap and now_ms-last[1]<2*INTERVAL_MS[interval]:
+                conn.execute('DELETE FROM history_progress WHERE symbol=? AND interval=?',(symbol,interval))
+                print(f'[update_klines] {symbol} {interval}: verified contiguous recent gap is complete',flush=True)
+                return None
+            conn.execute('UPDATE history_progress SET next_open_time=? WHERE symbol=? AND interval=?',(last[0]+1,symbol,interval))
+    return last[0]+1
+
+
 def update_one(symbol, interval, conn, *, latest_only=False):
     """
     Update one (symbol, interval). Returns rows inserted.
@@ -186,6 +214,11 @@ def update_one(symbol, interval, conn, *, latest_only=False):
             if not data_policy.enabled(symbol,interval) or epoch!=_pair_epoch(symbol,interval):return 0
             conn.execute('INSERT OR IGNORE INTO history_progress VALUES (?,?,?)',(symbol,interval,start_ms));conn.commit()
         cursor=start_ms
+    if latest_only and cursor is not None:
+        # Existing latest pages may already contain the interrupted tail. Check
+        # that path before downloading another large latest-page response.
+        cursor=_reconcile_recent_prefix(conn,symbol,interval,cursor,now_ms,epoch)
+        if cursor is None:start_ms=stored+1
     if cursor is not None and _LATEST_UPDATE_MS.get(key,-1)//step!=now_ms//step:
         try:
             latest=_fetch(symbol,interval,None)
@@ -197,7 +230,16 @@ def update_one(symbol, interval, conn, *, latest_only=False):
         except Exception as error:
             print(f'[update_klines] {symbol} {interval}: latest refresh error: {error}',flush=True)
 
-    if latest_only and cursor is not None:return total
+    if latest_only and cursor is not None:
+        cursor=_reconcile_recent_prefix(conn,symbol,interval,cursor,now_ms,epoch)
+        if cursor is None:
+            _LAST_UPDATE_MS[key]=now_ms
+            return total
+        from Section_1_Global_Core import work_priority
+        if now_ms-cursor>work_priority.recent_recovery_window(interval):return total
+        # One bounded page closes a recent interruption on any active coin;
+        # years-old historical paging remains with the pipeline's bulk owner.
+        start_ms=cursor
 
     try:
         page = _fetch(symbol, interval, start_ms)

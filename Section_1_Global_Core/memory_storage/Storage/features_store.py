@@ -13,6 +13,7 @@ Keyed by (symbol, interval, open_time), matching klines.db.
 from __future__ import annotations
 
 import sqlite3
+import re
 from pathlib import Path
 
 
@@ -164,23 +165,101 @@ for _field in _translated_fields:
     if _field not in COLUMNS:COLUMNS.append(_field)
 _PLACEHOLDERS = ",".join(["?"] * len(COLUMNS))
 
+# Public names remain readable; these 24 names have no independent stored value
+# in the canonical schema. The two unresolved confirmation names are excluded.
+from Section_4_Features.execution.contract import ALIASES
+STORAGE_ALIASES={
+    'ema_gap_7_25':'ema_gap7_25','ema_gap_25_50':'ema_gap25_50','ema_gap_50_100':'ema_gap50_100',
+    'ema_gap_7_25_pct':'ema_gap7_25_pct','ema_gap_25_50_pct':'ema_gap25_50_pct','ema_gap_50_100_pct':'ema_gap50_100_pct',
+    'distance_to_poc_atr':'distance_to_pocatr','prev_close':'c1',
+    'newyork_high':'new_york_high','newyork_low':'new_york_low',
+    'vp_vah':'vp_va_high','vp_val':'vp_va_low',
+    'nearest_support_price':'nearest_support','nearest_resistance_price':'nearest_resistance',
+    'swing_candidate_pivot':'candidate_pivot',
+    'swing_candidate_high_price':'candidate_pivot_high_price','swing_candidate_low_price':'candidate_pivot_low_price',
+    'swing_direction':'current_swing_direction',
+    'swing_latest_confirmed_high':'latest_confirmed_pivot_high','swing_latest_confirmed_low':'latest_confirmed_pivot_low',
+    'swing_nearest_high':'nearest_swing_high','swing_nearest_low':'nearest_swing_low',
+    'swing_distance_to_high_pct':'distance_to_swing_high_pct','swing_distance_to_low_pct':'distance_to_swing_low_pct',
+}
+if any(ALIASES.get(a)!=s or s not in _translated_fields for a,s in STORAGE_ALIASES.items()):
+    raise RuntimeError('A reviewed storage alias changed; repeat the semantic audit')
+FORMULA_COLUMNS={
+    'ema_gap7_25':'abs(ema7-ema25)',
+    'ema_gap25_50':'abs(ema25-ema50)',
+    'ema_gap50_100':'abs(ema50-ema100)',
+    'ema_gap7_25_pct':'ema_gap7_25/NULLIF(c,0)',
+    'ema_gap25_50_pct':'ema_gap25_50/NULLIF(c,0)',
+    'ema_gap50_100_pct':'ema_gap50_100/NULLIF(c,0)',
+    'ema_compression':'((ema_gap7_25_pct+ema_gap25_50_pct)+ema_gap50_100_pct)/3.0',
+}
+STORAGE_COLUMNS=[c for c in COLUMNS if c not in STORAGE_ALIASES and c not in FORMULA_COLUMNS]
+
+
+def storage_columns(conn):
+    generated={r[1] for r in conn.execute('PRAGMA table_xinfo(features)') if r[6] in (2,3)}
+    return [c for c in COLUMNS if c not in generated and c not in FORMULA_COLUMNS]
+
+
+def read_expression(field,prefix='f',*,preserve_legacy=True):
+    """Formula projections for dynamic research/SQL readers, with legacy fallback."""
+    if field not in COLUMNS:raise ValueError('Unknown feature column')
+    source=STORAGE_ALIASES.get(field,field)
+    def expand(name):
+        if name in FORMULA_COLUMNS:
+            return '('+re.sub(r'\b[A-Za-z_][A-Za-z_0-9]*\b',lambda m:expand(m[0]) if m[0] in COLUMNS else m[0],FORMULA_COLUMNS[name])+')'
+        return prefix+'."'+name+'"'
+    if source not in FORMULA_COLUMNS:return prefix+'."'+field+'"'
+    expression=expand(source)
+    if not preserve_legacy:return expression+' AS "'+field+'"'
+    return f'(CASE WHEN {prefix}.formula_version=3 THEN {expression} ELSE COALESCE({prefix}."{field}",{expression}) END) AS "{field}"'
+
+
+def resolve_derived(values):
+    if values.get('formula_version')==3:
+        from Section_4_Features.execution.derived_features import trend_values
+        values.update(trend_values(values))
+        for alias,source in STORAGE_ALIASES.items():
+            if source in FORMULA_COLUMNS:values[alias]=values[source]
+    return values
+
+
+def storage_values(row,columns):
+    values=dict(row)
+    for alias,source in STORAGE_ALIASES.items():
+        a=values.get(alias);s=values.get(source)
+        if a is not None and s is not None and a!=s:
+            raise ValueError('Conflicting feature alias: '+alias+' / '+source)
+        if s is None and a is not None:values[source]=a
+    return [values.get(c) for c in columns]
+
 
 def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     try:
-        conn.executescript(_SCHEMA)
-        existing = {row[1] for row in conn.execute('PRAGMA table_info(features)')}
+        schema=_SCHEMA
+        for alias in (*STORAGE_ALIASES,*FORMULA_COLUMNS):
+            schema=re.sub(r'^\s*'+re.escape(alias)+r'\s+[^\n]*,\n','',schema,flags=re.MULTILINE)
+        conn.executescript(schema)
+        existing = {row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
         for column in COLUMNS:
+            if column in STORAGE_ALIASES or column in FORMULA_COLUMNS:continue
             if column not in existing:
                 kind = 'INTEGER DEFAULT 1' if column=='formula_version' else 'TEXT' if _translated_fields.get(column)=='string' or column.endswith('_type') else 'REAL'
                 try:
                     conn.execute(f'ALTER TABLE features ADD COLUMN {column} {kind}')
                 except sqlite3.OperationalError:
                     # UI and runner may open the previous schema concurrently.
-                    if column not in {row[1] for row in conn.execute('PRAGMA table_info(features)')}:
+                    if column not in {row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}:
                         conn.close()
                         raise
+        for alias,source in {**FORMULA_COLUMNS,**STORAGE_ALIASES}.items():
+            if alias not in existing:
+                kind='TEXT' if _translated_fields.get(source)=='string' else 'REAL'
+                try:conn.execute(f'ALTER TABLE features ADD COLUMN {alias} {kind} GENERATED ALWAYS AS ({source}) VIRTUAL')
+                except sqlite3.OperationalError:
+                    if alias not in {r[1] for r in conn.execute('PRAGMA table_xinfo(features)')}:raise
         conn.execute('CREATE TABLE IF NOT EXISTS feature_replay_jobs (symbol TEXT, interval TEXT, signature TEXT, target INTEGER, last_time INTEGER, changed TEXT, state TEXT, columns TEXT, PRIMARY KEY(symbol,interval))')
         conn.execute("CREATE TABLE IF NOT EXISTS feature_calculation_versions (symbol TEXT, interval TEXT, signature TEXT, generation INTEGER NOT NULL DEFAULT 0, invalidated_columns TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(symbol,interval))")
         if 'invalidated_columns' not in {row[1] for row in conn.execute('PRAGMA table_info(feature_calculation_versions)')}:
@@ -196,12 +275,13 @@ def open_db() -> sqlite3.Connection:
 def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:
     if not rows:
         return 0
-    values = [[r.get(c) for c in COLUMNS] for r in rows]
+    columns=storage_columns(conn)
+    values = [storage_values(r,columns) for r in rows]
     cur = conn.executemany(
         f"""
         INSERT OR REPLACE INTO features
-        ({",".join(COLUMNS)})
-        VALUES ({_PLACEHOLDERS})
+        ({",".join(columns)})
+        VALUES ({",".join('?' for _ in columns)})
         """,
         values,
     )
@@ -236,7 +316,7 @@ def read_row(conn, symbol, interval, open_time):
 
 
 def _read_columns(conn):
-    existing={row[1] for row in conn.execute('PRAGMA table_info(features)')}
+    existing={row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
     return [column for column in COLUMNS if column in existing]
 
 
@@ -245,7 +325,7 @@ def _decode(columns,row):
     result.update(zip(columns,row))
     for key,value in result.items():
         if value is not None and _translated_fields.get(key)=='bool':result[key]=bool(value)
-    return result
+    return resolve_derived(result)
 
 
 def read_range(conn, symbol, interval, start_ms, end_ms, *, mask_pending=True):
@@ -298,7 +378,7 @@ __all__ = [
 
 
 def read_di_inputs(conn,symbol,interval,start,end):
-    columns={row[1] for row in conn.execute('PRAGMA table_info(features)')}
+    columns={row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
     fields=decision_fields()
     if not set(fields+['formula_version']).issubset(columns):return {}
     cap=replay_through(conn,symbol,interval)
@@ -343,7 +423,7 @@ def decision_fields():
 def read_replay_inputs(conn,symbol,interval,start,end,columns):
     """Small prerequisite projection for targeted replay; no presentation masking."""
     columns=sorted((set(columns)&set(COLUMNS))|{'open_time','formula_version'})
-    rows=conn.execute('SELECT '+','.join(columns)+' FROM features WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? ORDER BY open_time',(symbol,interval,start,end)).fetchall()
+    rows=conn.execute('SELECT '+','.join(read_expression(c) for c in columns)+' FROM features f WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? ORDER BY open_time',(symbol,interval,start,end)).fetchall()
     result=[]
     for row in rows:
         value=dict(zip(columns,row))

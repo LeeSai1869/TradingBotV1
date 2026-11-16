@@ -43,13 +43,20 @@ def import_legacy(source,target):
     if not storage.is_dir():raise ValueError('Source storage is missing')
     # Back up each SQLite file through SQLite, including committed WAL content.
     # This is not a live multi-database snapshot; source services must be stopped.
-    allowed=('klines.db','features.db','ADCN.db','intelligence.db','sentiment_sources.db','liquidity/liquidity.db')
+    allowed=('klines.db','features.db','ADCN.db','sentiment_sources.db','liquidity/liquidity.db')
     for relative in allowed:
         db=storage/relative
         if not db.is_file():continue
         dest=target/'storage'/relative;dest.parent.mkdir(parents=True,exist_ok=True)
         if dest.exists():raise ValueError('Destination already contains imported memory')
         with closing(sqlite3.connect(db.as_uri()+'?mode=ro',uri=True)) as src,closing(sqlite3.connect(dest)) as out:src.backup(out)
+    legacy=storage/'intelligence.db'
+    if legacy.is_file():
+        # Read directly from the stopped source: do not copy a second huge
+        # intelligence.db into the profile before consolidating its contents.
+        from Section_1_Global_Core import intelligence_migration
+        intelligence_migration.recover_source(legacy)
+        intelligence_migration.run(legacy,target/'storage/ADCN.db',until_complete=True)
     mapping={'Section_1_Global_Core/Symbols/symbols.json':'config/symbols.json','Section_1_Global_Core/runtime_policy.json':'config/runtime_policy.json','Section_1_Global_Core/feature_runtime.json':'config/feature_runtime.json','Section_1_Global_Core/section_1_9_state.json':'state/runner.json','Section_1_Global_Core/Symbols/daily_refresh_state.json':'state/daily_refresh.json','Section_11_UI_UX/config/ui_config.json':'config/ui_config.json'}
     for old,new in mapping.items():
         src=source/old

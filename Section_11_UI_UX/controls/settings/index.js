@@ -436,7 +436,7 @@ export async function mount() {
     } catch { saved = validated(defaults); }
     apply();
     const gear = el("button", "", document.getElementById("toolbar"));
-    const accountButton = el("button", `${window.AppSession.username} · ${window.AppSession.role === "admin" ? "Administrator" : "Normal user"}`, document.getElementById("toolbar"));
+    const accountButton = el("button", window.AppSession.username, document.getElementById("toolbar"));
     accountButton.id = "account-button";
     gear.before(accountButton);
     accountButton.onclick = () => { section = "general"; item = "Account"; gear.click(); };

@@ -7,6 +7,13 @@ from Section_1_Global_Core import work_priority
 from Section_1_Global_Core.memory_storage.Storage import klines_store,features_store
 
 class PriorityTests(unittest.TestCase):
+    def test_pipeline_owner_controls_history_even_after_feature_owner_releases(self):
+        with patch.object(work_priority,'_bulk_symbol','BTC'),patch.object(work_priority,'_selected',None):
+            self.assertEqual(work_priority.work_symbol(['BTC','ETH'],['1m']),'BTC')
+            self.assertTrue(work_priority.owns_history('BTC'))
+            self.assertFalse(work_priority.owns_history('ETH'))
+            self.assertIsNone(work_priority.work_symbol([],['1m']))
+
     def test_closest_symbol_first_then_next_with_empty_symbols_last(self):
         with TemporaryDirectory() as directory:
             raw=Path(directory)/'k.db';features=Path(directory)/'f.db'

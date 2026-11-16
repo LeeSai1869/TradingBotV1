@@ -243,6 +243,10 @@ button:hover { background: #333; }
 .alert-list-header {display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px;}
 .alert-list-header h3 {margin:0;}
 .alert-editor {width:min(700px,calc(100vw - 24px));}
+.alert-tabs {display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;}
+.alert-tabs [aria-selected="true"] {background:#27446c;border-color:#699dff;}
+.alert-editor [role="tabpanel"][hidden] {display:none;}
+.alert-editor .notification-rule {flex-wrap:wrap;}
 #indicator-pane-controls {position:absolute; inset:0; pointer-events:none; z-index:28;}
 .indicator-pane-header {position:absolute; left:12px; display:flex; gap:7px; align-items:center; font-size:12px; padding:3px 5px; background:#171c24d9; border-radius:4px; pointer-events:auto;}
 .indicator-pane-header button {height:23px; min-width:24px; padding:0 5px; background:transparent;}
@@ -254,17 +258,17 @@ button:hover { background: #333; }
 #status {white-space:normal;margin:0;padding:5px 12px;flex:0 0 auto;font-size:11px;color:#999;border-top:1px solid #333;background:#181818;}
 .chart-hud[data-position="top-left"] {top:76px;}
 .settings-selection {display:flex;gap:8px;margin:10px 0;}
-.drawing-tools {display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex:1 1 100%;min-width:0;max-width:100%;}
-.drawing-tools button {padding:0 8px;}
-#drawing-overlay {position:absolute;left:0;top:0;z-index:24;overflow:hidden;pointer-events:none;}
+.drawing-tools {position:fixed;z-index:70;display:flex;flex-direction:column;gap:4px;padding:8px;overflow:auto;background:#1b2029;border:1px solid #52647d;border-radius:7px;box-shadow:0 6px 25px #0009;}
+.drawing-tools[hidden] {display:none;}
+.drawing-tools button {display:flex;align-items:center;gap:10px;flex-shrink:0;padding:0 10px;text-align:left;}
+#drawing-overlay {position:absolute;left:0;top:0;z-index:24;overflow:hidden;pointer-events:none;touch-action:none;}
 #drawing-overlay[data-active="true"] {pointer-events:auto;cursor:crosshair;}
 #drawing-overlay .drawing-hit {pointer-events:stroke;cursor:move;}
 #drawing-overlay .drawing-handle {pointer-events:all;cursor:grab;}
+#drawing-overlay .drawing-body {cursor:move;}
 .drawing-instructions {font-size:11px;color:#aaa;max-width:250px;}
-/* Compact drawing icons remain in the regular toolbar, aligned right. */
-.drawing-tools {flex:0 1 auto;margin-left:auto;gap:3px;max-width:100%;flex-wrap:nowrap;}
-.drawing-tools button {width:29px;height:29px;padding:0;font-size:18px;}
 .drawing-tools button[aria-pressed="true"] {color:#58b9ff;border-color:#58b9ff;background:#203347;}
+#drawings-button[data-active="true"] {color:#58b9ff;border-color:#58b9ff;background:#203347;}
 .drawing-popup {position:fixed;left:auto;right:12px;top:64px;margin:0;width:min(320px,calc(100vw - 24px));max-height:80vh;overflow:auto;z-index:70;background:#1b2029;color:#ddd;border:1px solid #52647d;border-radius:7px;padding:12px;box-shadow:0 6px 25px #0009;}
 .drawing-popup form {display:flex;flex-direction:column;gap:8px;}
 .drawing-popup form > label {display:flex;align-items:center;justify-content:space-between;font-size:12px;}
@@ -308,7 +312,7 @@ button:hover { background: #333; }
 /* The BTC controls may wrap as a group on small screens. */
 #btc-strategy-controls {max-width:100%; min-width:0;}
 
-#feature-legend {position:absolute;top:68px;left:12px;z-index:29;max-width:calc(100% - 100px);max-height:35%;overflow:auto;display:flex;flex-direction:column;align-items:flex-start;gap:0;pointer-events:none;}
+#feature-legend {position:absolute;top:var(--feature-legend-top,28px);left:12px;z-index:29;max-width:calc(100% - 100px);max-height:35%;overflow:auto;display:flex;flex-direction:column;align-items:flex-start;gap:0;pointer-events:none;}
 #feature-legend[hidden] {display:none;}
 .feature-legend-row {display:flex;align-items:center;gap:0;max-width:100%;background:transparent;pointer-events:auto;}
 .feature-legend-row button {background:transparent;border:0;border-radius:3px;min-width:20px;height:20px;padding:0 3px;color:#cbd5e1;cursor:pointer;}

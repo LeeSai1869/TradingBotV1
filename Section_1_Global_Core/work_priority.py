@@ -6,6 +6,13 @@ from .memory_storage.Storage import klines_store,features_store
 
 _selected=None
 _identity=None
+_bulk_symbol=None
+
+
+def set_bulk_symbol(symbol):
+    """The pipeline retains this owner through source, features and intelligence."""
+    global _bulk_symbol
+    _bulk_symbol=symbol
 
 
 def work_symbol(symbols,intervals):
@@ -19,6 +26,7 @@ def work_symbol(symbols,intervals):
     identity=(str(klines_store.DB_PATH),str(features_store.DB_PATH),tuple(symbols),tuple(sorted(intervals)))
     if identity!=_identity:_selected=None;_identity=identity
     if not symbols or not intervals:return None
+    if _bulk_symbol in symbols:return _bulk_symbol
     if not klines_store.DB_PATH.exists():return symbols[0]
     with closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=2)) as raw:
         history=set(raw.execute('SELECT symbol,interval FROM history_progress')) if raw.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone() else set()
@@ -75,15 +83,21 @@ def interval_milliseconds(interval):
     return max(1,int(interval[:-1])*units[interval[-1]])
 
 
+def recent_recovery_window(interval):
+    """Recover interrupted live tails before deep research history."""
+    return max(86400000,12*interval_milliseconds(interval))
+
+
 def owns_history(symbol):
-    return _selected is None or _selected==symbol
+    owner=_bulk_symbol if _bulk_symbol is not None else _selected
+    return owner is None or owner==symbol
 
 
 _service_cursors={}
 _live_cursors={}
 _service_phases={}
 
-def service_pair(symbols,intervals,owner,kind,*,owner_interval=None,live_only=False,exclude=()):
+def service_pair(symbols,intervals,owner,kind,*,owner_interval=None,live_only=False,exclude=(),recover_recent=False):
     """Give non-owner pairs bounded turns without changing bulk ownership.
 
     Only indexed existence checks are used. Every connection closes even when a
@@ -129,7 +143,11 @@ def service_pair(symbols,intervals,owner,kind,*,owner_interval=None,live_only=Fa
                 s,t=pair;through=checkpoints[pair]
                 # At most thirteen indexed rows: no full-history COUNT scans.
                 rows=raw.execute('SELECT open_time FROM klines WHERE symbol=? AND interval=? AND open_time>? ORDER BY open_time LIMIT 13',(s,t,through)).fetchall()
-                if not 0<len(rows)<=12:continue
+                if not rows:continue
+                if len(rows)>12:
+                    if not recover_recent:continue
+                    anchor=raw.execute('SELECT close_time FROM klines WHERE symbol=? AND interval=? AND open_time=?',(s,t,through)).fetchone()
+                    if not anchor or int(time.time()*1000)-anchor[0]>recent_recovery_window(t):continue
                 # Do not step beyond the actually downloaded historical prefix.
                 limit=history.get(pair)
                 if limit is not None and rows[0][0]>=limit:continue

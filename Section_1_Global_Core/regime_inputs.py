@@ -43,7 +43,7 @@ def open_sources():
 
 
 def project(conn,symbol,interval,after,limit,identity,signature,source_versions,feature_parameters,now,fields=FIELDS,units=UNITS):
-    existing={r[1] for r in conn.execute('PRAGMA table_info(features)')}
+    existing={r[1] for r in conn.execute('PRAGMA table_xinfo(features)')}
     if not set(fields)<=existing:raise InputsUnavailable('Section 4 shared columns are not present')
     cap=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
     if not cap:return [],'No committed feature prefix'

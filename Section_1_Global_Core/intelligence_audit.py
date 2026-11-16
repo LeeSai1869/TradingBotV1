@@ -13,8 +13,7 @@ def reader():
     conn=None
     try:
         if engine_store.DB_PATH.is_file():
-            conn=sqlite3.connect(engine_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=.2)
-            conn.row_factory=sqlite3.Row
+            conn=engine_store.open_readonly(timeout=.2)
             conn.execute('BEGIN')
     except (OSError,sqlite3.Error):
         if conn:conn.close()

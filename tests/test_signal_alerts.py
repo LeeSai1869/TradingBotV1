@@ -1,5 +1,7 @@
 """Current Decision Engine alerts are durable and independent of the open chart."""
 import unittest
+import json
+import uuid
 from unittest.mock import patch
 import test_data_admin as fixtures
 from Section_11_UI_UX.server import alerts, alert_routes
@@ -85,5 +87,38 @@ class SignalAlerts(unittest.TestCase):
         code,_=alert_routes.handle_post('/api/alerts/signals','{"enabled":false}',self.server('admin','https://other.example'))
         self.assertEqual(code,403)
         self.assertTrue(alerts.signal_preferences('admin')['enabled'])
+
+    def test_renamed_account_ids_cannot_block_another_accounts_signal_subscriptions(self):
+        self.arm()
+        conn=alerts.open_db()
+        try:
+            with conn:
+                conn.execute("UPDATE rules SET owner='user' WHERE owner='admin'")
+                conn.execute("UPDATE signal_preferences SET owner='user' WHERE owner='admin'")
+        finally:conn.close()
+        with patch.object(alerts.time,'time',return_value=120):
+            alerts.signal_preferences('admin');alerts.sync_signal_rules();alerts.sync_signal_rules()
+        self.add('BUY')
+        alerts.evaluate_once();alerts.evaluate_once()
+        for owner in ('admin','user'):
+            self.assertEqual(len(alerts.events(owner,0)['events']),1)
+            self.assertEqual(alerts.events(owner,0)['events'][0]['field'],'decision.buy')
+
+    def test_legacy_duplicate_subscriptions_keep_the_furthest_cursor_and_do_not_double_deliver(self):
+        self.arm()
+        conn=alerts.open_db()
+        try:
+            row=conn.execute("SELECT * FROM rules WHERE owner='admin' AND spec LIKE '%decision.buy%' AND spec LIKE '%SUIUSDT%' AND spec LIKE '%1m%' LIMIT 1").fetchone()
+            with conn:
+                conn.execute('INSERT INTO rules VALUES (?,?,?,?,?,?,?,?)',
+                             ('auto:'+uuid.uuid4().hex,row['owner'],row['spec'],row['cursor'],row['epoch'],row['created'],uuid.uuid4().hex,row['status']))
+        finally:conn.close()
+        self.add('BUY');alerts.evaluate_once();alerts.evaluate_once()
+        self.assertEqual(len(alerts.events('admin',0)['events']),1)
+        self.add('SELL',t=180000);alerts.evaluate_once()
+        self.assertEqual(len(alerts.events('admin',0)['events']),2)
+        conn=alerts.open_db()
+        try:self.assertEqual(conn.execute("SELECT COUNT(*) FROM rules WHERE status='Superseded signal subscription'").fetchone()[0],1)
+        finally:conn.close()
 
 if __name__=='__main__':unittest.main()

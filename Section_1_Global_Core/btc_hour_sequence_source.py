@@ -6,7 +6,7 @@ import sqlite3
 import time
 from . import data_policy,regime_inputs,pivot_research,intelligence_audit,aggregation_processor
 from .pivot_context_audit import select_history_run
-from .memory_storage.Storage import engine_store,adcn_store
+from .memory_storage.Storage import engine_store,adcn_store,features_store
 
 VERSION='btc-hour-sequence-source-v1'
 FRAMES=('1h','4h','1d')
@@ -36,12 +36,12 @@ def export(report,*,progress=None,include_all_features=False):
         source=regime_inputs.open_sources();stack.callback(source.close)
         metadata,cap=pivot_research.metadata(source,'BTCUSDT','1h')
         if engine_store.digest(metadata)!=report['source_id'] or cap<report['coverage']['last']:raise ValueError('Feature generation/config differs from pivot report; regenerate the cohort instead of mixing generations')
-        existing={r[1] for r in source.execute('PRAGMA table_info(features)')};fields=[f for f in FIELDS if f in existing]
+        existing={r[1] for r in source.execute('PRAGMA table_xinfo(features)')};fields=[f for f in FIELDS if f in existing]
         required=set(FIELDS[:10])|{'di_plus','di_minus','adx'}
         if not required<=set(fields):raise ValueError('Candidate/DI fields are not stored')
         if include_all_features:
             fields=sorted(existing-{'symbol','interval','open_time','formula_version'})
-        sql='''SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,k.volume,f.formula_version,'''+','.join('f."'+f.replace('"','""')+'"' for f in fields)+''' FROM raw.klines k LEFT JOIN features f
+        sql='''SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,k.volume,f.formula_version,'''+','.join(features_store.read_expression(f) for f in fields)+''' FROM raw.klines k LEFT JOIN features f
         ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time WHERE k.symbol=? AND k.interval=? AND k.open_time<=? AND k.close_time<? ORDER BY k.open_time'''
         rows=[]
         for values in source.execute(sql,('BTCUSDT','1h',report['coverage']['last'],report['observed_as_of'])):

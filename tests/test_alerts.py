@@ -101,6 +101,30 @@ class AlertTests(unittest.TestCase):
         self.assertEqual(alerts.events('admin',0)['events'],[])
         self.assertEqual(alerts.list_rules('admin')[0]['value'],1000)
 
+    def test_preparing_closed_alerts_does_not_block_the_market_writer(self):
+        self.create(field='client.high',operator='above',value=1)
+        self.add_bar(120000)
+        read=alerts.db.read_state_after
+        def acquire():
+            with data_policy.locked(timeout=.2):return True
+        def checked_read(*args,**kwargs):
+            with ThreadPoolExecutor(1) as pool:
+                self.assertTrue(pool.submit(acquire).result(timeout=1))
+            return read(*args,**kwargs)
+        with patch.object(alerts.db,'read_state_after',side_effect=checked_read):alerts.evaluate_once()
+        self.assertEqual(len(alerts.events('admin',0)['events']),1)
+
+    def test_pause_during_preparation_discards_the_stale_notification(self):
+        self.create(field='client.high',operator='above',value=1)
+        self.add_bar(120000)
+        read=alerts.db.read_state_after
+        def pause_after_read(*args,**kwargs):
+            bars=read(*args,**kwargs)
+            data_admin.set_timeframe('1m','inactive')
+            return bars
+        with patch.object(alerts.db,'read_state_after',side_effect=pause_after_read):alerts.evaluate_once()
+        self.assertEqual(alerts.events('admin',0)['events'],[])
+
     def test_deleted_and_rebuilt_history_is_not_replayed(self):
         self.create(field='client.high',operator='above',value=1,repeat='per_bar')
         data_admin.delete_data(interval='1m');data_admin.set_timeframe('1m','active')

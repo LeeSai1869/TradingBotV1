@@ -5,17 +5,39 @@ Timeframes and Coins. They are not chart features.
 
 ## Notifications
 
-Use **Settings → Notifications → Allow desktop notifications** to grant browser/OS
-permission. Previously denied permission must be changed in the browser site
-settings and macOS System Settings → Notifications.
+Click **Alerts** in the toolbar to open the alert window with three tabs:
 
-The toolbar **Notifications: on/off** button only toggles desktop delivery. It
-does not open a menu or pause calculations. The Settings page has one custom-rule
-list and one **New notification** button, plus the automatic BUY/SELL switches.
+- **Create Alert**: name the alert, choose its coin, timeframe and condition (or
+  use a BUY/SELL preset), then click **Create alert**. The selectors start with
+  the current chart. Both offer **ALL**, independently or together.
+- **Edit Alerts**: view named saved rules, edit them, enable/disable or remove them.
+  Saving switches to this tab without closing the window or showing a redirect message.
+- **Recent Alert History**: read durable account history for the **Past 24 hours**,
+  **Today**, or **Yesterday**. Load additional pages to view the entire period;
+  viewing history does not replay notifications or sounds. This tab contains
+  user-created alerts only. Automatic Decision Engine BUY/SELL messages remain
+  on the live notification/mobile feed and do not appear in custom-alert history.
+
+**ALL** follows active coins and active timeframes with stored/live data, including
+newly activated pairs. Inactive markets remain suspended. One ALL rule stays one
+editable rule, with independent per-pair cursors, crossing state and deduplication.
+**Once** applies once per coin/timeframe; per-bar frequency applies independently
+to each matching pair. Editing/removing the parent replaces/removes its private
+workers while retaining durable history. The 50-rule account limit counts user rules.
+
+Use **Settings → Notifications → Allow desktop notifications** to grant permission
+and enable desktop delivery. The **Desktop notifications** checkbox controls
+delivery. Opening the alert editor leaves delivery settings unchanged.
+Permission/save/delivery errors are visible.
+Previously denied permission must be changed in the browser site settings or
+macOS System Settings → Notifications → Trading Indicator.
+
+The Settings page has one custom-rule list and one **New notification** button
+that also opens the editor, plus the automatic BUY/SELL switches.
 Existing custom rows have an enabled checkbox, Edit and Remove. The rule editor
 supports searchable numeric fields, BUY/SELL presets, comparisons, crossings and
-once/per-candle frequency. No intermediate rule-manager window is needed.
-Recent activity stays collapsed and shows ten compact entries with details.
+once/per-candle frequency. The Settings shortcut opens the same three-tab window.
+Its compact recent-activity summary is separate from the full-day history tab.
 
 **Settings → Timeframes** puts Desktop and Mobile notification switches beside
 status. **Settings → Coins** has the same switches per coin. Desktop delivery
@@ -64,7 +86,13 @@ accepts a larger JSON body; ordinary API requests retain their prior size limit.
 
 In-app cards are dismissible with ×, expire after 20 seconds and link to the
 original symbol/timeframe/signal candle, including older stored history. Desktop
-system notifications also close after 20 seconds when the browser supports it.
+browser notifications also close after 20 seconds when the browser supports it.
+The installed Tauri desktop app sends native system notifications; macOS controls
+their lifetime. The desktop shell registers `tauri-plugin-notification` and grants
+only notification permission checks, permission requests and delivery to the main
+window's local chart origins (localhost/127.0.0.1 on port 8000). Rebuild and replace
+the installed app after changing the native shell; reloading the chart alone does
+not update native plugins. From `Section_11_UI_UX/app`, run `npm run build -- --bundles app`.
 They include signal price, directional confidence /100, nearest resistance upper
 edge and nearest support lower edge. These values are captured from matching
 anchored evidence; missing context is unavailable, never substituted from another
@@ -93,5 +121,8 @@ PYTHONPATH=. python3 tests/browser_alert_delivery.py
 ```
 
 The browser test uses the actual alert control with mocked API, OS notification and
-audio objects. It verifies in-app cards and delivery/playback calls while open, after
-suspension/restoration and after a network failure; it does not test macOS permissions.
+audio objects. It verifies direct toolbar creation of named price/BUY/SELL alerts,
+editing/retry, permission requests in Settings, native and browser BUY/SELL delivery,
+visible failures, Settings recovery, unchanged mobile preferences,
+and delivery after suspension/restoration or network failure. It does not test macOS
+permissions or actual OS banners. Set `CHROMIUM_PATH` to use a local Chrome executable.

@@ -42,7 +42,7 @@ def visual(report):
     css = (assets / 'style.css').read_text(encoding='utf-8')
     script = (assets / 'report.js').read_text(encoding='utf-8')
     return ('<!doctype html><html lang="en"><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width"><title>BTC 1h strategy report</title>'
+            '<meta name="viewport" content="width=device-width"><title>Spot strategy report</title>'
             '<style>' + css + '</style><body class="standalone"><main id="report-area"></main>'
             '<script>' + script + '\nStrategyReport.mount(document.getElementById("report-area"),'
             + data + ');</script></body></html>')

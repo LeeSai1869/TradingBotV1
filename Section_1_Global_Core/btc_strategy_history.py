@@ -18,7 +18,7 @@ def history(symbol,interval,limit=1000,before=None,days=90,include_all_trades=Fa
             source=regime_inputs.open_sources();meta=regime_inputs.source_metadata(source,symbol,interval,'initial',FIELDS)
             cap=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
             if not cap:raise regime_inputs.InputsUnavailable('Waiting for committed features')
-            columns={r[1] for r in source.execute('PRAGMA table_info(features)')}
+            columns={r[1] for r in source.execute('PRAGMA table_xinfo(features)')}
             if not set(FIELDS)<=columns:raise regime_inputs.InputsUnavailable('Strategy source fields missing')
             now=int(time.time()*1000);bound=min(now,before) if before is not None else now
             sql='SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,f.formula_version,'+','.join('f.'+k for k in FIELDS)+''' FROM raw.klines k LEFT JOIN features f ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time WHERE k.symbol=? AND k.interval=? AND k.open_time<=? AND k.close_time<? AND k.open_time>=? ORDER BY k.open_time DESC LIMIT 105121'''

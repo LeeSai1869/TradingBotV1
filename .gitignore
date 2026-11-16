@@ -61,3 +61,34 @@ Section_1_Global_Core/feature_runtime.json
 
 # Full pivot dashboard is published as compressed HTML.
 research_reports/BTC_1h_sequences/analysis_v1.html
+
+# Local assistant memory and machine-specific service configuration
+/.codex/
+/.agents/
+/MEMORY.md
+/memory.md
+/memory/
+/server-launchd/
+/cd
+
+# Database sidecars, retired storage markers, logs and evaluation memory
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+*.db.retired
+*.log
+/Section_1_Global_Core/memory_storage/Audit/audit_log/
+/Section_1_Global_Core/memory_storage/Storage/eval_results/
+
+# Generated local diagnostics and research data; retain study source and protocols
+/*_review.json
+/*_readiness.json
+/scalp_*bps.json
+/research_reports/**/*.json
+/research_reports/**/*.json.gz
+/research_reports/**/*.csv
+/research_reports/**/*.html
+/research_reports/**/*.html.gz
+!/research_reports/**/protocol.json
+!/research_reports/**/configs/*.json
+/research_reports/strategy_workspace/

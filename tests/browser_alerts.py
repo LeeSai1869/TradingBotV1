@@ -53,7 +53,7 @@ async def exercise(base,library):
         dialog=page.get_by_role('dialog',name='Settings',exact=True)
         await dialog.get_by_role('button',name='New notification',exact=True).click()
         manager=dialog
-        dialog=page.get_by_role('dialog',name='Create alert',exact=True)
+        dialog=page.get_by_role('dialog',name='Alerts',exact=True)
         await dialog.get_by_label('Alert name',exact=True).fill('RSI crossing test')
         await dialog.get_by_label('Timeframe',exact=True).select_option('1m')
         await dialog.get_by_label('Field',exact=True).select_option('features.rsi')
@@ -61,6 +61,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Condition',exact=True).select_option('above')
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('70')
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
+        await dialog.locator('.notification-rule').get_by_text('RSI crossing test',exact=True).wait_for()
+        await dialog.get_by_role('button',name='Close alert editor',exact=True).click()
         dialog=manager
         await dialog.locator('.notification-rule').get_by_text('RSI crossing test',exact=True).wait_for()
         await dialog.get_by_role('button',name='Close settings',exact=True).click()
@@ -81,7 +83,7 @@ async def exercise(base,library):
         assert await page.evaluate('DataCache.atLiveEdge') is False
         await open_manager(page)
         await dialog.get_by_role('button',name='New notification',exact=True).click()
-        dialog=page.get_by_role('dialog',name='Create alert',exact=True)
+        dialog=page.get_by_role('dialog',name='Alerts',exact=True)
         assert await dialog.get_by_label('Coin',exact=True).input_value()==await page.locator('#symbol').input_value()
         assert await dialog.get_by_label('Timeframe',exact=True).input_value()==await page.locator('#interval').input_value()
         await dialog.get_by_label('Alert name',exact=True).fill('Live SUI alert')
@@ -92,6 +94,8 @@ async def exercise(base,library):
         await dialog.get_by_label('Condition',exact=True).select_option('crosses_above')
         await dialog.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('10')
         await dialog.get_by_role('button',name='Create alert',exact=True).click()
+        await dialog.locator('.notification-rule').get_by_text('Live SUI alert',exact=True).wait_for()
+        await dialog.get_by_role('button',name='Close alert editor',exact=True).click()
         dialog=manager
         await dialog.locator('.notification-rule').get_by_text('Live SUI alert',exact=True).wait_for()
         await dialog.get_by_role('button',name='Close settings',exact=True).click()
@@ -115,7 +119,7 @@ async def exercise(base,library):
         await page.reload()
         await page.wait_for_function('window.DataCache && DataCache.bars.length===2000&&!DataCache._olderPromise')
         assert await screen.is_hidden()
-        assert 'Administrator' in await page.locator('#account-button').inner_text()
+        assert await page.locator('#account-button').inner_text()=='admin'
         await page.get_by_role('button',name='Open settings',exact=True).click()
         await settings.get_by_role('tab',name='Coins',exact=True).click()
         await settings.get_by_label('Select BTCUSDT',exact=True).wait_for()

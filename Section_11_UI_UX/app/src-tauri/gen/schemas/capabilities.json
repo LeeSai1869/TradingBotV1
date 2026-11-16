@@ -1,1 +1,1 @@
-{}
+{"desktop-notifications":{"identifier":"desktop-notifications","description":"Allow the local chart in the main window to deliver desktop alerts.","remote":{"urls":["http://localhost:8000/*","http://127.0.0.1:8000/*"]},"local":true,"windows":["main"],"permissions":["notification:allow-is-permission-granted","notification:allow-request-permission","notification:allow-notify"]}}

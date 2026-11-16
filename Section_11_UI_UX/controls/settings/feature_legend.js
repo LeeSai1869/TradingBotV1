@@ -40,7 +40,13 @@ export function renderLegend(preferences,onChange){
     const chart=document.getElementById('chart');if(!chart)return;
     let legend=document.getElementById('feature-legend');
     if(!legend){legend=document.createElement('div');legend.id='feature-legend';legend.setAttribute('role','region');legend.setAttribute('aria-label','Chart features');chart.append(legend);
-        new ResizeObserver(()=>chart.style.setProperty('--feature-legend-bottom',`${legend.hidden?76:legend.offsetTop+legend.offsetHeight+6}px`)).observe(legend);
+        const details=document.getElementById('candle-details');
+        const position=()=>{
+            chart.style.setProperty('--feature-legend-top',`${details?details.offsetTop+details.offsetHeight+4:28}px`);
+            chart.style.setProperty('--feature-legend-bottom',`${legend.hidden?76:legend.offsetTop+legend.offsetHeight+6}px`);
+        };
+        const observer=new ResizeObserver(position);observer.observe(legend);if(details)observer.observe(details);
+        position();
     }
     // Keep controls stable during candle updates and preserve keyboard focus.
     const entries=legendEntries(preferences).filter(({name})=>!PANE_FEATURES.includes(name));
@@ -52,6 +58,8 @@ export function renderLegend(preferences,onChange){
         const title=document.createElement('button');title.type='button';title.className='feature-legend-name';title.textContent=name;title.title=`${name} settings`;
         title.setAttribute('aria-label',`${name} feature settings`);
         title.onclick=()=>window.dispatchEvent(new CustomEvent('open-feature-settings',{detail:name}));row.append(title);
+        const settings=document.createElement('button');settings.type='button';settings.textContent='⚙';settings.title=`${name} settings`;settings.setAttribute('aria-label',`${name} settings`);
+        settings.onclick=()=>window.dispatchEvent(new CustomEvent('open-feature-settings',{detail:name}));row.append(settings);
         for(const [action,text,label] of [[hidden?'show':'hide',hidden?'◉':'◎',`${hidden?'Show':'Hide'} ${name} on chart`],['remove','×',`Remove ${name} from chart`]]){
             const button=document.createElement('button');button.type='button';button.textContent=text;button.title=label;button.setAttribute('aria-label',label);
             if(action!=='remove'){

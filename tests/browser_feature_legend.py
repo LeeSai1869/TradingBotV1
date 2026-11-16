@@ -36,8 +36,18 @@ async def exercise(base,library):
         await hover_main()
         assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='1'
         assert sorted(await legend.locator('.feature-legend-name').all_text_contents())==['EMA','FVG','WMA']
+        settings=page.get_by_role('dialog',name='Settings',exact=True)
+        for feature in ['EMA','FVG','WMA']:
+            await hover_main()
+            await legend.get_by_role('button',name=f'{feature} settings',exact=True).click()
+            await settings.get_by_role('navigation',name=f'{feature} options',exact=True).wait_for()
+            await settings.get_by_role('button',name='Close settings',exact=True).click()
         await page.get_by_role('group',name='RSI pane controls',exact=True).wait_for()
         pane=page.get_by_role('group',name='RSI pane controls',exact=True)
+        await pane.hover()
+        await pane.get_by_role('button',name='RSI settings',exact=True).click()
+        await settings.get_by_role('navigation',name='RSI options',exact=True).wait_for()
+        await settings.get_by_role('button',name='Close settings',exact=True).click()
         await pane.hover();await settle(page)
         assert await legend.evaluate('node=>getComputedStyle(node).opacity')=='0'
         assert await pane.locator('.indicator-values').inner_text()=='RSI 61.00'

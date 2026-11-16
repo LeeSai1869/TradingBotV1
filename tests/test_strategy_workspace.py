@@ -59,6 +59,58 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.request('/assets/builder.js')[0],200)
         self.assertEqual(self.request('/assets/../../.git/config')[0],404)
 
+    def test_compact_15m_input_chart_discovery_and_stop_replay(self):
+        from test_pivot_discovery import source as spot_source, packed, config as spot_config
+        raw = gzip.compress(json.dumps(packed(spot_source())).encode())
+        status, uploaded = self.json('/api/upload', {'data':base64.b64encode(raw).decode(), 'name':'SUI 15m'})
+        self.assertEqual(status,200)
+        key = uploaded['id']
+        status, meta = self.json('/api/input?id='+key)
+        self.assertEqual((status,meta['symbol'],meta['timeframe'],meta['risk_budget_pct']),(200,'SUIUSDT','15m',.5))
+        status, chart = self.json('/api/chart?id='+key+'&center=1800000&feature=di_minus')
+        self.assertEqual(status,200)
+        self.assertEqual(len(chart['bars']),14)
+        self.assertEqual(chart['bars'][2]['feature'],50.)
+        self.assertEqual(len(chart['markers']),5)
+        status, comparison = self.json('/api/discovery?id='+key+'&control=failed_pivots')
+        self.assertEqual(status,200)
+        self.assertEqual(comparison['labels'],{'GE_1':1,'LT_1':1,'CENSORED':1})
+        self.assertEqual(self.json('/api/chart?id='+key+'&feature=not_a_feature')[0],400)
+        status, job = self.json('/api/run', {'input_id':key,'config':spot_config()})
+        self.assertEqual(status,202)
+        done = self.wait(job['id']);self.assertEqual(done['state'],'complete',done)
+        _, result = self.json('/api/report?id='+done['report_id'])
+        self.assertAlmostEqual(result['trades'][0]['net_pct'],-.5)
+        self.assertEqual(self.request('/assets/pivot.js')[0],200)
+        self.assertEqual(self.request('/assets/lightweight-charts.js')[0],200)
+
+    def test_memory_batch_runs_coins_independently_and_persists_reports(self):
+        from test_strategy_memory import StrategyMemory
+        from test_strategy_trailing import config as trailing_config
+        fixture=StrategyMemory();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        status,catalog=self.json('/api/catalog');self.assertEqual(status,200)
+        self.assertIn('memory:BTCUSDT:1m',{i['id'] for i in catalog['inputs']})
+        status,meta=self.json('/api/input?id=memory:BTCUSDT:1m');self.assertEqual(status,200)
+        self.assertEqual(meta['mode'],'memory')
+        self.assertIn('adcn.scalp_score',{f['id'] for f in meta['fields']})
+        status,chart=self.json('/api/chart?id=memory:BTCUSDT:1m&feature=rsi');self.assertEqual(status,200)
+        self.assertGreater(len(chart['bars']),0)
+        c=trailing_config();c['branches'][0]['when']={'field':'price.close','op':'available'}
+        status,job=self.json('/api/run',{'input_id':'memory:BTCUSDT:1m','symbols':['BTCUSDT','SUIUSDT'],'config':c})
+        self.assertEqual(status,202);done=self.wait(job['id']);self.assertEqual(done['state'],'complete',done)
+        self.assertEqual([r['symbol'] for r in done['coins']],['BTCUSDT','SUIUSDT'])
+        reports=[]
+        for row in done['coins']:
+            self.assertEqual(row['state'],'complete',row)
+            status,report=self.json('/api/report?id='+row['report_id']);self.assertEqual(status,200)
+            self.assertEqual(report['contract']['symbol'],row['symbol']);reports.append(report)
+        self.assertNotEqual(reports[0]['contract']['memory_digest'],reports[1]['contract']['memory_digest'])
+        self.assertEqual(reports[0]['contract']['execution']['initial_capital'],reports[1]['contract']['execution']['initial_capital'])
+        summary=json.loads((self.workspace.directory/'runs'/job['id']/'batch_summary.json').read_text())
+        self.assertIn('market_cutoff',summary)
+        self.assertTrue(all(r['contract']['observed_as_of']<=summary['market_cutoff'] for r in reports))
+        self.assertEqual(self.json('/api/run',{'input_id':'memory:BTCUSDT:1m','symbols':['MISSINGUSDT'],'config':c})[0],400)
+
     def test_configuration_save_preserves_versions_and_restart(self):
         first=config();status,saved=self.json('/api/config',{'config':first});self.assertEqual(status,200)
         second=config();second['branches'][0]['when']['value']=0

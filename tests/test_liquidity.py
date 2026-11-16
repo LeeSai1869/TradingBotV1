@@ -192,6 +192,29 @@ class RecorderTests(unittest.TestCase):
             finally:
                 writer.stopping.set();writer.join(timeout=3)
 
+    def test_samples_commit_before_a_busy_raw_archive_batch_finishes(self):
+        from Section_1_Global_Core.liquidity import recorder
+        clock=[0.];archived=[];published=[];writer=recorder.Writer()
+        class BusyArchive:
+            def __init__(self,*_):pass
+            def append(self,symbol,record):
+                archived.append(record);clock[0]+=.01
+                if len(archived)==1:writer.sample(ready().features(1000))
+            def flush(self):pass
+            def prune(self,*_):pass
+            def close(self):pass
+        original=store.write_sample
+        def publish(*args,**kwargs):
+            published.append(len(archived));return original(*args,**kwargs)
+        for _ in range(100):writer.raw('BTCUSDT',{},1000)
+        writer.stopping.set()
+        with tempfile.TemporaryDirectory() as directory,patch.object(store,'ROOT',Path(directory)),patch.object(store,'DB_PATH',Path(directory)/'liquidity.db'),patch.object(recorder,'Archive',BusyArchive),patch.object(recorder.time,'monotonic',side_effect=lambda:clock[0]),patch.object(store,'write_sample',side_effect=publish):
+            writer.run()
+        self.assertFalse(writer.failed.is_set(),writer.error)
+        self.assertEqual(len(archived),100,'raw observations must not be dropped')
+        self.assertEqual(len(published),1)
+        self.assertLess(published[0],20,'live sample must commit while raw archive work remains queued')
+
     def test_cleanup_attempts_every_archive_handle_and_closes_database_on_flush_failure(self):
         from unittest.mock import Mock
         import sqlite3

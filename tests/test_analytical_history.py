@@ -121,6 +121,17 @@ class Scheduling(unittest.TestCase):
 class HierarchicalReplay(unittest.TestCase):
     setUp=fixtures.RegimeHistory.setUp
 
+    def test_intelligence_completion_requires_every_current_history_cursor(self):
+        from Section_1_Global_Core import pipeline_scheduler as pipeline
+        self.assertTrue(pipeline.pending_intelligence('BTCUSDT',['1m']))
+        for turn in range(6):
+            for engine in history.ENGINES:history.advance('BTCUSDT','1m',engine,limit=200)
+        self.assertFalse(pipeline.pending_intelligence('BTCUSDT',['1m']))
+        conn=features_store.open_db()
+        with conn:conn.execute('UPDATE feature_calculation_versions SET generation=generation+1')
+        conn.close()
+        self.assertTrue(pipeline.pending_intelligence('BTCUSDT',['1m']))
+
     def test_real_engine_replay_and_decisions_use_the_same_ready_pair(self):
         from types import SimpleNamespace
         from unittest.mock import Mock
@@ -130,7 +141,8 @@ class HierarchicalReplay(unittest.TestCase):
         decisions=Mock(return_value=0)
         runner.modules={pipeline.FEATURES:SimpleNamespace(maintenance=Mock(return_value=0),maintain_recent=Mock(return_value=0)),
             pipeline.ANALYTICS:live,pipeline.DECISIONS:SimpleNamespace(maintenance=decisions)}
-        runner.existing=[];runner.new=[];runner.ready_pairs=set();runner.stage=None;runner.frontiers={}
+        runner.existing=[];runner.new=[];runner.ready_pairs=set();runner.stage=None;runner.frontiers={};runner.focus=None;runner._focus_message=None
+        self.addCleanup(pipeline.work_priority.set_bulk_symbol,None)
         hashes=lambda:tuple(hashlib.sha256(p.read_bytes()).hexdigest() for p in (features_store.DB_PATH,klines_store.DB_PATH))
         before=hashes()
         with patch.object(data_policy,'active_symbols',return_value=['BTCUSDT']),patch.object(data_policy,'active_intervals',return_value=['1m']),patch.object(pipeline.time,'time',return_value=3910),patch.object(pipeline.update_klines,'update_all',return_value=0):
