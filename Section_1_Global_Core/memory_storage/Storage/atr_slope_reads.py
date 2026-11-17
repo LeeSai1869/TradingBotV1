@@ -6,6 +6,8 @@ caller's SQLite snapshot. Missing provenance is not treated as a five-bar slope.
 import hashlib
 import json
 import math
+from collections import deque
+from contextlib import contextmanager
 
 FIELDS = {f'ema{p}_slope_atr': p for p in (50, 200, 300)}
 
@@ -144,6 +146,62 @@ def read_values(conn, symbol, interval, timestamp, lengths):
         (symbol, interval, timestamp, length + 1)
     ).fetchall()
     return reconstruct([dict(zip(columns, row)) for row in reversed(rows)], lengths)
+
+
+@contextmanager
+def read_snapshot(conn):
+    """Keep full feature reads and their raw windows in the caller's snapshot."""
+    has_raw=install(conn)
+    own=not conn.in_transaction
+    if own:conn.execute('BEGIN')
+    try:
+        yield has_raw
+    finally:
+        if own:conn.rollback()
+
+
+def resolve_rows(conn, rows):
+    """Batch Core/chart reads: one prefix and bounded raw lookups per pair.
+
+    Full feature rows already contain the retained EMA/ATR inputs. Reuse them
+    rather than invoking a SQL callback and a historical query for each cell.
+    The caller must hold read_snapshot (or its own explicit transaction).
+    """
+    if not rows:return
+    if not conn.in_transaction:
+        raise RuntimeError('Batch slope reads require an explicit snapshot')
+    lengths=known_lengths(conn)
+    groups={}
+    for row in rows:groups.setdefault((row['symbol'],row['interval']),[]).append(row)
+    columns=['open_time','formula_version','measurement_version','measurement_config_id',
+             'measurement_contiguous_bars','atr','ema50','ema200','ema300']
+    for (symbol,interval),group in groups.items():
+        needed=[lengths[row['measurement_config_id']] for row in group
+                if row['formula_version']==3 and row['measurement_version']=='shared-v1'
+                and row['measurement_config_id'] in lengths]
+        if not needed:continue
+        maximum=max(needed)
+        ordered=sorted(group,key=lambda row:row['open_time'])
+        prefix=conn.execute('SELECT '+','.join('f.'+c for c in columns)+
+            ',k.close_time,k.close FROM features f LEFT JOIN raw.klines k '
+            'ON k.symbol=f.symbol AND k.interval=f.interval AND k.open_time=f.open_time '
+            'WHERE f.symbol=? AND f.interval=? AND f.open_time<? '
+            'ORDER BY f.open_time DESC LIMIT ?',
+            (symbol,interval,ordered[0]['open_time'],maximum)).fetchall()
+        window=deque((dict(zip(columns+['close_time','close'],row)) for row in reversed(prefix)),maxlen=maximum+1)
+        raw={}
+        times=[row['open_time'] for row in ordered]
+        for offset in range(0,len(times),800):
+            chunk=times[offset:offset+800]
+            for stamp,close_time,close in conn.execute(
+                'SELECT open_time,close_time,close FROM raw.klines WHERE symbol=? AND interval=? '
+                'AND open_time IN ('+','.join('?' for _ in chunk)+')',[symbol,interval,*chunk]):
+                raw[stamp]=(close_time,close)
+        for row in ordered:
+            item={column:row[column] for column in columns}
+            item['close_time'],item['close']=raw.get(row['open_time'],(None,None))
+            window.append(item)
+            row.update(reconstruct(list(window),lengths))
 
 
 def install(conn, *, attach_raw=True):
