@@ -214,6 +214,9 @@ def storage_columns(conn):
 def read_expression(field,prefix='f',*,preserve_legacy=True):
     """Formula projections for dynamic research/SQL readers, with legacy fallback."""
     if field not in COLUMNS:raise ValueError('Unknown feature column')
+    from . import atr_slope_reads
+    if field in atr_slope_reads.FIELDS:
+        return atr_slope_reads.expression(field,prefix,preserve_legacy=preserve_legacy)
     source=STORAGE_ALIASES.get(field,field)
     def expand(name):
         if name in READ_FORMULAS:
@@ -249,7 +252,7 @@ def storage_values(row,columns):
 
 def open_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(DB_PATH.resolve().as_uri(),uri=True)
     try:
         schema=_SCHEMA
         for alias in (*STORAGE_ALIASES,*FORMULA_COLUMNS):
@@ -279,6 +282,8 @@ def open_db() -> sqlite3.Connection:
             conn.execute("ALTER TABLE feature_calculation_versions ADD COLUMN invalidated_columns TEXT NOT NULL DEFAULT '[]'")
         conn.execute('CREATE TABLE IF NOT EXISTS feature_engine_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))')
         conn.commit()
+        from . import atr_slope_reads
+        atr_slope_reads.install(conn,attach_raw=False)
         return conn
     except BaseException:
         conn.close()
@@ -315,7 +320,7 @@ def read_row(conn, symbol, interval, open_time):
     if not columns:return None
     cur = conn.execute(
         f"""
-        SELECT {",".join(columns)} FROM features
+        SELECT {_read_projection(conn,columns)} FROM features
         WHERE symbol=? AND interval=? AND open_time=?
         """,
         (symbol, interval, open_time),
@@ -331,6 +336,14 @@ def read_row(conn, symbol, interval, open_time):
 def _read_columns(conn):
     existing={row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
     return [column for column in COLUMNS if column in existing]
+
+
+def _read_projection(conn,columns):
+    from . import atr_slope_reads
+    if set(columns)&atr_slope_reads.FIELDS.keys():
+        atr_slope_reads.install(conn)
+    return ','.join(atr_slope_reads.expression(c,'features')
+                    if c in atr_slope_reads.FIELDS else '"'+c+'"' for c in columns)
 
 
 def _decode(columns,row):
@@ -351,7 +364,7 @@ def read_range(conn, symbol, interval, start_ms, end_ms, *, mask_pending=True):
     if not columns:return []
     cur = conn.execute(
         f"""
-        SELECT {",".join(columns)} FROM features
+        SELECT {_read_projection(conn,columns)} FROM features
         WHERE symbol=? AND interval=?
           AND open_time>=? AND open_time<?
         ORDER BY open_time
@@ -436,6 +449,8 @@ def decision_fields():
 def read_replay_inputs(conn,symbol,interval,start,end,columns):
     """Small prerequisite projection for targeted replay; no presentation masking."""
     columns=sorted((set(columns)&set(COLUMNS))|{'open_time','formula_version'})
+    from . import atr_slope_reads
+    if set(columns)&atr_slope_reads.FIELDS.keys():atr_slope_reads.install(conn)
     rows=conn.execute('SELECT '+','.join(read_expression(c) for c in columns)+' FROM features f WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? ORDER BY open_time',(symbol,interval,start,end)).fetchall()
     result=[]
     for row in rows:

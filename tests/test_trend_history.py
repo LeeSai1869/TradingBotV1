@@ -3,12 +3,38 @@ import json
 import unittest
 from unittest.mock import patch
 import test_regime_history as fixtures
-from Section_1_Global_Core import regime_research as research
-from Section_1_Global_Core.memory_storage.Storage import engine_store
+from Section_1_Global_Core import regime_research as research,regime_inputs
+from Section_1_Global_Core.memory_storage.Storage import engine_store,features_store
 from Section_5_Market_Regime.engines import trend,structure
 
 class TrendHistory(unittest.TestCase):
     setUp=fixtures.RegimeHistory.setUp
+
+    def test_trend_snapshots_reconstruct_poisoned_atr_slopes_without_replaying_emas(self):
+        run=research.catch_up('BTCUSDT','1m',since=None,limit=100,engine_name='TREND',now_ms=10**9)
+        c=engine_store.open_db()
+        try:
+            snapshots=[engine_store.input_bundle(c,run['run_id'],row[0]) for row in
+                       c.execute('SELECT candle_time FROM engine_results WHERE run_id=? ORDER BY candle_time',(run['run_id'],)).fetchall()]
+        finally:c.close()
+        self.assertTrue(snapshots)
+        c=features_store.open_db()
+        try:
+            with c:c.execute('UPDATE features SET ema50_slope_atr=-1e99,ema200_slope_atr=-1e99,ema300_slope_atr=-1e99')
+        finally:c.close()
+        source=regime_inputs.open_sources()
+        try:
+            with patch('Section_4_Features.features.trend.calculate_ema',side_effect=AssertionError('Must reuse retained EMAs')):
+                for original in snapshots:
+                    original['computed_at']=10**9
+                    projected,reason=regime_inputs.project(source,'BTCUSDT','1m',original['candle_open_time']-1,1,
+                        original['identity'],original['input_signature'],original['source_versions'],
+                        original['feature_parameters'],10**9,fields=trend.FIELDS,units=trend.UNITS)
+                    self.assertEqual(reason,'')
+                    self.assertEqual(projected[0]['features'],original['features'])
+                    replay=dict(original,features=projected[0]['features'])
+                    self.assertEqual(trend.evaluate(replay),trend.evaluate(original))
+        finally:source.close()
 
     def test_dependency_rows_budget_restart_and_projected_replay(self):
         first=research.catch_up('BTCUSDT','1m',since=None,limit=20,engine_name='TREND',now_ms=10**9)
