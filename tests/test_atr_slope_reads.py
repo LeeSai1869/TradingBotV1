@@ -41,7 +41,20 @@ class ATRSlopeReads(unittest.TestCase):
             k.insert_rows(self.raw, [bar])
             s.insert_rows(self.features, [row])
             result.append(row)
+        # These reader tests model retained history from before retirement.
+        # New-write omission itself is covered by the storage-policy tests.
+        with self.features:
+            for row in result:
+                self.features.execute('UPDATE features SET '+','.join(f+'=?' for f in a.FIELDS)+
+                    ' WHERE symbol=? AND interval=? AND open_time=?',
+                    [row[f] for f in a.FIELDS]+[row['symbol'],row['interval'],row['open_time']])
         return result
+
+    def historical(self,row):
+        columns=s.storage_columns(self.features)
+        with self.features:
+            self.features.execute('INSERT OR REPLACE INTO features ('+','.join(columns)+
+                ') VALUES ('+','.join('?' for _ in columns)+')',s.storage_values(row,columns))
 
     def project(self, conn, timestamp):
         a.install(conn)
@@ -82,7 +95,7 @@ class ATRSlopeReads(unittest.TestCase):
                 with self.features:
                     self.features.execute('UPDATE features SET '+changes+' WHERE open_time=840000')
                 self.assertEqual(self.project(self.features, 840000), (999.,)*3)
-                s.insert_rows(self.features, [dict(self.rows[-1], **dict.fromkeys(a.FIELDS, 999.))])
+                self.historical(dict(self.rows[-1], **dict.fromkeys(a.FIELDS, 999.)))
 
     def test_missing_feature_or_raw_history_uses_stored_fallback(self):
         self.poison()

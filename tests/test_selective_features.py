@@ -1,4 +1,4 @@
-from contextlib import ExitStack,nullcontext
+from contextlib import ExitStack,nullcontext,closing
 import copy
 import json
 from pathlib import Path
@@ -51,6 +51,41 @@ class SelectiveFeatures(unittest.TestCase):
         conn=features_store.open_db()
         try:return features_store.read_range(conn,'ETHUSDT','1m',0,10**12,mask_pending=False)
         finally:conn.close()
+
+    def test_atr_slope_replay_retires_storage_and_preserves_configuration_history(self):
+        from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads as slopes
+        from Section_4_Features.features.shared_measurements import DEFAULTS
+        params=self.config(measurementSlopeLength=3)
+        reference=Engine('ETHUSDT','1m',params)
+        expected=[reference.step(bar) for bar in self.clients]
+        self.finish()
+        with closing(features_store.open_db()) as conn:
+            populated=conn.execute('SELECT open_time FROM features WHERE '+
+                ' OR '.join(f+' IS NOT NULL' for f in slopes.FIELDS)+' LIMIT 1').fetchone()
+            self.assertIsNone(populated)
+            config={key:params.get(key,value) for key,value in DEFAULTS.items()}
+            self.assertEqual(slopes.known_lengths(conn)[slopes.fingerprint(config)],3)
+        with patch.object(components,'desired_parameters',return_value=dict(params,measurementSlopeLength=7)):
+            for actual,wanted in zip(self.raw_features(),expected):
+                for field in slopes.FIELDS:self.assertEqual(actual[field],wanted[field],field)
+
+    def test_atr_retirement_failure_rolls_back_new_features_and_checkpoint(self):
+        from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads as slopes
+        with closing(features_store.open_db()) as conn:
+            before=conn.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',
+                                ('ETHUSDT','1m')).fetchone()
+        client=bar(220,114);db.write_klines([client])
+        with patch.object(slopes,'clear_verified',side_effect=ValueError('injected retirement failure')):
+            with self.assertRaisesRegex(ValueError,'injected retirement failure'):
+                processor.catch_up('ETHUSDT','1m')
+        with closing(features_store.open_db()) as conn:
+            self.assertFalse(features_store.has_row(conn,'ETHUSDT','1m',client['open_time']))
+            self.assertEqual(conn.execute('SELECT last_open_time,state FROM feature_engine_state WHERE symbol=? AND interval=?',
+                                         ('ETHUSDT','1m')).fetchone(),before)
+        processor.catch_up('ETHUSDT','1m')
+        expected=self.engine.step(client)
+        actual=db.read_features('ETHUSDT','1m',client['open_time'])
+        for field in slopes.FIELDS:self.assertEqual(actual[field],expected[field],field)
 
     def test_rsi_input_only_recalculates_rsi_and_preserves_every_other_column(self):
         params=self.config(rsiLen=11)
