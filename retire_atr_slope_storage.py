@@ -14,6 +14,10 @@ JOB = 'atr_slopes_v1'
 COUNTERS = ('rows_checked','rows_cleared','values_cleared','values_retained')
 
 
+class WriterNotReady(RuntimeError):
+    pass
+
+
 def sources():
     result = {}
     for name,path in (('features',store.DB_PATH),('raw',klines_store.DB_PATH)):
@@ -47,10 +51,10 @@ def start(conn):
             derived = slopes.read_values(conn,*row[:3],lengths)
             ready += len(derived)
             if any(old_value is not None for field,old_value in zip(slopes.FIELDS,row[3:]) if field in derived):
-                raise RuntimeError('Recent writes still store reconstructible ATR slopes. '
+                raise WriterNotReady('Recent writes still store reconstructible ATR slopes. '
                                    'Restart the writer, wait for new rows, and retry; no historical values cleared.')
         if not ready:
-            raise RuntimeError('Cannot verify current writer output; no historical values cleared')
+            raise WriterNotReady('Cannot verify current writer output; no historical values cleared')
         if old is not None:
             return old
         state = dict(version=1,sources=sources(),target_rowid=conn.execute(
@@ -105,9 +109,12 @@ def main():
     parser.add_argument('--limit',type=int,default=1000,help='Dry-run sample size')
     parser.add_argument('--latest',action='store_true',help='Sample latest rows instead of earliest rows')
     parser.add_argument('--batch-size',type=int,default=500)
+    parser.add_argument('--wait-seconds',type=int,default=120,help='Wait for restarted writer output before applying')
     args=parser.parse_args()
     if not 1<=args.limit<=10000 or not 1<=args.batch_size<=1000:
         parser.error('Use limit 1..10000 and batch size 1..1000')
+    if not 0<=args.wait_seconds<=600:
+        parser.error('--wait-seconds must be between 0 and 600')
     if (args.apply or args.status) and args.latest:
         parser.error('--latest is only for dry runs')
     if args.status:
@@ -134,8 +141,20 @@ def main():
     with closing(store.open_db()) as conn:
         if not slopes.install(conn):
             parser.error('Raw candle store is unavailable')
-        with data_policy.locked(timeout=2):
-            state=start(conn)
+        deadline=time.monotonic()+args.wait_seconds
+        printed=0
+        while True:
+            try:
+                with data_policy.locked(timeout=2):
+                    state=start(conn)
+                break
+            except (WriterNotReady,TimeoutError):
+                if time.monotonic()>=deadline:
+                    raise
+                if time.monotonic()-printed>=15:
+                    print('Waiting for fresh writer output; historical values unchanged.',flush=True)
+                    printed=time.monotonic()
+                time.sleep(1)
         print(json.dumps(state),flush=True)
         printed=time.monotonic()
         while not state['complete']:

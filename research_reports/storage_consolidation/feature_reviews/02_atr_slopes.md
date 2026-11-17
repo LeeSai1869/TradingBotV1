@@ -46,7 +46,9 @@ python3 retire_atr_slope_storage.py --status
 ```
 
 The default mode is a bounded read-only dry run. `--apply` checks recent writer
-output, captures a maximum rowid, and clears history in small coordinated batches.
+output (waiting up to 120 seconds for new rows), captures a maximum rowid, and
+clears history in small coordinated batches. `--wait-seconds 0` disables the wait;
+the readiness check is never bypassed.
 Every populated candidate is compared again under the writer lock. Missing
 metadata, unknown configurations and incomplete history retain their values.
 Progress and clears commit atomically in `feature_storage_retirements`, with a

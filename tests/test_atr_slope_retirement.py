@@ -1,5 +1,5 @@
 """Durable configuration history, transactional writers and resumable clearing."""
-from contextlib import closing,redirect_stdout
+from contextlib import closing,redirect_stdout,chdir
 import io
 import json
 import shutil
@@ -177,6 +177,19 @@ class ATRRetirement(unittest.TestCase):
         self.assertEqual(report['state'],initial)
         self.assertTrue(report['sources_match'])
         self.assertEqual(job.load_state(self.features),initial)
+
+    def test_apply_waits_for_writer_without_bypassing_readiness(self):
+        from Section_1_Global_Core import data_policy
+        self.omit_latest();job.start(self.features);done=job.advance(self.features)
+        output=io.StringIO()
+        with patch.object(data_policy,'LOCK_FILE',self.root/'lock'),chdir(self.root),redirect_stdout(output):
+            with patch('sys.argv',['retire_atr_slope_storage.py','--apply','--wait-seconds','2']),\
+                 patch.object(job,'start',side_effect=[job.WriterNotReady('waiting'),done]) as start,\
+                 patch.object(job.time,'sleep'):
+                job.main()
+        self.assertEqual(start.call_count,2)
+        self.assertIn('Waiting for fresh writer output',output.getvalue())
+        self.assertEqual(job.load_state(self.features),done)
 
 
 if __name__=='__main__':unittest.main()
