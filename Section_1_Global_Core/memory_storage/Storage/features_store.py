@@ -282,15 +282,17 @@ def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:
         return 0
     columns=storage_columns(conn)
     values = [storage_values(r,columns) for r in rows]
-    cur = conn.executemany(
-        f"""
-        INSERT OR REPLACE INTO features
-        ({",".join(columns)})
-        VALUES ({",".join('?' for _ in columns)})
-        """,
-        values,
-    )
-    conn.commit()
+    with conn:
+        cur = conn.executemany(
+            f"""
+            INSERT OR REPLACE INTO features
+            ({",".join(columns)})
+            VALUES ({",".join('?' for _ in columns)})
+            """,
+            values,
+        )
+        from . import atr_slope_reads
+        atr_slope_reads.retire_written(conn,[(r['symbol'],r['interval'],r['open_time']) for r in rows])
     return cur.rowcount
 
 
