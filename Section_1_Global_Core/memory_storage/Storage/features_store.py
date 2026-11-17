@@ -193,6 +193,16 @@ FORMULA_COLUMNS={
     'ema_gap50_100_pct':'ema_gap50_100/NULLIF(c,0)',
     'ema_compression':'((ema_gap7_25_pct+ema_gap25_50_pct)+ema_gap50_100_pct)/3.0',
 }
+# Read adapters only; keep slope storage until historical parity is verified.
+SLOPE_READ_FORMULAS={
+    f'ema{p}_slope_pct':
+        f'CASE WHEN prev_ema{p} IS NULL THEN 0.0 ELSE '
+        f'((ema{p}-prev_ema{p})/NULLIF(prev_ema{p},0))*100.0 END'
+    for p in (50,200,300)
+}
+READ_FORMULAS={**FORMULA_COLUMNS,**SLOPE_READ_FORMULAS}
+
+
 STORAGE_COLUMNS=[c for c in COLUMNS if c not in STORAGE_ALIASES and c not in FORMULA_COLUMNS]
 
 
@@ -206,10 +216,10 @@ def read_expression(field,prefix='f',*,preserve_legacy=True):
     if field not in COLUMNS:raise ValueError('Unknown feature column')
     source=STORAGE_ALIASES.get(field,field)
     def expand(name):
-        if name in FORMULA_COLUMNS:
-            return '('+re.sub(r'\b[A-Za-z_][A-Za-z_0-9]*\b',lambda m:expand(m[0]) if m[0] in COLUMNS else m[0],FORMULA_COLUMNS[name])+')'
+        if name in READ_FORMULAS:
+            return '('+re.sub(r'\b[A-Za-z_][A-Za-z_0-9]*\b',lambda m:expand(m[0]) if m[0] in COLUMNS else m[0],READ_FORMULAS[name])+')'
         return prefix+'."'+name+'"'
-    if source not in FORMULA_COLUMNS:return prefix+'."'+field+'"'
+    if source not in READ_FORMULAS:return prefix+'."'+field+'"'
     expression=expand(source)
     if not preserve_legacy:return expression+' AS "'+field+'"'
     return f'(CASE WHEN {prefix}.formula_version=3 THEN {expression} ELSE COALESCE({prefix}."{field}",{expression}) END) AS "{field}"'
@@ -217,8 +227,9 @@ def read_expression(field,prefix='f',*,preserve_legacy=True):
 
 def resolve_derived(values):
     if values.get('formula_version')==3:
-        from Section_4_Features.execution.derived_features import trend_values
+        from Section_4_Features.execution.derived_features import trend_values, slope_pct_values
         values.update(trend_values(values))
+        values.update(slope_pct_values(values))
         for alias,source in STORAGE_ALIASES.items():
             if source in FORMULA_COLUMNS:values[alias]=values[source]
     return values
@@ -231,6 +242,8 @@ def storage_values(row,columns):
         if a is not None and s is not None and a!=s:
             raise ValueError('Conflicting feature alias: '+alias+' / '+source)
         if s is None and a is not None:values[source]=a
+    if values.get('formula_version')==3:
+        for field in SLOPE_READ_FORMULAS:values[field]=None
     return [values.get(c) for c in columns]
 
 

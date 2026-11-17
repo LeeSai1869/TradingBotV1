@@ -10,3 +10,14 @@ def trend_values(row):
         out[key+'_pct']=rt.binary('/',out[key],row.get('c'))
     out['ema_compression']=rt.binary('/',rt.binary('+',rt.binary('+',out['ema_gap7_25_pct'],out['ema_gap25_50_pct']),out['ema_gap50_100_pct']),3)
     return rt.clean(out)
+
+
+def slope_pct_values(row):
+    """Preserve the live one-bar percentage slope semantics."""
+    out={}
+    for p in (50,200,300):
+        previous=row.get(f'prev_ema{p}')
+        out[f'ema{p}_slope_pct']=(0.0 if rt.is_na(previous) else
+            rt.binary('*',rt.binary('/',rt.binary('-',
+                row.get(f'ema{p}'),previous),previous),100))
+    return rt.clean(out)

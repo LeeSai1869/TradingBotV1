@@ -393,7 +393,8 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     columns=sorted(set(plan.columns)&writable-{'symbol','interval','open_time','formula_version'})
     merged=selective.merge(base,partial) if complete else None
     state_text=checkpoint.dump(merged if complete else partial,epoch)
-    values=[[r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output]
+    # Selective replay is version 3; derive percentage slopes on reads.
+    values=[[None if c in features_store.SLOPE_READ_FORMULAS else r.get(c) for c in columns]+[symbol,interval,r['open_time']] for r in output]
     signature=current_signature()
     serialize_seconds=time.monotonic()-serialize_started;write_started=time.monotonic()
     with data_policy.locked():
