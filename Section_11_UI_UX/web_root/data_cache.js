@@ -31,6 +31,7 @@ const DataCache = {
     _fullRefreshVersion: 0,
     _appliedFullRefreshVersion: 0,
     _storageEpoch: "0:0",
+    _requests: new Set(),
     listeners: [],
 
     get renderBars() {
@@ -66,6 +67,7 @@ const DataCache = {
     },
 
     async _fetchPage(symbol, timeframe, limit, before = null) {
+        const generation=this._reloadGeneration;
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
             const reference=this.symbol===symbol&&this.timeframe===timeframe?[...this.bars].reverse().find(b=>b.signal_context)?.signal_context:null;
@@ -90,7 +92,9 @@ const DataCache = {
         if (before !== null) qs.set("before", before);
         else if (this.liveEnabled) qs.set("live", "1");
         for (let attempt = 0; attempt < 3; attempt++) {
+            if(generation!==this._reloadGeneration)throw Object.assign(new Error('Superseded chart request'),{name:'AbortError'});
             const controller = new AbortController();
+            this._requests.add(controller);
             const timer = setTimeout(() => controller.abort(), 12000);
             try {
                 const response = await fetch(`/api/bars?${qs}`, { cache: "no-store", signal: controller.signal });
@@ -103,10 +107,11 @@ const DataCache = {
                 if (!Array.isArray(packet.bars)) throw new Error("Invalid stored-bar packet");
                 return packet;
             } catch (error) {
+                if(generation!==this._reloadGeneration)throw error;
                 if (error.name === "AbortError") throw new Error("Chart server timed out. Use Reload to retry.");
                 if (error instanceof TypeError) throw new Error("Cannot reach the chart server. Run python3 restart_ui.py, then Reload.");
                 throw error;
-            } finally { clearTimeout(timer); }
+            } finally { clearTimeout(timer);this._requests.delete(controller); }
         }
     },
 
@@ -138,6 +143,8 @@ const DataCache = {
 
     async loadInitial(symbol, timeframe, before=null) {
         const generation = ++this._reloadGeneration;
+        for(const controller of this._requests)controller.abort();
+        this._requests.clear();
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
@@ -165,6 +172,9 @@ const DataCache = {
             this.loading = false;
             this.emit("reload");
             return true;
+        } catch(error) {
+            if(generation!==this._reloadGeneration)return false;
+            throw error;
         } finally {
             if (generation === this._reloadGeneration) this.loading = false;
         }
@@ -248,6 +258,9 @@ const DataCache = {
             if (changed) this.emit("stored-refresh");
             else if (liveChanged) this.emit("live");
             return changed || liveChanged;
+        }).catch(error=>{
+            if(generation!==this._reloadGeneration)return false;
+            throw error;
         }).finally(() => {
             if (this._refreshPromise === work) this._refreshPromise = null;
         });

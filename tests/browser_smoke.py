@@ -32,13 +32,22 @@ async def exercise(base, library):
         page.on('request',lambda r: requests.append(r.url))
         source = library.read_text() + '''
 ;window.markerAudit={created:0,updated:0};
-const createMarkersOriginal=LightweightCharts.createSeriesMarkers;
-window.LightweightCharts={...LightweightCharts,createSeriesMarkers:(...args)=>{
- window.markerAudit.created++;
- const wrapper=createMarkersOriginal(...args);
- const update=wrapper.setMarkers.bind(wrapper);
- wrapper.setMarkers=(...rows)=>{window.markerAudit.updated++;return update(...rows);};
- return wrapper;
+const createChartOriginal=LightweightCharts.createChart;
+window.LightweightCharts={...LightweightCharts,createChart:(...args)=>{
+ const chart=createChartOriginal(...args),add=chart.addSeries.bind(chart);
+ chart.addSeries=(...args)=>{
+  const series=add(...args),attach=series.attachPrimitive.bind(series);
+  series.attachPrimitive=primitive=>{
+   if(primitive.constructor.name==='SignalFlags'){
+    window.markerAudit.created++;
+    const attached=primitive.attached.bind(primitive);
+    primitive.attached=args=>attached({...args,requestUpdate:()=>{window.markerAudit.updated++;args.requestUpdate();}});
+   }
+   return attach(primitive);
+  };
+  return series;
+ };
+ return chart;
 }};
 '''
         await page.route('https://unpkg.com/**', lambda route:route.fulfill(
