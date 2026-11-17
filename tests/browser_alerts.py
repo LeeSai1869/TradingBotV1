@@ -75,12 +75,37 @@ async def exercise(base,library):
         db.write_klines([raw])
         with patch.object(alerts.time,'time',return_value=t/1000+61): alerts.evaluate_once()
         assert alerts.events('user',0)['events']==[]
-        db.write_features([dict(symbol='BTCUSDT',interval='1m',open_time=t,rsi=75)])
+        db.write_features([dict(symbol='BTCUSDT',interval='1m',open_time=t,rsi=75,di_plus=30)])
         with patch.object(alerts.time,'time',return_value=t/1000+61): alerts.evaluate_once()
         await page.locator('.alert-toast').filter(has_text='RSI crossing test').wait_for()
         assert await page.evaluate('soundEvents')>before
         assert await page.evaluate("noticeEvents.some(e=>e.name.includes('RSI crossing test'))")
         assert await page.evaluate('DataCache.atLiveEdge') is False
+        # A later feature alert must survive search/save and fire on DI+, even
+        # while candle close stays below the numeric threshold on both bars.
+        await open_manager(page)
+        await manager.get_by_role('button',name='New notification',exact=True).click()
+        feature_editor=page.get_by_role('dialog',name='Alerts',exact=True)
+        await feature_editor.get_by_label('Alert name',exact=True).fill('Later DI+ alert')
+        await feature_editor.get_by_label('Timeframe',exact=True).select_option('1m')
+        await feature_editor.get_by_label('Search fields',exact=True).fill('di_plus')
+        assert await feature_editor.get_by_label('Field',exact=True).input_value()==''
+        await feature_editor.get_by_label('Field',exact=True).select_option('features.di_plus')
+        await feature_editor.get_by_label('Condition',exact=True).select_option('crosses_above')
+        await feature_editor.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('35')
+        await feature_editor.get_by_role('button',name='Create alert',exact=True).click()
+        await feature_editor.locator('.notification-rule').get_by_text('Later DI+ alert',exact=True).wait_for()
+        saved=next(rule for rule in alerts.list_rules('user') if rule['name']=='Later DI+ alert')
+        assert saved['field']=='features.di_plus' and saved['mode']=='closed'
+        await feature_editor.get_by_role('button',name='Close alert editor',exact=True).click()
+        await manager.get_by_role('button',name='Close settings',exact=True).click()
+        db.write_klines([dict(raw,open_time=t+60000,close_time=t+119999)])
+        db.write_features([dict(symbol='BTCUSDT',interval='1m',open_time=t+60000,di_plus=40)])
+        with patch.object(alerts.time,'time',return_value=t/1000+121):alerts.evaluate_once()
+        await page.locator('.alert-toast').filter(has_text='Later DI+ alert').wait_for()
+        assert await page.evaluate("noticeEvents.some(e=>e.name.includes('Later DI+ alert'))")
+        delivered=next(event for event in alerts.events('user',0)['events'] if event['name']=='Later DI+ alert')
+        assert delivered['field']=='features.di_plus' and delivered['value']==40
         await open_manager(page)
         await dialog.get_by_role('button',name='New notification',exact=True).click()
         dialog=page.get_by_role('dialog',name='Alerts',exact=True)
@@ -104,7 +129,7 @@ async def exercise(base,library):
         with patch.object(alerts.live_candle,'get_snapshot',return_value={'bar':bar,'status':'live'}):
             alerts.evaluate_once();bar['client']['close']=11;alerts.evaluate_once();alerts.evaluate_once()
         await page.locator('.alert-toast').filter(has_text='Live SUI alert').wait_for()
-        assert len(alerts.events('user',0)['events'])==2
+        assert len(alerts.events('user',0)['events'])==3
         assert alerts.events('admin',0)['events']==[]
         await page.get_by_role('button',name='Open settings',exact=True).click()
         settings=page.get_by_role('dialog',name='Settings',exact=True)

@@ -197,9 +197,10 @@ function reset() {
     form.reset();editing=null;
     form.elements.symbol.value=document.getElementById('symbol').value;
     form.elements.interval.value=document.getElementById('interval').value;
-    form.elements.field.value='client.close';form.elements.sound.value='none';
+    form.elements.field_search.value='';form.elements.field_search.oninput();
+    form.elements.field.value='';form.elements.sound.value='none';
     form.elements.enabled.checked=true;form.elements.notify.checked=true;
-    form.elements.repeat.value='per_bar';form.elements.value.value='0';form.elements.mode.value='live';syncMode();
+    form.elements.repeat.value='per_bar';form.elements.value.value='0';form.elements.mode.value='closed';syncMode();
     form.querySelector('button[type=submit]').textContent='Create alert';
 }
 async function build() {
@@ -227,8 +228,21 @@ async function build() {
     el('p','ALL follows every active coin/timeframe with available market data. Newly activated pairs are included automatically.',form,'settings-note');
     select('Evaluation','mode',[['live','Live candle / provisional EMA / RSI'],['closed','Closed candle / stored features']],form);
     const search=input('Search fields','field_search','search',form);
-    const fields=select('Field','field',Object.entries(catalog.fields),form);fields.onchange=syncMode;
-    search.oninput=()=>{const selected=fields.value,query=search.value.toLowerCase();fields.replaceChildren();for(const [key,label] of Object.entries(catalog.fields)){if(key===selected||`${key} ${label}`.toLowerCase().includes(query)){const option=el('option',label,fields);option.value=key;}}fields.value=selected;};
+    const fields=select('Field','field',[['','Choose a field'],...Object.entries(catalog.fields)],form);fields.required=true;fields.onchange=syncMode;
+    search.oninput=()=>{
+        const selected=fields.value,query=search.value.trim().toLowerCase();
+        fields.replaceChildren();
+        el('option','Choose a field',fields).value='';
+        let found=false;
+        for(const [key,label] of Object.entries(catalog.fields)){
+            if(`${key} ${label}`.toLowerCase().includes(query)){
+                el('option',label,fields).value=key;
+                if(key===selected)found=true;
+            }
+        }
+        fields.value=found?selected:'';
+        syncMode();
+    };
     const presets=el('div','',form,'settings-coin-actions');
     for(const side of ['buy','sell']){const button=el('button',`${side.toUpperCase()} signal`,presets);button.type='button';button.onclick=()=>{search.value='';search.oninput();form.elements.field.value='decision.'+side;form.elements.operator.value='equals';form.elements.value.value='1';form.elements.target_field.value='';form.elements.name.value=`${side.toUpperCase()} ${form.elements.symbol.value}`;form.elements.repeat.value='per_bar';syncMode();};}
     select('Condition','operator',catalog.operators.map(value=>[value,value.replaceAll('_',' ')]),form);

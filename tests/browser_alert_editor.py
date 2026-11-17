@@ -28,16 +28,38 @@ async def exercise(base,library):
             assert await editor.get_by_role('tab').all_text_contents()==['Create Alert','Edit Alerts','Recent Alert History']
             for name in ['First alert','Second alert','Third alert']:
                 await editor.get_by_role('tab',name='Create Alert',exact=True).click()
+                field=editor.get_by_label('Field',exact=True)
+                search=editor.get_by_label('Search fields',exact=True)
+                assert await field.input_value()==''
+                assert await editor.get_by_label('Evaluation',exact=True).input_value()=='closed'
                 if name=='First alert':
                     await editor.get_by_label('Coin',exact=True).select_option('ALL')
                     await editor.get_by_label('Timeframe',exact=True).select_option('ALL')
                 await editor.get_by_label('Alert name',exact=True).fill(name)
+                # A name and threshold must not silently create a price alert.
+                await editor.get_by_role('button',name='Create alert',exact=True).click()
+                assert not await field.evaluate('(element)=>element.checkValidity()')
+                assert len(alerts.list_rules('user'))==['First alert','Second alert','Third alert'].index(name)
+                selected={'First alert':'features.adx','Second alert':'features.di_plus','Third alert':'features.rsi'}[name]
+                if name=='Second alert':
+                    await field.select_option('client.close')
+                    await search.fill('DI_PLUS')
+                    assert await field.input_value()==''
+                    assert await field.locator('option[value="client.close"]').count()==0
+                await field.select_option(selected)
+                await search.fill('no-such-feature')
+                assert await field.input_value()==''
+                await search.fill('')
+                await field.select_option(selected)
                 await editor.get_by_role('button',name='Create alert',exact=True).click()
                 await editor.locator('#alert-panel-edit .notification-rule').get_by_text(name,exact=True).wait_for()
                 assert await editor.is_visible()
                 assert await editor.get_by_role('tab',name='Edit Alerts',exact=True).get_attribute('aria-selected')=='true'
                 assert 'Alert saved.' not in await page.locator('body').inner_text()
             rows=alerts.list_rules('user');assert len(rows)==3
+            for rule in rows:
+                assert rule['field']=={'First alert':'features.adx','Second alert':'features.di_plus','Third alert':'features.rsi'}[rule['name']]
+                assert rule['mode']=='closed'
             assert alerts.signal_preferences('user')==before
             first=next(rule for rule in rows if rule['name']=='First alert')['id']
             assert next(rule for rule in rows if rule['id']==first)['symbol']=='ALL'
@@ -45,6 +67,7 @@ async def exercise(base,library):
             await row.get_by_role('button',name='Edit First alert',exact=True).click()
             assert await editor.get_by_label('Coin',exact=True).input_value()=='ALL'
             assert await editor.get_by_label('Timeframe',exact=True).input_value()=='ALL'
+            assert await editor.get_by_label('Field',exact=True).input_value()=='features.adx'
             await editor.get_by_label('Alert name',exact=True).fill('First edited')
             await editor.get_by_label('Timeframe',exact=True).select_option('1m')
             await editor.get_by_role('button',name='Save changes',exact=True).click()
@@ -56,6 +79,7 @@ async def exercise(base,library):
             await editor.locator('.notification-rule').filter(has_text='Second alert').wait_for(state='hidden')
             await editor.get_by_role('tab',name='Create Alert',exact=True).click()
             await editor.get_by_label('Alert name',exact=True).fill('Retry alert')
+            await editor.get_by_label('Field',exact=True).select_option('features.di_minus')
             async def fail(route):
                 if route.request.method=='POST':await route.fulfill(status=503,content_type='application/json',body='{"error":"Temporary save failure"}')
                 else:await route.continue_()
@@ -67,6 +91,7 @@ async def exercise(base,library):
             await editor.get_by_role('button',name='Create alert',exact=True).click()
             await editor.locator('.notification-rule').get_by_text('Retry alert',exact=True).wait_for()
             assert len(alerts.list_rules('user'))==3
+            assert next(rule for rule in alerts.list_rules('user') if rule['name']=='Retry alert')['field']=='features.di_minus'
 
             # History reads the durable account store, including more than one page.
             await page.evaluate("dispatchEvent(new Event('pagehide'))")
@@ -97,7 +122,7 @@ async def exercise(base,library):
             await page.wait_for_function("document.querySelectorAll('#alert-panel-history .alert-rule').length===100")
             await editor.get_by_role('tab',name='Edit Alerts',exact=True).click()
             await editor.locator('.notification-rule').get_by_text('First edited',exact=True).wait_for()
-            await page.screenshot(path='/private/tmp/scalp-alert-tabs.png')
+            await page.screenshot(path=str(Path(tempfile.gettempdir())/'scalp-alert-tabs.png'))
             await editor.get_by_role('button',name='Close alert editor',exact=True).click()
             await page.get_by_role('button',name='Alerts',exact=True).click()
             assert await editor.get_by_role('tab',name='Create Alert',exact=True).get_attribute('aria-selected')=='true'

@@ -88,6 +88,7 @@ async def main():
                     await editor.get_by_label('Coin',exact=True).select_option('ALL')
                     await editor.get_by_label('Timeframe',exact=True).select_option('ALL')
                     await editor.get_by_label('Alert name',exact=True).fill(name)
+                    await editor.get_by_label('Field',exact=True).select_option('client.close')
                     await editor.get_by_label('Threshold (signed numbers allowed)',exact=True).fill('10')
                     rule_save_failed=True
                     await editor.get_by_role('button',name='Create alert',exact=True).click()

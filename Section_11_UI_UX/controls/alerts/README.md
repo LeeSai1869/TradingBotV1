@@ -7,7 +7,7 @@ Timeframes and Coins. They are not chart features.
 
 Click **Alerts** in the toolbar to open the alert window with three tabs:
 
-- **Create Alert**: name the alert, choose its coin, timeframe and condition (or
+- **Create Alert**: name the alert, choose its coin, timeframe, field and condition (or
   use a BUY/SELL preset), then click **Create alert**. The selectors start with
   the current chart. Both offer **ALL**, independently or together.
 - **Edit Alerts**: view named saved rules, edit them, enable/disable or remove them.
@@ -17,6 +17,12 @@ Click **Alerts** in the toolbar to open the alert window with three tabs:
   viewing history does not replay notifications or sounds. This tab contains
   user-created alerts only. Automatic Decision Engine BUY/SELL messages remain
   on the live notification/mobile feed and do not appear in custom-alert history.
+
+New alerts default to closed-candle evaluation and require an explicit field
+selection. Searching filters the field list; it never silently retains an
+unrelated field such as candle close. Select the matching field before saving.
+Closed-candle evaluation controls when the chosen field is checked, not which
+field is checked. Existing saved rules retain their fields until edited.
 
 **ALL** follows active coins and active timeframes with stored/live data, including
 newly activated pairs. Inactive markets remain suspended. One ALL rule stays one
