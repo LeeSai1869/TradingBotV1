@@ -37,18 +37,22 @@ def open_sources():
     conn=sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=2)
     try:
         conn.execute('ATTACH DATABASE ? AS raw',(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',))
+        from .memory_storage.Storage import atr_slope_reads
+        atr_slope_reads.install(conn)
         conn.execute('BEGIN')
         return conn
     except BaseException:conn.close();raise
 
 
 def project(conn,symbol,interval,after,limit,identity,signature,source_versions,feature_parameters,now,fields=FIELDS,units=UNITS):
+    from .memory_storage.Storage import atr_slope_reads
+    if set(fields)&atr_slope_reads.FIELDS.keys():atr_slope_reads.install(conn)
     existing={r[1] for r in conn.execute('PRAGMA table_xinfo(features)')}
     if not set(fields)<=existing:raise InputsUnavailable('Section 4 shared columns are not present')
     cap=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
     if not cap:return [],'No committed feature prefix'
     sql='''SELECT k.open_time,k.close_time,k.open,k.high,k.low,k.close,
-        f.open_time,f.formula_version,'''+','.join('f.'+field for field in fields)+'''
+        f.open_time,f.formula_version,'''+','.join(features_store.read_expression(field) for field in fields)+'''
         FROM raw.klines k LEFT JOIN features f ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time
         WHERE k.symbol=? AND k.interval=? AND k.open_time>? AND k.open_time<=? AND k.close_time<?
         ORDER BY k.open_time LIMIT ?'''
