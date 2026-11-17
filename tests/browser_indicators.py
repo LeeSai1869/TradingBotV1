@@ -81,6 +81,7 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==5
         assert await page.evaluate('Composer.config.featureStyles.rsi.visible') is False
         assert not errors,errors
+        assert not any('/api/settings/adcn' in url for url in requests)
         forbidden=['/api/chart_window','/api/flags_current','/api/live_candle']
         assert not any(any(path in url for path in forbidden) for url in requests)
         print('PASS: RSI/ADX/ATR/Volume native panes, VWAP overlay, axis labels, collapse/close/direct settings, RSI levels/styles, persistence, candle details; no separate feature requests',flush=True)

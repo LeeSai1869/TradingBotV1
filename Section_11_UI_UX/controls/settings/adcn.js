@@ -1,7 +1,9 @@
 // ADCN administration only. No direct access to physical market stores.
+import {isAdmin} from './admin_controls.js';
 function el(tag,text,parent){const node=document.createElement(tag);node.textContent=text;parent.append(node);return node;}
 async function request(data){const response=await fetch('/api/settings/adcn',data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{cache:'no-store'});const packet=await response.json();if(!response.ok)throw new Error(packet.error||'ADCN request failed');return packet;}
 export async function renderAdcnMemory(parent){
+    if(!isAdmin()){el('p','Administrator access required for storage maintenance.',parent);return;}
     const status=el('p','Loading ADCN maintenance…',parent);status.setAttribute('role','status');
     try{
         const catalog=await request();if(!status.isConnected)return;status.textContent=catalog.note;
