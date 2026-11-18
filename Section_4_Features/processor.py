@@ -107,6 +107,8 @@ def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
                 conn.executemany(f'INSERT OR REPLACE INTO features ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})',values)
                 from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads
                 atr_slope_reads.retire_written(conn,[(symbol,interval,r['open_time']) for r in output],parameters=engine.context.parameters)
+                from Section_1_Global_Core.memory_storage.Storage import ema_distance_retirement
+                ema_distance_retirement.retire_written(conn,[(symbol,interval,r['open_time']) for r in output])
                 conn.execute('INSERT OR REPLACE INTO feature_engine_state VALUES (?,?,?,?)',(symbol,interval,engine.context.last_time,state_text))
                 conn.execute('INSERT INTO feature_calculation_versions(symbol,interval,signature,generation) VALUES (?,?,?,0) ON CONFLICT(symbol,interval) DO UPDATE SET signature=excluded.signature',(symbol,interval,signature))
         except Exception:
@@ -411,6 +413,8 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
                                      values)
                     from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads
                     atr_slope_reads.retire_written(conn,[(symbol,interval,r['open_time']) for r in output],parameters=partial.context.parameters)
+                    from Section_1_Global_Core.memory_storage.Storage import ema_distance_retirement
+                    ema_distance_retirement.retire_written(conn,[(symbol,interval,r['open_time']) for r in output])
                 if complete:
                     conn.execute('UPDATE feature_engine_state SET state=? WHERE symbol=? AND interval=?',(state_text,symbol,interval))
                     conn.execute('DELETE FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval))

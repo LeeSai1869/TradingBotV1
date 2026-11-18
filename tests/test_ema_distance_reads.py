@@ -38,7 +38,12 @@ class EMADistanceReads(unittest.TestCase):
     def insert(self,row,time=0,version=3,outputs=None):
         stored=dict(symbol='BTCUSDT',interval='1m',open_time=time,
                     formula_version=version,**row,**(outputs or live(row)))
-        s.insert_rows(self.conn,[stored])
+        # Seed historical rows directly so reader tests can retain old values,
+        # including poisoned duplicates that the new writer correctly rejects.
+        columns=s.storage_columns(self.conn)
+        with self.conn:
+            self.conn.execute('INSERT OR REPLACE INTO features ('+','.join(columns)+
+                ') VALUES ('+','.join('?' for _ in columns)+')',s.storage_values(stored,columns))
         return stored
 
     def projected(self,time=0):
@@ -89,7 +94,7 @@ class EMADistanceReads(unittest.TestCase):
         replay=s.read_replay_inputs(self.conn,'BTCUSDT','1m',0,1,FIELDS)[0]
         for result in (normal,ranged,replay):
             self.assertEqual({f:result[f] for f in FIELDS},expected)
-        # Read-only phase: storage policy and physical values are unchanged.
+        # Reading does not clear historical cells. Write policy is tested separately.
         self.assertTrue(set(FIELDS)<=set(s.storage_columns(self.conn)))
         self.assertEqual(tuple(self.conn.execute('SELECT '+','.join(FIELDS)+' FROM features').fetchone()),(999.,)*10)
 

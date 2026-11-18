@@ -1,7 +1,7 @@
 # EMA distance and nearest-EMA review
 
-This read-adapter phase covers ten outputs. No values or columns are removed,
-and no writer or live indicator calculations change.
+This phase retires duplicate storage for ten version-3 outputs after exact
+formula verification. Live calculations and retained EMA inputs remain unchanged.
 
 | Fields | Exact formula/selection |
 |---|---|
@@ -52,3 +52,27 @@ to avoid repeated scalar sorts across the entire history. The commands use
 read-only connections and leave legacy rows, writes and stored history intact.
 Any mismatch blocks storage retirement pending review. Physical compaction
 remains deferred to the consolidated rebuild.
+
+## Verified retirement
+
+The local full audit compared 31,388,604 version-3 rows through rowid 49,821,484
+with zero stored/Python mismatches and zero SQL mismatches in its 1,000-row sample.
+
+Normal and selective-replay writers verify persisted derivatives against retained
+same-row inputs, then clear their cells inside the feature/checkpoint transaction.
+A mismatch aborts that transaction. Historical cleanup uses a separate
+`ema_distances_v1` checkpoint; prior ATR cleanup metadata is untouched.
+
+```
+python3 -u retire_ema_distance_storage.py --apply
+python3 retire_ema_distance_storage.py --status
+python3 check_ema_distance_readers.py
+```
+
+Default execution without `--apply` is a bounded read-only dry run. Apply waits
+for current writer output, captures a target rowid, and verifies every populated
+version-3 value before clearing each batch. Progress and clears commit atomically.
+Source identity changes stop resumption. Legacy values are preserved. Omitted
+values are counted as reconstructed by the reader audit, rather than mismatches.
+Physical columns remain; this does not promise a smaller filesystem file before
+consolidated compaction. No recursive EMA history is recalculated.

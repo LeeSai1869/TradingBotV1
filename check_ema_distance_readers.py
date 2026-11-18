@@ -26,14 +26,15 @@ def main():
     args=parser.parse_args()
     if not 1<=args.sample<=10000 or not 1<=args.batch_size<=10000:
         parser.error('Sample and batch size must be between 1 and 10000')
-    checked=stored_bad=sql_bad=0
+    checked=stored_bad=sql_bad=omitted=0
     counts=Counter();examples=[]
     def compare(row,*,sql=False):
-        nonlocal checked,stored_bad,sql_bad
+        nonlocal checked,stored_bad,sql_bad,omitted
         expected=values(dict(zip(COLUMNS,row[:len(COLUMNS)])))
         for index,field in enumerate(FIELDS):
             original=row[len(KEYS)+len(INPUTS)+index]
-            if original!=expected[field]:
+            if original is None and expected[field] is not None:omitted+=1
+            if original is not None and original!=expected[field]:
                 stored_bad+=1;counts[field]+=1
                 if len(examples)<5:
                     examples.append(dict(rowid=row[0],symbol=row[1],interval=row[2],
@@ -54,7 +55,7 @@ def main():
         if args.full:
             # SQL parity is sampled; full historical value parity uses the
             # independent Python provider, avoiding millions of scalar sorts.
-            checked=stored_bad=0;counts.clear();examples.clear()
+            checked=stored_bad=omitted=0;counts.clear();examples.clear()
             last=0;printed=time.monotonic()
             print('Full EMA-distance audit; target rowid:',target,flush=True)
             while True:
@@ -69,6 +70,7 @@ def main():
                     printed=time.monotonic()
     report=dict(mode='full' if args.full else 'sample',target_rowid=target,
         rows_checked=checked,sql_sample_rows=len(sample),stored_formula_mismatches=stored_bad,
+        omitted_values_reconstructed=omitted,
         sql_sample_stored_mismatches=sample_stored_bad,sql_python_mismatches=sql_bad,
         mismatches_by_field=dict(counts),examples=examples)
     print('FINAL:',json.dumps(report,allow_nan=False),flush=True)

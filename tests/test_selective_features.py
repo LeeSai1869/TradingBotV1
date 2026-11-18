@@ -52,6 +52,18 @@ class SelectiveFeatures(unittest.TestCase):
         try:return features_store.read_range(conn,'ETHUSDT','1m',0,10**12,mask_pending=False)
         finally:conn.close()
 
+    def test_ema_distance_replay_omits_cells_and_matches_full_engine(self):
+        from Section_4_Features.execution.ema_distances import FIELDS
+        params=self.config(ema50Len=55)
+        reference=Engine('ETHUSDT','1m',params)
+        expected=[reference.step(client) for client in self.clients]
+        self.finish()
+        with closing(features_store.open_db()) as conn:
+            self.assertIsNone(conn.execute('SELECT rowid FROM features WHERE '+
+                ' OR '.join(field+' IS NOT NULL' for field in FIELDS)+' LIMIT 1').fetchone())
+        for actual,wanted in zip(self.raw_features(),expected):
+            self.assertEqual({f:actual[f] for f in FIELDS},{f:wanted[f] for f in FIELDS})
+
     def test_atr_slope_replay_retires_storage_and_preserves_configuration_history(self):
         from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads as slopes
         from Section_4_Features.features.shared_measurements import DEFAULTS

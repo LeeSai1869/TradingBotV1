@@ -311,6 +311,8 @@ def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:
         )
         from . import atr_slope_reads
         atr_slope_reads.retire_written(conn,[(r['symbol'],r['interval'],r['open_time']) for r in rows])
+        from . import ema_distance_retirement
+        ema_distance_retirement.retire_written(conn,[(r['symbol'],r['interval'],r['open_time']) for r in rows])
     return cur.rowcount
 
 
