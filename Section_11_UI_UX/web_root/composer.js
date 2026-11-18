@@ -98,7 +98,9 @@ const Composer = {
     },
 
     updateAll(chart, data, op = "reload", options = {}) {
+        const timings=[],started=performance.now();
         for (const v of this.visuals) {
+            const before=performance.now();
             try {
                 if (v.update) {
                     v.update(chart, data, { ...options, op, visible: this.config.display?.[v.name] !== false });
@@ -108,10 +110,11 @@ const Composer = {
                     `[composer] ${v.name} update failed:`,
                     e
                 );
-            }
+            } finally {timings.push({visual:v.name,ms:Math.round((performance.now()-before)*100)/100});}
         }
 
         for (const p of this.panels) {
+            const before=performance.now();
             try {
                 if (p.update) {
                     p.update(chart, data);
@@ -121,8 +124,11 @@ const Composer = {
                     `[composer] ${p.name} update failed:`,
                     e
                 );
-            }
+            } finally {timings.push({visual:p.name,ms:Math.round((performance.now()-before)*100)/100});}
         }
+        const records=window.ChartRenderTimings??=[];
+        records.push({op,bars:data.bars?.length??0,ms:Math.round((performance.now()-started)*100)/100,visuals:timings});
+        if(records.length>10)records.shift();
     },
 };
 

@@ -69,7 +69,16 @@ export function srSegments(bars,config,snapshot=null,options={}){
         }
         if(zone&&Number.isFinite(zone.score)&&!item.invalidated&&!item.truncated&&(item.scoreTime??-Infinity)<=snapshot.through){item.score=zone.score;item.scoreTime=zone.score_time;item.touches=zone.touches;item.strongRejections=zone.strong_rejections;}
     }
-    return result.filter(item=>!result.some(other=>other!==item&&other.retrospective&&other.key.startsWith('inst_')&&!item.key.startsWith('inst_')&&other.identity.slice(other.key.length+1)===item.identity.slice(item.key.length+1)&&other.start<=item.start&&other.end>=item.end));
+    // Index promotions once. Comparing every historical segment with every
+    // other segment freezes long BTC histories even when none is promoted.
+    const promoted=new Map();
+    for(const item of result)if(item.retrospective&&item.key.startsWith('inst_')){
+        const id=item.identity.slice(item.key.length+1);
+        if(!promoted.has(id))promoted.set(id,[]);
+        promoted.get(id).push(item);
+    }
+    return result.filter(item=>item.key.startsWith('inst_')||!(promoted.get(item.identity.slice(item.key.length+1))||[])
+        .some(other=>other!==item&&other.start<=item.start&&other.end>=item.end));
 }
 
 function legacySegments(bars,config){
@@ -117,8 +126,13 @@ export function srRole(item,bars){
     let support=item.side==='support'||item.key==='support_zones'||item.key==='inst_support_zones';
     let resistance=!support;
     const history=item.history||[];let cursor=0;
-    for(const bar of bars){
-        if(bar.provisional||bar.time<item.start||bar.time>item.end)continue;
+    // Stored chart rows are chronological. Jump directly to this segment's
+    // lifetime instead of rescanning all cached BTC candles for every zone.
+    let lo=0,hi=bars.length;
+    while(lo<hi){const mid=(lo+hi)>>1;if(bars[mid].time<item.start)lo=mid+1;else hi=mid;}
+    for(let index=lo;index<bars.length&&bars[index].time<=item.end;index++){
+        const bar=bars[index];
+        if(bar.provisional)continue;
         const close=bar.client?.close;if(!Number.isFinite(close))continue;
         while(cursor+1<history.length&&history[cursor+1].time<=bar.time)cursor++;
         const bounds=history[cursor]||item;
