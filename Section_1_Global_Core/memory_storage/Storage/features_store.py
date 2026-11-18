@@ -214,6 +214,9 @@ def storage_columns(conn):
 def read_expression(field,prefix='f',*,preserve_legacy=True):
     """Formula projections for dynamic research/SQL readers, with legacy fallback."""
     if field not in COLUMNS:raise ValueError('Unknown feature column')
+    from . import ema_distance_reads
+    if field in ema_distance_reads.FIELDS:
+        return ema_distance_reads.expression(field,prefix,preserve_legacy=preserve_legacy)
     from . import atr_slope_reads
     if field in atr_slope_reads.FIELDS:
         return atr_slope_reads.expression(field,prefix,preserve_legacy=preserve_legacy)
@@ -235,6 +238,8 @@ def resolve_derived(values):
         values.update(slope_pct_values(values))
         for alias,source in STORAGE_ALIASES.items():
             if source in FORMULA_COLUMNS:values[alias]=values[source]
+        from Section_4_Features.execution.ema_distances import values as ema_distance_values
+        values.update(ema_distance_values(values))
     return values
 
 
