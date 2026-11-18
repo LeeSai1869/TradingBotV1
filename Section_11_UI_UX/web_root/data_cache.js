@@ -58,7 +58,9 @@ const DataCache = {
                 }
             }
         }
-        return previous !== JSON.stringify([this.formingBar, this.liveStatus]);
+        const changed=previous !== JSON.stringify([this.formingBar, this.liveStatus]);
+        if(changed)this._liveVersion=(this._liveVersion||0)+1;
+        return changed;
     },
 
     subscribe(fn) { this.listeners.push(fn); },
@@ -128,6 +130,7 @@ const DataCache = {
         const byTime = new Map(this.bars.map(bar => [bar.open_time, bar]));
         for (const bar of rows) byTime.set(bar.open_time, bar);
         this.bars = [...byTime.values()].sort((a, b) => a.open_time - b.open_time);
+        this._barsVersion=(this._barsVersion||0)+1;
     },
 
     setVisibleWindow(range) {
@@ -163,6 +166,7 @@ const DataCache = {
             this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
             this.bars = packet.bars;
+            this._barsVersion=(this._barsVersion||0)+1;
             this.activeBars = this.bars;
             this.latestBar = this.bars.at(-1) || null;
             this.nextBefore = packet.next_before;

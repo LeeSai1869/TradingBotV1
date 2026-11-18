@@ -79,6 +79,11 @@ async function loadAll() {
         if (rendering || !pending) return;
         const { op, reset, latest, span } = pending;
         pending = null;
+        if(op==='live'&&!reset&&!latest&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
+            Composer.updateLive(chart,DataCache);
+            renderedBars[renderedBars.length-1]=DataCache.formingBar;
+            updateStatus();return;
+        }
         rendering = true;
         const generation = ++renderGeneration;
         const range = chart.timeScale().getVisibleLogicalRange();
@@ -124,7 +129,7 @@ async function loadAll() {
             return;
         }
         const reset=op === "reload" || op === "loading";
-        pending = { op, reset: reset || !!pending?.reset,
+        pending = { op:op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
             latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
         render();
     });

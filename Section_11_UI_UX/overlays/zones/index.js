@@ -1,10 +1,8 @@
 // Stored zone lifecycles share the existing combined bar stream.
 import {getSeries} from '../candles/index.js';
-import {fvgSegments} from './fvg.js';
-import {structureSegments} from './structure.js';
-import {srSegments,institutionalProjection,srRole} from './sr.js';
-import {obSegments} from './ob.js';
-import {ProjectionCache} from './projection_cache.js';
+import {ProjectionCache,projectionRows} from './projection_cache.js';
+import {segments} from './project.js';
+export {segments} from './project.js';
 export const name='zones';
 export function zoneScoreLabel(item){
     const name=item.key.includes('breaker')?'BRK':item.key.includes('_ob_')?'OB':item.key.includes('fvg')?'FVG':item.key.startsWith('inst_')?'I-S/R':'S/R';
@@ -21,19 +19,38 @@ const definitions={
 };
 let primitive,axis=[];
 const styles=()=>window.Composer.config.featureStyles||{};
-export function segments(bars,config,frames={},target=''){
-    const result=[];
-    if(['support','resistance','inst_support','inst_resistance'].some(key=>config[key+'_zones']?.visible))result.push(...srSegments(bars,config,frames.sr));
-    if(Object.entries(config).some(([key,value])=>/_(ob|breaker)_zones$/.test(key)&&value?.visible))result.push(...obSegments(bars,config,frames.sr));
-    result.push(...structureSegments(bars,config));
-    for(const [source,frame] of Object.entries(frames.institutional||{}))result.push(...institutionalProjection(bars,config,frame,source));
-    for(const item of result)if(/^(inst_)?(support|resistance)_zones$/.test(item.key))item.role=srRole(item,bars);
-    const endTime=bars.at(-1)?.time;
-    result.push(...fvgSegments(bars,config,{target,endTime,seeds:frames.current?.active}));
-    for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr'&&source!=='institutional')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
-    return result;
+let worker=null,job=0,pending=false,waiting=null,active=false,lastData=null,workerMs=null;
+function send(task){active=true;worker.postMessage(task);}
+function project(bars,config,frames,target){
+    if(!worker)return segments(bars,config,frames,target);
+    const task={id:++job,bars:projectionRows(bars),config,frames,target};
+    pending=true;
+    if(active)waiting=task;else send(task);
+    return [];
 }
-const projection=new ProjectionCache(segments);
+const projection=new ProjectionCache(project);
+function startWorker(){
+    if(typeof Worker==='undefined')return;
+    try{
+        worker=new Worker(new URL('./zone_worker.js',import.meta.url),{type:'module'});
+        worker.onmessage=({data})=>{
+            active=false;
+            if(data.id===job){
+                pending=false;workerMs=data.ms;
+                projection.items=data.items;projection.ends=data.items.map(item=>item.end);
+                primitive.items=data.items;
+                if(lastData?.formingBar)updateLive(null,lastData.formingBar);
+                primitive.requestUpdate?.();
+            }
+            if(waiting){const task=waiting;waiting=null;send(task);}
+        };
+        worker.onerror=()=>{
+            worker.terminate();worker=null;waiting=null;active=pending=false;
+            projection.reset();
+            if(lastData)update(null,lastData);
+        };
+    }catch{worker=null;}
+}
 class Zones {
     attached({chart,series,requestUpdate}){Object.assign(this,{chart,series,requestUpdate});}
     detached(){this.chart=this.series=this.requestUpdate=null;}
@@ -86,8 +103,9 @@ class Zones {
         });
     }
 }
-export function mount(){projection.reset();primitive=new Zones();getSeries().attachPrimitive(primitive);}
+export function mount(){projection.reset();primitive=new Zones();getSeries().attachPrimitive(primitive);startWorker();}
 export function update(chart,data){
+    lastData=data;
     primitive.times=(data.bars||[]).map(b=>b.time);
     primitive.items=projection.get(data,styles());
     if(data.formingBar)updateLive(chart,data.formingBar);
@@ -108,4 +126,4 @@ export function updateLive(chart,bar){
 }
 export function getSegments(){return primitive?.items||[];}
 
-export function getProjectionStats(){return {builds:projection.builds,hits:projection.hits};}
+export function getProjectionStats(){return {builds:projection.builds,hits:projection.hits,pending,worker:!!worker,workerMs};}

@@ -53,6 +53,7 @@ async def exercise_live(base, library):
             assert await page.evaluate('liveSeries.data().at(-1).close') == 131
             assert await page.evaluate('liveAudit.update') == 1
             assert await page.evaluate('liveAudit.setData') == 0
+            assert await page.evaluate("()=>{const before=liveAudit.setData;Composer.updateAll(Canvas.chart,{...DataCache,bars:DataCache.renderBars},'stored-refresh');return liveAudit.setData-before;}")==0
             assert db.count_klines('BTCUSDT','15m') == count
             assert await page.evaluate('DataCache.formingBar.features') is None
             print('PASS: live tick updates one point in the combined stream, no history rebuild or permanent writes',flush=True)
