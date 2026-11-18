@@ -244,6 +244,8 @@ async def sign_in(page, username='admin'):
 
 async def settle(page):
     await page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))))')
+    await page.wait_for_function("async()=>!(await import('/overlays/zones/index.js')).getProjectionStats().pending")
+    await page.evaluate('() => new Promise(resolve => requestAnimationFrame(resolve))')
 
 
 def run(library, scenario=exercise):

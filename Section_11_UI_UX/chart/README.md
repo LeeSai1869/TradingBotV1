@@ -49,3 +49,13 @@ History prepends, replay changes, revised OHLC/zone fields, source snapshots and
 settings invalidate it. Unchanged stored polls retain snapshot and row identities
 instead of replacing them during unrelated progress/liquidity updates. Cache
 results never replace engine calculations or stored feature history.
+
+Fresh zone builds run in a module Worker using only the required chart fields;
+closed-zone cache hits stay local. Pending requests coalesce to the latest inputs,
+and stale worker results cannot replace another dataset. Candles/controls remain
+interactive while the worker reconstructs zone geometry; zones appear when ready.
+Unsupported/failed workers retain the synchronous fallback. `getProjectionStats()`
+reports worker availability and pending status. Stored metadata refreshes skip
+unchanged candle/EMA/indicator/marker datasets; live ticks queued behind another
+render keep their incremental path. Real stored-row changes and settings still
+refresh the complete relevant series.

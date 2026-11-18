@@ -5,6 +5,9 @@ for(const side of ['support','resistance','inst_support','inst_resistance'])
     fields.push(side+'_zone_low',side+'_zone_high','nearest_'+side+'_zone_id','nearest_'+side+'_score');
 for(const side of ['bull','bear'])fields.push(`qualified_${side}_fvg`,`${side}_fvg_low`,`${side}_fvg_high`,
     ...['low','high','created_bar','age'].map(key=>`nearest_${side}_fvg_${key}`),`nearest${side}_fvg_reaction_score`);
+export function projectionRows(rows){return rows.map(row=>({time:row.time,provisional:row.provisional,
+    client:{open_time:row.client?.open_time,close_time:row.client?.close_time,low:row.client?.low,high:row.client?.high,close:row.client?.close},
+    features:Object.fromEntries(fields.map(field=>[field,row.features?.[field]]))}));}
 function key(row){const c=row.client||{},f=row.features||{};return [row.time,c.open_time,c.close_time,c.low,c.high,c.close,...fields.map(field=>f[field])];}
 function equal(a,b){return a.length===b.length&&a.every((value,i)=>Object.is(value,b[i]));}
 export class ProjectionCache {

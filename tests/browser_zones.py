@@ -175,7 +175,7 @@ async def exercise(base,library):
         assert await page.evaluate('Composer.config.featureStyles.bull_fvg_zones.color')=='#abcdef'
         assert await page.evaluate('Canvas.chart.panes().length')==1
         await page.screenshot(path='/tmp/tradingbot-zones.png')
-        await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading')
+        await page.reload();await sign_in(page,'user');await page.wait_for_function('window.Composer?.mounted && !DataCache.loading');await settle(page)
         assert await page.evaluate("import('/overlays/zones/index.js').then(x=>x.getSegments().length)")==10
         assert await page.evaluate('Composer.config.featureStyles.vp_hvn_nodes.opacity')==25
         assert await page.evaluate('Composer.config.featureStyles.vp_lvn_nodes.opacity')==75
@@ -223,9 +223,12 @@ async def exercise(base,library):
             const before=module.getProjectionStats();module.update(Canvas.chart,data);
             const warm=[];
             for(let i=0;i<5;i++){const start=performance.now();module.update(Canvas.chart,data);warm.push(performance.now()-start);}
+            while(module.getProjectionStats().pending)await new Promise(resolve=>setTimeout(resolve,10));
+            if(module.getSegments().length!==2000)throw Error('Worker result differs from full projection');
             const after=module.getProjectionStats();
-            return {builds:after.builds-before.builds,hits:after.hits-before.hits,warmMs:warm};
+            return {worker:after.worker,builds:after.builds-before.builds,hits:after.hits-before.hits,warmMs:warm};
         }""")
+        assert cached['worker'],cached
         assert cached['builds']==1,cached
         assert cached['hits']==5,cached
         print('PASS: real zone update reuses 2,000-bar projection:',cached,flush=True)
