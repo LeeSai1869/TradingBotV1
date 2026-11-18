@@ -217,6 +217,17 @@ def handle_get(path, raw_qs, server):
         return 200, {"precision": precision, "tickSize": 10 ** -precision}
 
     # ---- live candle ----
+    if path == "/api/chart_live":
+        symbol = qs.get('symbol', [''])[0]
+        interval = qs.get('interval', [''])[0]
+        if not symbol or interval not in data_policy.INTERVALS:
+            return 400, {'error': 'symbol and supported interval required'}
+        # No chart history, indicator reconstruction or schema writes here.
+        active = data_policy.enabled(symbol, interval)
+        live = live_candle.get_snapshot(symbol, interval) if active else {
+            'bar': None, 'status': 'inactive', 'as_of': None, 'error': None}
+        return 200, {'symbol': symbol, 'interval': interval, 'live': live}
+
     if path == "/api/live_candle":
         symbol = qs.get("symbol", [None])[0]
         interval = qs.get("interval", [None])[0]

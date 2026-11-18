@@ -1,26 +1,21 @@
-// One local combined-stream request: stored bars plus the server's provisional
-// live snapshot. Exchange I/O is independent of HTTP/history requests.
-let timer = null;
+// Stored history and live prices have independent, nonoverlapping poll loops.
+let timers = [];
 let cycle = 0;
-
-async function run(token, interval) {
-    try {
-        await DataCache.refreshStored();
-    } catch (error) {
-        console.warn("[stored bars] refresh failed:", error);
-    } finally {
-        if (token === cycle) timer = setTimeout(() => run(token, interval), interval);
+async function run(token, interval, live) {
+    try { await (live ? DataCache.refreshLive() : DataCache.refreshStored()); }
+    catch(error) { console.warn(live ? '[live candle]' : '[stored bars]',error); }
+    finally {
+        if(token===cycle)timers[live?1:0]=setTimeout(()=>run(token,interval,live),interval);
     }
 }
 export function stop() {
-    ++cycle;
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
+    ++cycle;for(const timer of timers)clearTimeout(timer);timers=[];
 }
-export function start(interval = 5000) {
+export function start(interval=5000, live=false) {
     stop();
-    if (Number.isFinite(interval) && interval > 0) {
-        const token = cycle;
-        timer = setTimeout(() => run(token, interval), interval);
+    if(Number.isFinite(interval)&&interval>0){
+        const token=cycle;
+        timers[0]=setTimeout(()=>run(token,interval,false),interval);
+        if(live)timers[1]=setTimeout(()=>run(token,1000,true),1000);
     }
 }

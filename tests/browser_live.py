@@ -48,7 +48,7 @@ async def exercise_live(base, library):
             }''')
             count=db.count_klines('BTCUSDT','15m')
             state['bar']=quote(T,131)
-            await page.evaluate('DataCache.refreshStored()')
+            await page.evaluate('DataCache.refreshLive()')
             await settle(page)
             assert await page.evaluate('liveSeries.data().at(-1).close') == 131
             assert await page.evaluate('liveAudit.update') == 1
@@ -62,26 +62,26 @@ async def exercise_live(base, library):
             historical=await page.evaluate('Canvas.chart.timeScale().getVisibleRange()')
             state['bar']=quote(T,132)
             before=len([url for url in requests if '/api/bars?' in url])
-            assert await page.evaluate('DataCache.refreshStored()') is False
+            assert await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())') is False
             assert await page.evaluate('Canvas.chart.timeScale().getVisibleRange()') == historical
             assert len([url for url in requests if '/api/bars?' in url]) == before
             await page.evaluate('''() => {const n=DataCache.renderBars.length;
                 Canvas.chart.timeScale().setVisibleLogicalRange({from:n-1000,to:n-1});}''')
             await settle(page)
-            await page.evaluate('DataCache.refreshStored()')
+            await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())')
             await settle(page)
             assert await page.evaluate('liveSeries.data().at(-1).close') == 132
             print('PASS: history browsing pauses live requests and returning to newest resumes ticks',flush=True)
 
             # A new forming interval must not jump over a missing audited close.
             state['bar']=quote(T+STEP,133)
-            await page.evaluate('DataCache.refreshStored()')
+            await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())')
             await settle(page)
             assert await page.evaluate('DataCache.formingBar.time') == T//1000
             assert await page.evaluate('DataCache.liveStatus') == 'waiting for stored bar'
             db.write_klines([quote(T,132)['client']])
             db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=T,ema50=129)])
-            await page.evaluate('DataCache.refreshStored()')
+            await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())')
             await settle(page)
             assert await page.evaluate('DataCache.formingBar.time') == (T+STEP)//1000
             assert await page.evaluate('(t)=>DataCache.renderBars.filter(b=>b.open_time === t).length',T) == 1
@@ -91,7 +91,7 @@ async def exercise_live(base, library):
             print('PASS: rollover waits for stored closure, replaces provisional bar once, then follows the next live candle',flush=True)
 
             state.update(bar=None,status='unavailable',error='test upstream unavailable')
-            await page.evaluate('DataCache.refreshStored()')
+            await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())')
             await settle(page)
             assert await page.evaluate('DataCache.liveStatus') == 'unavailable'
             assert 'unavailable' in await page.locator('#status').text_content()

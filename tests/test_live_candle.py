@@ -9,6 +9,25 @@ def raw(close=11):
 
 
 class LiveCandleTests(unittest.TestCase):
+    def test_price_available_while_provisional_indicators_are_blocked(self):
+        from unittest.mock import patch
+        entered=threading.Event();release=threading.Event()
+        def calculate(*args,**kwargs):
+            entered.set();release.wait(3);return {'rsi':55}
+        cache=FormingCandleCache(lambda *_:raw(),poll_seconds=10000,wall_clock=lambda:100)
+        try:
+            with patch('Section_11_UI_UX.server.live_features.calculate',side_effect=calculate):
+                cache.snapshot('BTCUSDT','1m')
+                self.assertTrue(entered.wait(1))
+                result=cache.snapshot('BTCUSDT','1m')
+                self.assertEqual(result['status'],'live')
+                self.assertEqual(result['bar']['client']['close'],11)
+                self.assertIsNone(result['bar']['features'])
+                self.assertEqual(result['bar']['features_status'],'calculating')
+                release.set();cache.close()
+            self.assertEqual(cache.snapshot('BTCUSDT','1m')['bar']['features'],{'rsi':55})
+        finally:release.set();cache.close()
+
     def test_slow_fetch_is_nonblocking_and_deduplicated(self):
         entered=threading.Event();release=threading.Event();calls=[]
         def fetch(symbol,interval):
