@@ -203,6 +203,19 @@ async def exercise(base,library):
         assert 'Zone coverage pending feature repair' in await page.locator('#status').inner_text()
         assert await page.evaluate('DataCache.bars.length')==3
         assert not errors,errors
+        stress=await page.evaluate("""async()=>{
+            const {segments}=await import('/overlays/zones/index.js');
+            const rows=Array.from({length:8000},(_,i)=>({time:i*60,client:{open_time:i*60000,close_time:(i+1)*60000-1,close:100},features:{sr_zone_events:JSON.stringify([
+                ...(i?[{id:String(i-1),removed:true}]:[]),
+                {id:String(i),side:'support',low:90,high:95,institutional:false,before:null}
+            ])}}));
+            const start=performance.now();const result=segments(rows,{support_zones:{visible:true}});
+            return {zones:result.length,ms:performance.now()-start,roles:[...new Set(result.map(z=>z.role))]};
+        }""")
+        assert stress['zones']==8000,stress
+        assert stress['roles']==['support'],stress
+        assert await page.evaluate('ChartRenderTimings.length>0 && ChartRenderTimings.length<=10')
+        print('PASS: Chromium 8,000-zone history projection:',stress,flush=True)
         print('PASS: continuous OB lifecycle and Display controls, institutional scores, source-chart FVG, structure ranges, VP and combined-stream reuse',flush=True)
         await browser.close()
 

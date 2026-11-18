@@ -34,3 +34,10 @@ All formulas, levels, progression states, frozen evidence and historical results
 remain the same. Large HTTP JSON replies negotiate gzip (level 1); clients that
 decline it receive ordinary JSON. The profiler also reports compressed size and
 compression cost separately; timings require another run on the user's database.
+
+Browser zone projection indexes institutional promotions by identity and searches
+only the candles inside each zone's lifetime when classifying its display role.
+Hidden SR/OB overlays skip event decoding entirely. This removes all-history
+pairwise scans without changing stored zone scores, bounds or lifecycle events.
+`window.ChartRenderTimings` retains the last ten synchronous visual/panel timings
+in milliseconds for diagnosing remaining client stalls; it sends no telemetry.
