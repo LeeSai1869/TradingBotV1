@@ -3,6 +3,7 @@ import argparse
 from contextlib import ExitStack
 import cProfile
 import functools
+import gzip
 import json
 import pstats
 import subprocess
@@ -54,6 +55,8 @@ def measure(symbol, interval, limit, *, profile=False):
             report=dict(run=run,analysis_reference=reference,rows=len(page['bars']),read_seconds=round(read_seconds,4),
                 json_seconds=round(time.perf_counter()-started,4),payload_MiB=round(len(encoded.encode())/1024**2,3),
                 stages={name:dict(calls=v['calls'],seconds=round(v['seconds'],4)) for name,v in stages.items()})
+            started=time.perf_counter();compressed=gzip.compress(encoded.encode(),compresslevel=1,mtime=0)
+            report.update(gzip_MiB=round(len(compressed)/1024**2,3),gzip_seconds=round(time.perf_counter()-started,4))
             print('RESULT: '+json.dumps(report),flush=True)
             reference=next((bar['signal_context']['open_time'] for bar in reversed(page['bars']) if bar.get('signal_context')),None)
     if profiler:

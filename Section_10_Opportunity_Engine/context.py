@@ -20,7 +20,14 @@ def anchor(packet,*,side,open_time,confidence=None,previous=None):
 def advance(context,bar):
     if context is None or context['state']=='coverage unknown':return context
     if bar['open_time']<=context['open_time']:return context
-    state=copy.deepcopy(context);plan=state['plan'];client=bar['client'];buy=state['side']=='BUY'
+    return _advance_owned(copy.deepcopy(context),bar)
+
+
+def _advance_owned(state,bar):
+    """Advance an exclusively owned working context; caller snapshots outputs."""
+    if state is None or state['state']=='coverage unknown':return state
+    if bar['open_time']<=state['open_time']:return state
+    plan=state['plan'];client=bar['client'];buy=state['side']=='BUY'
     for role,areas in state.get('area_map',{}).items():
         previous=state.get('area_progress',{}).get(role,[]);progress=[]
         for index,area in enumerate(areas):
