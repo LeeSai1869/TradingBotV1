@@ -1,5 +1,5 @@
 import { requireSignIn } from "./login.js";
-import { logicalShift } from "./window_state.js";
+import { logicalShift, readableRange } from "./window_state.js";
 import * as symbolControl from "../controls/symbol/index.js";
 import * as timeframeControl from "../controls/timeframe/index.js";
 import * as reloadControl from "../controls/reload/index.js";
@@ -42,6 +42,8 @@ async function loadAll() {
     let renderGeneration = 0;
 
     function updateStatus() {
+        const view=chart.timeScale().getVisibleLogicalRange();
+        const visible=view?Math.max(0,Math.min(renderedBars.length-1,Math.floor(view.to))-Math.max(0,Math.ceil(view.from))+1):0;
         const bar=DataCache.latestBar, client=bar?.client;
         const duration=client ? client.close_time-bar.open_time+1 : 0;
         const behind=duration>0 && Date.now()-client.close_time>2*duration;
@@ -55,6 +57,7 @@ async function loadAll() {
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
+              `${visible} candles in view | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
               (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
     }
@@ -86,7 +89,7 @@ async function loadAll() {
             target = { from: last - span, to: last };
             chart.priceScale("right").applyOptions({ autoScale: true });
         } else if (reset && bars.length) {
-            target = { from: Math.max(0, bars.length - 200), to: bars.length + 7 };
+            target = readableRange(bars.length,chart.timeScale().width());
             symbolControl.applyPriceFormat(DataCache.symbol, bars,
                 Composer.config.price_precision?.[DataCache.symbol]);
         } else if (range && renderedBars.length && bars.length) {
@@ -120,8 +123,9 @@ async function loadAll() {
             updateStatus();
             return;
         }
-        pending = { op, reset: op === "reload" || !!pending?.reset,
-            latest: pending?.latest, span: pending?.span };
+        const reset=op === "reload" || op === "loading";
+        pending = { op, reset: reset || !!pending?.reset,
+            latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
         render();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(checkBoundary);

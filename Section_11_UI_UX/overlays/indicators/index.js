@@ -74,7 +74,7 @@ export function mount(instance){
     chart=instance;chart.subscribeCrosshairMove(event=>{hoverTime=typeof event.time==='number'?event.time:null;values();});controls=document.createElement('div');controls.id='indicator-pane-controls';document.getElementById('chart').append(controls);
     observer=new ResizeObserver(()=>requestAnimationFrame(positionHeaders));observer.observe(document.getElementById('chart'));
 }
-export function update(instance,data){
+export function update(instance,data,options={}){
     barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
     for(const feature of [...LOWER,'VWAP','WMA','Volume Profile','Market Structure']){
         const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&styles()[key]?.visible);
@@ -93,7 +93,8 @@ export function update(instance,data){
             const style=styles()[key];line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
                 priceFormat:featurePriceFormat,
                 lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:!!style?.visible && !state.collapsed});
-            if(!style?.visible)continue;
+            if(!style?.visible){if(line.data().length)line.setData([]);continue;}
+            if(options.resetViewport)line.priceScale().applyOptions({autoScale:true});
             line.setData((data.bars||[]).map(bar=>{
                 const n=value(bar,key);if(n===null)return {time:bar.time};
                 const point={time:bar.time,value:n};

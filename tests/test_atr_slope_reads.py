@@ -185,6 +185,28 @@ class ATRSlopeReads(unittest.TestCase):
         self.assertEqual(report['stored_formula_mismatches'],0)
         self.assertEqual(self.features.execute('SELECT measurement_config_id FROM features WHERE open_time=840000').fetchone()[0],None)
 
+    def test_full_feature_reads_batch_history_and_keep_borrowed_transactions(self):
+        self.poison()
+        with patch.object(a,'read_values',side_effect=AssertionError('No per-cell history queries')):
+            rows=s.read_range(self.features,'BTCUSDT','1m',0,900000)
+        self.assertEqual(tuple(rows[-1][f] for f in a.FIELDS),(2.5,5.,7.5))
+        self.assertFalse(self.features.in_transaction)
+        self.features.execute('BEGIN')
+        s.read_row(self.features,'BTCUSDT','1m',840000)
+        self.assertTrue(self.features.in_transaction)
+        self.features.rollback()
+
+    def test_batch_prefix_and_feature_values_share_one_snapshot(self):
+        self.features.execute('PRAGMA main.journal_mode=WAL')
+        original=a.resolve_rows
+        def concurrent_commit(conn,rows):
+            with closing(sqlite3.connect(s.DB_PATH)) as writer:
+                with writer:writer.execute('UPDATE features SET ema50=ema50+2 WHERE open_time=540000')
+            return original(conn,rows)
+        with patch.object(a,'resolve_rows',side_effect=concurrent_commit):
+            self.assertEqual(s.read_row(self.features,'BTCUSDT','1m',840000)['ema50_slope_atr'],2.5)
+        self.assertEqual(s.read_row(self.features,'BTCUSDT','1m',840000)['ema50_slope_atr'],1.5)
+
     def test_randomized_windows_match_live_rules_including_all_resets(self):
         rng = random.Random(42)
         state = {}; history = []; timestamp = 0; lengths = {}

@@ -24,7 +24,7 @@ export function update(chart, data, options = {}) {
         const visible = options.visible !== false && (style ? style.visible : periods.includes(period));
         line.applyOptions({ priceFormat:featurePriceFormat, visible, lastValueVisible: visible, color: style?.color || config.color || "#f5c542",
             lineWidth: style?.width || config.lineWidth || 2, lineStyle: style?.style ?? config.lineStyle ?? 0 });
-        if (!visible) continue;
+        if (!visible) { if(line.data().length)line.setData([]); continue; }
         const points = [];
         for (const bar of data.bars || []) {
             const value = bar.features?.[`ema${period}`];
@@ -39,6 +39,7 @@ export function update(chart, data, options = {}) {
 export function updateLive(chart, bar) {
     if (!bar) return;
     for (const [period, line] of series) {
+        if (!line.options().visible) continue;
         const value = bar.features?.[`ema${period}`];
         line.update(Number.isFinite(value) ? {time: bar.time, value} : {time: bar.time});
     }

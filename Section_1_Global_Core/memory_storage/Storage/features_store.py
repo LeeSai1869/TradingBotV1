@@ -314,32 +314,21 @@ def has_row(conn, symbol, interval, open_time) -> bool:
 def read_row(conn, symbol, interval, open_time):
     columns = _read_columns(conn)
     if not columns:return None
-    cur = conn.execute(
-        f"""
-        SELECT {_read_projection(conn,columns)} FROM features
-        WHERE symbol=? AND interval=? AND open_time=?
-        """,
-        (symbol, interval, open_time),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    result=_decode(columns,row)
-    mask_replays(conn,symbol,interval,[result])
+    from . import atr_slope_reads
+    with atr_slope_reads.read_snapshot(conn) as has_raw:
+        row=conn.execute('SELECT '+','.join(columns)+
+            ' FROM features WHERE symbol=? AND interval=? AND open_time=?',
+            (symbol,interval,open_time)).fetchone()
+        if row is None:return None
+        result=_decode(columns,row)
+        if has_raw:atr_slope_reads.resolve_rows(conn,[result])
+        mask_replays(conn,symbol,interval,[result])
     return result
 
 
 def _read_columns(conn):
     existing={row[1] for row in conn.execute('PRAGMA table_xinfo(features)')}
     return [column for column in COLUMNS if column in existing]
-
-
-def _read_projection(conn,columns):
-    from . import atr_slope_reads
-    if set(columns)&atr_slope_reads.FIELDS.keys():
-        atr_slope_reads.install(conn)
-    return ','.join(atr_slope_reads.expression(c,'features')
-                    if c in atr_slope_reads.FIELDS else '"'+c+'"' for c in columns)
 
 
 def _decode(columns,row):
@@ -358,17 +347,14 @@ def read_range(conn, symbol, interval, start_ms, end_ms, *, mask_pending=True):
     """
     columns=_read_columns(conn)
     if not columns:return []
-    cur = conn.execute(
-        f"""
-        SELECT {_read_projection(conn,columns)} FROM features
-        WHERE symbol=? AND interval=?
-          AND open_time>=? AND open_time<?
-        ORDER BY open_time
-        """,
-        (symbol, interval, start_ms, end_ms),
-    )
-    result=[_decode(columns,row) for row in cur.fetchall()]
-    if mask_pending:mask_replays(conn,symbol,interval,result)
+    from . import atr_slope_reads
+    with atr_slope_reads.read_snapshot(conn) as has_raw:
+        rows=conn.execute('SELECT '+','.join(columns)+' FROM features '
+            'WHERE symbol=? AND interval=? AND open_time>=? AND open_time<? ORDER BY open_time',
+            (symbol,interval,start_ms,end_ms)).fetchall()
+        result=[_decode(columns,row) for row in rows]
+        if has_raw:atr_slope_reads.resolve_rows(conn,result)
+        if mask_pending:mask_replays(conn,symbol,interval,result)
     return result
 
 
