@@ -212,6 +212,23 @@ async def exercise(base,library):
             const start=performance.now();const result=segments(rows,{support_zones:{visible:true}});
             return {zones:result.length,ms:performance.now()-start,roles:[...new Set(result.map(z=>z.role))]};
         }""")
+        cached=await page.evaluate("""async()=>{
+            const module=await import('/overlays/zones/index.js');
+            const rows=Array.from({length:2000},(_,i)=>({time:i*60,client:{open_time:i*60000,close_time:(i+1)*60000-1,close:100,low:99,high:101},features:{sr_zone_events:JSON.stringify([
+                ...(i?[{id:String(i-1),removed:true}]:[]),
+                {id:String(i),side:'support',low:90,high:95,institutional:false,before:null}
+            ])}}));
+            const data={symbol:'BTCUSDT',timeframe:'5m',bars:rows,srSnapshot:null,srFrames:{},fvgFrames:{}};
+            Composer.config.featureStyles.support_zones.visible=true;
+            const before=module.getProjectionStats();module.update(Canvas.chart,data);
+            const warm=[];
+            for(let i=0;i<5;i++){const start=performance.now();module.update(Canvas.chart,data);warm.push(performance.now()-start);}
+            const after=module.getProjectionStats();
+            return {builds:after.builds-before.builds,hits:after.hits-before.hits,warmMs:warm};
+        }""")
+        assert cached['builds']==1,cached
+        assert cached['hits']==5,cached
+        print('PASS: real zone update reuses 2,000-bar projection:',cached,flush=True)
         assert stress['zones']==8000,stress
         assert stress['roles']==['support'],stress
         assert await page.evaluate('ChartRenderTimings.length>0 && ChartRenderTimings.length<=10')

@@ -262,8 +262,7 @@ const DataCache = {
             if(limit<WINDOW_BARS&&this.featureProgress&&this.featureProgress.status!=='features current'&&packet.feature_progress?.status==='features current')++this._fullRefreshVersion;
             this.featureProgress=packet.feature_progress??null;
             const srChanged=JSON.stringify([this.srSnapshot,this.srFrames])!==JSON.stringify([packet.sr_snapshot??null,packet.sr_frames??{}]);
-            this.srSnapshot=packet.sr_snapshot??null;
-            this.srFrames=packet.sr_frames??{};
+            if(srChanged){this.srSnapshot=packet.sr_snapshot??null;this.srFrames=packet.sr_frames??{};}
             const fvgChanged=this._applyFVG(packet);
             const liquidityChanged=JSON.stringify(this.liquidity)!==JSON.stringify(packet.liquidity??null);
             this.liquidity=packet.liquidity??null;
@@ -273,12 +272,13 @@ const DataCache = {
             // a two-row edge poll. An unchanged edge must not rebuild the chart.
             const existing=new Map(this.bars.map(bar=>[bar.open_time,bar]));
             const signature = JSON.stringify(packet.bars);
-            const barsChanged=packet.bars.some(bar=>JSON.stringify(existing.get(bar.open_time))!==JSON.stringify(bar));
+            const changedRows=packet.bars.filter(bar=>JSON.stringify(existing.get(bar.open_time))!==JSON.stringify(bar));
+            const barsChanged=changedRows.length>0;
             const changed = barsChanged || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
             if (changed) {
                 this._latestSignature = signature;
-                this._merge(packet.bars);
-                this.latestBar = packet.bars.at(-1) || null;
+                if(barsChanged)this._merge(changedRows);
+                this.latestBar = this.bars.at(-1) || null;
             }
             const liveChanged = this._applyLive(packet.live);
             if (changed) this.emit("stored-refresh");
