@@ -276,3 +276,20 @@ test('two-candle polls send the known decision reference only for the same pair'
     await data._fetchPage('BTCUSDT','4h',2);
     assert.equal(new URL(calls[1],'http://local').searchParams.has('analysis_reference'),false);
 });
+
+test('live polling continues while the stored-history request is blocked',async()=>{
+    const pending=deferred(),scheduled=[];let prices=0;
+    const context=vm.createContext({DataCache:{refreshStored:()=>pending.promise,refreshLive:async()=>{prices++;}},
+        console,setTimeout:(fn,ms)=>{scheduled.push({fn,ms});return scheduled.length;},clearTimeout(){}});
+    const source=fs.readFileSync(new URL('../Section_11_UI_UX/web_root/stored_poll.js',import.meta.url),'utf8')
+        .replace(/export function/g,'function');
+    vm.runInContext(source+'\nglobalThis.controls={start,stop};',context);
+    context.controls.start(5000,true);
+    assert.deepEqual(scheduled.map(t=>t.ms),[5000,1000]);
+    scheduled[0].fn();await scheduled[1].fn();
+    assert.equal(prices,1);assert.equal(scheduled[2].ms,1000);
+    await scheduled[2].fn();assert.equal(prices,2);
+    context.controls.stop();const count=scheduled.length;
+    pending.resolve(false);await new Promise(r=>setImmediate(r));
+    assert.equal(scheduled.length,count,'stopped pending loop must not reschedule');
+});

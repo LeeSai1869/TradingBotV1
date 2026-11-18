@@ -101,6 +101,19 @@ class ChartGatewayTests(unittest.TestCase):
             status, _ = routes.handle_get('/api/symbol_meta','symbol=BTCUSDT',None)
             self.assertEqual(status,200)
 
+    def test_live_price_route_is_independent_of_history_and_respects_inactive_policy(self):
+        snapshot={'bar':None,'status':'loading','as_of':None}
+        with patch.object(routes.db,'read_state_page',side_effect=AssertionError('No history work')), \
+             patch.object(routes.data_policy,'enabled',return_value=True), \
+             patch.object(routes.live_candle,'get_snapshot',return_value=snapshot) as live:
+            status,packet=routes.handle_get('/api/chart_live','symbol=BTCUSDT&interval=5m',None)
+            self.assertEqual(status,200);self.assertEqual(packet['live'],snapshot)
+            live.assert_called_once_with('BTCUSDT','5m')
+        with patch.object(routes.data_policy,'enabled',return_value=False), \
+             patch.object(routes.live_candle,'get_snapshot',side_effect=AssertionError('Inactive feed')):
+            status,packet=routes.handle_get('/api/chart_live','symbol=BTCUSDT&interval=1m',None)
+            self.assertEqual(packet['live']['status'],'inactive')
+
     def test_forming_snapshot_is_in_latest_packet_only(self):
         snapshot = {"bar": {"time": 240, "provisional": True}, "status": "live"}
         with patch.object(routes.live_candle, 'get_snapshot', return_value=snapshot) as live:

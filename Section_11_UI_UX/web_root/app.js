@@ -193,5 +193,5 @@ async function loadAll() {
         catch(error){status().textContent=error.message;}
     }else await loadAll();
     const interval = Composer.config.stored_refresh_ms ?? 5000;
-    storedPoll.start(DataCache.liveEnabled && interval > 0 ? Math.min(interval, 1000) : interval);
+    storedPoll.start(interval, DataCache.liveEnabled);
 })();

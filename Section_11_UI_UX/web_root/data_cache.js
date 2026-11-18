@@ -66,7 +66,7 @@ const DataCache = {
         for (const fn of this.listeners) fn(this, op, meta);
     },
 
-    async _fetchPage(symbol, timeframe, limit, before = null) {
+    async _fetchPage(symbol, timeframe, limit, before = null, includeLive = true) {
         const generation=this._reloadGeneration;
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
@@ -90,7 +90,7 @@ const DataCache = {
         if(before===null&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('liquidity','1');
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);
-        else if (this.liveEnabled) qs.set("live", "1");
+        else if (this.liveEnabled && includeLive) qs.set("live", "1");
         for (let attempt = 0; attempt < 3; attempt++) {
             if(generation!==this._reloadGeneration)throw Object.assign(new Error('Superseded chart request'),{name:'AbortError'});
             const controller = new AbortController();
@@ -147,7 +147,7 @@ const DataCache = {
         this._requests.clear();
         Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
-            _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
+            _olderPromise: null, _refreshPromise: null, _livePromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
             historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
@@ -211,6 +211,28 @@ const DataCache = {
         return work;
     },
 
+    refreshLive() {
+        if (!this.liveEnabled || this.loading || !this.atLiveEdge) return Promise.resolve(false);
+        if (this._livePromise) return this._livePromise;
+        const generation=this._reloadGeneration;
+        const controller=new AbortController();this._requests.add(controller);
+        const timer=setTimeout(()=>controller.abort(),4000);
+        const qs=new URLSearchParams({symbol:this.symbol,interval:this.timeframe});
+        const work=fetch(`/api/chart_live?${qs}`,{cache:'no-store',signal:controller.signal})
+            .then(async response=>{
+                const packet=await response.json();
+                if(!response.ok)throw new Error(packet.error||'Live snapshot unavailable');
+                if(generation!==this._reloadGeneration||!this.atLiveEdge||this.loading)return false;
+                const changed=this._applyLive(packet.live);
+                if(changed)this.emit('live');
+                return changed;
+            }).finally(()=>{
+                clearTimeout(timer);this._requests.delete(controller);
+                if(this._livePromise===work)this._livePromise=null;
+            });
+        this._livePromise=work;return work;
+    },
+
     refreshStored({full=false}={}) {
         if(full)++this._fullRefreshVersion;
         if (this.loading || !this.atLiveEdge) return Promise.resolve(false);
@@ -221,7 +243,7 @@ const DataCache = {
         const fullVersion=this._fullRefreshVersion;
         const replaying=this.historyPending||this.featureProgress?.status!=='features current';
         const limit=fullVersion>this._appliedFullRefreshVersion||(++this._refreshCount%12===0&&replaying)?WINDOW_BARS:2;
-        const request = this._fetchPage(this.symbol, this.timeframe, limit);
+        const request = this._fetchPage(this.symbol, this.timeframe, limit, null, false);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
             if(limit===WINDOW_BARS)this._appliedFullRefreshVersion=fullVersion;
@@ -247,8 +269,12 @@ const DataCache = {
             this.liquidity=packet.liquidity??null;
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
+            // Compare matching rows, not the initial 1,000-row packet against
+            // a two-row edge poll. An unchanged edge must not rebuild the chart.
+            const existing=new Map(this.bars.map(bar=>[bar.open_time,bar]));
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
+            const barsChanged=packet.bars.some(bar=>JSON.stringify(existing.get(bar.open_time))!==JSON.stringify(bar));
+            const changed = barsChanged || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);

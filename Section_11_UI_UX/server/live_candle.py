@@ -99,10 +99,16 @@ class FormingCandleCache:
                            "client": {"symbol": symbol, "interval": interval,
                                       "open_time": open_time, "close_time": close_time, **values},
                            "features": None, "adcn": None}
+            received=self.clock();as_of=int(self.wall_clock()*1000)
             if bar is not None:
+                # Publish immutable price-only data before potentially slow checkpoint
+                # restore/deepcopy/indicator work. Readers must never wait for it.
+                first_tick=entry['bar'] is None or entry['bar']['open_time']!=open_time
+                with self._lock:
+                    entry.update(bar={**bar, 'features_status': 'calculating'},
+                        received=received, as_of=as_of, error=None)
                 try:
                     from .live_features import calculate
-                    first_tick=entry['bar'] is None or entry['bar']['open_time']!=open_time
                     bar['features'] = calculate(symbol, interval, bar['client'],is_new=first_tick)
                     bar['features_status'] = 'provisional' if bar['features'] else 'waiting for stored history'
                 except Exception as feature_error:
@@ -110,7 +116,7 @@ class FormingCandleCache:
                     bar['features_status'] = 'unavailable'
                     bar['features_error'] = str(feature_error)
             with self._lock:
-                entry.update(bar=bar, received=self.clock(), as_of=int(self.wall_clock()*1000), error=None)
+                entry.update(bar=bar, received=received, as_of=as_of, error=None)
         except Exception as error:
             with self._lock:
                 entry['error'] = str(error)
