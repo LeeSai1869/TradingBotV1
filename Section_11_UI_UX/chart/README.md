@@ -24,3 +24,13 @@ missing stored closes. The server publishes fetched OHLCV before provisional
 checkpoint/indicator work, then replaces that immutable snapshot with its computed
 features. No market-data writes occur on this path. Initial history and stored
 refreshes still use Core's canonical stored-bar stream.
+
+The chart-load profile on the user's BTC 5m database measured about 1.62 s in
+opportunity projection versus 0.3 s in feature reads, with a 33.746 MiB JSON page
+under cProfile. Core now owns one working lifecycle during a page/reference
+projection, copying contexts at retained historical snapshots rather than every
+WAIT candle. The public immutable `advance` API retains its copy isolation.
+All formulas, levels, progression states, frozen evidence and historical results
+remain the same. Large HTTP JSON replies negotiate gzip (level 1); clients that
+decline it receive ordinary JSON. The profiler also reports compressed size and
+compression cost separately; timings require another run on the user's database.

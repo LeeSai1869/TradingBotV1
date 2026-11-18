@@ -3,6 +3,7 @@
 Serves static files from Section 11's root and dispatches /api/* to routes.py.
 """
 from __future__ import annotations
+import gzip
 import json
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import logging
@@ -22,6 +23,20 @@ from Section_1_Global_Core.paths import data_path
 routes.UI_CONFIG = data_path('config/ui_config.json',SECTION_11 / 'config' / 'ui_config.json')
 
 PORT = 8000
+
+
+def _accepts_gzip(headers):
+    for item in headers.get('Accept-Encoding', '').lower().split(','):
+        coding,*parameters=item.strip().split(';')
+        if coding.strip()!='gzip':continue
+        quality=1.0
+        for parameter in parameters:
+            key,separator,value=parameter.strip().partition('=')
+            if key=='q' and separator:
+                try:quality=float(value)
+                except ValueError:quality=0
+        return 0<quality<=1
+    return False
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -121,7 +136,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _json(self, obj, status=200):
         body = json.dumps(obj, default=str).encode("utf-8")
+        compressed=False
+        if len(body)>=16384 and _accepts_gzip(self.headers):
+            packed=gzip.compress(body,compresslevel=1,mtime=0)
+            if len(packed)<len(body):body=packed;compressed=True
         self.send_response(status)
+        self.send_header("Vary", "Accept-Encoding")
+        if compressed:self.send_header("Content-Encoding", "gzip")
         if status == 503:
             self.send_header("Retry-After", "1")
         if getattr(self, "response_cookie", None):

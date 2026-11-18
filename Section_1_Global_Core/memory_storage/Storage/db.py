@@ -310,7 +310,7 @@ def read_analysis_reference(symbol,interval,reference,before,fee_bps=4.,slippage
     if not row or row['open_time']!=reference or (row.get('momentum') or {}).get('signal_type') not in ('BUY','SELL'):return None
     context=row.get('signal_context')
     if not context:return None
-    from Section_10_Opportunity_Engine.context import advance
+    from Section_10_Opportunity_Engine.context import _advance_owned as advance
     raw=_read_connection(klines_store.DB_PATH)
     try:rows=raw.execute('SELECT '+','.join(_KLINE_COLUMNS)+' FROM klines WHERE symbol=? AND interval=? AND open_time>? AND open_time<? ORDER BY open_time LIMIT 10000',(symbol,interval,reference,before)).fetchall()
     finally:raw.close()

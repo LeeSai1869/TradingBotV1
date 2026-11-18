@@ -3,7 +3,7 @@ import time
 import copy
 from Section_9_Confidence_Engine.engine import evaluate as confidence
 from Section_10_Opportunity_Engine.engine import evaluate as opportunity,with_costs
-from Section_10_Opportunity_Engine.context import anchor,advance
+from Section_10_Opportunity_Engine.context import anchor,_advance_owned as advance
 from .opportunity_inventory import Inventory
 
 
@@ -28,7 +28,7 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
             inventory.zones.clear();inventory.coverage={k:'partial: features unavailable' for k in inventory.coverage}
             previous=None
             if context:context={**context,'state':'coverage unknown'}
-            if bar is latest or context_history:bar['signal_context']=context
+            if bar is latest or context_history:bar['signal_context']=context if bar is latest else copy.deepcopy(context)
             if bar is latest and context:bar['opportunity']=context['opportunity'];bar['confidence']=context['confidence']
             continue
         if features.get('formula_version')==3:inventory.advance(client,features)
@@ -54,7 +54,9 @@ def annotate(bars,*,fee_bps=4.,slippage_bps=2.,now_ms=None,seed=None,context_his
         if context:context={**context,'through_close':client['close_time']}
         if bar is latest and context:
             bar['opportunity']=context['opportunity'];bar['confidence']=context['confidence']
-        bar['signal_context']=context if context_history or bar is latest or signal in ('BUY','SELL') else None
+        # The working lifecycle is private to this request. Copy only contexts
+        # actually retained by a historical bar, never every WAIT candle.
+        bar['signal_context']=(context if bar is latest else copy.deepcopy(context)) if context_history or bar is latest or signal in ('BUY','SELL') else None
     return bars
 
 
