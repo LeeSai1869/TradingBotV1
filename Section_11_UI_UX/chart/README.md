@@ -41,3 +41,11 @@ Hidden SR/OB overlays skip event decoding entirely. This removes all-history
 pairwise scans without changing stored zone scores, bounds or lifecycle events.
 `window.ChartRenderTimings` retains the last ten synchronous visual/panel timings
 in milliseconds for diagnosing remaining client stalls; it sends no telemetry.
+
+Closed zone projections are cached by their exact relevant candle/feature inputs,
+source snapshot identities, settings, timeframe and timeline endpoint. Live-price
+changes reuse the closed projection and only extend known active endpoints.
+History prepends, replay changes, revised OHLC/zone fields, source snapshots and
+settings invalidate it. Unchanged stored polls retain snapshot and row identities
+instead of replacing them during unrelated progress/liquidity updates. Cache
+results never replace engine calculations or stored feature history.

@@ -4,6 +4,7 @@ import {fvgSegments} from './fvg.js';
 import {structureSegments} from './structure.js';
 import {srSegments,institutionalProjection,srRole} from './sr.js';
 import {obSegments} from './ob.js';
+import {ProjectionCache} from './projection_cache.js';
 export const name='zones';
 export function zoneScoreLabel(item){
     const name=item.key.includes('breaker')?'BRK':item.key.includes('_ob_')?'OB':item.key.includes('fvg')?'FVG':item.key.startsWith('inst_')?'I-S/R':'S/R';
@@ -32,6 +33,7 @@ export function segments(bars,config,frames={},target=''){
     for(const [source,frame] of Object.entries(frames))if(source!=='current'&&source!=='sr'&&source!=='institutional')result.push(...fvgSegments(frame.bars||[],config,{source,target,endTime,seeds:frame.active}));
     return result;
 }
+const projection=new ProjectionCache(segments);
 class Zones {
     attached({chart,series,requestUpdate}){Object.assign(this,{chart,series,requestUpdate});}
     detached(){this.chart=this.series=this.requestUpdate=null;}
@@ -84,10 +86,12 @@ class Zones {
         });
     }
 }
-export function mount(){primitive=new Zones();getSeries().attachPrimitive(primitive);}
+export function mount(){projection.reset();primitive=new Zones();getSeries().attachPrimitive(primitive);}
 export function update(chart,data){
     primitive.times=(data.bars||[]).map(b=>b.time);
-    primitive.items=segments(data.bars||[],styles(),{...data.fvgFrames,sr:data.srSnapshot,institutional:data.srFrames},data.timeframe);primitive.requestUpdate?.();
+    primitive.items=projection.get(data,styles());
+    if(data.formingBar)updateLive(chart,data.formingBar);
+    primitive.requestUpdate?.();
     // Labels use the last actually calculated closed candle, never fabricated levels.
     const series=getSeries();for(const line of axis)series.removePriceLine(line);axis=[];
     const last=data.bars?.at(-1),f=last?.features||{};
@@ -103,3 +107,5 @@ export function updateLive(chart,bar){
     primitive.requestUpdate?.();
 }
 export function getSegments(){return primitive?.items||[];}
+
+export function getProjectionStats(){return {builds:projection.builds,hits:projection.hits};}

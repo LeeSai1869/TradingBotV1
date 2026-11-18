@@ -13,6 +13,12 @@ let events=[];c.subscribe((cache,event)=>events.push(event));
     c._latestSignature='initial full-history signature';
     c._fetchPage=async()=>({bars:[stored],feature_progress:null});
     await c.refreshStored();assert.deepEqual(events,[]);
+    // Progress-only polls must not replace identical rows or source snapshots.
+    const snapshot={through:0,zones:{}};c.srSnapshot=snapshot;c.srFrames={};
+    c._fetchPage=async()=>({bars:[JSON.parse(JSON.stringify(stored))],sr_snapshot:JSON.parse(JSON.stringify(snapshot)),
+        sr_frames:{},feature_progress:{status:'features current'}});
+    await c.refreshStored();assert.equal(c.bars[0],stored);assert.equal(c.srSnapshot,snapshot);
+    events=[];
     c.liveEnabled=true;
     c._fetchPage=()=>new Promise(()=>{});
     c.refreshStored(); // Deliberately stuck full chart request.
