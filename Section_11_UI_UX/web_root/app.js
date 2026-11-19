@@ -113,6 +113,7 @@ async function loadAll() {
     DataCache.subscribe((cache, op) => {
         if (op === "loading") { latestControl.update(chart, cache); return; }
         if (op === "error") { updateStatus(); return; }
+        if (op === "liquidity") { Composer.updateLiquidity(chart, cache); return; }
         if (op === "live" && !rendering && !pending && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {

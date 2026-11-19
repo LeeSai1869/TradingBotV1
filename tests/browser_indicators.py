@@ -46,11 +46,13 @@ async def exercise(base,library):
         assert 'DI dominance 0.33' in await page.locator('.indicator-values[aria-label="DI values"]').inner_text()
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('vwap').getPane().paneIndex();})()") == 0
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('adx').getPane().paneIndex()!==x.getSeries('di_plus').getPane().paneIndex() && x.getSeries('adx').priceLines().some(line=>line.options().price===25) && x.getSeries('vwap_upper1').options().title==='';})()")
-        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','volume','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
+        assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return ['rsi','adx','atr','vwap'].every(key=>x.getSeries(key).priceFormatter().format(34.40199)==='34.40');})()")
         assert await page.evaluate("Canvas.chart.panes()[0].getSeries().filter(s=>s.options().title==='EMA 50' || s.options().color===Composer.config.featureStyles.ema50.color).some(s=>s.options().lastValueVisible && s.priceFormatter().format(34.40199)==='34.40')")
         assert 'O' in await page.get_by_role('region',name='Candle details').inner_text()
         details=page.get_by_role('region',name='Candle details')
         assert await details.locator('dt').filter(has_text='Vol').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
+        assert 'USDT' in await page.locator('.indicator-values[aria-label="Volume values"]').inner_text()
+        assert '≈' in await details.inner_text()
         await page.evaluate("""async()=>{
             const indicators=await import('/overlays/indicators/index.js');
             const bar=DataCache.bars.at(-1);
@@ -85,8 +87,8 @@ async def exercise(base,library):
             if(series.seriesType()!=='Line'||lineWidth!==4||lineStyle!==2||color!=='#18abfe')
                 throw Error('Volume line style did not apply');
             const bar=DataCache.bars.at(-1);
-            indicators.updateLive(Canvas.chart,{...bar,client:{...bar.client,volume:123.45}});
-            if(series.data().at(-1).value!==123.45)throw Error('Volume line missed live update');
+            indicators.updateLive(Canvas.chart,{...bar,client:{...bar.client,volume:123.45,quote_volume:246.9}});
+            if(series.data().at(-1).value!==246.9)throw Error('Volume line missed live update');
         }""")
         await page.get_by_role('button',name='Close RSI',exact=True).click();await settle(page)
         assert await page.evaluate('Canvas.chart.panes().length')==5
@@ -97,6 +99,34 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==5
         assert await page.evaluate('Composer.config.featureStyles.rsi.visible') is False
         assert await page.evaluate("Composer.config.featureStyles.volume.presentation === 'line' && Composer.config.featureStyles.volume.style === 2")
+        # Dense BTC depth packets must render and leave the main time scale draggable.
+        await page.evaluate("""async () => {
+            const {update} = await import('/overlays/liquidity/index.js');
+            Composer.config.featureStyles.liquidity_bids.visible = true;
+            Composer.config.featureStyles.liquidity_heatmap.visible = true;
+            const bars = DataCache.bars;
+            const start = bars.at(-2).open_time - 1200000;
+            const bands = Array.from({length: 550}, (_, i) => ({
+                side:'bid', low:236 + i/1000, high:236.001 + i/1000, notional_usdt:1000+i
+            }));
+            const history = Array.from({length:240}, (_, i) => ({
+                observed:true, market:'usdt_perpetual', bands, metrics:{mid:240},
+                sampled_ms:start+i*5000, available_ms:start+i*5000, book_received_ms:start+i*5000
+            }));
+            update(Canvas.chart, {bars, liquidity:{status:'stale', history}});
+        }""")
+        await settle(page)
+        target=await page.locator('#chart canvas').first.bounding_box()
+        x=target['x']+target['width']*.6
+        y=target['y']+target['height']*.4
+        before=await page.evaluate("Canvas.chart.timeScale().getVisibleLogicalRange().from")
+        await page.mouse.move(x,y)
+        await page.mouse.down()
+        await page.mouse.move(x+150,y,steps=10)
+        await page.mouse.up()
+        await settle(page)
+        after=await page.evaluate("Canvas.chart.timeScale().getVisibleLogicalRange().from")
+        assert after < before - 1, (before, after)
         assert not errors,errors
         forbidden=['/api/chart_window','/api/flags_current','/api/live_candle']
         assert not any(any(path in url for path in forbidden) for url in requests)

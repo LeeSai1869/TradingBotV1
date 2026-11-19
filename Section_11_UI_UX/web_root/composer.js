@@ -97,6 +97,10 @@ const Composer = {
         }
     },
 
+    updateLiquidity(chart, data) {
+        liquidity.update(chart, {...data, bars: data.renderBars});
+    },
+
     updateAll(chart, data, op = "reload", options = {}) {
         for (const v of this.visuals) {
             try {

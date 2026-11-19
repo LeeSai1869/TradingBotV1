@@ -1,21 +1,56 @@
+import {formatTurnover, isUSDT, turnover, turnoverPriceFormat, TURNOVER_AVERAGE_BARS} from '../../web_root/quote_volume.js';
 import {formatValue,featurePriceFormat} from '../../web_root/value_format.js';
 // Completed stored indicators use exactly the same canonical bars as candles.
 import {FEATURE_STYLES} from '../../controls/settings/feature_styles.js';
 import {PANE_FEATURES} from '../../controls/settings/feature_legend.js';
 export const name='indicators';
 const groups=new Map();let chart, controls, observer, latestBar, hoverTime=null, barsByTime=new Map();
+let turnoverAverages = new Map(), turnoverTail = [], quoteVolume = false;
+function averageTurnover(points) {
+    if (points.length < TURNOVER_AVERAGE_BARS || points.some(point => !point)) return null;
+    return {value: points.reduce((sum, point) => sum + point.value, 0) / TURNOVER_AVERAGE_BARS,
+        estimated: points.some(point => point.estimated)};
+}
+function updateTurnover(bars) {
+    quoteVolume = isUSDT(bars.at(-1));
+    turnoverAverages = new Map();
+    turnoverTail = [];
+    if (!quoteVolume || !['volume', 'volume_ma'].some(key => styles()[key]?.visible)) return;
+    for (const bar of bars) {
+        turnoverTail.push(turnover(bar));
+        if (turnoverTail.length > TURNOVER_AVERAGE_BARS) turnoverTail.shift();
+        turnoverAverages.set(bar.time, averageTurnover(turnoverTail));
+    }
+}
 function values(){
     const bar=barsByTime.get(hoverTime)||latestBar;
     for(const state of groups.values())if(state.valueLabel){
-        state.valueLabel.replaceChildren();
+        const labels = [];
         for(const [key,label] of FEATURE_STYLES[state.feature].outputs)if(styles()[key]?.visible||window.Composer.config.hiddenFeatures?.[state.feature]?.includes(key)){
-            const text=document.createElement("span");text.textContent=`${label} ${formatValue(bar?value(bar,key):null)}`;text.style.color=styles()[key].color;state.valueLabel.append(text);
+            let text = `${label} ${formatValue(bar ? value(bar,key) : null)}`;
+            if (quoteVolume && key === 'volume') text = `Turnover ${formatTurnover(turnover(bar))}`;
+            if (quoteVolume && key === 'volume_ma') text = `Turnover SMA (${TURNOVER_AVERAGE_BARS}) ${formatTurnover(turnoverAverages.get(bar?.time))}`;
+            labels.push([text, styles()[key].color]);
         }
+        const signature = JSON.stringify(labels);
+        if (signature === state.labelSignature) continue;
+        state.labelSignature = signature;
+        state.valueLabel.replaceChildren(...labels.map(([label,color]) => {
+            const text = document.createElement("span");
+            text.textContent = label;
+            text.style.color = color;
+            return text;
+        }));
     }
 }
 const LOWER=PANE_FEATURES;
 function styles(){return window.Composer.config.featureStyles||{};}
-function value(bar,key){const n=key==='volume'?bar.client?.volume:bar.features?.[key];return Number.isFinite(n)?n:null;}
+function value(bar,key){
+    if (quoteVolume && key === 'volume') return turnover(bar)?.value ?? null;
+    if (quoteVolume && key === 'volume_ma') return turnoverAverages.get(bar.time)?.value ?? null;
+    const n=key==='volume'?bar.client?.volume:bar.features?.[key];
+    return Number.isFinite(n)?n:null;
+}
 function button(label,text,parent,action){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.onclick=action;parent.append(b);return b;}
 function positionHeaders(){
     if(!chart)return;
@@ -89,6 +124,7 @@ export function mount(instance){
 }
 export function update(instance,data){
     barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
+    updateTurnover(data.bars || []);
     for(const feature of [...LOWER,'VWAP','WMA','Volume Profile','Market Structure']){
         const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&styles()[key]?.visible);
         let state=groups.get(feature);
@@ -113,7 +149,7 @@ export function update(instance,data){
                 state.volumePresentation = presentation;
             }
             line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
-                priceFormat:featurePriceFormat,
+                priceFormat:quoteVolume && state.feature === 'Volume' ? turnoverPriceFormat : featurePriceFormat,
                 lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:!!style?.visible && !state.collapsed});
             if(!style?.visible)continue;
             line.setData((data.bars||[]).map(bar => indicatorPoint(bar, key, style)));
@@ -124,6 +160,14 @@ export function update(instance,data){
 }
 export function updateLive(instance,bar){
     if(!bar)return;
+    if (quoteVolume && turnoverTail.length) {
+        if (latestBar?.time === bar.time) turnoverTail[turnoverTail.length - 1] = turnover(bar);
+        else {
+            turnoverTail.push(turnover(bar));
+            if (turnoverTail.length > TURNOVER_AVERAGE_BARS) turnoverTail.shift();
+        }
+        turnoverAverages.set(bar.time, averageTurnover(turnoverTail));
+    }
     latestBar=bar;barsByTime.set(bar.time,bar);values();
     for(const state of groups.values())for(const [key,line] of state.lines){
         const style = styles()[key];

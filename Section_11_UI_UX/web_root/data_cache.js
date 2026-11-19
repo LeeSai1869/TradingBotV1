@@ -281,16 +281,18 @@ const DataCache = {
             const profileChanged=JSON.stringify(this.volumeProfile)!==JSON.stringify(packet.volume_profile??null);
             this.volumeProfile=packet.volume_profile??null;
             const signature = JSON.stringify(packet.bars);
-            const changed = signature !== this._latestSignature || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
-            if (changed) {
+            const rowsChanged = signature !== this._latestSignature;
+            const chartChanged = rowsChanged || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged;
+            if (rowsChanged) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);
                 this.latestBar = this.bars.at(-1) || null;
             }
             const liveChanged = this._applyLive(packet.live);
-            if (changed) this.emit("stored-refresh");
+            if (chartChanged || (liquidityChanged && liveChanged)) this.emit("stored-refresh");
             else if (liveChanged) this.emit("live");
-            return changed || liveChanged;
+            else if (liquidityChanged) this.emit("liquidity");
+            return chartChanged || liveChanged || liquidityChanged;
         }).finally(() => {
             if (this._refreshPromise === work) this._refreshPromise = null;
         });

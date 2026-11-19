@@ -138,34 +138,13 @@ def _refetch_range(symbol: str, interval: str, start_ms: int, end_ms: int) -> in
         if not page:
             break
 
-        rows = []
-        for k in page:
-            ct = int(k[6])
-            if ct >= now_ms:
-                continue
-            ot = int(k[0])
-            if ot >= end_ms:
-                break
-            rows.append((
-                symbol, interval, ot,
-                float(k[1]), float(k[2]), float(k[3]), float(k[4]),
-                float(k[5]), ct,
-            ))
-
-        if rows:
-            conn = sqlite3.connect(str(cfg.KLINES_DB))
-            try:
-                cur = conn.executemany(
-                    "INSERT OR IGNORE INTO klines "
-                    "(symbol, interval, open_time, open, high, low, close, "
-                    "volume, close_time) "
-                    "VALUES (?,?,?,?,?,?,?,?,?)",
-                    rows,
-                )
-                conn.commit()
-                inserted += cur.rowcount
-            finally:
-                conn.close()
+        from ..Storage import klines_store
+        conn = sqlite3.connect(str(cfg.KLINES_DB))
+        try:
+            inserted += klines_store.insert_binance_page(
+                conn, symbol, interval, (k for k in page if int(k[0]) < end_ms), now_ms)
+        finally:
+            conn.close()
 
         last_close = int(page[-1][6])
         cursor = last_close + 1

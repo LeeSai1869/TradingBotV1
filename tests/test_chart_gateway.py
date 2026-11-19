@@ -124,6 +124,12 @@ class ChartGatewayTests(unittest.TestCase):
         self.assertEqual((status, packet), (200, snapshot))
         live.assert_called_once_with('BTCUSDT', '1m')
 
+    def test_chart_page_preserves_exchange_quote_volume_and_legacy_rows(self):
+        row = self.candle('BTCUSDT', 300_000)
+        db.write_klines([{**row, 'quote_volume': 123.45}])
+        packet = db.read_state_page('BTCUSDT', '1m', 2)
+        self.assertEqual([bar['client']['quote_volume'] for bar in packet['bars']], [None, 123.45])
+
     def test_invalid_cursor_and_page_size_are_rejected(self):
         for query in ['limit=0','limit=1001','before=wrong','limit=wrong']:
             status,_ = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&'+query,None)

@@ -66,7 +66,29 @@ class Liquidity {
     }
     detached(){this.chart=this.series=this.requestUpdate=null;}
     paneViews(){return this.views||[];}
-    get hitboxes(){return [...(this.heatmapBoxes||[]),...(this.profileBoxes||[])];}
+    setHistory(history, config) {
+        let maximum = 1;
+        this.history = config.liquidity_heatmap?.visible ? history.map(sample => {
+            const bands = bandRows(sample, config);
+            for (const band of bands) maximum = Math.max(maximum, band.notional_usdt);
+            return {sample, bands};
+        }) : [];
+        this.historyMaximum = maximum;
+    }
+    hitAt({x,y}) {
+        const profile = this.profileBoxes || [];
+        const columns = this.heatmapColumns || [];
+        for (let columnIndex = columns.length; columnIndex >= 0; columnIndex--) {
+            const column = columns[columnIndex];
+            if (column && (x < column.left || x > column.right)) continue;
+            const boxes = column?.boxes ?? profile;
+            for (let i = boxes.length - 1; i >= 0; i--) {
+                const b = boxes[i];
+                if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) return b;
+            }
+        }
+        return null;
+    }
     xAt(ms){
         let lo=0,hi=this.bars.length;
         while(lo<hi){const mid=(lo+hi)>>1;if(this.bars[mid].open_time<=ms)lo=mid+1;else hi=mid;}
@@ -79,16 +101,22 @@ class Liquidity {
         if(!this.series||!snapshot)return;
         target.useMediaCoordinateSpace(({context,mediaSize})=>{
             const config=styles(),latest=fresh(snapshot),boxes=[];
-            this[layer==='heatmap'?'heatmapBoxes':'profileBoxes']=boxes;
+            const columns = [];
+            if (layer === 'heatmap') this.heatmapColumns = columns;
+            else this.profileBoxes = boxes;
             const spacing=this.chart.timeScale().options().barSpacing,last=this.bars.at(-1);
             const candleX=last?this.chart.timeScale().timeToCoordinate(last.time):null;
             const protectedX=last?.provisional?candleX:null;
-            const history=snapshot.history||[],max=Math.max(1,...history.flatMap(s=>bandRows(s,config).map(b=>b.notional_usdt)));
-            const paint=(band,box,opacity,observed_ms)=>{
+            const coordinates = new Map();
+            const coordinate = price => {
+                if (!coordinates.has(price)) coordinates.set(price, this.series.priceToCoordinate(price));
+                return coordinates.get(price);
+            };
+            const paint=(band,box,opacity,observed_ms,hits=boxes)=>{
                 if(box.x+box.width<0||box.x>mediaSize.width||box.y+box.height<0||box.y>mediaSize.height)return false;
                 context.fillStyle=config[`liquidity_${band.side==='bid'?'bids':'asks'}`].color;
                 context.globalAlpha=opacity;context.fillRect(box.x,box.y,box.width,box.height);
-                boxes.push({...box,height:box.height,band:{...band,observed_ms}});
+                hits.push({...box,band,observed_ms});
                 return true;
             };
             const bounds=(sample,band)=>{
@@ -96,16 +124,31 @@ class Liquidity {
                 // Clip each side at the observed midpoint, preserving price meaning.
                 const mid=sample.metrics.mid,low=band.side==='ask'?Math.max(band.low,mid):band.low;
                 const high=band.side==='bid'?Math.min(band.high,mid):band.high;
-                const top=this.series.priceToCoordinate(high),bottom=this.series.priceToCoordinate(low);
+                const top=coordinate(high),bottom=coordinate(low);
                 return top===null||bottom===null?null:{y:Math.min(top,bottom),height:Math.abs(bottom-top)};
             };
             context.save();
-            if(layer==='heatmap'&&config.liquidity_heatmap?.visible)for(const sample of history){
-                const t=sample.sampled_ms??sample.available_ms,x=this.xAt(t),end=this.xAt(t+5000);
-                if(x===null||end===null)continue;
-                for(const band of bandRows(sample,config)){
-                    const vertical=bounds(sample,band);if(!vertical)continue;
-                    for(const span of heatmapSpans(x,end-x,protectedX,spacing))paint(band,{...span,...vertical},(config.liquidity_heatmap.opacity??40)/100*Math.sqrt(band.notional_usdt/max),sample.book_received_ms);
+            const visibleSamples = new Map();
+            if (layer === 'heatmap') for (const {sample, bands} of this.history) {
+                const t = sample.sampled_ms ?? sample.available_ms;
+                const start = this.xAt(t), stop = this.xAt(t + 5000);
+                if (start === null || stop === null || stop <= start || stop <= 0 || start >= mediaSize.width) continue;
+                // Several book observations can fall inside one pixel at 5m/15m.
+                // Draw the latest observation per pixel until zoom reveals the rest.
+                const x = stop - start < 1 ? Math.floor(start) : start;
+                visibleSamples.set(x, {sample, bands, x, end: Math.max(x + 1, stop)});
+            }
+            for (const {sample, bands, x, end} of visibleSamples.values()) {
+                const spans = heatmapSpans(x, end - x, protectedX, spacing);
+                if (!spans.length) continue;
+                const column = {left: x, right: end, boxes: []};
+                columns.push(column);
+                for (const band of bands) {
+                    const vertical = bounds(sample, band);
+                    if (!vertical) continue;
+                    const opacity = (config.liquidity_heatmap.opacity ?? 40) / 100;
+                    for (const span of spans) paint(band, {...span,...vertical},
+                        opacity * Math.sqrt(band.notional_usdt / this.historyMaximum), sample.book_received_ms, column.boxes);
                 }
             }
             const projected=layer==='profile'&&currentBookVisible(latest,this.bars,this.following,this.chart.timeScale().getVisibleRange());
@@ -134,8 +177,12 @@ export function mount(){
     Object.assign(tooltip.style,{position:'absolute',left:'8px',bottom:'30px',background:'#101820ee',color:'#fff',fontSize:'12px',padding:'6px',pointerEvents:'none',zIndex:3});
     document.getElementById('chart').append(tooltip);
     primitive.chart?.subscribeCrosshairMove(param=>{
-        const hit=param.point?[...(primitive.hitboxes||[])].reverse().find(b=>param.point.x>=b.x&&param.point.x<=b.x+b.width&&param.point.y>=b.y&&param.point.y<=b.y+b.height):null;
-        tooltip.hidden=!hit;if(hit)tooltip.textContent=bandLabel(hit.band);
+        const hit = param.point ? primitive.hitAt(param.point) : null;
+        tooltip.hidden = !hit;
+        if (hit) {
+            const label = bandLabel({...hit.band, observed_ms: hit.observed_ms});
+            if (tooltip.textContent !== label) tooltip.textContent = label;
+        }
     });
 }
 export function feedState(snapshot,now=Date.now()){return fresh(snapshot,now)?'live':snapshot?.status==='live'?'stale':snapshot?.status||'not recording';}
@@ -158,7 +205,8 @@ function statusText(){
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);
     snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];primitive.following=data.atLiveEdge!==false;primitive.projectionHint='';status.hidden=!enabled;tooltip.hidden=true;
-    if(!enabled){primitive.heatmapBoxes=[];primitive.profileBoxes=[];}
+    primitive.setHistory(snapshot?.history || [], styles());
+    if(!enabled){primitive.heatmapColumns=[];primitive.profileBoxes=[];}
     clearTimeout(expiryTimer);
     if(enabled)statusText();primitive.requestUpdate?.();
     if(enabled&&snapshot?.latest){

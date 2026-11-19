@@ -117,13 +117,22 @@ export function srRole(item,bars){
     let support=item.side==='support'||item.key==='support_zones'||item.key==='inst_support_zones';
     let resistance=!support;
     const history=item.history||[];let cursor=0;
-    for(const bar of bars){
-        if(bar.provisional||bar.time<item.start||bar.time>item.end)continue;
+    let first = 0, end = bars.length;
+    while (first < end) {
+        const middle = (first + end) >>> 1;
+        if (bars[middle].time < item.start) first = middle + 1;
+        else end = middle;
+    }
+    for (let index = first; index < bars.length; index++) {
+        const bar = bars[index];
+        if (bar.time > item.end) break;
+        if (bar.provisional) continue;
         const close=bar.client?.close;if(!Number.isFinite(close))continue;
         while(cursor+1<history.length&&history[cursor+1].time<=bar.time)cursor++;
         const bounds=history[cursor]||item;
         if(close>bounds.high)support=true;
         if(close<bounds.low)resistance=true;
+        if (support && resistance) return 'both';
     }
     return support&&resistance?'both':support?'support':'resistance';
 }

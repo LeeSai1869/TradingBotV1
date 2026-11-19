@@ -37,6 +37,7 @@ def fetch_forming_candle(symbol: str, interval: str):
         "low": float(k[3]),
         "close": float(k[4]),
         "volume": float(k[5]),
+        "quote_volume": float(k[7]),
     }
 
 
@@ -93,6 +94,8 @@ class FormingCandleCache:
                 open_time = int(raw['open_time']) if 'open_time' in raw else int(raw['time'])*1000
                 close_time = int(raw['close_time'])
                 values = {name: float(raw[name]) for name in ('open','high','low','close','volume')}
+                if raw.get('quote_volume') is not None:
+                    values['quote_volume'] = float(raw['quote_volume'])
                 if not all(math.isfinite(value) for value in values.values()):
                     raise ValueError('Non-finite forming candle')
                 if close_time >= int(self.wall_clock()*1000):
