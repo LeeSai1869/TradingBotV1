@@ -98,6 +98,10 @@ const Composer = {
         this._seriesKey=`${data.symbol}:${data.timeframe}:${data._barsVersion}:${data._liveVersion||0}`;
     },
 
+    updateLiquidity(chart, data) {
+        liquidity.update(chart, {...data, bars: data.renderBars});
+    },
+
     updateAll(chart, data, op = "reload", options = {}) {
         const timings=[],started=performance.now();
         const key=`${data.symbol}:${data.timeframe}:${data._barsVersion}:${data._liveVersion||0}`;

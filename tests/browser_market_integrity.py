@@ -11,7 +11,7 @@ async def exercise(base,library):
     for i in range(2200):
         stamp=end-(2200-i)*step;price=3000+i*.01
         rows.append(dict(symbol='ETHUSDT',interval='15m',open_time=stamp,close_time=stamp+step-1,
-            open=price,high=price+2,low=price-1,close=price+1,volume=100))
+            open=price,high=price+2,low=price-1,close=price+1,volume=100,quote_volume=300000))
         features.append(dict(symbol='ETHUSDT',interval='15m',open_time=stamp,ema50=price,volume_ma=321))
     db.write_klines(rows);db.write_features(features)
     async with async_playwright() as p:
@@ -77,7 +77,7 @@ const originalInit=Canvas.init.bind(Canvas);Canvas.init=(...args)=>{
         await settle(page)
         line=await page.evaluate("import('/overlays/indicators/index.js').then(m=>({options:m.getSeries('volume_ma').options(),last:m.getSeries('volume_ma').data().at(-1)}))")
         assert line['options']['visible'] and line['options']['lineWidth']==4 and line['options']['lineStyle']==2,line
-        assert line['last']['value']==321,line
+        assert line['last']['value']==300000,line
         # A correctly labeled envelope with BTC candle contents must still fail closed.
         async def mismatch(route):
             response=await route.fetch();packet=await response.json()

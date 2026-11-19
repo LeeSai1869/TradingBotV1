@@ -2,6 +2,7 @@
 // Retain visited history for smooth reversal; only fetch the next older page.
 const WINDOW_BARS = 1000;
 const BLOCK_BARS = 500;
+const LIVE_TAIL_BARS = 4;
 
 const DataCache = {
     symbol: null,
@@ -9,7 +10,7 @@ const DataCache = {
     bars: [],
     liveEnabled: true,
     historyPending: false,
-    formingBar: null,
+    liveBars: [],
     featureProgress: null,
     volumeProfile: null,
     liquidity:null,
@@ -34,33 +35,35 @@ const DataCache = {
     _requests: new Set(),
     listeners: [],
 
+    get formingBar() {
+        return this.liveBars.at(-1) ?? null;
+    },
+
     get renderBars() {
-        return this.formingBar ? [...this.bars, this.formingBar] : this.bars;
+        return this.liveBars.length ? [...this.bars, ...this.liveBars] : this.bars;
     },
 
     _applyLive(live) {
-        if(live)this.liveQuote=this.liveEnabled?(live.bar??null):null;
-        const previous = JSON.stringify([this.formingBar, this.liveStatus]);
+        if (live) this.liveQuote = this.liveEnabled ? (live.bar ?? null) : null;
+        const previous = JSON.stringify([this.liveBars, this.liveStatus]);
         const latest = this.bars.at(-1);
-        if (!this.liveEnabled || !latest || this.formingBar?.open_time <= latest.open_time) {
-            this.formingBar = null;
-        }
-        if (live && this.liveEnabled) {
-            this.liveStatus = live.status;
-            if (live.status === "inactive") this.formingBar = null;
-            const candidate = live.bar;
-            if (candidate && latest) {
-                // Do not jump over missing audited history. At rollover keep
-                // the prior provisional bar until the store replaces it.
-                if (candidate.open_time === latest.client.close_time + 1) {
-                    this.formingBar = candidate;
-                } else if (candidate.open_time > latest.open_time) {
-                    this.liveStatus = "waiting for stored bar";
+        if (!this.liveEnabled || live?.status === "inactive") {
+            this.liveBars = [];
+        } else {
+            if (latest) this.liveBars = this.liveBars.filter(bar => bar.open_time > latest.open_time);
+            const candidate = live?.bar;
+            if (candidate && (!latest || candidate.open_time > latest.open_time)) {
+                const last = this.formingBar;
+                if (!last || candidate.open_time > last.open_time) {
+                    this.liveBars = [...this.liveBars, candidate].slice(-LIVE_TAIL_BARS);
+                } else if (candidate.open_time === last.open_time) {
+                    this.liveBars[this.liveBars.length - 1] = candidate;
                 }
             }
         }
-        const changed=previous !== JSON.stringify([this.formingBar, this.liveStatus]);
-        if(changed)this._liveVersion=(this._liveVersion||0)+1;
+        if (live && this.liveEnabled) this.liveStatus = live.status;
+        const changed = previous !== JSON.stringify([this.liveBars, this.liveStatus]);
+        if (changed) this._liveVersion = (this._liveVersion || 0) + 1;
         return changed;
     },
 
@@ -175,7 +178,7 @@ const DataCache = {
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _livePromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
-            historyPending: false, formingBar: null, liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, liveBars: [], liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
@@ -201,18 +204,19 @@ const DataCache = {
             return true;
         } catch(error) {
             if(generation!==this._reloadGeneration)return false;
+            this.error = error.message;
             throw error;
         } finally {
             if (generation === this._reloadGeneration) this.loading = false;
         }
     },
 
-    prefetchOlder() {
+    prefetchOlder({limit = BLOCK_BARS} = {}) {
         if (this.loading || this.nextBefore === null) return Promise.resolve(false);
         if (this._olderPromise) return this._olderPromise;
         const generation = this._reloadGeneration;
         const cursor = this.nextBefore;
-        const request = this._fetchPage(this.symbol, this.timeframe, BLOCK_BARS, cursor);
+        const request = this._fetchPage(this.symbol, this.timeframe, limit, cursor);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || cursor !== this.nextBefore) return false;
             if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
@@ -313,16 +317,17 @@ const DataCache = {
             const signature = JSON.stringify(packet.bars);
             const changedRows=packet.bars.filter(bar=>JSON.stringify(existing.get(bar.open_time))!==JSON.stringify(bar));
             const barsChanged=changedRows.length>0;
-            const changed = barsChanged || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged || liquidityChanged;
+            const changed = barsChanged || historyChanged || profileChanged || fvgChanged || progressChanged || srChanged;
             if (changed) {
                 this._latestSignature = signature;
                 if(barsChanged)this._merge(changedRows);
                 this.latestBar = this.bars.at(-1) || null;
             }
             const liveChanged = this._applyLive(packet.live);
-            if (changed) this.emit("stored-refresh");
+            if (changed || (liquidityChanged && liveChanged)) this.emit("stored-refresh");
             else if (liveChanged) this.emit("live");
-            return changed || liveChanged;
+            else if (liquidityChanged) this.emit("liquidity");
+            return changed || liveChanged || liquidityChanged;
         }).catch(error=>{
             if(generation!==this._reloadGeneration)return false;
             throw error;
