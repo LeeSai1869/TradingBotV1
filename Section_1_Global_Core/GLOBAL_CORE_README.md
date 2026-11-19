@@ -66,11 +66,11 @@ Nothing else. In particular:
     Section_1_Global_Core.section_1_9_orchestrator.*       <- PRIVATE
     Section_1_Global_Core.section_1_10_*                   <- PRIVATE
     Section_1_Global_Core.section_1_11_*                   <- PRIVATE
-    Section_1_Global_Core.tools.*                          <- PRIVATE
+    Section_13_Development.diagnostics.core.*                          <- PRIVATE
 
 Enforced by:
 
-    python3 -m Section_1_Global_Core.tools.check_imports
+    python3 -m Section_13_Development.diagnostics.core.check_imports
 
 ---
 
@@ -209,7 +209,7 @@ data changes. Existing range readers remain compatible.
 
 Re-audit scope: isolated SQLite contract tests cover exact counts, gaps,
 calendar-month keys, missing derived rows, market identity and cursor edges.
-Browser flow tests exercise the same gateway. This is not a new market-data
+Browser flow Section_13_Development/tests exercise the same gateway. This is not a new market-data
 A1/A2/A5 certification: the cloud instance has no downloaded market history.
 The previously reported public-surface checker conflicts remain outstanding.
 
@@ -246,9 +246,9 @@ other pairs get turns while catching up. No formulas or store schemas change.
 Closed alert reads use the shared DB gateway/data lock; live alert reads reuse
 the shared Section 11 snapshot cache and never write provisional market rows.
 
-Isolated tests compare warmup rows, verify bounded chronological delivery, and
+Isolated Section_13_Development/tests compare warmup rows, verify bounded chronological delivery, and
 exercise real feature computation. Actual Ethereum download progress must be
-checked on the user's machine with `python3 check_coin.py ETHUSDT`; this cloud
+checked on the user's machine with `python3 Section_13_Development/diagnostics/check_coin.py ETHUSDT`; this cloud
 checkout does not contain their current registry or historical data. Restart the
 runner after pulling so its in-memory code adopts the bounded reads.
 
@@ -361,7 +361,7 @@ outputs and dependents. Unchanged feature columns stay intact; strategy/style ed
 do not reset Section 4. Repair checkpoints resume after restart, and the initial
 formula-v3 migration retains its progress. See
 [`SELECTIVE_REPLAY.md`](../Section_4_Features/execution/SELECTIVE_REPLAY.md) for
-dependency, visibility and state-merging behavior. `check_coin.py SYMBOL --logs`
+dependency, visibility and state-merging behavior. `Section_13_Development/diagnostics/check_coin.py SYMBOL --logs`
 lists affected columns and repair progress separately from feature row counts.
 
 ### Checkpoint-based chart progress and diagnostic logs
@@ -373,7 +373,7 @@ Pending event batches are labelled as events; only the processor's committed row
 messages report completed calculations. Background turns identify their pair in
 runner logs. No feature generation runs in the status endpoint.
 
-`check_coin.py --logs` reads bounded log tails, reports modification times, and on
+`Section_13_Development/diagnostics/check_coin.py --logs` reads bounded log tails, reports modification times, and on
 macOS compares stderr modification time to the running PID's start time. Errors
 that predate that start remain in the file but are not presented as new failures.
 
@@ -392,7 +392,7 @@ This changes scheduling only and never resets feature checkpoints.
 
 ### Runtime health and zone availability
 
-Run `python3 audit_status.py` for a read-only report naming active missing/stale
+Run `python3 Section_13_Development/diagnostics/audit_status.py` for a read-only report naming active missing/stale
 pairs and unfinished historical downloads. It samples recent rows; it does not
 verify exchange values or full-history continuity, repair data, or write audit
 records. `--symbol ETHUSDT` narrows the report. A source-confirmed first forming
@@ -407,7 +407,7 @@ jobs resume without resetting checkpoints or recalculating unrelated columns.
 
 SQLite initialization and multi-store acquisition failures close already-open
 handles. The runner records its PID, project and precise start timestamp so
-`check_coin.py` can distinguish earlier appended errors from this run. This does
+`Section_13_Development/diagnostics/check_coin.py` can distinguish earlier appended errors from this run. This does
 not erase logs or establish that every historical error has been resolved.
 
 The obsolete hard-coded `_section1_audit.py`, unused single-row compatibility
@@ -456,7 +456,7 @@ The analytical processor now reserves a separate bounded historical lane after
 its live turn. Core owns the persistence/indexing adapter; Section 5 owns the
 unchanged analytical formulas. Historical runs and Bias dependencies have a
 separate `engine_history_bindings` index and do not replace live `mtf_bindings`.
-See [SECTION5_HISTORY.md](../SECTION5_HISTORY.md) for budgets, lineage and readiness
+See [docs/SECTION5_HISTORY.md](../docs/SECTION5_HISTORY.md) for budgets, lineage and readiness
 semantics. This amendment does not change raw ingestion, Section 4 calculations,
 BarEvent or the production decision rules. It supersedes any implication that
 current live Section 5 publications certify all-history completion.

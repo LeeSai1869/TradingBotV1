@@ -5,7 +5,7 @@ Matching existing formula-v3 checkpoints retain their progress; future edits
 update only affected columns and dependents. Strategy and display edits do not
 restart feature history.
 
-The executable calculations in `sections_4&5_Tradingview` are translated into
+The executable calculations in `Section_4_Features/conversion/reference/sections_4_and_5.pine` are translated into
 **22 numbered Section 4 calculation modules and six Section 5 modules**. The complete
 537-field MarketFeatures contract and six regime outputs are calculated and
 persisted, with compatible aliases for existing clients. This replaces the earlier
@@ -45,7 +45,7 @@ Before their first replacement, the runner preserves the feature database as
 `features.pre-pine-v3.db`. Replay uses bounded pages and a round-robin maintenance
 budget between download cycles, including intervals with no new candles. Older
 rows remain available while replay catches up. Large histories can take time;
-`python3 check_coin.py ETHUSDT` reports the separate full-conversion cursor.
+`python3 Section_13_Development/diagnostics/check_coin.py ETHUSDT` reports the separate full-conversion cursor.
 
 Forming-candle features come from a copy of the committed closed state. They never
 write features or advance the checkpoint. They remain unavailable until that
@@ -147,7 +147,7 @@ A replay error previously escaped maintenance and aborted the rest of its pass.
 Maintenance now reports the failing symbol/timeframe, retains its committed
 checkpoint, and continues other pairs within the global budget. Orchestrator
 maintenance failures also no longer prevent the event pass. Failed candles are
-not skipped. Disabled timeframes remain paused. `check_coin.py SYMBOL --logs`
+not skipped. Disabled timeframes remain paused. `Section_13_Development/diagnostics/check_coin.py SYMBOL --logs`
 shows policy, pending raw candles after each checkpoint, and recent runner logs.
 This fixes a demonstrated failure-isolation path; it does not establish why an
 individual Mac stalled without that machine's diagnostic output.

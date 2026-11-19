@@ -1,11 +1,11 @@
 # Numbered Section 4 feature calculations
 
-Permanent retention follows the project [storage policy](../../STORAGE_POLICY.md).
+Permanent retention follows the project [storage policy](../../docs/STORAGE_POLICY.md).
 Calculation outputs and stored historical fields are separate contracts. Alias
 retirement precedes individual review of optional historical measurements.
 
 This is the only active Section 4 calculation folder. Each numbered `4.2.x`
-section in `sections_4&5_Tradingview` owns one file. There is no 4.2.15 in that
+section in `Section_4_Features/conversion/reference/sections_4_and_5.pine` owns one file. There is no 4.2.15 in that
 source; no section is invented to fill the gap.
 
 Engulfing, rejection, candle pivots and break/retest stay together in 4.2.12.

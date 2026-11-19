@@ -85,7 +85,7 @@ projected-input lineage/persistence described above.
 
 The first pure classifier, typed immutable configuration, public Core projection
 adapter, immutable minimal input bundles and atomic versioned history/checkpoints
-are implemented. See [REGIME_V1.md](../REGIME_V1.md) and `run_regime.py --help`.
+are implemented. See [REGIME_V1.md](../REGIME_V1.md) and `Section_14_Operations/commands/run_regime.py --help`.
 It is deliberately on-demand: no scheduler, UI or decision migration is included.
 Source/config/seed changes produce separate runs. Out-of-band raw edits require an
 explicit revision; historical publication availability remains reconstructed.

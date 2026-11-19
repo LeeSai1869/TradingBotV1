@@ -44,7 +44,7 @@ and real elapsed wall time to assess sustained production catch-up.
 Run on the target machine without writing production data:
 
 ```sh
-python3 benchmark_features.py --bars 1000 --warmup 500 --compare
+python3 Section_13_Development/benchmarks/benchmark_features.py --bars 1000 --warmup 500 --compare
 ```
 
 Order-block execution additionally removes `rt.truth` only around expressions

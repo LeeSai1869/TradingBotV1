@@ -68,11 +68,11 @@ responses must be a JSON array matching the observation contract below. Alternat
 write a vendor-specific converter and use the local import command.
 
 ```bash
-python3 sentiment_sources.py configure my_provider.json
-python3 sentiment_sources.py import my_provider my_observations.json
+python3 Section_14_Operations/configuration/sentiment_sources.py configure my_provider.json
+python3 Section_14_Operations/configuration/sentiment_sources.py import my_provider my_observations.json
 # Optional explicit HTTPS fetch, only if configured:
-python3 sentiment_sources.py fetch my_provider
-python3 sentiment_sources.py status --symbol BTCUSDT
+python3 Section_14_Operations/configuration/sentiment_sources.py fetch my_provider
+python3 Section_14_Operations/configuration/sentiment_sources.py status --symbol BTCUSDT
 ```
 
 Each imported observation has exactly these keys (illustrative, not real data):

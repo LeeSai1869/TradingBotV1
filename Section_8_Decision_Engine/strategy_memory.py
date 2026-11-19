@@ -206,7 +206,7 @@ def load(symbol,frame,*,fields=None,since=None,until=None,limit=None,center=None
 
 
 def metadata(symbol,frame):
-    from strategy_analyzer_workspace import field_catalog
+    from .strategy_catalog import field_catalog
     source=load(symbol,frame,limit=64,all_fields=True,all_context=True)
     meta=field_catalog(source);meta.update(mode='memory',first=source['memory']['first'],last=source['observed_as_of'],memory=source['memory'])
     c=open_sources()

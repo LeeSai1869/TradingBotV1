@@ -110,15 +110,15 @@ The overlay requests again when the last displayed closed candle or selected
 horizon changes, with a maximum frequency of once per 15 seconds, and receives no live
 exchange ticks. No request is made while disabled or on unsupported symbols.
 
-Validation: unit tests cover next-open fills, gap stops/costs, nonretroactive trails,
-DI-only rejection and censored gaps; stored-source tests cover closed cutoffs,
+Validation: unit Section_13_Development/tests cover next-open fills, gap stops/costs, nonretroactive trails,
+DI-only rejection and censored gaps; stored-source Section_13_Development/tests cover closed cutoffs,
 read-only access and replay guards; browser test renders the actual chart primitive
 and checks the toggle, symbol scope, polling and unchanged autoscale.
 
 ## Local review command
 
 ```sh
-python3 inspect_btc_strategy.py --timeframe 15m --days 90 \
+python3 Section_12_Research/cli/inspect_btc_strategy.py --timeframe 15m --days 90 \
   --before 2026-11-05T00:00:00Z --output btc_controlled_v04_review.json
 ```
 
@@ -141,7 +141,7 @@ full per-trade exit reasons, and matched rule IDs. Chart events show Rule and
 Action separately. Run the same fixed period with one rule disabled, for example:
 
 ```sh
-python3 inspect_btc_strategy.py --timeframe 15m --days 90 \
+python3 Section_12_Research/cli/inspect_btc_strategy.py --timeframe 15m --days 90 \
   --before 2026-11-05T00:00:00Z \
   --disable-sell-rule S2_BULLISH_SPREAD_MATURITY \
   --output btc_v04_without_S2.json

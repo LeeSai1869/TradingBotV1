@@ -24,10 +24,10 @@ to compile. Sign in to read history even before push is configured.
 
 ## Laptop address for your small group
 
-Follow the private Tailscale HTTPS instructions in [MOBILE_SETUP.md](../../MOBILE_SETUP.md).
+Follow the private Tailscale HTTPS instructions in [docs/MOBILE_SETUP.md](../../docs/MOBILE_SETUP.md).
 Use Tailscale Serve, not public Funnel; install Tailscale on each phone. Enter
 that HTTPS address in the app and use a separate existing laptop account for
-each user (`python3 add_user.py USERNAME`). Both internet access and access to
+each user (`python3 Section_14_Operations/accounts/add_user.py USERNAME`). Both internet access and access to
 the private laptop are needed to synchronize history. The laptop must be awake,
 online and running the backend/calculations to generate and send new events.
 Google Play distribution does not replace this connection.
@@ -49,12 +49,12 @@ Google Play distribution does not replace this connection.
 4. From the repository root, using the same Python as the UI backend:
 
    ```bash
-   python3 -m pip install -r requirements-android-push.txt
-   python3 configure_android.py \
+   python3 -m pip install -r packaging/requirements/android-push.txt
+   python3 Section_14_Operations/configuration/configure_android.py \
      --origin https://YOUR-LAPTOP.YOUR-NETWORK.ts.net \
      --google-services /PATH/TO/google-services.json \
      --service-account /PATH/TO/firebase-private-key.json
-   python3 restart_ui.py
+   python3 Section_14_Operations/services/restart_ui.py
    ```
 
    This copies the secret into `~/.tradingbot/firebase-service-account.json`

@@ -63,7 +63,7 @@ portable metadata without replay. Maintenance also recovers one queued old-forma
 job per visit outside the history owner, without calculating other symbols.
 
 After editing calculation code or configured inputs, restart the existing runner.
-No manual historical rebuild command is required. `check_coin.py SYMBOL --logs`
+No manual historical rebuild command is required. `Section_13_Development/diagnostics/check_coin.py SYMBOL --logs`
 reports full replay checkpoints and any targeted repair's affected columns and
 cursor. Turning features off in the display controls visibility, not the runner's
 calculation requirements.
@@ -181,7 +181,7 @@ specific active pair without pausing coins, launching another writer, resetting
 state or changing formula fingerprints:
 
 ```bash
-python3 configure_feature_runtime.py --seconds 3 --max-bars 3000 \
+python3 Section_14_Operations/configuration/configure_feature_runtime.py --seconds 3 --max-bars 3000 \
   --priority-symbol BTCUSDT --priority-timeframe 5m
 ```
 
@@ -204,8 +204,8 @@ not a promise that each SQL batch will contain 3000 rows.
 Inspect settings or restore the original scheduling at any time:
 
 ```bash
-python3 configure_feature_runtime.py
-python3 configure_feature_runtime.py --reset
+python3 Section_14_Operations/configuration/configure_feature_runtime.py
+python3 Section_14_Operations/configuration/configure_feature_runtime.py --reset
 ```
 
 Full and selective feature batches now serialize checkpoints and materialize SQL
