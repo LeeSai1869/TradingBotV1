@@ -189,6 +189,30 @@ async def exercise(base,library):
         await settle(page)
         after=await page.evaluate("Canvas.chart.timeScale().getVisibleLogicalRange().from")
         assert after < before - 1, (before, after)
+        # A full refresh can arrive with all optional features off and the pointer held down.
+        await page.evaluate("""() => {
+            for (const style of Object.values(Composer.config.featureStyles)) style.visible = false;
+            dispatchEvent(new Event('chart-settings-change'));
+        }""")
+        await settle(page)
+        await page.evaluate("""() => {
+            window.redraws = 0;
+            const update = Composer.updateAll.bind(Composer);
+            Composer.updateAll = (...args) => { window.redraws++; return update(...args); };
+        }""")
+        before = await page.evaluate("Canvas.chart.timeScale().getVisibleLogicalRange().from")
+        await page.mouse.move(x,y)
+        await page.mouse.down()
+        try:
+            await page.evaluate("DataCache.emit('stored-refresh')")
+            await page.mouse.move(x-120,y,steps=8)
+            await settle(page)
+            assert await page.evaluate("window.redraws") == 0
+            assert await page.evaluate("Canvas.chart.timeScale().getVisibleLogicalRange().from") > before + 1
+        finally:
+            await page.mouse.up()
+        await page.wait_for_function("window.redraws > 0")
+
         assert not errors,errors
         forbidden=['/api/chart_window','/api/flags_current','/api/live_candle']
         assert not any(any(path in url for path in forbidden) for url in requests)

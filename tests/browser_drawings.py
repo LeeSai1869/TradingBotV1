@@ -1,7 +1,7 @@
 """Single drawing-tools button, style editing and account memory across browsers."""
 from pathlib import Path
 import sys
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, expect
 from browser_smoke import run,sign_in,settle
 
 async def exercise(base,library):
@@ -70,7 +70,10 @@ async def exercise(base,library):
         await second.locator('#interval').select_option('1m')
         await second.wait_for_function("DataCache.timeframe==='1m' && !DataCache.loading && DataCache.bars.length>0")
         await settle(second)
-        assert await second.locator('#drawing-overlay > g').count()==1
+        assert not await second.locator('#drawing-overlay > g:not([data-drawing="0"])').count()
+        assert await second.evaluate("fetch('/api/drawings?symbol=BTCUSDT').then(r=>r.json()).then(r=>r.drawings.length)") == 5
+        await second.locator('#interval').select_option('15m')
+        await second.wait_for_function("!DataCache.loading && document.querySelectorAll('#drawing-overlay > g').length===5")
         # Another account cannot retrieve these drawings.
         admin=await browser.new_context();await admin.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         third=await admin.new_page();await third.goto(base);await sign_in(third,'admin')
