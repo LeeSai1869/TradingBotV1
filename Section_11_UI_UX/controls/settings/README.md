@@ -143,3 +143,12 @@ with the keyboard. RSI, ADX, DI, ATR and Volume have their own pane headers, wit
 the current/crosshair numbers beside their names. Their actions appear on pane
 hover or keyboard focus. Hidden indicators retain their pane and selected outputs
 for restoration; removing closes the pane. Touch devices show controls directly.
+
+### Local password recovery
+
+List existing usernames with `python3 -m Section_14_Operations.accounts.reset_password --list`, then reset one
+with `python3 -m Section_14_Operations.accounts.reset_password USERNAME`. It prompts privately for a new password
+of at least 12 characters and preserves the existing account role, metadata and
+all other users. Restart only the chart with `python3 restart_ui.py` to invalidate
+active sessions. Existing alerts/preferences remain attached to their usernames.
+The setup command above replaces the account list; use targeted reset for recovery.

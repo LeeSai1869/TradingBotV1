@@ -1106,6 +1106,12 @@
       "original_sha256": "8cc73ab07b28b694de1fd6be128eb3e2946de82d4cc9b18ed178341f51375628"
     },
     {
+      "old": "reset_password.py",
+      "new": "Section_14_Operations/accounts/reset_password.py",
+      "category": "operations",
+      "original_sha256": "23cc7e74c815dfd2d20909066d3ed767bad77214f04197c34d8f79204314e57a"
+    },
+    {
       "old": "restart_liquidity.py",
       "new": "Section_14_Operations/services/restart_liquidity.py",
       "category": "operations",
@@ -2046,6 +2052,12 @@
       "new": "Section_13_Development/tests/test_participation_history.py",
       "category": "development",
       "original_sha256": "d1a55aaf37e95f50ae1e8ee2d39ce9abab30d12f406e3f140f0850655a7e4d58"
+    },
+    {
+      "old": "tests/test_password_recovery.py",
+      "new": "Section_13_Development/tests/test_password_recovery.py",
+      "category": "development",
+      "original_sha256": "952ceb87463c993f404034cfa721e9c11633a7c6a584eec970a95b842e5dd029"
     },
     {
       "old": "tests/test_phase_engine.py",
