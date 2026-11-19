@@ -17,7 +17,8 @@ caffeinate -i python3 -u compact_feature_storage.py --apply --manage-services
 
 The first command is a read-only preflight. The second intentionally takes this
 checkout's loaded chart and live-runner launchd services offline for the copy and
-full verification. It validates both plist working directories/module arguments,
+full verification. It validates both plist working directories/module arguments, including the exact
+`/bin/bash <checkout>/Section_11_UI_UX/binance_chart/run_chart.sh` chart launcher,
 refuses other database handles, and restarts only services that were previously
 loaded, including on failure. Timeframe activation policy is never changed.
 

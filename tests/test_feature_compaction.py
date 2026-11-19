@@ -149,3 +149,33 @@ class Compaction(unittest.TestCase):
         self.assertEqual(state['stage'],'no_savings');self.assertFalse(state['complete'])
         self.assertEqual(path.read_bytes(),before)
         self.assertFalse(Path(str(path)+'.before-compaction').exists())
+
+    def test_exact_installed_chart_shell_launcher_is_recognized(self):
+        root=Path(job.__file__).resolve().parent
+        launcher=root/'Section_11_UI_UX/binance_chart/run_chart.sh'
+        config=dict(WorkingDirectory=str(launcher.parent),ProgramArguments=['/bin/bash',str(launcher)])
+        self.assertTrue(job.service_belongs_to_checkout(config,'com.tradingindicator.chart','Section_11_UI_UX.server.ui_server',root))
+        for altered in (
+            dict(config,WorkingDirectory=str(root)),
+            dict(config,ProgramArguments=['/bin/bash',str(self.root/'run_chart.sh')]),
+            dict(config,ProgramArguments=['/bin/bash','-c','echo Section_11_UI_UX.server.ui_server']),
+        ):
+            self.assertFalse(job.service_belongs_to_checkout(altered,'com.tradingindicator.chart','Section_11_UI_UX.server.ui_server',root))
+        self.assertFalse(job.service_belongs_to_checkout(config,'com.tradingindicator.liverunner','Section_1_Global_Core.memory_storage.Runner.live_runner',root))
+
+    def test_shell_chart_and_module_runner_stop_and_restart_together(self):
+        from types import SimpleNamespace
+        import plistlib
+        root=Path(job.__file__).resolve().parent
+        launcher=root/'Section_11_UI_UX/binance_chart/run_chart.sh'
+        agents=self.root/'Library/LaunchAgents';agents.mkdir(parents=True)
+        configs={
+            'chart':dict(WorkingDirectory=str(launcher.parent),ProgramArguments=['/bin/bash',str(launcher)]),
+            'liverunner':dict(WorkingDirectory=str(root),ProgramArguments=['python3','-u','-m','Section_1_Global_Core.memory_storage.Runner.live_runner'])}
+        for label,config in configs.items():
+            (agents/f'com.tradingindicator.{label}.plist').write_bytes(plistlib.dumps(config))
+        calls=[]
+        def run(args,**kwargs):calls.append(args);return SimpleNamespace(returncode=0,stderr='')
+        with patch.object(job.sys,'platform','darwin'),patch.object(Path,'home',return_value=self.root),patch.object(job.subprocess,'run',side_effect=run):
+            with job.stopped_services():pass
+        self.assertEqual([call[1] for call in calls],['print','print','bootout','bootout','bootstrap','bootstrap'])
