@@ -74,7 +74,9 @@ async function loadAll() {
 
     function render() {
         if (rendering || !pending) return;
-        const { op, reset, latest, span } = pending;
+        const { op, latest, span } = pending;
+        const scope = `${DataCache.symbol}:${DataCache.timeframe}`;
+        const reset = pending.reset || renderedScope !== scope;
         pending = null;
         if(op==='live'&&!reset&&!latest&&renderedScope===`${DataCache.symbol}:${DataCache.timeframe}`&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
             Composer.updateLive(chart,DataCache);
@@ -92,7 +94,7 @@ async function loadAll() {
                 target = { from: last - span, to: last };
                 chart.priceScale("right").applyOptions({ autoScale: true });
             } else if (reset && bars.length) {
-                target = readableRange(bars.length,chart.timeScale().width());
+                target = readableRange(bars.length, chart.timeScale().width(), DataCache.timeframe);
                 symbolControl.applyPriceFormat(DataCache.symbol, bars,
                     Composer.config.price_precision?.[DataCache.symbol]);
             } else if (range && renderedBars.length && bars.length) {
@@ -100,12 +102,12 @@ async function loadAll() {
                     range.to >= renderedBars.length - 2;
                 const shift = following ? bars.length - renderedBars.length
                     : logicalShift(renderedBars, bars);
-                target = { from: range.from + shift, to: range.to + shift };
+                if (shift) target = { from: range.from + shift, to: range.to + shift };
             }
             // All consumers receive the same canonical bars. No visual fetches
             // its own candles/features/decisions, and no visible history is evicted.
             Composer.updateAll(chart, { ...DataCache, formingBar: DataCache.formingBar, bars }, op, { resetViewport: reset });
-            renderedBars = bars;renderedScope=`${DataCache.symbol}:${DataCache.timeframe}`;needsRecovery=false;
+            renderedBars = bars;renderedScope=bars.length ? scope : null;needsRecovery=false;
             if(DataCache.error===renderError)DataCache.error=null;
             renderError=null;
             if (target) chart.timeScale().setVisibleLogicalRange(target);

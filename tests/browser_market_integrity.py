@@ -77,7 +77,7 @@ const originalInit=Canvas.init.bind(Canvas);Canvas.init=(...args)=>{
         await settle(page)
         line=await page.evaluate("import('/overlays/indicators/index.js').then(m=>({options:m.getSeries('volume_ma').options(),last:m.getSeries('volume_ma').data().at(-1)}))")
         assert line['options']['visible'] and line['options']['lineWidth']==4 and line['options']['lineStyle']==2,line
-        assert line['last']['value']==300000,line
+        assert line['last']['value']==321,line
         # A correctly labeled envelope with BTC candle contents must still fail closed.
         async def mismatch(route):
             response=await route.fetch();packet=await response.json()

@@ -510,7 +510,7 @@ export async function mount() {
     };
     window.addEventListener('open-feature-settings', event=>{
         if(!FEATURE_STYLES[event.detail])return;
-        section='features';item=event.detail;featureTab='Style';gear.click();
+        section='features';item=event.detail;featureTab=item==='Volume'?'Display':'Style';gear.click();
     });
     window.addEventListener('feature-legend-action',event=>changeDisplayedFeature(event.detail.feature,event.detail.action));
     window.addEventListener('feature-visibility-change',event=>{

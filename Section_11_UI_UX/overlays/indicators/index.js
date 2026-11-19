@@ -1,35 +1,20 @@
-import {formatTurnover, isUSDT, turnover, turnoverPriceFormat, TURNOVER_AVERAGE_BARS} from '../../web_root/quote_volume.js';
+import {formatTurnover, isUSDT, turnover, turnoverPriceFormat} from '../../web_root/quote_volume.js';
 import {formatValue,featurePriceFormat} from '../../web_root/value_format.js';
 // Completed stored indicators use exactly the same canonical bars as candles.
 import {FEATURE_STYLES} from '../../controls/settings/feature_styles.js';
 import {PANE_FEATURES} from '../../controls/settings/feature_legend.js';
 export const name='indicators';
 const groups=new Map();let chart, controls, observer, latestBar, hoverTime=null, barsByTime=new Map();
-let turnoverAverages = new Map(), turnoverTail = [], quoteVolume = false;
-function averageTurnover(points) {
-    if (points.length < TURNOVER_AVERAGE_BARS || points.some(point => !point)) return null;
-    return {value: points.reduce((sum, point) => sum + point.value, 0) / TURNOVER_AVERAGE_BARS,
-        estimated: points.some(point => point.estimated)};
-}
-function updateTurnover(bars) {
-    quoteVolume = isUSDT(bars.at(-1));
-    turnoverAverages = new Map();
-    turnoverTail = [];
-    if (!quoteVolume || !['volume', 'volume_ma'].some(key => styles()[key]?.visible)) return;
-    for (const bar of bars) {
-        turnoverTail.push(turnover(bar));
-        if (turnoverTail.length > TURNOVER_AVERAGE_BARS) turnoverTail.shift();
-        turnoverAverages.set(bar.time, averageTurnover(turnoverTail));
-    }
-}
+let quoteVolume = false;
+const available = key => key !== 'volume_usdt' || quoteVolume;
 function values(){
     const bar=barsByTime.get(hoverTime)||latestBar;
     for(const state of groups.values())if(state.valueLabel){
         const labels = [];
-        for(const [key,label] of FEATURE_STYLES[state.feature].outputs)if(styles()[key]?.visible||window.Composer.config.hiddenFeatures?.[state.feature]?.includes(key)){
+        for(const [key,label] of FEATURE_STYLES[state.feature].outputs)if(available(key) && (styles()[key]?.visible||window.Composer.config.hiddenFeatures?.[state.feature]?.includes(key))){
             let text = `${label} ${formatValue(bar ? value(bar,key) : null)}`;
-            if (quoteVolume && key === 'volume') text = `Turnover ${formatTurnover(turnover(bar))}`;
-            if (quoteVolume && key === 'volume_ma') text = `Turnover SMA (${TURNOVER_AVERAGE_BARS}) ${formatTurnover(turnoverAverages.get(bar?.time))}`;
+            if (key === 'volume_usdt') text = formatTurnover(turnover(bar));
+            if (quoteVolume && (key === 'volume' || key === 'volume_ma') && bar) text += ` ${(bar.symbol ?? bar.client.symbol).slice(0, -4)}`;
             labels.push([text, styles()[key].color]);
         }
         const signature = JSON.stringify(labels);
@@ -46,8 +31,7 @@ function values(){
 const LOWER=PANE_FEATURES;
 function styles(){return window.Composer.config.featureStyles||{};}
 function value(bar,key){
-    if (quoteVolume && key === 'volume') return turnover(bar)?.value ?? null;
-    if (quoteVolume && key === 'volume_ma') return turnoverAverages.get(bar.time)?.value ?? null;
+    if (key === 'volume_usdt') return turnover(bar)?.value ?? null;
     const n=key==='volume'?bar.client?.volume:bar.features?.[key];
     return Number.isFinite(n)?n:null;
 }
@@ -58,10 +42,11 @@ function positionHeaders(){
     const outer=document.getElementById('chart').getBoundingClientRect();
     for(const state of groups.values())if(state.header){const row=state.pane.getHTMLElement();if(row){row.dataset.featurePane=state.feature;state.header.style.top=(row.getBoundingClientRect().top-outer.top+5)+'px';}}
 }
-function addOutput(state, presentation) {
+function addOutput(state, presentation, key) {
     return chart.addSeries(presentation === 'histogram' ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries,
         {visible: false, title: '', priceLineVisible: false, lastValueVisible: true,
-         crosshairMarkerVisible: true, priceFormat: featurePriceFormat}, state.pane?.paneIndex() ?? 0);
+         crosshairMarkerVisible: true, priceFormat: featurePriceFormat,
+         ...(key === 'volume_usdt' ? {priceScaleId: 'left'} : {})}, state.pane?.paneIndex() ?? 0);
 }
 function indicatorPoint(bar, key, style) {
     const n = value(bar, key);
@@ -82,7 +67,7 @@ function create(feature){
             state.collapsed=!state.collapsed;
             collapse.textContent=state.collapsed?'▸':'▾';collapse.setAttribute('aria-label',`${state.collapsed?'Expand':'Collapse'} ${feature}`);
             collapse.setAttribute('aria-expanded',String(!state.collapsed));
-            for(const [key,line] of state.lines)line.applyOptions({visible:!state.collapsed && styles()[key]?.visible===true});
+            for(const [key,line] of state.lines)line.applyOptions({visible:!state.collapsed && available(key) && styles()[key]?.visible===true});
             state.pane.setHeight(state.collapsed?34:150);requestAnimationFrame(positionHeaders);
         });collapse.setAttribute('aria-expanded','true');
         const title=document.createElement('strong');title.textContent=feature;header.append(title);
@@ -95,7 +80,7 @@ function create(feature){
     for(const [key,,,presentation='line'] of FEATURE_STYLES[feature].outputs){
         if(['zone','profile'].includes(presentation))continue;
         const type = key === 'volume' ? (styles()[key]?.presentation ?? presentation) : presentation;
-        state.lines.set(key, addOutput(state, type));
+        state.lines.set(key, addOutput(state, type, key));
         if (key === 'volume') state.volumePresentation = type;
     }
     groups.set(feature,state);
@@ -128,9 +113,9 @@ export function mount(instance){
 }
 export function update(instance,data,options={}){
     barsByTime=new Map((data.bars||[]).map(bar=>[bar.time,bar]));latestBar=data.bars?.at(-1);
-    updateTurnover(data.bars || []);
+    quoteVolume = isUSDT(latestBar) || (data.symbol?.endsWith('USDT') ?? false);
     for(const feature of [...LOWER,'VWAP','WMA','Volume Profile','Market Structure']){
-        const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&styles()[key]?.visible);
+        const enabled=FEATURE_STYLES[feature].outputs.some(([key,,,presentation])=>!['zone','profile'].includes(presentation)&&available(key)&&styles()[key]?.visible);
         let state=groups.get(feature);
         const hidden=LOWER.includes(feature)&&!!window.Composer.config.hiddenFeatures?.[feature]?.length;
         if(!enabled&&!hidden){if(state)remove(state);continue;}
@@ -147,15 +132,17 @@ export function update(instance,data,options={}){
             let line = output;
             const presentation = style?.presentation ?? 'histogram';
             if (key === 'volume' && state.volumePresentation !== presentation) {
-                line = addOutput(state, presentation);
+                line = addOutput(state, presentation, key);
                 chart.removeSeries(output);
                 state.lines.set(key, line);
                 state.volumePresentation = presentation;
             }
-            line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
-                priceFormat:quoteVolume && state.feature === 'Volume' ? turnoverPriceFormat : featurePriceFormat,
-                lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:!!style?.visible && !state.collapsed});
-            if(!style?.visible){if(line.data().length)line.setData([]);continue;}
+            const visible = available(key) && !!style?.visible;
+            line.applyOptions({visible:visible && !state.collapsed,color:style?.color,
+                priceFormat:key === 'volume_usdt' ? turnoverPriceFormat : featurePriceFormat,
+                lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:visible && !state.collapsed});
+            if (key === 'volume_usdt') line.priceScale().applyOptions({visible});
+            if(!visible){if(line.data().length)line.setData([]);continue;}
             if(options.resetViewport)line.priceScale().applyOptions({autoScale:true});
             line.setData((data.bars||[]).map(bar => indicatorPoint(bar, key, style)));
         }
@@ -165,20 +152,12 @@ export function update(instance,data,options={}){
 }
 export function updateLive(instance,bar){
     if(!bar)return;
-    if (quoteVolume && turnoverTail.length) {
-        if (latestBar?.time === bar.time) turnoverTail[turnoverTail.length - 1] = turnover(bar);
-        else {
-            turnoverTail.push(turnover(bar));
-            if (turnoverTail.length > TURNOVER_AVERAGE_BARS) turnoverTail.shift();
-        }
-        turnoverAverages.set(bar.time, averageTurnover(turnoverTail));
-    }
     latestBar=bar;barsByTime.set(bar.time,bar);values();
     for(const state of groups.values())for(const [key,line] of state.lines){
         const style = styles()[key];
-        if (style?.visible) line.update(indicatorPoint(bar, key, style));
+        if (available(key) && style?.visible) line.update(indicatorPoint(bar, key, style));
     }
 }
 export function getSeries(key){for(const state of groups.values())if(state.lines.has(key))return state.lines.get(key);return null;}
 
-export function clear(){barsByTime=new Map();latestBar=null;updateTurnover([]);for(const state of groups.values())for(const line of state.lines.values())line.setData([]);values();}
+export function clear(){barsByTime=new Map();latestBar=null;quoteVolume=false;for(const state of groups.values())for(const line of state.lines.values())line.setData([]);values();}
