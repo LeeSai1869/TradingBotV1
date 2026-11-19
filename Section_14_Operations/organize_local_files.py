@@ -19,6 +19,7 @@ FOLDERS = {
     'research_fixes': 'Section_12_Research/fixes',
     'tests': 'Section_13_Development/local_archive/tests',
 }
+CODE_BACKUP_MARKERS = tuple(suffix+'.before-' for suffix in ('.py','.js','.mjs','.ts','.tsx','.sh'))
 PROTECTED = {'.git', '.venv', '.venv-build', 'venv', 'node_modules', '__pycache__', '.agents', '.codex'}
 
 
@@ -53,11 +54,11 @@ def plan(root):
     runtime = [d for d in root.glob('Section_*') if d.is_dir() and not d.is_symlink() and d.name.split('_')[1].isdigit() and int(d.name.split('_')[1]) <= 11]
     candidates = list(root.iterdir())
     for directory in runtime:
-        candidates.extend(p for p in directory.rglob('*') if '.bak' in p.name or p.name.endswith(('.backup', '.orig', '.rej', '.save')))
+        candidates.extend(p for p in directory.rglob('*') if '.bak' in p.name or any(marker in p.name for marker in CODE_BACKUP_MARKERS) or p.name.endswith(('.backup', '.orig', '.rej', '.save')))
     for source in sorted(candidates):
         if (source.is_file() and not protected(source)
                 and source.relative_to(root).as_posix() not in tracked
-                and ('.bak' in source.name or source.name.endswith(('.backup', '.orig', '.rej', '.save')) or (source.parent == root and any(fnmatch.fnmatch(source.name, pattern) for pattern in ('*_review.json','*_readiness.json','scalp_*bps.json','strategy_report.json'))))):
+                and ('.bak' in source.name or any(marker in source.name for marker in CODE_BACKUP_MARKERS) or source.name.endswith(('.backup', '.orig', '.rej', '.save')) or (source.parent == root and any(fnmatch.fnmatch(source.name, pattern) for pattern in ('*_review.json','*_readiness.json','scalp_*bps.json','strategy_report.json'))))):
             target = root / 'Section_13_Development/local_archive' / ('root' if source.parent == root else '') / source.relative_to(root)
             if not target.exists() and not target.is_symlink():
                 moves.append((source, target))

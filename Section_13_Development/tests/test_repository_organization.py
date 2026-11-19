@@ -18,6 +18,8 @@ class LocalOrganization(unittest.TestCase):
                 'research_reports/.env': 'private',
                 'research_reports/tracked.txt': 'tracked',
                 'features_store.py.bak': 'backup',
+                'Section_4_Features/processor.py.before-slope-write-policy': 'old code',
+                'Section_1_Global_Core/memory_storage/Storage/features.db.compaction.json': 'keep report',
             }
             for name, content in files.items():
                 path = root/name
@@ -25,7 +27,7 @@ class LocalOrganization(unittest.TestCase):
                 path.write_text(content)
             subprocess.run(['git','add','research_reports/tracked.txt'], cwd=root, check=True)
             preview = organize(root)
-            self.assertEqual(len(preview['moves']), 3)
+            self.assertEqual(len(preview['moves']), 4)
             self.assertTrue((root/'research_reports/local.txt').exists())
             organize(root, apply=True)
             self.assertEqual((root/'Section_12_Research/reports/local.txt').read_text(),'local')
@@ -33,6 +35,8 @@ class LocalOrganization(unittest.TestCase):
             self.assertEqual((root/'Section_13_Development/local_archive/research_reports/record.json').read_text(),'edited')
             for name in ('keep.db','.env','tracked.txt'):
                 self.assertTrue((root/'research_reports'/name).exists())
+            self.assertEqual((root/'Section_13_Development/local_archive/Section_4_Features/processor.py.before-slope-write-policy').read_text(),'old code')
+            self.assertTrue((root/'Section_1_Global_Core/memory_storage/Storage/features.db.compaction.json').exists())
             self.assertEqual(organize(root)['moves'], [])
 
 

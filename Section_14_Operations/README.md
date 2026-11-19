@@ -33,3 +33,19 @@ This archives files rather than deleting them. Conflicting reports go to
 replaced. Move records are saved there. Databases and their sidecars, secrets,
 symlinks, virtual environments and tracked files are excluded. Unknown files are
 left for review. Do not rerun database retirement or compaction to organize files.
+
+## Recover a blocked cleanup merge
+
+`finish_repository_cleanup.py --apply` is for the interrupted report-before-cleanup
+workflow. It uses the existing launchd ownership checks to pause and resume chart
+and runner services. It saves current state outside the app, merges the cleanup
+with autostash disabled, and maps saved report/test edits to their new paths.
+All original stashes and the recovery patch are retained. Runtime state from an
+older stash is never restored over the latest checkpoint. A merge that would
+change UI/UX files is aborted. Unexpected local code edits stop the operation
+before the merge; test/report patch conflicts are left for review with backups.
+
+Before the branch is installed, extract the recovery command from the fetched
+branch into `/tmp` and run it from the original application checkout. Afterward,
+use the organizer for the `.py.before-slope-*` backup files. Keep
+`features.db.compaction.json` beside the database; maintenance checks use it.
