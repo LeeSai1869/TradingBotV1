@@ -41,8 +41,8 @@ workflow. It uses the existing launchd ownership checks to pause and resume char
 and runner services. It saves current state outside the app, merges the cleanup
 with autostash disabled, and maps saved report/test edits to their new paths.
 All original stashes and the recovery patch are retained. Runtime state from an
-older stash is never restored over the latest checkpoint. A merge that would
-change UI/UX files is aborted. Unexpected local code edits stop the operation
+older stash is never restored over the latest checkpoint. The current checkout's tracked UI/UX tree is retained exactly, including when older branch history
+contains UI changes or conflicts. Unexpected local code edits stop the operation
 before the merge; test/report patch conflicts are left for review with backups.
 
 Before the branch is installed, extract the recovery command from the fetched
@@ -53,4 +53,4 @@ use the organizer for the `.py.before-slope-*` backup files. Keep
 The known `feature_styles.test.mjs` relocation conflict is resolved by retaining
 stage 2 (the local checkout's complete test fixture) and rebasing its relative
 Section 11 imports for the new test folder. No other content in that fixture is
-replaced. Other conflicts still stop the recovery for review.
+replaced. Other non-UI conflicts still stop the recovery for review.

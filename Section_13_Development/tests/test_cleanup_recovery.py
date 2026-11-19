@@ -55,15 +55,17 @@ class CleanupRecovery(unittest.TestCase):
         self.assertIn(self.stash,self.git('stash','list','--format=%H'))
         self.assertEqual(self.services,['stopped','restarted'])
 
-    def test_aborts_a_merge_that_would_change_ui_and_still_restores_state(self):
+    def test_keeps_current_ui_despite_different_cleanup_history_and_restores_state(self):
         self.git('stash','push','-qm','temporary runtime')
         self.git('switch','-q','cleanup')
-        self.write('Section_11_UI_UX/view.js',b'changed UI');self.git('add','.');self.git('commit','-qm','UI change')
+        self.write('Section_11_UI_UX/view.js',b'changed UI');self.write('Section_11_UI_UX/incoming-only.js',b'incoming-only UI');self.git('add','.');self.git('commit','-qm','UI change')
         self.git('switch','-q','main');self.git('stash','pop','-q')
-        before=self.git('rev-parse','HEAD')
-        with self.assertRaisesRegex(RuntimeError,'UI/UX'):
-            finish(self.root,'cleanup',self.stash,stop_services=self.stopped)
-        self.assertEqual(self.git('rev-parse','HEAD'),before)
+        before=self.git('rev-parse','HEAD').strip()
+        self.write('Section_11_UI_UX/private-local.json',b'private local preferences')
+        finish(self.root,'cleanup',self.stash,stop_services=self.stopped)
+        self.assertEqual(self.git('diff',before,'HEAD','--','Section_11_UI_UX'),'')
+        self.assertEqual((self.root/'Section_11_UI_UX/private-local.json').read_bytes(),b'private local preferences')
+        self.assertFalse((self.root/'Section_11_UI_UX/incoming-only.js').exists())
         self.assertEqual((self.root/RUNTIME[0]).read_bytes(),b'{"cursor":987}')
         self.assertEqual((self.root/'Section_11_UI_UX/view.js').read_bytes(),b'original UI')
         self.assertEqual(self.services,['stopped','restarted'])
@@ -117,3 +119,17 @@ class CleanupRecovery(unittest.TestCase):
         self.assertEqual((root/'Section_11_UI_UX/example.js').read_bytes(),b'unchanged UI')
         self.assertEqual((root/RUNTIME[0]).read_bytes(),b'{"cursor":999}')
         self.assertEqual((root/new_report).read_bytes(),b'\0local report')
+
+    def test_conflicting_ui_commits_retain_current_ui_without_blocking_moves(self):
+        self.git('stash','push','-qm','temporary runtime')
+        self.git('switch','-q','cleanup')
+        self.write('Section_11_UI_UX/view.js',b'old incoming UI');self.git('add','.');self.git('commit','-qm','incoming UI')
+        self.git('switch','-q','main')
+        self.write('Section_11_UI_UX/view.js',b'latest user UI');self.git('add','.');self.git('commit','-qm','user UI')
+        self.git('stash','pop','-q')
+        before=self.git('rev-parse','HEAD').strip()
+        finish(self.root,'cleanup',self.stash,stop_services=self.stopped)
+        self.assertEqual(self.git('diff',before,'HEAD','--','Section_11_UI_UX'),'')
+        self.assertEqual((self.root/'Section_11_UI_UX/view.js').read_bytes(),b'latest user UI')
+        self.assertTrue((self.root/'Section_13_Development/tests/example.py').is_file())
+        self.assertEqual((self.root/RUNTIME[0]).read_bytes(),b'{"cursor":987}')
