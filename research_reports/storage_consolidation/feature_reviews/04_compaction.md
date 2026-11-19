@@ -51,4 +51,11 @@ page, or a missing stored close cannot suppress that quote. They still prevent
 inserting a fictitious candle across a history gap. Provisional indicator work
 has a separate executor and cannot hold up exchange price refreshes. No stale
 indicator result may replace a newer quote. Unavailable feeds fall back to a
-stored-price label, rather than claiming an old forming price is live.
+stored price without extra text on the price line. Feed status remains in the status line.
+
+`python3 compact_feature_storage.py --status` reads saved and committed partial
+progress, file sizes/modification ages, and running compaction commands. It never
+stops or starts services. Check it before attempting recovery after a logout.
+`caffeinate -i` prevents idle sleep; it does not prevent macOS automatic logout.
+A logout may terminate the terminal job and GUI services. A partial copy must not
+be resumed against a source file modified by restarted writers.
