@@ -89,7 +89,7 @@ function updateCurrentPrice(bar) {
     }
     const options = {
         price: bar.client.close,
-        title:bar.provisional?'':'Stored',
+        title:'',
         color: bar.client.close >= bar.client.open ? series.options().upColor : series.options().downColor,
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,

@@ -234,15 +234,60 @@ def stopped_services():
         if failures:raise RuntimeError('Database operation ended, but service restart failed: '+'; '.join(failures))
 
 
+def running_compactions():
+    try:
+        result=subprocess.run(['ps','-axo','pid=,etime=,stat=,%cpu=,command='],capture_output=True,text=True,timeout=5)
+    except (OSError,subprocess.TimeoutExpired) as error:return [dict(error=str(error))]
+    if result.returncode:return [dict(error=result.stderr.strip())]
+    processes=[]
+    for line in result.stdout.splitlines():
+        parts=line.strip().split(None,4)
+        if len(parts)==5 and 'compact_feature_storage.py' in parts[4] and '--apply' in parts[4] and '--status' not in parts[4]:
+            processes.append(dict(pid=parts[0],elapsed=parts[1],state=parts[2],cpu_percent=parts[3],command=parts[4]))
+    return processes
+
+
+def read_status(path):
+    path=Path(path).resolve();target=path.with_name(path.name+'.compact-building')
+    report=path.with_name(path.name+'.compaction.json')
+    result=dict(mode='status',running=running_compactions(),files={},state=None)
+    for name,file in (('source',path),('building',target),('backup',path.with_name(path.name+'.before-compaction'))):
+        if file.exists():
+            info=file.stat();result['files'][name]=dict(GiB=round(info.st_size/1024**3,3),seconds_since_modified=round(time.time()-info.st_mtime))
+        else:result['files'][name]=None
+    if report.exists():
+        try:result['state']=json.loads(report.read_text())
+        except (OSError,ValueError) as error:result['report_error']=str(error)
+    if target.exists():
+        try:
+            with closing(sqlite3.connect(target.as_uri()+'?mode=ro',uri=True,timeout=.5)) as conn:
+                conn.execute('PRAGMA query_only=ON')
+                if conn.execute('SELECT 1 FROM sqlite_master WHERE name=?',(WORK,)).fetchone():
+                    row=conn.execute('SELECT state FROM '+q(WORK)).fetchone()
+                    if row:result['state']=json.loads(row[0])
+        except (sqlite3.Error,ValueError,OSError) as error:result['building_state_unavailable']=str(error)
+    state=result['state']
+    expected=state.get('new_source') if state and state.get('complete') else state.get('source') if state else None
+    current=identity(path) if path.exists() else None
+    if expected and current and state.get('complete'):
+        result['source_matches']=all(expected[key]==current[key] for key in ('path','device','inode'))
+    else:result['source_matches']=bool(expected and current and expected==current)
+    result['can_resume']=bool(state and not state.get('complete') and target.exists() and result['source_matches'] and not result['running'])
+    return result
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--apply',action='store_true')
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument('--apply',action='store_true')
+    mode.add_argument('--status',action='store_true',help='Read progress and process status without stopping services')
     parser.add_argument('--manage-services',action='store_true',help='Stop/restart only this checkout’s loaded chart and writer services')
     parser.add_argument('--batch-size',type=int,default=10000)
     args=parser.parse_args()
     if not 1<=args.batch_size<=20000:parser.error('Batch size must be 1..20000')
     path=features_store.DB_PATH.resolve()
     if args.manage_services and not args.apply:parser.error('--manage-services requires --apply')
+    if args.status:print(json.dumps(read_status(path),indent=2));return
     if not args.apply:print(json.dumps(preflight(path),indent=2));return
     with stopped_services() if args.manage_services else nullcontext():
         compact(path,batch=args.batch_size)

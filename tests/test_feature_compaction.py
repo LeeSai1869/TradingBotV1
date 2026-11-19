@@ -179,3 +179,26 @@ class Compaction(unittest.TestCase):
         with patch.object(job.sys,'platform','darwin'),patch.object(Path,'home',return_value=self.root),patch.object(job.subprocess,'run',side_effect=run):
             with job.stopped_services():pass
         self.assertEqual([call[1] for call in calls],['print','print','bootout','bootout','bootstrap','bootstrap'])
+
+    def test_status_is_read_only_and_reports_committed_partial_progress(self):
+        original=job.write_report
+        def stop(path,state):
+            if state['stage']=='verified':raise RuntimeError('interrupted')
+            original(path,state)
+        with patch.object(job,'write_report',side_effect=stop),self.assertRaises(RuntimeError):self.run_job()
+        before={p.name:p.read_bytes() for p in self.root.iterdir() if p.is_file()}
+        with patch.object(job,'running_compactions',return_value=[dict(pid='123')]):
+            status=job.read_status(self.path)
+        self.assertEqual(status['mode'],'status');self.assertEqual(status['running'],[dict(pid='123')])
+        self.assertTrue(status['source_matches']);self.assertEqual(status['state']['rows_copied'],2)
+        self.assertIsNotNone(status['files']['building']);self.assertIsNone(status['files']['backup'])
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.root.iterdir() if p.is_file()})
+
+    def test_status_after_switch_recognizes_new_database_identity(self):
+        self.run_job()
+        with patch.object(job,'running_compactions',return_value=[]):status=job.read_status(self.path)
+        self.assertTrue(status['state']['complete']);self.assertTrue(status['source_matches'])
+        self.assertIsNotNone(status['files']['backup']);self.assertIsNone(status['files']['building'])
+        with sqlite3.connect(self.path) as c:c.execute('UPDATE features SET value=100 WHERE rowid=5')
+        with patch.object(job,'running_compactions',return_value=[]):status=job.read_status(self.path)
+        self.assertTrue(status['source_matches']);self.assertFalse(status['can_resume'])

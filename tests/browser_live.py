@@ -100,6 +100,7 @@ async def exercise_live(base, library):
             await settle(page)
             assert await page.evaluate('DataCache.liveStatus') == 'unavailable'
             assert 'unavailable' in await page.locator('#status').text_content()
+            assert await page.evaluate("liveSeries.priceLines().every(line=>!['Live','Stored'].includes(line.options().title))")
             assert not errors,errors
             assert not [u for u in requests if 'binance.com' in u or '/api/live_candle' in u]
             assert any('/api/bars?' in u and 'live=1' in u for u in requests)
