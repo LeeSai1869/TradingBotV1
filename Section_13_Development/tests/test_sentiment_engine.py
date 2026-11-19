@@ -16,7 +16,7 @@ def snapshot(i=10,*,rate=.0001,baseline_rate=.0001,oi=110.,base_oi=100.,liquidat
     bundle=observation(s,oi=oi,base_oi=base_oi);current=bundle['sample'];current['mid']=current['metrics']['mid'];current['context']['funding_rate']=rate
     current['reported_long_liquidations_usdt']=liquidations
     baseline=copy.deepcopy(current);baseline.update(available_ms=s['as_of']-300000,sampled_ms=s['as_of']-300500,context=dict(bundle['oi_baseline']['context'],mark_price=s['candle']['close'],index_price=s['candle']['close'],funding_rate=baseline_rate,mark_exchange_ms=s['as_of']-300600,mark_received_ms=s['as_of']-300550))
-    s['Section_14_Operations.configuration.sentiment_sources']=dict(version='sentiment-projection-v1',status='RECORDED',current=current,baseline=baseline,last_gap_ms=None,association=bundle['association'])
+    s['sentiment_sources']=dict(version='sentiment-projection-v1',status='RECORDED',current=current,baseline=baseline,last_gap_ms=None,association=bundle['association'])
     return s
 
 
@@ -38,9 +38,9 @@ class SentimentEngine(unittest.TestCase):
             self.assertGreater(result['measurements']['funding_change']['window_ms'],280000)
 
     def test_no_sources_is_unknown_and_missing_baseline_is_partial(self):
-        s=snapshot();s.pop('Section_14_Operations.configuration.sentiment_sources')
+        s=snapshot();s.pop('sentiment_sources')
         result,_=sentiment.evaluate(s);self.assertEqual(result['classification'],sentiment.UNKNOWN);self.assertEqual(result['coverage'],0.)
-        s=snapshot();s['Section_14_Operations.configuration.sentiment_sources']['baseline']=None
+        s=snapshot();s['sentiment_sources']['baseline']=None
         result,_=sentiment.evaluate(s);self.assertEqual(result['classification']['sentiment'],'BULLISH');self.assertEqual(result['classification']['stability'],'UNKNOWN');self.assertEqual(result['coverage'],.25)
 
     def test_optimistic_proxy_can_have_elevated_risk_without_buy_edge(self):
@@ -55,9 +55,9 @@ class SentimentEngine(unittest.TestCase):
         self.assertEqual(result['classification']['risk'],'UNKNOWN')  # Zero sampled reports cannot prove low risk.
 
     def test_each_source_missingness_is_independent(self):
-        s=snapshot(liquidations=1500000.);s['Section_14_Operations.configuration.sentiment_sources']['current']['context']['funding_rate']=None
+        s=snapshot(liquidations=1500000.);s['sentiment_sources']['current']['context']['funding_rate']=None
         result,_=sentiment.evaluate(s);self.assertEqual(result['classification']['sentiment'],'UNKNOWN');self.assertEqual(result['classification']['risk'],'HIGH')
-        s=snapshot();s['Section_14_Operations.configuration.sentiment_sources']['current']['context']['open_interest_exchange_ms']-=200000
+        s=snapshot();s['sentiment_sources']['current']['context']['open_interest_exchange_ms']-=200000
         result,_=sentiment.evaluate(s);self.assertIsNone(result['measurements']['open_interest_change_pct']);self.assertEqual(result['classification']['sentiment'],'BULLISH')
         s=snapshot(base_oi=0.)
         result,_=sentiment.evaluate(s);self.assertIsNone(result['measurements']['open_interest_change_pct'])
@@ -69,11 +69,11 @@ class SentimentEngine(unittest.TestCase):
             lambda b:b['association'].update(basis_bps=999.),
             lambda b:b.update(last_gap_ms=b['current']['sampled_ms']+1),
         ):
-            s=snapshot();mutate(s['Section_14_Operations.configuration.sentiment_sources']);result,_=sentiment.evaluate(s)
+            s=snapshot();mutate(s['sentiment_sources']);result,_=sentiment.evaluate(s)
             self.assertEqual(result['classification'],sentiment.UNKNOWN)
-        s=snapshot();s['Section_14_Operations.configuration.sentiment_sources']['current']['context']['mark_exchange_ms']-=20000
+        s=snapshot();s['sentiment_sources']['current']['context']['mark_exchange_ms']-=20000
         result,_=sentiment.evaluate(s);self.assertEqual(result['classification']['sentiment'],'UNKNOWN')
-        s=snapshot();s['Section_14_Operations.configuration.sentiment_sources']['baseline']['available_ms']=s['as_of']-1000
+        s=snapshot();s['sentiment_sources']['baseline']['available_ms']=s['as_of']-1000
         result,_=sentiment.evaluate(s);self.assertEqual(result['classification']['stability'],'UNKNOWN')
 
     def test_restart_preview_event_dedup_and_source_generation(self):

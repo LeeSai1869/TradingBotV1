@@ -8,6 +8,7 @@ if __package__ in (None, ''):
 
 import argparse
 import json
+import fnmatch
 from pathlib import Path
 import subprocess
 from Section_1_Global_Core.paths import REPO_ROOT
@@ -37,7 +38,7 @@ def plan(root):
         if not directory.is_dir() or directory.is_symlink():
             continue
         for source in sorted(directory.rglob('*')):
-            if not source.is_file() or protected(source.relative_to(root)) or any(p.is_symlink() for p in source.parents):
+            if not source.is_file() or protected(source) or any(p.is_symlink() for p in source.parents):
                 continue
             relative = source.relative_to(root).as_posix()
             if relative in tracked:
@@ -46,19 +47,19 @@ def plan(root):
             # A locally edited report must never overwrite the committed copy.
             if target.exists():
                 target = root / 'Section_13_Development/local_archive' / relative
-            if target.exists():
+            if target.exists() or target.is_symlink():
                 continue
             moves.append((source, target))
-    runtime = [d for d in root.glob('Section_*') if d.is_dir() and d.name.split('_')[1].isdigit() and int(d.name.split('_')[1]) <= 11]
+    runtime = [d for d in root.glob('Section_*') if d.is_dir() and not d.is_symlink() and d.name.split('_')[1].isdigit() and int(d.name.split('_')[1]) <= 11]
     candidates = list(root.iterdir())
     for directory in runtime:
         candidates.extend(p for p in directory.rglob('*') if '.bak' in p.name or p.name.endswith(('.backup', '.orig', '.rej', '.save')))
     for source in sorted(candidates):
-        if (source.is_file() and not protected(source.relative_to(root))
+        if (source.is_file() and not protected(source)
                 and source.relative_to(root).as_posix() not in tracked
-                and ('.bak' in source.name or source.name.endswith(('.backup', '.orig', '.rej', '.save')))):
+                and ('.bak' in source.name or source.name.endswith(('.backup', '.orig', '.rej', '.save')) or (source.parent == root and any(fnmatch.fnmatch(source.name, pattern) for pattern in ('*_review.json','*_readiness.json','scalp_*bps.json','strategy_report.json'))))):
             target = root / 'Section_13_Development/local_archive' / ('root' if source.parent == root else '') / source.relative_to(root)
-            if not target.exists():
+            if not target.exists() and not target.is_symlink():
                 moves.append((source, target))
     return moves
 
@@ -69,7 +70,7 @@ def organize(root, *, apply=False):
     record = {'apply': apply, 'moves': [{'from': str(a.relative_to(root)), 'to': str(b.relative_to(root))} for a,b in moves]}
     if apply:
         for source, target in moves:
-            if target.exists() or any(p.is_symlink() for p in target.parents):
+            if target.exists() or target.is_symlink() or any(p.is_symlink() for p in target.parents):
                 raise RuntimeError(f'Unsafe destination; retained {source}')
             target.parent.mkdir(parents=True, exist_ok=True)
             source.rename(target)

@@ -137,7 +137,7 @@ def catch_up(symbol,interval,*,limit=200,since=0,config=None,revision='initial',
                     if len(snapshot['dependencies'])!=len(phase.DEPENDENCIES):break
 
                 if engine_name=='LIQUIDITY':snapshot['observations']=liquidity_inputs.project(observations,snapshot,cfg)
-                if engine_name=='SENTIMENT':snapshot['Section_14_Operations.configuration.sentiment_sources']=sentiment_inputs.project(observations,snapshot)
+                if engine_name=='SENTIMENT':snapshot['sentiment_sources']=sentiment_inputs.project(observations,snapshot)
                 evaluation_started=time.monotonic()
                 result,state=module.evaluate(snapshot,None if engine_name=='STRUCTURE' else cfg,state);batch.append((snapshot,result))
                 evaluation_seconds+=time.monotonic()-evaluation_started

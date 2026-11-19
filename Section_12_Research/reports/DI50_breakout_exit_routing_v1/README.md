@@ -131,7 +131,7 @@ All 11/11 entries have compatible closed 5m measurements. The strict crash diagn
 - `*_5m_observations.json.gz` and `*_execution.json.gz`: frozen gate evidence and price bars.
 - `independent_execution_audit.json`: 1,078 new exit replays through a separate segment engine plus 98 unchanged original trades, zero mismatches. Gate observations are frozen inputs, not an independently recalculated indicator audit.
 
-29 targeted Section_13_Development/tests passed, including gross/net conversion, closed-bar timing, future-signal rejection, same-bar protection order, unchanged initial stops, retained adverse gaps and missing post-stop coverage.
+29 targeted tests passed, including gross/net conversion, closed-bar timing, future-signal rejection, same-bar protection order, unchanged initial stops, retained adverse gaps and missing post-stop coverage.
 
 ```sh
 PYTHONPATH=/tmp/btc-section5-test-deps:. .venv-build/bin/python3 -m research_reports.DI50_breakout_exit_routing_v1.study

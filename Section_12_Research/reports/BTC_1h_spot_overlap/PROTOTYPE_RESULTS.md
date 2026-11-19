@@ -76,6 +76,6 @@ python3 Section_12_Research/cli/analyze_btc_hour_strategy.py \
   --output-dir Section_12_Research/reports/BTC_1h_spot_overlap/prototype_replay
 ```
 
-Eighteen existing strategy-analyzer Section_13_Development/tests passed. Replay checks confirm unique,
+Eighteen existing strategy-analyzer tests passed. Replay checks confirm unique,
 alternating signals and no unavailable feature columns. The exact-pair study
 and Section 5 readiness checks remain separate from this trade replay.

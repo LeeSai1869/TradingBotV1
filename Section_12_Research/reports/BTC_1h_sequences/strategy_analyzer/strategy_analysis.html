@@ -41,7 +41,7 @@
     const branchIds=[...new Set(allTrades.flatMap(t=>[t.buy_branch,t.sell_branch]).filter(Boolean))].sort();
     const years=[...new Set([...(d.yearly||[]).map(y=>y.year),...allTrades.map(t=>dateYear(t.buy_signal_time))])].sort();
     const baseColumns=[['buy','BUY known',true],['sell','SELL known',true],['prices','Entry → exit price',true],['branches','BUY / SELL branches',true],['status','Status',true],['outcome','Result',true],['net','Net return',true],['hold','Holding hours',false]];
-    $('report-name').textContent=d.config.id;if(!document.getElementById('branches-editor'))el('p','To edit strategies and run new comparisons, launch: python3 Section_12_Research/cli/analyze_btc_hour_strategy.py --serve',root.querySelector('.report-header'),{class:'muted compact'});
+    $('report-name').textContent=d.config.id;if(!document.getElementById('branches-editor'))el('p','To edit strategies and run new comparisons, launch: python3 analyze_btc_hour_strategy.py --serve',root.querySelector('.report-header'),{class:'muted compact'});
     const first=d.signals[0]?.known_time,last=d.signals.at(-1)?.known_time;
     $('report-provenance').textContent=`${(d.candles_scanned??d.candles_evaluated).toLocaleString()} candles scanned · ${d.signals.length.toLocaleString()} accepted signals · ${d.workspace?.input_name||'Frozen BTC 1h source'}${first?' · '+new Date(first).toISOString().slice(0,10)+' to '+new Date(last).toISOString().slice(0,10):''} · Fee ${d.contract.execution.fee_bps_per_side} bps/side · Slippage ${d.contract.execution.slippage_bps_per_side} bps/side`;
     const summary=d.summary;

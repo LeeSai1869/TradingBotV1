@@ -58,7 +58,7 @@ computer can calculate while asleep or powered off.
 
 ## Verification
 
-93 targeted backend Section_13_Development/tests passed for source recovery, decisions, scheduler
+93 targeted backend tests passed for source recovery, decisions, scheduler
 fairness, live previews and feature-runtime behavior. A final 33-test subset
 passed after adding pre-fetch cursor reconciliation and exercising feature
 recovery after app logout. The standalone Node regression covers healthy edge

@@ -49,7 +49,7 @@ The non-overlapping 24-hour replay has 94 fully observable trades, 58.51% target
 
 ## Holding until 1% is not a free exit
 
-Unlimited-hold Section_13_Development/tests must retain unresolved positions and missing-data censoring; a 100% win rate among only completed target exits is not a valid success rate. For the DI− >45 / RSI <20 single-position replay:
+Unlimited-hold tests must retain unresolved positions and missing-data censoring; a 100% win rate among only completed target exits is not a valid success rate. For the DI− >45 / RSI <20 single-position replay:
 
 - Entry 2022-05-05T17:00:00+00:00; GAP_CENSORED; observed for 7748 hours (322.8 days); adverse excursion bound -58.21%. Censored entries have no claimed completed-trade return.
 - Entry 2026-01-19T02:00:00+00:00; RIGHT_CENSORED; observed for 7166 hours (298.6 days); adverse excursion bound -37.57%. Censored entries have no claimed completed-trade return.
@@ -113,6 +113,6 @@ Price touched that target in the third hourly candle after entry (12:00–13:00 
 - `liquidity_verification.json`: before/after timing, coverage, clock check, live status and observation limits.
 - Replay the frozen source: `PYTHONPATH=. .venv-build/bin/python3 Section_12_Research/reports/BTC_1h_di_spread_reversal/study.py`.
 - A new read-only export can be made with `export_source.py`. It releases source database read snapshots before running the longer offline classifiers. A fresh export changes the frozen observation window.
-- Verification: 29 Python Section_13_Development/tests passed for the liquidity recorder/analytics and replay semantics; 10 JavaScript liquidity-display Section_13_Development/tests passed. Target touches remain an OHLC fill approximation. Stop and target in the same hourly candle use stop-first ordering, except a gap-up opening already through the target.
+- Verification: 29 Python tests passed for the liquidity recorder/analytics and replay semantics; 10 JavaScript liquidity-display tests passed. Target touches remain an OHLC fill approximation. Stop and target in the same hourly candle use stop-first ordering, except a gap-up opening already through the target.
 
 Keep this as an exhaustion-watch hypothesis. A usable buy/sell rule still needs a supported entry filter plus a defined loss/time/capital policy; a frequent rebound is not enough to establish positive expectancy.

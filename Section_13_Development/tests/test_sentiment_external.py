@@ -74,7 +74,7 @@ class ExternalSources(unittest.TestCase):
         s=snapshot();at=s['as_of']
         sources.configure(profile(),now_ms=0)
         sources.import_records('news',[record(published_ms=at-1000)],received_ms=at-500)
-        with sources.reader() as conn:s['Section_14_Operations.configuration.sentiment_sources']=sentiment_inputs.project(sentiment_inputs.Sources(None,conn),s)
+        with sources.reader() as conn:s['sentiment_sources']=sentiment_inputs.project(sentiment_inputs.Sources(None,conn),s)
         original=copy.deepcopy(s)
         result,_=sentiment.evaluate(s)
         self.assertEqual(result['classification']['sentiment'],'BULLISH');self.assertEqual(result['coverage'],.2)
@@ -87,11 +87,11 @@ class ExternalSources(unittest.TestCase):
         for identifier,category,score in [('news','NEWS',.8),('social','SOCIAL',-.8)]:
             sources.configure(profile(identifier,category),now_ms=0)
             sources.import_records(identifier,[record(published_ms=at-1000,score=score)],received_ms=at-500)
-        with sources.reader() as conn:s['Section_14_Operations.configuration.sentiment_sources']['external']=sources.project(conn,'BTCUSDT',at)
+        with sources.reader() as conn:s['sentiment_sources']['external']=sources.project(conn,'BTCUSDT',at)
         result,_=sentiment.evaluate(s)
         self.assertEqual(result['classification']['sentiment'],'NEUTRAL');self.assertAlmostEqual(result['coverage'],.8)
         self.assertAlmostEqual(result['confidence'],.4);self.assertIn('CONFLICTING_EXTERNAL_SENTIMENT',result['quality_flags'])
-        rows=s['Section_14_Operations.configuration.sentiment_sources']['external'];rows[1]['publisher_group']=rows[0]['publisher_group']
+        rows=s['sentiment_sources']['external'];rows[1]['publisher_group']=rows[0]['publisher_group']
         result,_=sentiment.evaluate(s);self.assertAlmostEqual(result['coverage'],.6)
         self.assertIn('CORRELATED_PUBLISHER_GROUP_EXCLUDED',result['quality_flags'])
         for row in rows:row['published_ms']=0;row['kind']='UNSCORED_HEADLINE';row['score']=None
@@ -99,14 +99,14 @@ class ExternalSources(unittest.TestCase):
         rows[0].update(kind='AGGREGATE_SENTIMENT',score=.8,published_ms=at-1000)
         from Section_5_Market_Regime.engines.sentiment_config import SentimentConfig
         result,_=sentiment.evaluate(s,SentimentConfig(news_ttl_ms=100));self.assertIn('EXTERNAL_STALE:news',result['quality_flags'])
-        s['Section_14_Operations.configuration.sentiment_sources']=None
+        s['sentiment_sources']=None
         self.assertEqual(sentiment.evaluate(s)[0]['coverage'],0.)
 
     def test_market_wide_downweight_and_causal_rejection(self):
         s=snapshot();at=s['as_of'];sources.configure(profile(),now_ms=0)
         sources.import_records('news',[record(asset='*',published_ms=at-1000)],received_ms=at-500)
         with sources.reader() as conn:rows=sources.project(conn,'BTCUSDT',at)
-        s['Section_14_Operations.configuration.sentiment_sources']['external']=rows
+        s['sentiment_sources']['external']=rows
         self.assertAlmostEqual(sentiment.evaluate(s)[0]['coverage'],.5)
         rows[0]['received_ms']=at+1
         self.assertEqual(sentiment.evaluate(s)[0]['coverage'],.4)
@@ -117,7 +117,7 @@ class ExternalSources(unittest.TestCase):
             sources.configure(profile(identifier,category),now_ms=0)
             sources.import_records(identifier,[record(published_ms=at-1000)],received_ms=at-500)
         cfg=profile();cfg['reliability']=.9;sources.configure(cfg,now_ms=at-100)
-        with sources.reader() as conn:s['Section_14_Operations.configuration.sentiment_sources']['external']=sources.project(conn,'BTCUSDT',at)
+        with sources.reader() as conn:s['sentiment_sources']['external']=sources.project(conn,'BTCUSDT',at)
         result,_=sentiment.evaluate(s)
         self.assertEqual(result['classification']['sentiment'],'EXTREMELY_BULLISH')
         self.assertAlmostEqual(result['coverage'],.78)
@@ -129,7 +129,7 @@ class ExternalSources(unittest.TestCase):
         s=snapshot()
         projection=sentiment_inputs.project(sentiment_inputs.Sources(None,conn),s)
         self.assertTrue(projection['external_error'])
-        s['Section_14_Operations.configuration.sentiment_sources']['external_error']=projection['external_error']
+        s['sentiment_sources']['external_error']=projection['external_error']
         result,_=sentiment.evaluate(s)
         self.assertEqual(result['coverage'],.4)
         self.assertEqual(result['classification']['sentiment'],'BULLISH')
@@ -157,6 +157,6 @@ class ExternalHistory(unittest.TestCase):
         conn=engine_store.open_db()
         try:
             bundle=engine_store.input_bundle(conn,row['run_id'],client['open_time']);bundle['computed_at']=10**9
-            self.assertEqual(bundle['Section_14_Operations.configuration.sentiment_sources']['external'][0]['score'],.8)
+            self.assertEqual(bundle['sentiment_sources']['external'][0]['score'],.8)
             self.assertEqual(sentiment.evaluate(bundle)[0],row['latest'])
         finally:conn.close()

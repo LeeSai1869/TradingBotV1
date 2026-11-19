@@ -38,7 +38,7 @@ v=r['variants']['di_minus_gt_45_rsi_lt_20']
 lines += [table(['Window','Eligible','Target hit rate','Mean net at target / window close'],[[h+'h',s['evaluable'],pct(s['target_hit_pct']),pct(s['mean_net_pct'])] for h,s in v['horizons'].items()]),'',
 'The non-overlapping 24-hour replay has '+str(v['single_position']['no_stop']['evaluable'])+' fully observable trades, '+pct(v['single_position']['no_stop']['target_hit_pct'])+' target attainment and '+pct(v['single_position']['no_stop']['mean_net_pct'])+' mean net return. The same negative conclusion survives removing overlapping entries.','',
 '## Holding until 1% is not a free exit','',
-'Unlimited-hold Section_13_Development/tests must retain unresolved positions and missing-data censoring; a 100% win rate among only completed target exits is not a valid success rate. For the DI− >45 / RSI <20 single-position replay:','']
+'Unlimited-hold tests must retain unresolved positions and missing-data censoring; a 100% win rate among only completed target exits is not a valid success rate. For the DI− >45 / RSI <20 single-position replay:','']
 u=v['single_position']['no_time_limit_no_stop']
 for x in u['longest_holds']:
  lines.append(f"- Entry {x['entry_utc']}; {x['status']}; observed for {x['hours']} hours ({x['hours']/24:.1f} days); adverse excursion bound {pct(x['adverse_bound_pct'])}. Censored entries have no claimed completed-trade return.")
@@ -76,7 +76,7 @@ lines += [f"The {e['signal_utc']} signal candle was known at **{pkt(e['entry_utc
 '- `liquidity_verification.json`: before/after timing, coverage, clock check, live status and observation limits.',
 '- Replay the frozen source: `PYTHONPATH=. .venv-build/bin/python3 Section_12_Research/reports/BTC_1h_di_spread_reversal/study.py`.',
 '- A new read-only export can be made with `export_source.py`. It releases source database read snapshots before running the longer offline classifiers. A fresh export changes the frozen observation window.',
-'- Verification: 29 Python Section_13_Development/tests passed for the liquidity recorder/analytics and replay semantics; 10 JavaScript liquidity-display Section_13_Development/tests passed. Target touches remain an OHLC fill approximation. Stop and target in the same hourly candle use stop-first ordering, except a gap-up opening already through the target.','',
+'- Verification: 29 Python tests passed for the liquidity recorder/analytics and replay semantics; 10 JavaScript liquidity-display tests passed. Target touches remain an OHLC fill approximation. Stop and target in the same hourly candle use stop-first ordering, except a gap-up opening already through the target.','',
 'Keep this as an exhaustion-watch hypothesis. A usable buy/sell rule still needs a supported entry filter plus a defined loss/time/capital policy; a frequent rebound is not enough to establish positive expectancy.','']
 (O/'README.md').write_text('\n'.join(lines))
 print(O/'README.md')

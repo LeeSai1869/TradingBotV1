@@ -250,7 +250,7 @@ def running_compactions():
     processes=[]
     for line in result.stdout.splitlines():
         parts=line.strip().split(None,4)
-        if len(parts)==5 and 'Section_14_Operations/storage/compact_feature_storage.py' in parts[4] and '--apply' in parts[4] and '--status' not in parts[4]:
+        if len(parts)==5 and ('compact_feature_storage.py' in parts[4] or 'Section_14_Operations.storage.compact_feature_storage' in parts[4]) and '--apply' in parts[4] and '--status' not in parts[4]:
             processes.append(dict(pid=parts[0],elapsed=parts[1],state=parts[2],cpu_percent=parts[3],command=parts[4]))
     return processes
 

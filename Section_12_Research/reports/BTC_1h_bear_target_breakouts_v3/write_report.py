@@ -115,6 +115,6 @@ lines += [table(['Entry branch','Separate flat-start period','Closed','Unresolve
 '- `five_minute_volumes.json.gz`: aligned frozen volume observations. Price source remains the same frozen 1h/5m archive used in v2. `execution_blocks.json.gz` freezes the minute/fallback blocks used for this replay.',
 '- Run `PYTHONPATH=. .venv-build/bin/python3 Section_12_Research/reports/BTC_1h_bear_target_breakouts_v3/study.py`, then `.../write_report.py`.',
 '- The 2025–26 window has already been viewed in earlier hypothesis work. It is a chronological check, not prospective validation. All positive tiny subsets and negative larger results remain reported.',
-'- Verification: 28 targeted Section_13_Development/tests pass for exit-policy changes, bullish-gate preservation, stop priority, target basis, feature timing, prior-volume/range baselines, crash recovery, fixed retest anchors, missing data, delayed confirmation, intrabar reconstruction and original trailing behavior. The independent audit separately checked 328 unambiguous bearish first-barrier outcomes.','']
+'- Verification: 28 targeted tests pass for exit-policy changes, bullish-gate preservation, stop priority, target basis, feature timing, prior-volume/range baselines, crash recovery, fixed retest anchors, missing data, delayed confirmation, intrabar reconstruction and original trailing behavior. The independent audit separately checked 328 unambiguous bearish first-barrier outcomes.','']
 (P/'README.md').write_text('\n'.join(lines))
 print(P/'README.md')

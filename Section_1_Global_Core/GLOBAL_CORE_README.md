@@ -207,7 +207,7 @@ and an exclusive `before` cursor. `klines_store.read_page()` uses the existing
 primary key; no schema, ingestion, audit rule, BarEvent, processor, or stored
 data changes. Existing range readers remain compatible.
 
-Re-audit scope: isolated SQLite contract Section_13_Development/tests cover exact counts, gaps,
+Re-audit scope: isolated SQLite contract tests cover exact counts, gaps,
 calendar-month keys, missing derived rows, market identity and cursor edges.
 Browser flow Section_13_Development/tests exercise the same gateway. This is not a new market-data
 A1/A2/A5 certification: the cloud instance has no downloaded market history.

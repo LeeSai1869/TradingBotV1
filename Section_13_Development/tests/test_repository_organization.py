@@ -46,7 +46,7 @@ class TrackedOrganization(unittest.TestCase):
             target = REPO_ROOT/move['new']
             self.assertTrue(target.is_file(), move['new'])
             self.assertFalse((REPO_ROOT/move['old']).is_file(), move['old'])
-            if (move['old'].startswith('research_reports/') and target.suffix in ('.json','.csv','.gz')) or target.suffix == '.pine':
+            if (move['old'].startswith('research_reports/') and target.suffix in ('.json','.csv','.gz','.html')) or target.suffix == '.pine':
                 self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), move['original_sha256'], move['new'])
 
     def test_moved_commands_resolve_checkout_from_unrelated_working_directory(self):
@@ -59,3 +59,16 @@ class TrackedOrganization(unittest.TestCase):
                 result = subprocess.run([sys.executable,str(REPO_ROOT/script),'--help'],cwd=directory,text=True,capture_output=True)
                 self.assertEqual(result.returncode,0,result.stderr)
                 self.assertIn('usage:',result.stdout)
+
+    def test_application_does_not_import_research_or_maintenance_packages(self):
+        import ast
+        from Section_1_Global_Core.paths import REPO_ROOT
+        forbidden = ('Section_12_Research','Section_13_Development','Section_14_Operations')
+        for section in REPO_ROOT.glob('Section_*'):
+            if section.name.startswith(forbidden):
+                continue
+            for source in section.rglob('*.py'):
+                for node in ast.walk(ast.parse(source.read_text())):
+                    names = [a.name for a in node.names] if isinstance(node,ast.Import) else [node.module or ''] if isinstance(node,ast.ImportFrom) else []
+                    for name in names:
+                        self.assertFalse(name.startswith(forbidden),f'{source}: {name}')

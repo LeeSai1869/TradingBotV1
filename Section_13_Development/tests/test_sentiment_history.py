@@ -18,7 +18,7 @@ class SentimentHistory(unittest.TestCase):
 
     def prepare(self,index=33):
         client=self.clients[index];s=snapshot(index,rate=.0001,baseline_rate=0.)
-        source=s['Section_14_Operations.configuration.sentiment_sources'];current=copy.deepcopy(source['current']);baseline=copy.deepcopy(source['baseline'])
+        source=s['sentiment_sources'];current=copy.deepcopy(source['current']);baseline=copy.deepcopy(source['baseline'])
         for packet in (current,baseline):
             packet['metrics']['mid']=client['close'];packet['context'].update(mark_price=client['close'],index_price=client['close'])
             packet['bands']=[dict(low=1.,high=2.,notional_usdt=100.)]*1000
@@ -42,8 +42,8 @@ class SentimentHistory(unittest.TestCase):
             bundle=engine_store.input_bundle(conn,row['run_id'],client['open_time']);bundle['computed_at']=10**9
             expected,state=sentiment.evaluate(bundle)
             self.assertEqual(expected,row['latest']);self.assertEqual(state,engine_store.load(conn,row['run_id'])[1])
-            self.assertNotIn('bands',bundle['Section_14_Operations.configuration.sentiment_sources']['current'])
-            self.assertEqual(bundle['Section_14_Operations.configuration.sentiment_sources']['current']['context']['funding_rate'],.0001)
+            self.assertNotIn('bands',bundle['sentiment_sources']['current'])
+            self.assertEqual(bundle['sentiment_sources']['current']['context']['funding_rate'],.0001)
         finally:conn.close()
         writer=store.open_writer()
         try:
@@ -67,13 +67,13 @@ class SentimentHistory(unittest.TestCase):
         with sentiment_inputs.reader() as conn:
             projected=sentiment_inputs.project(conn,dict(s,as_of=s['as_of']-1000))
         self.assertLessEqual(projected['current']['available_ms'],s['as_of']-1000)
-        s['Section_14_Operations.configuration.sentiment_sources']=projected
+        s['sentiment_sources']=projected
         self.assertEqual(sentiment.evaluate(s)[0]['classification'],sentiment.UNKNOWN)
         writer=store.open_writer()
         try:
             with writer:store.set_status(writer,'*','offline','gap',now_ms=s['as_of']-100)
         finally:writer.close()
-        with sentiment_inputs.reader() as conn:s['Section_14_Operations.configuration.sentiment_sources']=sentiment_inputs.project(conn,s)
+        with sentiment_inputs.reader() as conn:s['sentiment_sources']=sentiment_inputs.project(conn,s)
         self.assertEqual(sentiment.evaluate(s)[0]['classification'],sentiment.UNKNOWN)
 
     def test_corrupt_baseline_preserves_current_funding_and_runner_budget(self):

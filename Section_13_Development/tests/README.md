@@ -663,13 +663,13 @@ using the same historical/live line-series path as VWAP.
 checkpoint/candle/epoch consistency, and withholding stale bins during repair.
 Bins are read from the runner checkpoint, never inferred from price levels.
 
-Daily registry refresh Section_13_Development/tests cover the optional CoinGecko key: process environment
+Daily registry refresh tests cover the optional CoinGecko key: process environment
 takes priority over the existing Symbols `.env` file; missing/empty configuration
 uses public requests without an authentication header. Incomplete results retain
 the previous registry, and failed refreshes retain the existing hourly retry.
 
 VP per-candle lines and histogram bars have independent visibility: selecting POC,
-VAH and VAL must not enable any bars. The Section_13_Development/tests check this migration regression,
+VAH and VAL must not enable any bars. The tests check this migration regression,
 volume-proportional lengths, configurable chart length, and exact low-to-high
 price extents at different zoom scales. Fixed pixel thickness is removed so
 filled node bars show their actual ranges without changing price-bin resolution. The extra VP value-area rectangle
@@ -798,7 +798,7 @@ Liquidity rolling analytics: `python3 -m unittest discover -s Section_13_Develop
  'test_liquidity*.py'` covers incomplete windows, continuity resets, absorption
 price response, bounded memory, OI/basis availability, closed-summary retention,
 and causal BTC/ETH alignment with missing benchmarks and recovery gaps. Existing
-recorder, storage and chart Section_13_Development/tests remain applicable; no exchange access is needed.
+recorder, storage and chart tests remain applicable; no exchange access is needed.
 
 Institutional projection display: JS coverage includes source origin, promotion
 without a duplicate dynamic underlay, closed-price dual-role classification,
@@ -851,7 +851,7 @@ Decision evidence: `test_decision_evidence.py` verifies ADCN's eight primary val
 insert-only persistence across reopening, epoch isolation, saved geometry despite
 missing features, and cost-only repricing. `test_di_decisions.py` exercises actual
 worker writes, historical recovery of signals with no prior ADCN row, and reloads
-after feature changes. JS Section_13_Development/tests and the browser evidence fixture check explicit
+after feature changes. JS tests and the browser evidence fixture check explicit
 marker prices, six saved bands and persistence through cost edits/short polls.
 
 Opportunity v5 spacing uses the original 2-ATR separation for both the first
@@ -953,7 +953,7 @@ round-robin work, adapter failure isolation, non-gating event callbacks, persist
 recent seeding and following a new close in the same run. Structure Section_13_Development/tests cover
 explicit enum mapping, source break deduplication, unavailable event origins,
 gaps, preview isolation, restart and the common output schema. Existing DI and
-legacy-feature regression Section_13_Development/tests remain unchanged.
+legacy-feature regression tests remain unchanged.
 
 `test_structure_lineage.py` checks producer IDs and origin/confirmation times,
 confirmed-price comparisons, source-engine checkpoint/preview/prefix parity,
@@ -1087,7 +1087,7 @@ python3 Section_13_Development/tests/frozen_backend_smoke.py
 ```
 
 The last two require a built distribution (the backend smoke uses Linux executable
-layout and localhost port 8000). Profile Section_13_Development/tests cover relocation, duplicate instances,
+layout and localhost port 8000). Profile tests cover relocation, duplicate instances,
 WAL-aware offline import, private account import, formula compatibility refusal and
 matching pending-replay admission. Frozen smoke checks exact source formula identity,
 Tcl resources and feature/checkpoint roundtrip; HTTP smoke checks locally bundled chart
@@ -1119,7 +1119,7 @@ confluence, immediate eligibility at the third close, next-open fills without
 price-break or chase gates, dominance gates, spot exits, protective stops under
 DI- dominance and prefix consistency. The browser check covers the DI events
 dialog. Stored-history Section_13_Development/tests verify bounded chart output plus optional complete
-trade exports. Cash-summary Section_13_Development/tests check closed-trade $100 compounding.
+trade exports. Cash-summary tests check closed-trade $100 compounding.
 
 For actual local history, run:
 

@@ -77,7 +77,7 @@ The active symbol/timeframe universe is unchanged.
 
 ## Verification and activation
 
-123 scheduler/history Section_13_Development/tests passed, covering resume/lineage, hierarchy, focus retention,
+123 scheduler/history tests passed, covering resume/lineage, hierarchy, focus retention,
 separate lane budgets, recent-service fairness, source generations, decision
 alternation and resource lifetimes. Runner dependency preflight passed with its
 existing `.venv-build` interpreter; `git diff --check` passed.

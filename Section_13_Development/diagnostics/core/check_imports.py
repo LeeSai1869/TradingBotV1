@@ -19,7 +19,7 @@
 #       Section_1_Global_Core.Symbols.symbols
 #
 # Reviewed worker/UI/diagnostic bridges have exact grants in integration_imports.json.
-# Integration Section_13_Development/tests may inspect internals; retired Section 6/7 imports are always rejected.
+# Integration tests may inspect internals; retired Section 6/7 imports are always rejected.
 # Anything else (in particular, anything under
 # Section_1_Global_Core.memory_storage.*)
 # is PRIVATE and must not be imported from outside.
@@ -125,7 +125,7 @@ def scan() -> int:
         for module in _imports_of(py):
             if module.startswith(('Section_6_Base_Scoring_Engines','Section_7_Confluence_Engines')):
                 violations.append((py,module))
-        # Integration Section_13_Development/tests intentionally inspect internal stores and fixtures.
+        # Integration tests intentionally inspect internal stores and fixtures.
         if py.relative_to(PROJECT_ROOT).parts[:2]==('Section_13_Development','tests'):continue
         # skip Global Core itself, .venv, and caches
         try:

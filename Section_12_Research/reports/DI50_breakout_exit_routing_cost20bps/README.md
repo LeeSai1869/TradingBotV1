@@ -52,6 +52,6 @@ Execution frames: {'1m': 10, '5m': 1}.
 
 ## Evidence
 
-`protocol.json` defines the correction; `summary.json` contains every policy/path summary; `*_results.json.gz` retains all trades; `all_exit_trades.csv` lists every exit. `execution_audit.json` checks all 1,176 trades for gross/net arithmetic, raw initial stops, target basis, price-bar fills and causal gate timestamps: zero mismatches. 36 targeted Section_13_Development/tests passed, including the cost arithmetic, hard stops, trailing and breakeven protection.
+`protocol.json` defines the correction; `summary.json` contains every policy/path summary; `*_results.json.gz` retains all trades; `all_exit_trades.csv` lists every exit. `execution_audit.json` checks all 1,176 trades for gross/net arithmetic, raw initial stops, target basis, price-bar fills and causal gate timestamps: zero mismatches. 36 targeted tests passed, including the cost arithmetic, hard stops, trailing and breakeven protection.
 
 Reproduce: `PYTHONPATH=/tmp/btc-section5-test-deps:. .venv-build/bin/python3 -m research_reports.DI50_breakout_exit_routing_cost20bps.study`

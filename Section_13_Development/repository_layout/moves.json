@@ -2419,5 +2419,13 @@
       "category": "development",
       "original_sha256": "ef14245be2a32b29dfd9d2ea9efd1d14c4d34095848bf8655ff68720546ccfa0"
     }
+  ],
+  "extractions": [
+    {
+      "source": "strategy_analyzer_workspace.py",
+      "symbol": "field_catalog",
+      "destination": "Section_8_Decision_Engine/strategy_catalog.py",
+      "reason": "Shared by the app and offline research; runtime must not import research packages."
+    }
   ]
 }

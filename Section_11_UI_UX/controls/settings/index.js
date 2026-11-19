@@ -233,7 +233,7 @@ function renderFeature() {
                 const input=el('input','',row);input.type='checkbox';input.checked=draft.outputs[key].higher;
                 input.onchange=()=>{draft.outputs[key].higher=input.checked;};
             }
-            note('Institutional overlays retain their original dynamic-zone origin. Scores accumulate recorded Section_13_Development/tests and need not change without another interaction. Gold means the zone has appeared on both sides of closed price. Origin extension is retrospective; scores are latest calculated values, not scores at birth. Projection reads stored features and does not enable downloads.');
+            note('Institutional overlays retain their original dynamic-zone origin. Scores accumulate recorded tests and need not change without another interaction. Gold means the zone has appeared on both sides of closed price. Origin extension is retrospective; scores are latest calculated values, not scores at birth. Projection reads stored features and does not enable downloads.');
         }
         if(item==='Liquidity'){
             const row=el('label','Show feed health and rolling flow',content,'settings-row');
