@@ -45,7 +45,7 @@ def open_db():
         except sqlite3.OperationalError:ready=None
         if not ready or ready[0]!='true':
             conn.close()
-            raise RuntimeError('Section 5 history needs migration to ADCN.db; run migrate_intelligence.py before restarting writers')
+            raise RuntimeError('Section 5 history needs migration to ADCN.db; run Section_14_Operations/storage/migrate_intelligence.py before restarting writers')
     conn.execute('PRAGMA foreign_keys=ON')
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS engine_history_bindings (

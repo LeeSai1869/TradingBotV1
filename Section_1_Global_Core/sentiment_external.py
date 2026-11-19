@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 
 from .paths import data_path
-DB_PATH=data_path('storage/sentiment_sources.db',Path(__file__).with_name('memory_storage')/'Storage'/'sentiment_sources.db')
+DB_PATH=data_path('storage/sentiment_sources.db',Path(__file__).with_name('memory_storage')/'Storage'/'Section_14_Operations.configuration.sentiment_sources.db')
 VERSION='external-sentiment-v1'
 MAX_PROVIDERS=20
 

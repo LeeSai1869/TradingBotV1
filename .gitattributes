@@ -1,2 +1,2 @@
 # Preserve the Pine reference's existing CRLF format in whitespace checks.
-sections_4&5_Tradingview whitespace=trailing-space,space-before-tab,cr-at-eol
+Section_4_Features/conversion/reference/sections_4_and_5.pine whitespace=trailing-space,space-before-tab,cr-at-eol

@@ -60,7 +60,7 @@ Section_1_Global_Core/feature_runtime.json
 /.venv-build/
 
 # Full pivot dashboard is published as compressed HTML.
-research_reports/BTC_1h_sequences/analysis_v1.html
+Section_12_Research/reports/BTC_1h_sequences/analysis_v1.html
 
 # Local assistant memory and machine-specific service configuration
 /.codex/
@@ -84,11 +84,14 @@ research_reports/BTC_1h_sequences/analysis_v1.html
 /*_review.json
 /*_readiness.json
 /scalp_*bps.json
-/research_reports/**/*.json
-/research_reports/**/*.json.gz
-/research_reports/**/*.csv
-/research_reports/**/*.html
-/research_reports/**/*.html.gz
-!/research_reports/**/protocol.json
-!/research_reports/**/configs/*.json
-/research_reports/strategy_workspace/
+/Section_12_Research/reports/**/*.json
+/Section_12_Research/reports/**/*.json.gz
+/Section_12_Research/reports/**/*.csv
+/Section_12_Research/reports/**/*.html
+/Section_12_Research/reports/**/*.html.gz
+!/Section_12_Research/reports/**/protocol.json
+!/Section_12_Research/reports/**/configs/*.json
+/Section_12_Research/reports/strategy_workspace/
+
+# Archived machine-local artifacts and organizer reports
+/Section_13_Development/local_archive/

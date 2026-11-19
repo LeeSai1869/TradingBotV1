@@ -134,7 +134,7 @@ const DataCache = {
                 if(generation!==this._reloadGeneration)throw error;
                 if(error.name==='ChartIdentityError'){this.error=error.message;this.emit('error');}
                 if (error.name === "AbortError") throw new Error("Chart server timed out. Use Reload to retry.");
-                if (error instanceof TypeError) throw new Error("Cannot reach the chart server. Run python3 restart_ui.py, then Reload.");
+                if (error instanceof TypeError) throw new Error("Cannot reach the chart server. Run python3 Section_14_Operations/services/restart_ui.py, then Reload.");
                 throw error;
             } finally { clearTimeout(timer);this._requests.delete(controller); }
         }

@@ -40,7 +40,7 @@ Older stored decisions remain legacy records, not re-evaluated v3 results.
 Run from the project folder:
 
 ```bash
-python3 evaluate_strategy.py --symbols ETHUSDT --intervals 5m 15m 1h 4h --output strategy_report.json
+python3 Section_12_Research/cli/evaluate_strategy.py --symbols ETHUSDT --intervals 5m 15m 1h 4h --output strategy_report.json
 ```
 
 Omit symbol/timeframe filters to evaluate all available committed pairs. Only
@@ -103,7 +103,7 @@ close explicitly. V2 ADCN records are retained as legacy data and no longer used
 as fallback Momentum markers. Current markers use the V3 projection.
 
 Historical reports generated before this change counted repeated raw candidates.
-Re-run `evaluate_strategy.py` to evaluate the accepted alternating sequence. This
+Re-run `Section_12_Research/cli/evaluate_strategy.py` to evaluate the accepted alternating sequence. This
 remains a forward-return study; alternation does not add exits or position sizing.
 
 ### Decision evidence memory

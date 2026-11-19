@@ -27,7 +27,7 @@ def context(snapshot,cfg):
         open_interest=None,open_interest_change_pct=None,open_interest_window_ms=None,reported_liquidations=None,
         unavailable_sources=['NORMALIZED_POSITIONING','ACCOUNT_RATIOS','NEWS','CROWD_SOCIAL'])
     classification=UNKNOWN.copy();parts={key:0. for key in BUDGET}
-    bundle=snapshot.get('sentiment_sources')
+    bundle=snapshot.get('Section_14_Operations.configuration.sentiment_sources')
     if not isinstance(bundle,dict) or bundle.get('version') not in ('sentiment-projection-v1','sentiment-projection-v2') or bundle.get('status')!='RECORDED':
         return classification,parts,measurements,['SENTIMENT_SOURCES_UNAVAILABLE']
     sample=bundle.get('current');base=bundle.get('baseline');identity=snapshot['identity'];at=snapshot['as_of'];age=cfg.sample_max_age_ms
@@ -97,7 +97,7 @@ def context(snapshot,cfg):
 
 
 def external_context(snapshot,cfg):
-    bundle=snapshot.get('sentiment_sources')
+    bundle=snapshot.get('Section_14_Operations.configuration.sentiment_sources')
     if bundle is None:return None,{},dict(),[]
     if not isinstance(bundle,dict):return None,{},dict(),['EXTERNAL_SCHEMA_REJECTED']
     rows=bundle.get('external',[])

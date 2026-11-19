@@ -5,7 +5,7 @@ shared measurements through Core. No network, SQL or other engine implementation
 imports. Core owns immutable snapshots, version/config-bound history and restart
 state in intelligence.db. The normal bounded analytical maintenance includes this
 engine for every active coin/timeframe, using the existing saved recent seed.
-Historical backfill is separately available through run_regime.py --engine PARTICIPATION.
+Historical backfill is separately available through Section_14_Operations/commands/run_regime.py --engine PARTICIPATION.
 
 ## Rules and configurable defaults
 

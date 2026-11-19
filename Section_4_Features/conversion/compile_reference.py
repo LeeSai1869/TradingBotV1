@@ -14,7 +14,7 @@ except ImportError:
     from kernels import KERNELS, VOLUME_PROFILE_HISTOGRAM
 
 ROOT=Path(__file__).resolve().parents[2]
-SOURCE=ROOT/'sections_4&5_Tradingview'
+SOURCE=ROOT/'Section_4_Features/conversion/reference/sections_4_and_5.pine'
 OUT=ROOT/'Section_4_Features/features'
 SUPPORT=ROOT/'Section_4_Features/execution'
 REVIEWED_SHA256='0bd770b5b36e41ad116a1080401b421305a219fb5b66278d92bedd4f497dbbf5'

@@ -13,7 +13,7 @@ export async function hudRequest(url, {signal, timeoutMs=8000}={}) {
     } catch(error) {
         if(timedOut)throw new Error('HUD server did not respond. Retry or restart the UI server.');
         if(error.name==='AbortError')throw error;
-        if(error instanceof TypeError)throw new Error('Cannot reach the UI server. Run python3 restart_ui.py, then retry.');
+        if(error instanceof TypeError)throw new Error('Cannot reach the UI server. Run python3 Section_14_Operations/services/restart_ui.py, then retry.');
         throw error;
     } finally {
         clearTimeout(timer);signal?.removeEventListener('abort',abort);

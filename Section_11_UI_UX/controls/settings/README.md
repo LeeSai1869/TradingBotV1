@@ -69,7 +69,7 @@ scopes remain inactive; activating a timeframe does not override paused coins.
 Core `data_policy.py` is shared by ingestion, processing and admin operations.
 Policy persists in ignored `runtime_policy.json`. New code must be running in
 both server and runner; an already running old runner does not reload Python
-source after git pull. `bash restart_runner.sh` restarts the launchd runner.
+source after git pull. `bash Section_14_Operations/services/restart_runner.sh` restarts the launchd runner.
 Avoid parallel legacy writer processes. All deployed writer entry points must
 use the new policy/coordination code before using deletion.
 
@@ -93,7 +93,7 @@ The chart status `waiting for stored bar` means a live snapshot is ahead of the
 last locally stored closed candle. It does not indicate whether features are
 running. The UI server and feature runner are separate processes. From the
 project root, inspect `launchctl list | grep com.scalp.liverunner`. If launchd
-already runs it, use `bash restart_runner.sh`. Otherwise, start it in another
+already runs it, use `bash Section_14_Operations/services/restart_runner.sh`. Otherwise, start it in another
 terminal with `python3 -u -m Section_1_Global_Core.memory_storage.Runner.live_runner`.
 Keep that terminal open and inspect processor/catch-up messages. Do not run two
 writers. A desktop UI launcher need not start the runner.
@@ -102,7 +102,7 @@ If account/settings endpoints are missing or the backend is stale, run from the
 project root:
 
 ```bash
-python3 restart_ui.py
+python3 Section_14_Operations/services/restart_ui.py
 ```
 
 The helper validates the process on port 8000 before stopping it. It restarts

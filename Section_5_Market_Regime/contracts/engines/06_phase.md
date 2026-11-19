@@ -48,7 +48,7 @@ Core commits candle history and checkpoints. Distinct interpretation events have
 stable IDs and origin/known times; persistent labels do not duplicate events.
 No SQL, network fetches or cross-engine implementation imports belong here.
 
-## Admission tests
+## Admission Section_13_Development/tests
 
 - Ordinary consolidation versus supported cycle hypothesis.
 - Continuation range versus reversal range.

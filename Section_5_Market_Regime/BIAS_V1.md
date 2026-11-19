@@ -142,8 +142,8 @@ Pull and restart the existing runner. Bias populates automatically after compati
 base-engine publications/checkpoints are available. Optional diagnostics:
 
 ```bash
-python3 run_regime.py --engine BIAS --automatic --summary --diagnostics
-python3 aggregate_market.py --engine BIAS --symbols BTCUSDT --summary
+python3 Section_14_Operations/commands/run_regime.py --engine BIAS --automatic --summary --diagnostics
+python3 Section_14_Operations/commands/aggregate_market.py --engine BIAS --symbols BTCUSDT --summary
 ```
 
 The first synthesizes stored exact-candle dependencies; the second aggregates saved
@@ -151,4 +151,4 @@ Bias across timeframes. Neither creates BUY/SELL flags. MTF recognizes strong Bi
 labels as bullish/bearish directional opposition while preserving per-timeframe
 intensity. No UI, notifications, recorder or existing Decision/Confidence/Opportunity
 behavior changes in this release. Predictive usefulness remains a separate research
-question; passing software tests alone does not establish profitability.
+question; passing software Section_13_Development/tests alone does not establish profitability.

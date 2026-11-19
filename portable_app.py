@@ -43,7 +43,7 @@ def import_legacy(source,target):
     if not storage.is_dir():raise ValueError('Source storage is missing')
     # Back up each SQLite file through SQLite, including committed WAL content.
     # This is not a live multi-database snapshot; source services must be stopped.
-    allowed=('klines.db','features.db','ADCN.db','sentiment_sources.db','liquidity/liquidity.db')
+    allowed=('klines.db','features.db','ADCN.db','Section_14_Operations.configuration.sentiment_sources.db','liquidity/liquidity.db')
     for relative in allowed:
         db=storage/relative
         if not db.is_file():continue

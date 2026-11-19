@@ -1,0 +1,1179 @@
+Run from the repository root with Node 24 (tested) and Python with numpy/pandas installed:
+
+```bash
+node --test Section_13_Development/tests/ui_lifecycle.test.mjs
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_*.py' -v
+```
+
+Completed indicator displays
+---------------------------
+Symbol selection supports typing a ticker (or common coin name), keyboard arrows
+and Enter. The original selector remains hidden as the shared market identity;
+search never starts a load for unmatched free text. Candles have separate Display
+and Style tabs for bullish/bearish body, wick and border colors and visibility.
+WMA 50 uses its existing stored calculation and now has chart/style controls.
+Indicator axes show numbers without name tags; pane headers retain names/values.
+
+Drawing placement uses a transparent HTML input layer over the price pane so it
+does not depend on unpainted SVG hit areas. Requests use AbortController timeouts
+without requiring AbortSignal.timeout. Load/save failures are visible on the chart;
+a failed save retains the drawing in memory and exposes Retry saving drawings.
+The browser regression simulates a failed POST and verifies retry/persistence.
+
+The candle header is a compact `O H L C Vol Δ%` strip beneath the symbol.
+Chart loading/cache status sits below the chart; the stored-flags panel is removed.
+Every feature has Select all/Deselect all controls on its Display and Style tabs.
+ADX and DI have independent panes/settings; ADX has a dashed 25 reference line.
+VWAP axis labels retain their numeric values/colors without band-name tags.
+
+Compact drawing icons sit at the right of the regular top toolbar. Click a
+shape icon, then place anchors on the price chart. Clicking a saved drawing opens
+its small style popup: color, width, line style, rectangle fill, position lock and
+visible timeframes (or all). Drag unlocked shapes/handles to move/edit them.
+Undo reverses edits/deletions; Escape cancels unfinished placement.
+
+Drawings now belong to the authenticated account in
+`~/.tradingbot/drawings.sqlite3`, separate from market databases. The API ignores
+client-supplied usernames and uses the session identity. Each coin has a revision
+counter; concurrent saves from other devices return a conflict instead of
+silently overwriting their changes. The UI refreshes account drawings periodically.
+Devices must connect to the same backend to share the account memory; separate
+localhost installations do not share a database. This change does not expose the
+local server to the network. Existing browser drawings are imported on first load
+of their coin, then removed from browser storage after a successful server save.
+
+Drawings use absolute candle timestamps and price, allowing projection onto the
+chosen timeframes. Defaults restrict a new drawing to its creation timeframe.
+The duplicate symbol/timeframe row above candle details is removed. Lower-pane
+headers show enabled outputs in their own colors, with two-decimal values following
+the crosshair or latest candle.
+
+`test_drawings.py` covers persistence, ownership, revision conflicts, deletion,
+validation and access checks. `browser_drawings.py` checks icons, style/lock editing,
+timeframe visibility and persistence across clean browser contexts. Geometry
+vectors remain in `drawings.test.mjs`.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_drawings.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+Feature displays use exactly two decimal places in the HUD (including tooltips),
+indicator price labels, candle volume/change details and new alert messages.
+Raw OHLC prices retain their numeric precision. This is presentation formatting;
+stored values and alert comparisons retain full precision. `value_format.test.mjs`
+checks that distinction; browser indicator/HUD checks exercise the rendered values.
+
+RSI, ADX/DMI, ATR, Volume and VWAP can be enabled in Features settings.
+RSI, ADX, ATR and Volume use synchronized lower chart panes with collapse,
+close and direct settings buttons. Per-output colors, widths and line styles
+persist in browser preferences; RSI also has editable reference levels.
+EMA and VWAP display matching colored price-axis labels. The candle-details
+table follows the crosshair and otherwise shows the latest loaded candle.
+All these displays consume the existing combined bar stream without separate
+indicator requests. Missing feature values remain blank; live values are shown
+only when supplied by the existing provisional feature calculation.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_indicators.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+This browser regression uses disposable data and checks pane controls, styles,
+RSI levels, live RSI updates, persistence, candle details and request reuse.
+It verifies rendering, not numerical parity with TradingView.
+
+The supplied `Section_4_Features/conversion/reference/sections_4_and_5.pine` reference was populated at commit
+`e940218`. Numerical translation is tracked separately from these rendering tests.
+
+The cloud Python environment is `/workspace/.venvs/tradingbot/bin/python`.
+These Section_13_Development/tests use disposable SQLite databases and never fetch market data.
+They cover count-based paging over gaps/month boundaries, cursor exhaustion,
+missing derived rows, unified identity alignment, stale loads, deduplicated
+prefetch, readiness notifications, stored refresh, marker lifecycle and serial
+local-store polling. The existing range API remains covered for compatibility.
+
+For the real-browser flow check, install Playwright in a development environment
+and provide Chromium at `/usr/bin/chromium`. Obtain the pinned chart library
+through npm, which verifies package integrity:
+
+```bash
+mkdir -p /workspace/.cache
+npm pack lightweight-charts@5.2.1 --cache /workspace/.cache/npm --pack-destination /workspace/.cache
+tar -xzf /workspace/.cache/lightweight-charts-5.2.1.tgz -C /workspace/.cache package/dist/lightweight-charts.standalone.production.js
+PYTHONPATH=. python3 Section_13_Development/tests/browser_smoke.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+The browser runs at 2560 x 1440 using 14,000 stored BTCUSDT 15-minute candles,
+matching features, periodic decisions, and additional market/timeframe fixtures.
+The history deliberately ends in June 2026, independent of today's clock.
+It verifies 200 initially visible candles with right margin, then user zoom-out
+and 20 consecutive 500-candle pages
+(10,000 candles back), timestamp/pixel continuity, reversal without refetch,
+stationary boundary arrival, reversal during prefetch, one marker wrapper,
+renderer configuration, rapid selection/reload, and local ingestion/derived-state
+updates that follow the newest edge without interrupting historical browsing.
+Older requests are delayed
+150 ms so readiness/viewport assertions exercise asynchronous rendering.
+The historical scenario disables live quotes and asserts there are no Binance
+or separate candle/EMA/current-flags requests.
+Browser time-range endpoints round fractional edge candles; anchor pixel
+continuity is checked to 0.1 pixel instead of relying on endpoint rounding.
+
+The chart reads `/api/bars?symbol=BTCUSDT&interval=15m&limit=1000`; older pages
+use `limit=500&before=<first open_time in milliseconds>`. Each `bars` item
+contains `client`, `features`, and `adcn` under one canonical identity, plus
+`time` in seconds for chart rendering. Missing derived state is null.
+Visited history is retained for smooth reversals and cleared on explicit
+reload or market/timeframe change. It is not silently trimmed to 1,000 rows
+while those rows are visible. The active window remains 1,000 candles.
+
+Optional fields in `Section_11_UI_UX/config/ui_config.json`:
+
+```json
+{
+  "display": {"candles": true, "ema50": true, "markers": true},
+  "stored_refresh_ms": 5000,
+  "live_candle": true,
+  "price_precision": {"BTCUSDT": 2, "SUIUSDT": 4}
+}
+```
+
+Merge these fields with the existing `timeframes` settings. Zero disables
+all automatic refresh. `live_candle` defaults to true: latest-page requests add
+`live=1` and the server includes a cached provisional candle in the same response.
+The server fetches Binance quotes in a background worker (at most once a second
+per market/timeframe), so slow exchange I/O cannot block historical requests.
+Automatic refresh uses a one-second cadence while live quotes are enabled and
+pauses while browsing history. Set `live_candle` to false for stored-only browsing.
+The provisional record has the same client/features/adcn shape, but features and
+decisions are null until confirmed; it never enters the permanent bar cache or
+databases. The chart updates the forming price using `series.update`, not a full
+history/indicator redraw. At rollover, it waits for the stored closed candle
+before displaying the next forming interval, avoiding gaps and duplicate bars.
+Unavailability is shown in the status text; the last provisional quote may remain
+visible without being labelled live. Precision otherwise comes from stored prices; it is display formatting,
+not an exchange tick-size contract. The ingestion runner is unchanged.
+The old `/api/live_candle` endpoint returns 410; live preview is part of
+`/api/bars?live=1`, rather than a separate browser candle request. Older cursor
+pages never request a live snapshot.
+
+The dedicated live browser scenario uses a controlled source, without network:
+
+```bash
+PYTHONPATH=. python3 Section_13_Development/tests/browser_live.py /workspace/.cache/package/dist/lightweight-charts.standalone.production.js
+```
+
+It verifies incremental price ticks without `setData` or permanent writes,
+paused history browsing, rollover, replacement by audited state, and source
+failure status. Python Section_13_Development/tests also cover nonblocking/deduplicated requests and
+snapshot expiry. Live Binance access from the cloud machine returned HTTP 451
+on verification; source connectivity is not claimed from these simulated tests.
+The desktop chart server needs access to api.binance.com for live preview.
+
+
+The live configuration registers `Section_4_Features.processor` followed by
+`Section_8_Decision_Engine.processor`. Features include the six Section 5 regime
+states; Section 8 persists the closed-candle DI recovery rule in ADCN with its
+restart checkpoint in the same transaction. Test decisions use disposable stores.
+
+The existing architecture check (`python -m Section_13_Development.diagnostics.core.check_imports`)
+rejects the storage gateway imports already used by the UI and feature processor;
+integration fixtures also import stores to isolate their databases. That checker
+and the gateway enforce conflicting contracts. This change does not suppress
+that check or claim it passes. The additive read-contract version and isolated
+validation scope are recorded in Global Core's README; no new market-data audit
+certification is claimed.
+
+Settings navigation and chart preferences (isolated databases, real chart):
+
+```bash
+PYTHONPATH=. python3 Section_13_Development/tests/browser_settings.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Covers Apply/Cancel, EMA period/style, viewport preservation, browser persistence,
+coin registry categories, signed-out policy restrictions, keyboard close/focus and mobile
+layout. `test_settings_catalog.py` verifies read-only registry grouping and failure
+handling. Settings do not enable runner-policy changes or deletion yet.
+
+Independent output styles and migration of shared EMA preferences:
+
+```bash
+node --test Section_13_Development/tests/feature_styles.test.mjs Section_13_Development/tests/ui_lifecycle.test.mjs
+```
+
+The settings browser scenario also checks separate EMA colors/widths/styles,
+feature submenus and saved RSI/ADX output preferences.
+
+Administrator workflow (isolated databases and temporary accounts):
+
+```bash
+PYTHONPATH=. python3 Section_13_Development/tests/browser_admin.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Tests actual HTTP sessions, normal-user permission denials, immediate timeframe
+policy, typed administrator deletion, cache invalidation, scoped coin deletion
+and reapproval. `test_data_admin.py` covers three-store rollback, eligibility,
+reactivation bootstrap with actual feature computation, epoch invalidation,
+policy changes during in-flight downloads/calculation, and failed-bar retries.
+Exchange requests use fixtures; this does not establish Binance connectivity.
+
+Authentication now gates chart startup. Browser fixtures provision temporary
+accounts and sign in through the actual startup form. The administrator scenario
+also covers stale-backend recovery, first-time setup guidance, wrong passwords,
+normal-user tab hiding and GET/POST denials, sign-out and expired sessions.
+`test_restart_ui.py` checks safe process selection and launchd/manual restart
+branches with mocked process controls (never stopping a real process).
+
+Live/stored alerts, sound/notification delivery, Remember Me and category selection:
+
+```bash
+PYTHONPATH=. python3 Section_13_Development/tests/browser_alerts.py /path/to/lightweight-charts.standalone.production.js
+```
+
+Uses isolated market/alert/session databases, controlled live snapshots and browser
+audio/notification mocks. It verifies stored RSI waits for features, a live price
+crossing on an unviewed coin, deduplication, account isolation, delivery while
+browsing history, Select All/Deselect All, remembered login after in-memory session
+reset, and logout revocation. `test_alerts.py` covers field comparisons, signed
+thresholds, readiness, edit revisions, dataset epochs, historical bootstrap,
+bounded readers, token hashing and password-change invalidation. These Section_13_Development/tests do
+not establish Binance connectivity or native Mac notification support.
+
+Live EMA/RSI and runner recovery
+-------------------------------
+The shared forming-candle worker now forks the runner's committed full-history
+formula-v3 checkpoint and calculates the complete provisional feature packet.
+It requires the checkpoint to be adjacent to the forming candle; while historical
+replay is behind, provisional features remain unavailable. Each tick uses a fresh
+fork, without advancing permanent state or writing feature rows. Final closed
+packets and checkpoints are stored together by the existing runner. Live alert
+field eligibility remains price, EMA and RSI; other alert conditions remain
+closed-feature rules. New alert forms take the current chart symbol/timeframe
+on every opening.
+
+On macOS, from the checkout, using the Python environment with pipeline dependencies:
+
+```sh
+python3 Section_14_Operations/services/restart_runner.py
+python3 Section_13_Development/diagnostics/check_coin.py ETHUSDT
+```
+
+The installer recreates the user launchd plist with this checkout and interpreter,
+enables the service even if it was disabled, and starts it on future logins.
+It verifies the working folder of an existing runner before replacing it. It
+stops a verified project runner and its dedicated launchd job, preserving general
+Terminal/VS Code applications. An unknown checkout or respawning writer prevents
+a competing start. Logs are created before recovery, even if recovery fails.
+The runner performs an initial download pass before feature catch-up; catch-up
+can still delay subsequent cycles.
+Check both logs for progress or exchange/network failures:
+
+```sh
+tail -n 60 "$HOME/Library/Logs/TradingBotV1/runner.log"
+tail -n 60 "$HOME/Library/Logs/TradingBotV1/runner-error.log"
+```
+
+`Section_13_Development/tests/test_live_features.py` checks provisional formula parity, tick replacement,
+gapped history, and launchd configuration/installation with mocked macOS commands.
+
+
+Comparison HUD / analysis workspace
+----------------------------------
+The toolbar's **Analysis** button opens a collapsible right panel, with Best
+opportunity pinned above a separately scrollable analysis/chat region. The
+independent **HUD** toggle shows a transparent comparison table on the chart. AI ranking,
+chart analysis and chat are labelled placeholders; no provider or predictions are
+connected. Settings → HUD chooses a pinned reference coin or follows the chart,
+1–8 timeframe columns in selection order, and 1–20 reorderable feature rows.
+Preferences, HUD visibility and its chart corner (top/bottom left/right) persist
+in the browser, independently of analysis-panel visibility. Values come from one
+combined latest bar per timeframe (shared provisional live snapshot when available,
+otherwise stored closed), with candle UTC timestamps, stale and
+inactive labels, and missing values shown as an em dash. This view does not infer
+trade direction from numeric indicators. The HUD polls every five seconds while visible,
+pauses while hidden, and never requests Binance or full chart history. The chart
+resizes with the desktop panel; small screens use a drawer.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_workspace.py /path/to/lightweight-charts.standalone.production.js
+```
+
+`test_hud.py` checks joined snapshots, absent/stale/inactive values, request limits
+and bounded reads. `test_restart_runner.py` checks exact process matching, verified
+checkout replacement and preservation of unrelated applications. macOS launchd
+operations are mocked here; actual download progress must be checked on the Mac.
+
+
+UI request availability under runner load
+----------------------------------------
+The UI uses a threaded HTTP server so an idle browser socket or waiting HUD
+request cannot monopolize chart/static/account requests. Chart/HUD deletion-guard
+waits are capped at one second; temporary lock/SQLite contention returns JSON
+HTTP 503 (Retry-After: 1), while unexpected API errors are logged with a traceback
+and return JSON HTTP 500 instead of dropping the connection. Stored-bar requests
+retry HTTP 503 up to twice. Chart and HUD fetches have finite deadlines; failed
+HUD catalog requests clear their shared promise so Retry can work. HUD failure
+never gates initial chart loading.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_hud_failure.py /path/to/lightweight-charts.standalone.production.js
+node --test Section_13_Development/tests/hud_requests.test.mjs Section_13_Development/tests/ui_lifecycle.test.mjs
+```
+
+`test_ui_availability.py` verifies idle sockets, concurrent blocked HUD requests,
+bounded real policy-lock waits and structured error responses. Browser fixtures
+use the production threaded server. `browser_hud_failure.py` forces HUD and
+catalog failures while confirming the chart loads and settings retry recovers.
+These checks reproduce failure modes in isolation; they cannot identify a Mac
+network/process failure without that machine's server response or logs.
+
+
+Shared chart/HUD reads without runner contention
+-----------------------------------------------
+Chart `/api/bars` and other-pair HUD columns use Core's `db.read_state_page`.
+That reader opens SQLite in `mode=ro`, avoiding schema initialization during reads.
+Neither endpoint acquires the runner's calculation/write policy lock. They instead
+hold a shared deletion guard; administrator deletion holds that guard exclusively
+through its epoch change and three-store transaction. Ordinary ingestion/features
+keep their existing writer coordination and do not block these readers while
+calculating. SQLite still protects committed reads during actual database writes.
+
+A HUD column matching the current chart pair uses `DataCache.latestBar` or its
+available live `formingBar`, without a HUD data request. Chart events project tick
+changes directly into the table. Only other pairs (or a chart browsing history)
+need a bounded latest-bar snapshot. Their live values use the existing shared
+forming-candle cache, never a separate feature calculator. HUD requests wait for
+initial chart loading to finish. Missing provisional features remain missing.
+
+The existing Section 3 `MTF Data.py` describes a timeframe-only in-memory contract
+and explicitly leaves its provider unconnected. Section 2 contains input settings;
+neither is currently a populated, symbol-aware source for the UI.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_hud_reuse.py /path/to/lightweight-charts.standalone.production.js
+node --test Section_13_Development/tests/hud_chart_column.test.mjs
+```
+
+The browser regression holds the real runner policy lock during initial chart
+loading and verifies live/closed HUD projection with zero HUD data requests.
+Gateway Section_13_Development/tests hold an uncommitted feature write and verify that reads see the last
+committed value without opening schema-initializing store connections. Separate
+checks preserve deletion exclusion and epoch invalidation.
+
+HUD appearance and compact toolbar
+----------------------------------
+HUD reference choices are restricted to Follow current chart and BTCUSDT; old
+other-coin preferences migrate to Follow current chart. Settings → HUD controls
+font family/size/color/weight, border color/width/style, cell spacing and optional
+candle dates (hidden by default). Status labels remain visible. A keyboard-accessible
+corner handle resizes the overlay relative to its selected anchor; dimensions are
+saved alongside existing preferences and constrained to chart bounds. Reset HUD
+size restores content-based dimensions. The toolbar wraps into available width;
+favorite timeframe buttons and status text wrap too, preserving access to controls.
+
+`browser_workspace.py` verifies the two reference options, style/date application,
+corner dragging, reload persistence and narrow-window toolbar button bounds.
+
+The HUD table paints beneath the chart's transparent canvas so candles, grid,
+and indicators remain above its text and borders. The chart container supplies
+the dark background. Only HUD settings/resize controls remain above the canvas;
+the table's scroll region remains keyboard-focusable. The workspace browser
+regression checks layer order and continues to exercise settings and resizing.
+
+Saved-alert manager and independent editor
+-----------------------------------------
+Alerts opens the saved-alert list and activity. The + New alert button opens a
+separate modal editor; Edit opens that editor for the selected rule. Successful
+saves close the editor, release its saving state immediately and refresh the list
+independently. New creates clear the editing ID and default to the current chart
+pair. Failed saves keep the form and re-enable submission. In-flight saves prevent
+closing/replacing the editor; requests have a finite deadline and timeout messages
+advise checking saved alerts before retrying an uncertain submission.
+
+Saving uses the same deletion guard as chart snapshots rather than waiting for
+runner feature-processing locks. Browser audio resume is attempted independently
+and cannot delay the save request. Existing per-account alert storage is retained.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_alert_editor.py /path/to/lightweight-charts.standalone.production.js
+```
+
+This browser regression creates three alerts successively while holding the runner
+lock and mocking audio resume to remain pending. It verifies separate list/editor,
+edit identity, deletion, and successful retry after an HTTP save failure.
+
+Historical backfill versus wrong prices
+--------------------------------------
+`Section_13_Development/diagnostics/check_coin.py ETHUSDT` now prints latest stored closes alongside their dates and
+flags history behind current time. A read-only exact-timestamp source comparison
+can be requested for selected intervals:
+
+```sh
+python3 Section_13_Development/diagnostics/check_coin.py ETHUSDT --verify 1m 5m 15m 1h 2h 4h
+```
+
+This compares one latest stored OHLCV sample per interval to a fresh Binance
+request for that same symbol, interval and timestamp. MATCH is sample evidence,
+not certification of all history; UNVERIFIED reports a failed/unavailable source
+check. It never changes candles or runtime state. The chart labels historical
+latest candles explicitly instead of implying their prices are current.
+
+The existing fast ingest audit excludes A3 cross-source verification. Freshness
+A5 is separate from historical row validity. Ingest now retains/logs actual audit
+summaries and the orchestrator no longer hardcodes audit_pass=True. Full audit
+aggregation now includes A3 issues, A4 consistency failures and missing freshness
+rows; skipped, disabled and empty source checks are labelled separately. Audit
+remains post-ingest/best-effort and does not stop a legitimate historical backfill.
+
+`test_coin_verification.py` checks request identity/time, mismatch detection and
+read-only operation. `test_audit_reporting.py` distinguishes stale history, missing
+rows, source failures and skipped source verification. The cloud cannot validate
+the Mac's saved prices; the command above must run against that local database.
+
+Runner progress and bounded ingest audit
+---------------------------------------
+The ingest `run_fast` audit now samples at most 1000 recent rows per active pair
+(10 requested by the runner), checks continuity within that bounded window, and
+checks latest-candle freshness via the indexed latest open time. It does not hash
+the entire database, scan complete histories, run cross-interval/source checks or
+perform network gap repair inline. Detected recent gaps are reported with
+`repair_deferred`; A3/A4 are explicitly skipped, never reported as verified.
+`audit_runner.run()` retains full-history checks and optional repairs for a
+separate full audit. The fast manifest and metadata retain their bounded scope.
+This prevents full-history audit/repair work from monopolizing each ingest cycle;
+it does not claim all older rows have been audited by the recent sample.
+
+Runner logs identify download, audit and feature-batch phases. After installing
+updates, restart the existing runner with `python3 Section_14_Operations/services/restart_runner.py`; pulling
+source files does not reload a running Python process. Startup feature catch-up
+may take time before normal cycles resume. Current wrapper versions register
+faulthandler's SIGUSR1 traceback handler for diagnosing a stall without killing the
+process; never send that signal to an older runner that has not been restarted.
+`test_fast_audit.py` verifies bounded sampling, deferred gap repair and exclusion of
+full hashing/scanning/network work from the ingest audit.
+
+Restart process identity
+------------------------
+Runner discovery checks process state and the actual executable (`ps comm`) in
+addition to the exact `-m` module. Launcher shells, `-c` command text, and zombie
+processes cannot count as active Python writers. A process disappearing during
+inspection is tolerated. If a real writer persists after termination, restart
+still refuses a competing start and reports PID/parent/state/command for diagnosis.
+
+One login service
+-----------------
+The canonical launchd label is the existing `com.tradingindicator.liverunner`.
+Restart verifies running processes belong to this checkout, disables/boots out both
+that job and the earlier helper's `com.scalp.liverunner`, waits for Python writers
+to exit, then enables/starts only the original label. The duplicate plist remains
+on disk but disabled across logins. Coin diagnostics recognize both labels and
+warn if multiple jobs are loaded. This avoids restarting one identity while the
+other supervisor respawns its writer. The regression uses the observed legacy
+PID/job mapping to verify both jobs are stopped and the original identity reused.
+
+Volume-profile infinite-loop regression
+--------------------------------------
+A value-area expansion with POC in the first histogram bin and an empty right
+neighbor previously treated an unavailable left neighbor as an available zero
+bin. A zero/zero tie decremented the lower index below zero forever. The runner's
+Python traceback confirmed it was stuck at this loop during ETH 1m catch-up.
+Expansion now selects only available sides, crossing empty bins when necessary;
+each iteration adds one valid bin, so expansion is bounded by the histogram size.
+
+`test_volume_profile_progress.py` runs the original sparse left-edge failure in a
+subprocess with a deadline, and checks right-edge, single-bin and dense profiles.
+The correction does not alter stored candles or require clearing feature memory;
+restart the runner to resume catch-up from its last committed feature rows.
+
+
+Complete feature conversion and replay
+--------------------------------------
+The supplied Section 4/5 reference is now covered by 28 modules (22 numbered Section 4 sections and six Section 5 modules),
+not broad location/momentum implementations. See
+`Section_4_Features/TRADINGVIEW_REVIEW.md` and `features/README.md` for the source
+map, external parameter defaults, explicit source corrections and parity limits.
+
+`test_complete_conversion.py` checks source statement coverage, all 537 contract
+fields, independent EMA/Wilder vectors, checkpoint equivalence, pair isolation,
+FVG failure memory, institutional references, live rollback, daily security timing,
+daily dependency repair, empty profile bins, all six regimes, bounded replay,
+backup and export mismatch detection. Previous source is archived. Migration to
+formula version 3 is automatic and bounded; `Section_13_Development/diagnostics/check_coin.py` distinguishes its
+cursor from old feature row counts. The raw candles and downloader are unchanged.
+
+```sh
+python3 -m Section_4_Features.conversion.validate_export export.csv --symbol ETHUSDT --interval 15m --fields ema50 rsi adx
+```
+
+This read-only comparator requires the same Pine inputs/history and an actual
+export fixture. Passing synthetic regression vectors is not TradingView export
+certification. No such export was provided with the reference source.
+
+
+Numbered-section layout and replay isolation
+--------------------------------------------
+`test_complete_conversion.py` verifies exact 4.2 source boundaries, candle ownership,
+the absence of the duplicate individual tree, a pre-refactor packet digest,
+healthy-pair progress after an injected calculation error, retry without skipping
+failed candles, and intentional disabled-timeframe behavior. The source manifest
+is in `Section_4_Features/conversion/`; execution helpers are in `execution/`.
+Use `python3 Section_13_Development/diagnostics/check_coin.py ETHUSDT --logs` as a single read-only diagnostic command.
+
+
+Large-universe runner scheduling
+--------------------------------
+The existing runner now rotates through bounded download and event slices rather
+than visiting every approved coin/timeframe before yielding. Downloads visit up
+to 512 pairs or a two-second soft budget; a running network call retains its timeout.
+Events have a separate 12-pair/two-second soft budget, checked between bars, with
+chronological watermarks retained across slices. Feature maintenance remains a
+separate bounded round-robin pass. No extra downloader or writer is introduced.
+
+`test_runner_scheduling.py` covers rotation across more pairs than one slice,
+yielding after a slow download, and event timeouts that resume the next pair
+without skipping the interrupted pair's next candle. Diagnostics explicitly
+separate old feature row counts from missing new-formula checkpoints and label
+logs as cumulative across process starts. Backups announce when they begin.
+
+
+Nested policy writer locks
+--------------------------
+`test_policy_lock.py` uses actual `flock` calls in bounded subprocesses. It checks
+that nested orchestrator/processor locks finish, competing processes stay excluded
+until the outermost scope exits, thread timeouts work, and exceptions release the
+lock. A real-storage runner cycle replays 205 candles across the maintenance/event
+boundary and commits without mocking the policy lock. The prior test fixtures'
+no-op locks could not expose this deadlock.
+
+
+Symbol dropdown picker
+----------------------
+`browser_symbol_picker.py` checks a 63-symbol list without truncation, a separate
+blank/focused search at the top on every open, ticker/name filtering, keyboard
+selection, cancel/outside dismissal, scrollable results with a fixed search field,
+and a narrow viewport. Existing history and HUD Section_13_Development/tests select symbols through the
+same dropdown. The underlying select/change event contract is retained.
+
+```sh
+PYTHONPATH=. python3 Section_13_Development/tests/browser_symbol_picker.py /path/to/lightweight-charts.standalone.production.js
+```
+
+
+Zone displays and catch-up performance
+-------------------------------------
+Settings → Features now includes Support / Resistance (dynamic and institutional)
+and FVG (bull/bear). `browser_zones.py` covers combined-stream zone rendering,
+style persistence and visibility without extra feature requests. Zone primitives
+stay in the price pane behind candles and only draw visible segments. The stored
+zone bounds are the selected zone's actual array entries, not an ATR approximation.
+Older dynamic S/R rows lacking bounds remain hidden until range data is available.
+New bounds populate as chronological replay reaches each bar; no reset is needed.
+
+Profiling identified the VP histogram loop and repeated field-name regex work.
+The native histogram retains ordered per-bin additions and the golden reference
+packet digest; field names are memoized. A local 1,800-bar engine benchmark measured
+192→416 bars/s with the old/new histogram, both using cached field names. This
+excludes SQLite/network work and is not a promise about the user's Mac.
+
+Normal chart polling reads two newest closed bars instead of 1,000; each twelfth
+poll reconciles the full window for historical feature replay. A discontinuous
+new edge reloads its initial window rather than skipping cache rows silently.
+The updater scans more eligible pairs per soft time budget and fetches a recent
+closed page while history fills. Its persistent `history_progress` cursor is in
+klines.db, is deleted with the relevant coin/timeframe, and caps feature replay
+so a fresh tail can never make recursive calculations jump an unfinished gap.
+Audit summaries keep `pass=false` while active history backfills remain.
+`test_complete_conversion.py` exercises fresh-tail insertion, gap exclusion,
+forward cursor completion, and continued full feature replay on actual stores.
+
+
+Closed DI-spread decision rule
+-----------------------------
+`test_di_decisions.py` covers both strictly qualifying setup candles, the inclusive
++DI/spread crossing, strict +DI rise and −DI decline, invalid inputs, no immediate
+repeat, closed-feature checkpoint gating, raw time gaps, initial latest-window
+seeding, restart/idempotence, symbol/timeframe isolation, policy epochs, and
+atomic row/checkpoint rollback. ADCN's unrelated score fields remain intact.
+`test_policy_lock.py` exercises both real processors beneath the real runner lock.
+`browser_di_decisions.py` generates a decision from stored DI values and verifies
+its score-free BUY marker through the existing combined bar endpoint.
+
+### DI turning-point strategy and symbol priority
+
+`test_di_decisions.py` covers both branches in each direction, strict comparisons,
+10,000 generated comparisons against the supplied Pine conditions, closed-candle
+memory, gaps, policy cancellation, and transactional restart behavior.
+`test_work_priority.py` checks existing-before-new ordering, sticky ownership until
+raw and feature work finish, and release after pausing/removal. Scheduling Section_13_Development/tests
+cover current refreshes preceding historical work and yielding after slow requests.
+`test_daily_refresh.py` checks persisted daily success and failure retry behavior.
+`test_strategy_evaluation.py` verifies next-bar-open entry, explicit costs, horizons,
+and exclusion of gaps/unfinished tails. These are correctness Section_13_Development/tests, not evidence
+of profitable historical performance. Run `python3 Section_12_Research/cli/evaluate_strategy.py` on the
+machine holding actual formula-v3 market history for a read-only forward study.
+
+Momentum Indicator coverage: `test_di_decisions.py` checks read-only chart markers
+without ADCN records, predecessor lookback at page boundaries, and missing bars.
+`momentum_indicator.test.mjs` covers independent styles, forming/old-rule exclusion,
+sound preference validation, deduplication, historical suppression, and chart
+switches. `browser_di_decisions.py` checks visible markers, settings, persistence,
+style changes, visibility, synthesized audio and exactly-once delivery in Chromium.
+
+`test_scheduler_resources.py` verifies deterministic closure with retained
+connection references, early returns, SQL errors, and failure opening the second
+database. Its isolated subprocess performs 1,000 scheduler checks with garbage
+collection disabled and a 64-descriptor soft limit. This reproduces the resource
+constraint without touching production databases or the parent process limits.
+
+Strict alternation: `test_signal_alternation.py` covers BUY/BUY and SELL/SELL
+suppression, WAIT/gap handling, and agreement between chart and event study.
+`test_di_decisions.py` verifies restart persistence, v2 checkpoint migration,
+page-size invariance, backward lookup across page boundaries, and avoiding
+historical scans for windows without candidates. Marker Section_13_Development/tests exclude suppressed
+signals and obsolete V2 records from marker/sound delivery.
+
+Selective calculation repair: `test_selective_features.py` compares repaired
+historical columns and the next new candle against full-engine references for
+RSI, EMA, ADX/DI, ATR, volume, volume profile, S/R, VWAP and pivot inputs. It checks
+every unrelated column remains unchanged, blocks unrelated EMA/ADX computation
+during RSI repair, verifies source-change detection, compatible checkpoint adoption and FVG-only source repair without
+resetting the main cursor, restart/resume, input reversal, transaction rollback, masked dirty values,
+dependent decision invalidation and strategy edits leaving Section 4 untouched.
+Live-preview coverage verifies that dirty values are withheld and repaired state
+refreshes even when the main candle cursor stays unchanged. Fixtures use isolated
+databases and synthetic candles, not production history.
+
+Cross-interpreter regression coverage in `test_selective_features.py` compares the
+portable fingerprints to the frozen baseline without using `ast.dump`, recovers
+pending and completed Python 3.13/3.14-format jobs without replay or cursor resets,
+preserves genuine input edits during recovery, and retires other symbols' false
+jobs without waiting for the selected history owner. Run this suite on Python
+3.14 as well as the main interpreter; native AST defaults differ between them.
+
+Volume Profile presentation: `volume_profile_display.test.mjs` covers independent
+POC/VAH/VAL line visibility/styles, histogram/node controls, opacity validation, missing
+boundaries and gaps. `browser_zones.py` verifies these levels and shaded bands in
+the main price pane, saved colors/width/dashes/opacity, and S/R/FVG visibility.
+All displays consume the existing combined bars; the optional histogram snapshot
+travels in the same `/api/bars` response. No separate market-data requests or
+feature recalculation are introduced. Missing S/R boundaries are hidden rather
+than rendered as zero-width zones at a fallback price. The profile displays the latest committed rolling histogram as horizontal bars,
+with independent HVN/LVN colors. POC/VAH/VAL plot their stored values per candle,
+using the same historical/live line-series path as VWAP.
+`test_profile_snapshot.py` checks a known bin/POC/value-area vector, cache reuse,
+checkpoint/candle/epoch consistency, and withholding stale bins during repair.
+Bins are read from the runner checkpoint, never inferred from price levels.
+
+Daily registry refresh Section_13_Development/tests cover the optional CoinGecko key: process environment
+takes priority over the existing Symbols `.env` file; missing/empty configuration
+uses public requests without an authentication header. Incomplete results retain
+the previous registry, and failed refreshes retain the existing hourly retry.
+
+VP per-candle lines and histogram bars have independent visibility: selecting POC,
+VAH and VAL must not enable any bars. The Section_13_Development/tests check this migration regression,
+volume-proportional lengths, configurable chart length, and exact low-to-high
+price extents at different zoom scales. Fixed pixel thickness is removed so
+filled node bars show their actual ranges without changing price-bin resolution. The extra VP value-area rectangle
+was removed. Calculations retain the Pine rolling OHLCV allocation and custom
+HVN/LVN thresholds; these UI Section_13_Development/tests do not establish equivalence to a lower-timeframe
+or exchange-trade volume profile.
+
+Per-candle VP coverage: the browser compares all 150 plotted POC/VAH/VAL points
+against their corresponding feature rows and confirms the series vary over time.
+Node-bar opacity is edited independently for high/low nodes and survives reload.
+A rolling-window calculation/storage vector verifies changed levels on a new
+closed candle without overwriting the previous candle's profile values. The
+latest closed histogram remains on the side; it is not substituted for the
+historical line series. No feature formula or replay version changes are needed.
+
+FVG lifecycle display: `fvg_lifecycle.test.mjs` verifies that nearest-zone changes,
+missing feature packets and wick touches do not split a valid gap. Zones end at
+closed touched price-through invalidation, matching the Pine FVG rule; unknown
+raw-history gaps truncate coverage. Forming candles extend valid boxes without
+invalidating them. Source candles must close before 4H/1D/1W gaps appear on a lower
+frame, and source invalidation is projected to the corresponding lower candle.
+All zone styles accept `No border` while preserving fill opacity.
+
+`test_fvg_frames.py` checks bounded, read-only source projections through Core,
+all active checkpoint gaps (including ones that are never nearest), conditional
+versions avoiding repeated history reads, repair masking, deletion epochs, and
+continuity while the next raw candle waits for features. `browser_zones.py` checks
+a selectable borderless 4H gap across a 15-minute chart, style persistence and
+independent visibility alongside current-frame FVGs. Projections travel with the
+existing `/api/bars` request; unchanged source histories are not retransmitted.
+Each higher frame supplies up to 1,000 stored source candles plus active checkpoint
+gaps. Older-than-window active gaps are clipped to that coverage boundary. No
+formula revision, recalculation, external download or extra worker is introduced.
+
+FVG correction Section_13_Development/tests reproduce consecutive weak touches, completion and renewed
+reactions on both sides, plus independent bear score bounds with higher-quality
+scores normalizing higher. Runtime Section_13_Development/tests protect zero ATR, missing comparisons
+and descending array removal. The Pine reference and regenerated module agree;
+the component baseline remains frozen and all changed outputs are FVG-related.
+Selective replay Section_13_Development/tests block EMA/ADX/Volume Profile computation, preserve every
+unrelated stored column and compare the next new full packet after state merge.
+
+`test_fair_service.py` recreates a permanently busy BTC owner and verifies ENA/SUI
+both receive download/feature turns. It checks raw-gap barriers, reserved budget,
+owner progress even during cheap targeted replay or slow network requests, and deterministic resource
+closure with retained connection references. Status Section_13_Development/tests verify checkpoint and
+repair cursors and that an unchanged candle payload still redraws feature progress.
+Diagnostic Section_13_Development/tests distinguish historical stderr using actual modification/start
+times; no error log is deleted or truncated.
+
+Support/resistance lifecycle checks: `test_sr_lifecycle.py` verifies reverse
+parallel-array removal, NA propagation, institutional identity-based band bounds
+and touch normalization, sparse reversible lifecycle events, and selective output
+ownership. `sr_lifecycle.test.mjs` checks continuous lifetimes, merge geometry,
+institutional style changes, checkpoint seeding and missing-data boundaries.
+`test_selective_features.py` exercises S/R-only historical export migration while
+prohibiting EMA, DMI and VP calculations. `browser_zones.py` also renders stored
+S/R lifecycle events and a bound change through the actual combined bars API.
+
+`zone_scores.test.mjs` checks independent score-label preferences, metric labels,
+missing values, stable S/R identity matching and FVG seed enrichment without
+extra boxes. The browser fixture checks the saved score toggle and a calculated
+S/R score through the combined API. FVG frame Section_13_Development/tests validate checkpoint reaction
+scores. The selective-plan cache regression ensures repeated jobs reuse a plan
+while separate Catalog instances and formula sources remain independent.
+
+Market-structure review coverage includes first-swing bootstrap, no same-candle
+opposite confirmation, two real foundation pivots, single BOS completion, and
+bull/bear/range establishment without duplicate pivot identities. A selective
+migration test verifies repaired historical rows and the next streamed packet
+while prohibiting EMA, DMI and VP computation. The 700-bar reference vector was
+reviewed against 9bdd0cd; changes belong to structure-dependent outputs.
+Closest-symbol priority Section_13_Development/tests use different checkpoint lags and verify empty
+symbols wait until existing work is finished. FVG Section_13_Development/tests include source-equals-
+target behavior, and browser settings checks cover independent Display score
+bulk controls and institutional scores.
+
+`test_fast_execution.py` compares original and accelerated full packets, scratch
+values and checkpoints; randomized liquidity histories and VP bins include NA,
+zero denominators, short windows and ties. Changed loop/runtime fingerprints
+must fall back to original execution, and module helpers stay replaceable.
+A scheduling regression verifies normal maintenance can consume a 1,000-bar page
+without the previous 200-row ceiling. `Section_13_Development/benchmarks/benchmark_features.py --compare` times the
+full calculation path independently of network/database/scheduler waits, checks
+all measured packets, and never writes production memory.
+
+Runtime-health coverage: `test_audit_availability.py` checks first-forming-monthly
+availability, expiry/retry, genuinely missing pairs, and read-only diagnostics;
+`test_connection_cleanup.py` retains failed handles to verify explicit closure;
+`test_import_boundary.py` checks exact integration grants and retired imports.
+`zone_readiness.test.mjs` and the browser smoke test verify pending zone repairs
+are explained while candles remain visible. Runner diagnostics cover precise
+PID/project-matched start timestamps. These changes do not alter feature formulas.
+
+OB lifecycle coverage (`test_ob_lifecycle.py`, `ob_lifecycle.test.mjs`) checks
+creation/promotion versus subsequent returns, retained older blocks, strict IDs,
+same-candle touch/invalidation, reversible terminal history, checkpoint recovery,
+unknown-history truncation, and independent UI controls. The selective integration
+test prohibits EMA/DMI/VP execution, verifies unchanged unrelated stored values
+and the main cursor, and compares the next live OB events/state with a full replay.
+The browser smoke test also checks continuous OB bands, ATR strength labels,
+Display score bulk controls and invisible borders. The Pine conversion preserves
+the existing line mapping and reproduces the reviewed scalar corrections.
+
+Observed perpetual liquidity: `test_liquidity.py` covers snapshot-before-bridge,
+absolute size replacements/deletions, duplicates/sequence gaps, invalid/crossed
+books, delayed exchange messages, coverage-limited depth, slippage, market
+identity, read-only/as-of joins, delayed-write gaps, raw archive retention,
+recorded trade/liquidation directions, backpressure, disk failure and REST
+cooldown. `liquidity_display.test.mjs` covers freshness, observed market identity,
+notional labels and independent toggles; cache Section_13_Development/tests verify one combined poll.
+`browser_liquidity.py` exercises chart/settings/stacked price-band bars and stale hiding
+with disposable observations and no exchange calls. Live connectivity remains
+an explicit deployment check; fixture Section_13_Development/tests cannot establish exchange access.
+
+Liquidity display regressions also cover current-book projection across a
+missing/expired provisional candle, historical viewport exclusion, genuinely old
+candle data, and expiration of a cached packet whose server label was live.
+
+Liquidity/candle isolation Section_13_Development/tests verify joined bid/ask segments with correct combined widths,
+exact subpixel heatmap widths and clipping around the provisional candle. The
+browser integration compares all candle time/OHLC points before and after
+Liquidity is enabled; observation overlays must not mutate those values.
+
+Liquidity rolling analytics: `python3 -m unittest discover -s Section_13_Development/tests -p
+ 'test_liquidity*.py'` covers incomplete windows, continuity resets, absorption
+price response, bounded memory, OI/basis availability, closed-summary retention,
+and causal BTC/ETH alignment with missing benchmarks and recovery gaps. Existing
+recorder, storage and chart Section_13_Development/tests remain applicable; no exchange access is needed.
+
+Institutional projection display: JS coverage includes source origin, promotion
+without a duplicate dynamic underlay, closed-price dual-role classification,
+higher-frame selection, repair gating, and coverage cutoffs. Python snapshot
+coverage validates original pivot time, score and Section_13_Development/tests by identity (including
+numeric IDs). `browser_zones.py` projects a committed 4H institution onto 15m and
+checks its origin, score, count and persistence alongside existing overlays.
+`browser_liquidity.py` checks the new Data tab against recorded observations.
+
+Confidence/opportunity: `python3 -m unittest discover -s Section_13_Development/tests -p
+ 'test_evidence_engines.py'` verifies coverage, directional symmetry, family caps,
+input-sensitive caching, barrier ordering/deduplication, near-edge targets,
+short-side invalidation without three layers, missing targets, costs and closed
+bar gating. `Section_13_Development/tests/evidence_display.test.mjs` checks labels, toggles and assumptions.
+`PYTHONPATH=. python3 Section_13_Development/tests/browser_evidence.py /path/to/lightweight-charts.standalone.production.js`
+checks the actual chart, Data breakdown, three targets, cost updates, unchanged
+candles and persistence with disposable stores and no exchange requests.
+
+Point-context v2: `test_analysis_context.py` Section_13_Development/tests independent price-point
+calculations, reversal versus continuation, frozen 81,000-entry context as price
+moves to 85,000, unchanged decisions, gap handling and ambiguous intrabar ordering.
+`test_liquidity_corrections.py` covers comparable units, nearest-side semantics,
+lookback initialization, invalid ATR and replay scope. The public
+`Section_13_Development/diagnostics/inspect_price_point.py SYMBOL --timeframe 4h --at ISO_TIMESTAMP_WITH_OFFSET`
+reads local stored data; it never contacts an exchange or writes memory.
+
+Opportunity band v2: `test_opportunity_bands.py` covers real-range overlap,
+dense ENA-like point references, modeled band provenance, near/far returns and
+the opposing area versus invalidation. `test_di_decisions.py` verifies an older
+canonical anchor survives a two-candle page without changing its levels. The
+browser evidence fixture checks an older SELL point across an actual short poll,
+filled band bounds, removed preview toggle, editable costs and unchanged OHLC.
+
+Six-area v3 Section_13_Development/tests verify three red resistance and three green support areas from
+one snapshot, side-correct FVGs, both favorable/adverse outcomes, no opportunity
+or confidence calculation on WAIT bars, frozen maps despite changed current
+features, and progression through support areas after a legacy risk threshold.
+The browser fixture verifies both sides and unchanged anchor amounts after a
+two-candle poll. No feature database columns or replay jobs are added.
+
+Opportunity v4: `test_opportunity_bands.py` checks non-expanding overlap cores,
+price-capped point bands, daily-ATR nearby levels, same-family alternatives,
+at-entry and future-inventory auditing. `test_opportunity_inventory.py` checks
+stored non-nearest zones, frozen decisions, FVG failure/gap handling, reversible
+checkpoint history, replay masking and bounded-history completeness. The real
+browser evidence fixture checks the Data-tab timeframe/source report as well as
+six anchored bands, short refreshes, costs and unchanged candles.
+
+Decision evidence: `test_decision_evidence.py` verifies ADCN's eight primary values,
+insert-only persistence across reopening, epoch isolation, saved geometry despite
+missing features, and cost-only repricing. `test_di_decisions.py` exercises actual
+worker writes, historical recovery of signals with no prior ADCN row, and reloads
+after feature changes. JS Section_13_Development/tests and the browser evidence fixture check explicit
+marker prices, six saved bands and persistence through cost edits/short polls.
+
+Opportunity v5 spacing uses the original 2-ATR separation for both the first
+band's clearance from the entire decision candle and edge-to-edge spacing of
+later bands. `SharedClearanceTests` checks wick changes, symmetric upper/lower
+clearance, fixed entry price, and explicit rejection reasons. Existing snapshot
+and browser fixtures contain genuinely separated source levels; no zones are
+invented or moved to satisfy six slots. Model version is part of evidence identity,
+so pre-change snapshots remain archived rather than silently overwritten.
+
+Strategy baseline diagnostics: `test_strategy_evaluation.py` checks date-window
+gate warmup, directional gross/net returns, end-boundary exclusion, purged splits,
+short-side arithmetic, invalid costs/dates and compact output. See
+`Section_12_Research/docs/STRATEGY_RESEARCH.md`. These fixtures validate calculations, not profitability.
+
+Compact chart UI: JS Section_13_Development/tests verify two-line flag rendering, one persistent flag
+primitive, OZ label/score/return toggles, preference migration, and decision-to-live
+candle time bounds (excluding future margin). Browser evidence covers score
+Select/Deselect All in Display, actual compact OZ canvas labels, stored anchors,
+cost changes and candle preservation. Zone/liquidity browser suites verify
+abbreviated annotations and retained liquidity health tooltips.
+
+Opportunity v6 hierarchy: `HierarchicalGeometryTests` verifies wide S/R geometry
+and all contained evidence, S/R > FVG > OB precedence, local rather than global
+priority, one representative per family, three-family/one-ATR fallback clusters,
+no chaining, and native clearance that cannot be bypassed by an inner thin zone.
+The browser evidence fixture now uses 1.5-ATR native zones and checks their full
+bounds survive storage, polling and rendering. Source formulas are unchanged.
+
+Momentum DI anchors: `test_momentum_anchors.py` covers unqualified real peaks,
+negative spread, first-turn bootstrap, immutable cycles, plateau origins, noise
+and delayed confirmations, known-time price/regime association, retests/breaks,
+gaps, previews/duplicate bars, bounded histories, validation, Momentum ownership,
+new-field-only replay and checkpoint equivalence. Legacy packet checksum Section_13_Development/tests
+exclude only the newly added fields and retain their previous expected digest.
+
+Desktop automatic signals: `test_signal_alerts.py` verifies unviewed pairs,
+WAIT/missing/legacy decisions, persistent deduplication, default and edited tones,
+pause/re-arm without history replay, account isolation and API origin checks.
+`browser_signal_alerts.py` verifies one audible desktop notification for a stored
+BUY on an unviewed symbol, plus searchable fields and the simple SELL preset.
+Run with `PYTHONPATH=. python3 Section_13_Development/tests/browser_signal_alerts.py /path/to/lightweight-charts.js`.
+
+Notifications and Sounds are top-level Settings tabs; Sounds owns tones,
+volume and audio permission. `browser_signal_alerts.py` covers navigation,
+notification permission, unviewed delivery, HUD search/current confidence rows,
+and administrator ADCN previews/protection/confirmation. `test_adcn_maintenance.py`
+covers retirement/restore, stale-preview rejection and legacy-only cleanup while
+preserving current signals/checkpoints/evidence and permanent features.
+`test_server_service_config.py` checks normal-user non-GUI service configurations.
+`current_hud.test.mjs` covers legacy selection migration and closed anchored
+evidence alongside live price.
+
+
+`test_custom_sounds.py` covers private audio upload/assignment/deletion, quotas,
+invalid inputs, origin/auth checks, and independent coin/timeframe desktop filters.
+`browser_custom_sounds.py` Section_13_Development/tests real WAV decoding/playback, upload persistence,
+assignment and deletion, top-level menus, the toolbar toggle, Desktop scope
+switches and disabled/deferred Mobile controls. Sound assignments and calculation
+status stay unchanged when notification scopes are muted.
+
+
+Rich/mobile notifications: `test_mobile_push.py` covers matching evidence,
+private device ownership, scope routing, retries/expiry, configured proxy origin,
+provider validation and real Web Push encryption with a mocked HTTP transport.
+`test_mobile_setup.py` verifies adding a normal user preserves existing accounts.
+`notification_cards.test.mjs` checks content/deep links and service-worker click,
+dismiss and no-API-cache behavior. `browser_notification_cards.py` checks rich
+card content, dismissal, 20-second expiry, historical-candle focus and mobile
+sign-in/setup-needed UI. Real phone receipt requires private HTTPS and device
+enrollment; Section_13_Development/tests do not send messages to an external push endpoint.
+
+Native Android inbox: `test_android_push.py` checks complete private history
+paging, cursor-preserving device settings, muted-event skipping and private
+Firebase setup/public configuration separation. `browser_mobile_inbox.py`
+checks 125 messages across pages, chart-free cards and offline local history.
+Build Android with `cd mobile/android && ./gradlew assembleDebug bundleRelease`.
+The release bundle needs operator signing before Play submission. No test proves
+real FCM receipt without a Firebase project/phone; see mobile/android/README.md.
+
+Section 4 shared measurements: `test_shared_measurements.py` covers hand-computed
+ER, Bollinger population variance, causal full-baseline midranks, flat/zero/invalid
+inputs, gap/config resets, independent pair state and checkpoint/preview parity.
+The selective-feature integration test verifies stored new fields, unchanged
+legacy columns, restarts and continued streaming. The 700-candle legacy packet
+hash remains unchanged after excluding the documented additive exports.
+
+Independent Regime v1: `test_regime_engine.py` checks rule thresholds/hysteresis,
+confirmation and preview isolation, independent dimensions, warmup, flat/degenerated
+baselines, gaps, timestamp/units/availability checks, calendar-month continuity,
+identity/config/source isolation, restart parity and the public JSON schema.
+`test_regime_history.py` verifies actual stores, bounded atomic resume, immutable
+projected inputs, policy/pending-feature guards, missing-row blocking, concurrent
+cursor protection, divergence rejection, new source revisions and the command.
+No live scheduler/UI integration or predictive performance is claimed by these tests.
+
+Automatic analytical processing: `test_analytical_runner.py` checks bounded
+round-robin work, adapter failure isolation, non-gating event callbacks, persistent
+recent seeding and following a new close in the same run. Structure Section_13_Development/tests cover
+explicit enum mapping, source break deduplication, unavailable event origins,
+gaps, preview isolation, restart and the common output schema. Existing DI and
+legacy-feature regression Section_13_Development/tests remain unchanged.
+
+`test_structure_lineage.py` checks producer IDs and origin/confirmation times,
+confirmed-price comparisons, source-engine checkpoint/preview/prefix parity,
+consumer deduplication and rejection of future events. Counter/candidate fields
+cannot manufacture events. The existing legacy packet hash remains unchanged
+after excluding the three additive lineage fields; selective replay Section_13_Development/tests verify
+correct recomputation through existing store/checkpoint paths.
+
+Trend: `test_trend_engine.py` covers capped families, confirmation/hysteresis,
+measurement-only versus neutral/conflicted Structure, warm EMA seeds, directional
+weakening/exhaustion, flat markets, preview/restart/gap isolation and rejected
+wrong-time/market/version/config/source dependencies. `test_trend_history.py`
+checks exact persisted dependency projection/references, replay parity, shared
+budgets, failure rollback, backlog blocking and runner budget accounting.
+
+Momentum: `test_momentum_engine.py` checks bullish/bearish acceleration,
+corroborated persistent exhaustion, malformed/future DI-turn batch rejection,
+anchor missingness, flat markets, preview/restart/gap and identity boundaries,
+optional MACD and the common JSON schema. `test_momentum_history.py` checks
+automatic fixed seeding, bounded resume, exact immutable-input reproduction and
+Momentum-specific diagnostic counts through the real Core stores.
+
+Volatility: `test_volatility_engine.py` checks percentile boundaries independent
+of shock/direction, prior-ATR shocks, severity deduplication, signed-mirror
+invariance, flat/zero/degenerate/missing baselines, independent warmup, gaps,
+preview/restart/time/schema checks, calendar months and unsupported sessions.
+`test_volatility_history.py` checks automatic bounded resume, SQLite primitive
+typing, frozen-input reproduction and direction-free diagnostic reports through
+the actual Core stores. Existing engine and trading regressions remain in place.
+
+Participation v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_participation*.py'`
+checks RVOL boundaries, real zero versus unavailable volume, symmetric price/volume
+confirmation, no inferred aggressor dominance, event deduplication, preview/gap and
+restart safety, and immutable history reproduction through the real Core gateway.
+
+Phase v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_phase*.py'` verifies
+preceding-trend/range/evidence ordering, all four developing cycle hypotheses,
+consolidation without unsupported labels, frozen geometry, causal structural
+confirmation, invalidation/failure/expiry, conflicting evidence, source identity
+and availability gates, restart/preview/gap behavior, exact immutable dependencies,
+rollback and the shared row budget (including nested Trend/Structure work).
+
+Liquidity analytical v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_liquidity_engine*.py'`
+checks causal sweep acceptance/rejection, pivot knowledge times, ambiguity/expiry,
+covered depth/slippage/withdrawal, flow completeness, OI baselines, zero versus
+missing context, timestamps/wildcard gaps, explicit spot/perpetual association,
+corrupt optional inputs, read-only projection and immutable replay after pruning.
+
+Sentiment v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_sentiment*.py'` checks
+partial derivatives scope, zero versus missing funding, no invented crowding/extremes,
+funding-point stability, optimistic funding with elevated stress, independent missing
+sources, timestamps/identity/basis/gap gates, restart/preview/events, fixed coverage,
+read-only as-of projection, immutable replay after pruning and runner budget use.
+
+MTF v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_aggregation*.py'` covers
+horizon budgets/countertrend conflicts, independent Regime dimensions, partial/missing
+coverage, disabled/new timeframes, unavailable/stale/future/revised inputs, exact
+source cohorts, calendar months, actual versus explicitly simulated availability,
+immutable reference reconstruction, deduplication, rollback and shared runner budgets.
+
+Bias v1: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_bias*.py'` checks capped
+price families, independent risk/context, conflict/neutral versus missing coverage,
+no directional funding proxy, observed-flow scope, confirmation/restart/preview/gap,
+future/wrong-identity/aggregated input rejection, exact stored dependency replay,
+common recent seeds, waiting for backlog, source generation changes and rollback
+without child reprocessing. Aggregation also Section_13_Development/tests strong Bias countertrend labels.
+
+Optional sentiment sources and read-only intelligence tools:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p "test_sentiment*.py"
+python3 -m unittest discover -s Section_13_Development/tests -p "test_intelligence_tools.py"
+```
+
+Covers source revisions/receipt-time joins, configuration history, freshness, publisher
+deduplication, source failure isolation, explicit credential fetch mocks, next eligible
+entry opens, split/end purging, gaps/tails, bounded evaluation and read-only cohort guards.
+
+Live alert lifecycle regression (no production data or actual desktop notices):
+
+```bash
+node Section_13_Development/tests/alert_feed.test.mjs
+PYTHONPATH=. python3 Section_13_Development/tests/browser_alert_delivery.py
+```
+
+Checks open-app delivery, silent startup history, duplicate prevention, preserved
+cursors after pagehide/pageshow and reconnection, plus desktop/audio delivery calls.
+
+Portable launchers, system-service exports and notification pipeline diagnostics:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_portable_launchers.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_server_service_config.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_delivery_diagnostics.py'
+```
+
+Uses disposable paths/notification stores; no macOS service is installed and no
+push message is sent. Validates moved folders with spaces, explicit Python selection,
+opt-in caffeinate export and credential/token-free read-only delivery reporting.
+
+Live progress under replay backlog:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_fair_service.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_analytical_retry.py'
+```
+
+Tests alternate near-current and historical service without admitting targeted
+repair jobs to the live lane, retain bulk ownership, and retry transient analytical
+writer collisions next turn without duplicate traceback/log spam.
+
+Recovery budget and shorter feature critical sections:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_feature_runtime.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_fair_service.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_selective_features.py'
+```
+
+Checks opt-in configuration bounds/defaults, priority release/fairness, checkpoint
+serialization outside the writer lock, failed serialization retaining prior progress,
+and numerical/continuation equivalence of repaired features. No production data is
+used and no recovery preference is enabled by tests.
+
+Standalone profile/build regressions:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_standalone.py'
+python3 packaging/smoke.py
+python3 Section_13_Development/tests/frozen_backend_smoke.py
+```
+
+The last two require a built distribution (the backend smoke uses Linux executable
+layout and localhost port 8000). Profile Section_13_Development/tests cover relocation, duplicate instances,
+WAL-aware offline import, private account import, formula compatibility refusal and
+matching pending-replay admission. Frozen smoke checks exact source formula identity,
+Tcl resources and feature/checkpoint roundtrip; HTTP smoke checks locally bundled chart
+assets. Native Windows/macOS builds still require native runners.
+
+Research catalogue and manual historical event viewer:
+
+```bash
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_research_events.py'
+python3 -m unittest discover -s Section_13_Development/tests -p 'test_event_history.py'
+PYTHONPATH=. python3 Section_13_Development/tests/browser_research_events.py
+```
+
+Covers candidate/confirmation separation, active-side selection, native qualification,
+unknown DI candidate origin, causal knowledge times, malformed/future sources, gap
+handling, prefix invariance, generation guards, real read-only storage, bounded whole-
+candle pagination and actual viewer navigation/filter controls. No trading rule or
+feature formula is changed.
+
+BTC visual strategy: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_btc*.py'`
+checks causal fills, stop gaps/costs, trailing activation without retroactive fills,
+missing-data censoring, symbol scope, read-only closed-history bounds and replay
+guards. `PYTHONPATH=. python3 Section_13_Development/tests/browser_btc_strategy.py` uses the real local
+chart vendor and overlay to check visibility, request throttling and autoscale.
+See `Section_8_Decision_Engine/BTC_VISUAL_STRATEGY.md` for experimental scope.
+
+BTC DI-turn v0.3 verifies independent three-candle DI turns, candidate/price-only
+confluence, immediate eligibility at the third close, next-open fills without
+price-break or chase gates, dominance gates, spot exits, protective stops under
+DI- dominance and prefix consistency. The browser check covers the DI events
+dialog. Stored-history Section_13_Development/tests verify bounded chart output plus optional complete
+trade exports. Cash-summary Section_13_Development/tests check closed-trade $100 compounding.
+
+For actual local history, run:
+
+```sh
+python3 Section_12_Research/cli/inspect_btc_strategy.py --timeframe 15m --days 90 \
+  --before 2026-11-05T00:00:00Z --output btc_di_only_v03_review.json
+```
+
+This exports the full trade list and a simulated cash summary. Event and stop
+level details remain the recent chart tail. Open/censored positions are excluded
+from the closed-trade balance; this is not live or marked-to-market performance.
+
+BTC controlled sells v0.4: `test_btc_sell_rules.py` isolates S1 trail arming, S2
+strict spread-40 maturity/first decline, bearish-vs-bullish scope, S3 entry-scenario
+and gain-before-loss crossover, declared exit priority and rule disabling.
+Integration Section_13_Development/tests verify no profit-only activation, independent monotonic trailing
+after DI resumes rising, nonretroactive stop updates and per-trade exit rule IDs.
+The CLI supports `--disable-sell-rule` for fixed-period comparisons.
+
+Historical pivot research: `python3 -m unittest discover -s Section_13_Development/tests -p 'test_pivot*.py'`
+checks exact 2% touches, both directions, first-hit bar counts, gaps/tail censoring,
+fixed-horizon boundaries, native pivot pairing, already-completed moves at
+confirmation, post-known outcomes, all-column contexts/cutoffs/source guards,
+read-only stores, scans beyond 1,000 bars and deterministic compressed reports.
+Git publishing is mocked to verify only the generated report is committed.
+`PYTHONPATH=. python3 Section_13_Development/tests/browser_pivot_research.py` checks compressed local
+report loading, full feature inspection, frozen embedded contexts, source mismatch,
+chart navigation and unchanged scale. See Section_12_Research/docs/PIVOT_RESEARCH.md for the workflow.
+
+Read-only Regime/Trend and Confidence/Opportunity audits:
+`python3 -m unittest discover -s Section_13_Development/tests -p 'test_pivot_context*.py'` covers exact
+closed-time HTF joins, immutable saved scores/bands, independent DI sequences,
+censoring, gaps, reaction timing and real SQLite no-write checks.
+`python3 -m unittest discover -s Section_13_Development/tests -p 'test_structure_latest_types_preview.py'`
+reproduces the count>2 structure defect and validates a staged patch without
+changing production formulas. See `Section_12_Research/docs/PIVOT_CONTEXT_AUDIT.md` for full-history runs.
+
+All-pivot 1% research: install `packaging/requirements/research.txt`, then run
+`python3 -m unittest discover -s Section_13_Development/tests -p 'test_all_pivot_features.py'`.
+Coverage includes every-pivot membership, missing-candle offsets, finite moments,
+source generation checks, actual 4h/daily SQLite scans/context exports and the
+five-timeframe 1% batch contract. NumPy remains research-only.
+
+Full BTC 1h sequence study:
+`python3 -m unittest discover -s Section_13_Development/tests -p 'test_hour*.py'` checks independent
+three-close events, sequential spread confirmation, candidate stages and every
+active observation, preserved/breached DI+ recovery paths, gaps, future-data
+independence, exact closed-time context, native-outcome verification, and real
+SQLite export/CLI no-write behavior. `python3 Section_13_Development/tests/browser_hour_pivot_sequences.py`
+checks cohort filters, every-pivot inspection, SVG timelines and narrow-screen
+layout. See `Section_12_Research/docs/BTC_1H_SEQUENCE_STUDY.md` for the data contract and export command.
+# Section 5 historical scheduler
+
+`python3 -m unittest discover -s Section_13_Development/tests -p 'test_analytical*.py'` includes real
+ten-engine historical replay and Bias dependency joins, independent live bindings,
+resumable checkpoints, paused scopes, generation guards, pending-feature diagnostics
+and fair bounded turns. See `docs/SECTION5_HISTORY.md`.

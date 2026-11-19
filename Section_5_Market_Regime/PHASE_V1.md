@@ -24,7 +24,7 @@ configurable research defaults, not established predictive parameters.
   limits, decision processing and UI remain in place.
 - Automatic processing uses the existing fixed recent seed (32 closed candles) and
   follows new closes. It cannot infer an unobserved earlier cycle. Optional explicit
-  historical research uses `run_regime.py --engine PHASE --since ...`.
+  historical research uses `Section_14_Operations/commands/run_regime.py --engine PHASE --since ...`.
 
 ## Inputs and causal sequence
 

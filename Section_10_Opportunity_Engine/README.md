@@ -93,7 +93,7 @@ inputs available by that candle close. No formula replay or database write is
 performed. Coverage does not claim the inventory includes unavailable history.
 
 Opportunity > Data shows scope, timeframe, coverage and a collapsible source
-selection report. `inspect_price_point.py --opportunity-only --level 0.1748`
+selection report. `Section_13_Development/diagnostics/inspect_price_point.py --opportunity-only --level 0.1748`
 provides a compact local report against the frozen reference. This can explain
 whether a particular source was present, broad, duplicated or outside the first
 three; absence of a source in partial history remains unknown.
@@ -134,7 +134,7 @@ A missing modeled stop cannot erase otherwise known areas.
 Settings > Features > Opportunity offers six independent area switches, labels,
 anchor reference and per-area style controls. Completed/invalidated reference
 maps stay visible until the next decision, with crossing information. The old
-unanchored-preview chart switch is removed. `inspect_price_point.py` defaults to
+unanchored-preview chart switch is removed. `Section_13_Development/diagnostics/inspect_price_point.py` defaults to
 anchored outputs; `--include-point-preview` is a separate opt-in diagnostic only.
 
 ## Durable decision snapshots and marker price

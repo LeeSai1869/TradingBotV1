@@ -9,9 +9,9 @@ internal compatibility inputs, not order-book observations.
 ## Start on macOS
 
 ```sh
-python3 -m pip install -r requirements-liquidity.txt
-python3 restart_liquidity.py
-python3 restart_ui.py
+python3 -m pip install -r packaging/requirements/liquidity.txt
+python3 Section_14_Operations/services/restart_liquidity.py
+python3 Section_14_Operations/services/restart_ui.py
 ```
 
 The independent `com.tradingindicator.liquidity` LaunchAgent runs at login,
@@ -32,7 +32,7 @@ perpetual feed and the existing spot candles. A missing or stale book is hidden;
 known historical samples can remain at their actual observation times. Current
 bands are not projected onto an unrelated historical chart viewport.
 
-Check `python3 liquidity_status.py BTCUSDT`. Logs are
+Check `python3 Section_13_Development/diagnostics/liquidity_status.py BTCUSDT`. Logs are
 `~/Library/Logs/TradingBotV1/liquidity.log` and `liquidity-error.log`.
 Disabling a display does not stop recording; pause its coin in the existing
 policy, or unload this separate LaunchAgent to stop the recorder altogether.
@@ -63,7 +63,7 @@ exceeds known coverage. A stable logarithmic 10-bps grid groups observed orders
 within 100 bps of mid. Orders can be withdrawn; displayed depth is not guaranteed
 execution or hidden liquidity.
 
-The implementation and recovery tests use local protocol fixtures. This build
+The implementation and recovery Section_13_Development/tests use local protocol fixtures. This build
 environment's proxy blocked Binance documentation and public API access (HTTP
 403 tunnel failure), so **production REST/WebSocket connectivity has not been
 validated here**. Startup reports real discovery/connection failures explicitly;

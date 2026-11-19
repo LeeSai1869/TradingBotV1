@@ -77,8 +77,8 @@ optional `before` is UTC milliseconds. `GET /api/events/catalog` lists definitio
 An optional development CLI uses the same read-only projection:
 
 ```bash
-python3 inspect_events.py BTCUSDT --timeframe 5m --bars 250 --summary
-python3 inspect_events.py BTCUSDT --timeframe 5m --bars 1000 --output btc_events.json
+python3 Section_13_Development/diagnostics/inspect_events.py BTCUSDT --timeframe 5m --bars 250 --summary
+python3 Section_13_Development/diagnostics/inspect_events.py BTCUSDT --timeframe 5m --bars 1000 --output btc_events.json
 ```
 
 This v1 reads the **current committed feature generation**. It does not create a new

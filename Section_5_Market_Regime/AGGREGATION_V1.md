@@ -118,7 +118,7 @@ After pulling, restart the existing runner; no manual command is required to pop
 new aggregates. Optional inspection:
 
 ```bash
-python3 aggregate_market.py --engine TREND --symbols BTCUSDT ETHUSDT --summary
+python3 Section_14_Operations/commands/aggregate_market.py --engine TREND --symbols BTCUSDT ETHUSDT --summary
 ```
 
 The command reads stored/indexed results; it does not run missing base engines. Early

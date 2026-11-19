@@ -92,7 +92,7 @@ checkpointed/merged through the existing replay mechanism.
 
 The pre-change calculation fingerprints were independently compared with this
 commit's additions: **no existing formula fingerprint changed**. The repair plan
-contains exactly the 112 new columns. Legacy packet checksum tests still verify
+contains exactly the 112 new columns. Legacy packet checksum Section_13_Development/tests still verify
 all prior outputs after excluding only the added fields. No broad memory deletion,
 formula-version reset or full feature replay is required. Paused pairs obey the
 existing policy. Restart the runner; logs should show targeted new-field replay.

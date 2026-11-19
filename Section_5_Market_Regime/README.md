@@ -24,7 +24,7 @@ below. It is not connected to chart or decision consumers. Structure now consume
 For a recent independently seeded research run:
 
 ```bash
-python3 run_regime.py --symbols BTCUSDT ETHUSDT ENAUSDT --intervals 5m \
+python3 Section_14_Operations/commands/run_regime.py --symbols BTCUSDT ETHUSDT ENAUSDT --intervals 5m \
   --since 2026-10-01 --max-bars 1000 --summary --diagnostics
 ```
 
@@ -59,12 +59,12 @@ candles close. The seed does not move each cycle. It is a recent classification
 run, not a claim that every old candle has already been classified. Full historical
 research runs and their earlier snapshots remain separate and preserved.
 
-After pulling, use `python3 restart_runner.py`. No manual research command is
+After pulling, use `python3 Section_14_Operations/services/restart_runner.py`. No manual research command is
 needed to keep these engines working. For inspection only:
 
 ```bash
-python3 run_regime.py --automatic --symbols BTCUSDT --intervals 15m --summary --diagnostics
-python3 run_regime.py --automatic --engine STRUCTURE --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 Section_14_Operations/commands/run_regime.py --automatic --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 Section_14_Operations/commands/run_regime.py --automatic --engine STRUCTURE --symbols BTCUSDT --intervals 15m --summary --diagnostics
 ```
 
 The chart and BUY/SELL, confidence and opportunity consumers are unchanged.
@@ -91,7 +91,7 @@ After pulling, restart the normal runner. No repeated manual command is required
 For optional inspection:
 
 ```bash
-python3 run_regime.py --automatic --engine TREND --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 Section_14_Operations/commands/run_regime.py --automatic --engine TREND --symbols BTCUSDT --intervals 15m --summary --diagnostics
 ```
 
 The command's legacy filename is retained; `--engine` chooses the classifier.
@@ -113,7 +113,7 @@ exhaustion, and missing anchor history remains explicitly partial.
 Pull and restart the runner once. For optional inspection only:
 
 ```bash
-python3 run_regime.py --automatic --engine MOMENTUM --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 Section_14_Operations/commands/run_regime.py --automatic --engine MOMENTUM --symbols BTCUSDT --intervals 15m --summary --diagnostics
 ```
 
 Historical source publication times remain reconstructed; results retain exact
@@ -136,7 +136,7 @@ has a separate absolute-zero rule, not invented percentile history.
 Pull and restart the runner once. Optional inspection only:
 
 ```bash
-python3 run_regime.py --automatic --engine VOLATILITY --symbols BTCUSDT --intervals 15m --summary --diagnostics
+python3 Section_14_Operations/commands/run_regime.py --automatic --engine VOLATILITY --symbols BTCUSDT --intervals 15m --summary --diagnostics
 ```
 
 High volatility is not automatically a shock, bullish signal or bearish signal.
@@ -178,7 +178,7 @@ at .40. The normal runner persists exact source evidence without UI/trading chan
 [Aggregation](AGGREGATION_V1.md) is runner-connected per public engine family.
 It preserves horizon conflicts, full configured evidence budgets, actual publication
 availability and source scope. Core stores deduplicated input references separately
-from base-engine history. Optional inspection: `python3 aggregate_market.py --engine TREND --summary`.
+from base-engine history. Optional inspection: `python3 Section_14_Operations/commands/aggregate_market.py --engine TREND --summary`.
 
 ## Bias v1
 
@@ -190,7 +190,7 @@ history; MTF aggregation can consume Bias outputs without a circular dependency.
 
 ## Completion diagnostics and optional sources
 
-See [operational readiness and causal outcome research](../MARKET_INTELLIGENCE_READINESS.md)
+See [operational readiness and causal outcome research](../docs/MARKET_INTELLIGENCE_READINESS.md)
 and [Sentiment 1.1 optional news/social](SENTIMENT_V1_1.md). Optional providers remain
 disabled until explicitly configured; implementation does not establish profitability.
 
@@ -201,5 +201,5 @@ traceback. This does not bypass the shared writer lock or feature-generation gat
 # Automatic full-history coverage
 
 The runner now retains its recent live lane and separately advances full-history
-classification checkpoints for active scopes. See [SECTION5_HISTORY.md](../SECTION5_HISTORY.md)
+classification checkpoints for active scopes. See [docs/SECTION5_HISTORY.md](../docs/SECTION5_HISTORY.md)
 for deployment, bounded budgets and the separate live/history readiness report.

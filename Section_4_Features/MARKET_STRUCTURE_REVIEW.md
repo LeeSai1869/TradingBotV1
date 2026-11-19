@@ -68,7 +68,7 @@ Score controls for S/R and FVG live in Display, with independent bulk score
 selection. Scores require the corresponding zone to be visible and calculated.
 Historical scores absent from stored data remain explicitly unavailable.
 
-The now-active state-machine tests also exposed a selective-replay dependency
+The now-active state-machine Section_13_Development/tests also exposed a selective-replay dependency
 issue: a later persistent write (such as BOS cleanup) affects earlier consumers
 on the **next** candle. The dependency graph now follows persistent-state writers
 to those consumers as well as ordinary forward dependencies. Plans close these

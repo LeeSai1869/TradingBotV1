@@ -85,7 +85,7 @@ use HISTORICAL_RECONSTRUCTION + AVAILABILITY_RECONSTRUCTED. `as_of` simulates th
 candle close using causal inputs; `computed_at`/`available_at` record the actual
 calculation time. This is not proof of live availability or profitability.
 
-Run `python3 run_regime.py --help`. The command defaults to active configured
+Run `python3 Section_14_Operations/commands/run_regime.py --help`. The command defaults to active configured
 symbols/timeframes and a global 1000-candle budget, divided across pairs in transactions of at most 200. It does not install a daemon,
 change runner policy or start another downloader. The existing runner now invokes the bounded analytical maintenance hook.
 UI/decision integration remains separate.

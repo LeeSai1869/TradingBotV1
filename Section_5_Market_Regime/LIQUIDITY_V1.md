@@ -12,7 +12,7 @@ or other engine implementation. Core reads a bounded, read-only as-of projection
 and commits minimal immutable inputs, results and checkpoint state to intelligence.db.
 The existing bounded runner includes this engine per active coin/timeframe, using
 its saved recent 32-closed-candle seed and following new closes. Optional historical
-research uses `run_regime.py --engine LIQUIDITY`; manual commands are not required.
+research uses `Section_14_Operations/commands/run_regime.py --engine LIQUIDITY`; manual commands are not required.
 
 Already committed inputs survive recorder pruning and reproduce exactly. Current
 live data never fills an old candle. Corrected source generations/operator revisions

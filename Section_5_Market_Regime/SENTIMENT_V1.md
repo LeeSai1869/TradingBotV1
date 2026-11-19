@@ -21,7 +21,7 @@ baseline cannot erase a valid current funding observation.
 No new source provider, credential, dependency, news scraper, Section 4 formula,
 liquidity-recorder behavior, UI or trading rule is introduced. The existing bounded
 runner includes SENTIMENT per active coin/timeframe with its fixed recent 32-candle
-seed and subsequent closes. Optional research uses `run_regime.py --engine SENTIMENT`.
+seed and subsequent closes. Optional research uses `Section_14_Operations/commands/run_regime.py --engine SENTIMENT`.
 Each result is independent of other engines. History survives recorder pruning and
 replays exactly from committed source bundles. Revised source generations/operator
 revisions create separate runs; old results are preserved.
