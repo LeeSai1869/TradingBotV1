@@ -113,6 +113,7 @@ const Composer = {
                     `[composer] ${v.name} update failed:`,
                     e
                 );
+                if(['candles','ema50','indicators'].includes(v.name))throw e;
             } finally {timings.push({visual:v.name,ms:Math.round((performance.now()-before)*100)/100});}
         }
 

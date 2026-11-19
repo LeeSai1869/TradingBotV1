@@ -55,6 +55,7 @@ Canvas.init = (...args) => {
         assert await page.evaluate('Composer.config.display.markers') is True
         await page.get_by_role('button', name='Open settings').click()
         await dialog.get_by_role('tab', name='Features', exact=True).click()
+        await dialog.get_by_role('button',name='EMA',exact=True).click()
         await dialog.get_by_label('EMA 25', exact=True).check()
         await dialog.get_by_label('EMA 25 width', exact=True).select_option('3')
         await dialog.get_by_label('EMA 25 line style', exact=True).select_option('2')

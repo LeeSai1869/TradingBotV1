@@ -149,3 +149,5 @@ export function getSeries() {
 }
 
 export function updateQuote(chart,bar){if(series)updateCurrentPrice(bar);}
+
+export function clear(){if(series){series.setData([]);latestPlottedTime=null;updateCurrentPrice(null);}}

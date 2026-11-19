@@ -13,8 +13,8 @@ function cache(fetcher, styles={}) {
 }
 const deferred = () => {let resolve; const promise=new Promise(r=>resolve=r); return {promise,resolve};};
 const bar = (time, extra={}) => ({open_time:time*1000,time,symbol:'BTCUSDT',interval:'1m',
-    client:{open:10,high:12,low:9,close:11},features:{ema50:10},adcn:null,...extra});
-const page = (times, next=null) => ({bars:times.map(t=>bar(t)),next_before:next});
+    client:{symbol:'BTCUSDT',interval:'1m',open_time:time*1000,close_time:time*1000+59999,open:10,high:12,low:9,close:11,volume:1},features:{ema50:10},adcn:null,...extra});
+const page = (times, next=null) => ({symbol:'BTCUSDT',interval:'1m',bars:times.map(t=>bar(t)),next_before:next});
 
 test('late initial response cannot overwrite a newer market', async()=>{
     const c=cache(); const pending=deferred();
@@ -241,7 +241,7 @@ test('feature checkpoint progress redraws status even when candle data is unchan
 
 test('OB-only display fetches its checkpoint in the shared bars request',async()=>{
     const calls=[];
-    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({bars:[]})};}, {normal_bull_ob_zones:{visible:true}});
+    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({symbol:new URL(url,'http://localhost').searchParams.get('symbol'),interval:new URL(url,'http://localhost').searchParams.get('interval'),bars:[]})};}, {normal_bull_ob_zones:{visible:true}});
     await c._fetchPage('ETHUSDT','4h',1000);
     assert.equal(calls.length,1);assert.equal(new URL(calls[0],'http://local').searchParams.get('sr_zones'),'1');
     await c._fetchPage('ETHUSDT','4h',1000,123);
@@ -250,7 +250,7 @@ test('OB-only display fetches its checkpoint in the shared bars request',async()
 
 test('liquidity uses the combined poll and never attaches history to old-page requests',async()=>{
     const calls=[];
-    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({bars:[]})};},{liquidity_bids:{visible:true}});
+    const c=cache(async url=>{calls.push(url);return {ok:true,status:200,json:async()=>({symbol:new URL(url,'http://localhost').searchParams.get('symbol'),interval:new URL(url,'http://localhost').searchParams.get('interval'),bars:[]})};},{liquidity_bids:{visible:true}});
     await c._fetchPage('BTCUSDT','1m',1000);
     assert.equal(new URL(calls[0],'http://local').searchParams.get('liquidity'),'1');
     await c._fetchPage('BTCUSDT','1m',1000,123);
@@ -259,7 +259,7 @@ test('liquidity uses the combined poll and never attaches history to old-page re
 
 test('institutional higher projection requests every higher source only when selected',async()=>{
     const calls=[],styles={inst_support_zones:{visible:true,higher:true}};
-    const data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({bars:[]})};},styles);
+    const data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({symbol:new URL(url,'http://localhost').searchParams.get('symbol'),interval:new URL(url,'http://localhost').searchParams.get('interval'),bars:[]})};},styles);
     await data._fetchPage('BTCUSDT','1h',1000);
     const query=new URL(calls[0],'http://local').searchParams;
     assert.equal(query.get('sr_frames'),'2h,4h,6h,8h,12h,1d,3d,1w,1M');
@@ -269,7 +269,7 @@ test('institutional higher projection requests every higher source only when sel
 });
 
 test('two-candle polls send the known decision reference only for the same pair',async()=>{
-    const calls=[],data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({bars:[]})};});
+    const calls=[],data=cache(async url=>{calls.push(url);return {ok:true,json:async()=>({symbol:new URL(url,'http://localhost').searchParams.get('symbol'),interval:new URL(url,'http://localhost').searchParams.get('interval'),bars:[]})};});
     data.symbol='ENAUSDT';data.timeframe='4h';data.bars=[{open_time:1000,signal_context:{open_time:500}}];
     await data._fetchPage('ENAUSDT','4h',2);
     assert.equal(new URL(calls[0],'http://local').searchParams.get('analysis_reference'),'500');
