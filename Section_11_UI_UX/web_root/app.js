@@ -51,11 +51,15 @@ async function loadAll() {
         const zoneNotice=zonesPending?` | ${zonesPending}`:'';
         const featureNotice=progress?progress.repair?` | Feature repair${progress.active===false?' paused':''}: ${progress.repair.columns} columns through ${stamp(progress.repair.through)}; target ${stamp(progress.repair.target)}`:
             progress.active===false?` | Features paused at ${stamp(progress.through)}`:progress.status==='features current'?' | Features current':` | Features through ${stamp(progress.through)} (${progress.status})`:'';
+        const liveNotice = DataCache.liveEnabled
+            ? ` | Live quote: ${DataCache.atLiveEdge ? DataCache.liveStatus : "paused while viewing history"}` +
+              (DataCache.atLiveEdge && DataCache.liveError ? ` (${DataCache.liveError})` : "")
+            : "";
         status().textContent = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
-              (DataCache.liveEnabled ? ` | ${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
+              liveNotice + historyNotice + featureNotice + zoneNotice;
     }
 
     function checkBoundary() {
@@ -96,7 +100,7 @@ async function loadAll() {
         }
         // All consumers receive the same canonical bars. No visual fetches
         // its own candles/features/decisions, and no visible history is evicted.
-        Composer.updateAll(chart, { ...DataCache, bars }, op, { resetViewport: reset });
+        Composer.updateAll(chart, { ...DataCache, formingBar: DataCache.formingBar, bars }, op, { resetViewport: reset });
         renderedBars = bars;
         if (target) chart.timeScale().setVisibleLogicalRange(target);
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -184,7 +188,6 @@ async function loadAll() {
     if(target.has('at')){
         try{await window.openAlertChart({symbol:target.get('symbol'),interval:target.get('interval'),bar_time:Number(target.get('at'))});}
         catch(error){status().textContent=error.message;}
-    }else await loadAll();
-    const interval = Composer.config.stored_refresh_ms ?? 5000;
-    storedPoll.start(DataCache.liveEnabled && interval > 0 ? Math.min(interval, 1000) : interval);
+    }else void loadAll();
+    storedPoll.start(Composer.config.stored_refresh_ms ?? 5000, DataCache.liveEnabled);
 })();

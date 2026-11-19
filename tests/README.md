@@ -138,23 +138,20 @@ Optional fields in `Section_11_UI_UX/config/ui_config.json`:
 ```
 
 Merge these fields with the existing `timeframes` settings. Zero disables
-all automatic refresh. `live_candle` defaults to true: latest-page requests add
-`live=1` and the server includes a cached provisional candle in the same response.
-The server fetches Binance quotes in a background worker (at most once a second
-per market/timeframe), so slow exchange I/O cannot block historical requests.
-Automatic refresh uses a one-second cadence while live quotes are enabled and
-pauses while browsing history. Set `live_candle` to false for stored-only browsing.
-The provisional record has the same client/features/adcn shape, but features and
-decisions are null until confirmed; it never enters the permanent bar cache or
-databases. The chart updates the forming price using `series.update`, not a full
-history/indicator redraw. At rollover, it waits for the stored closed candle
-before displaying the next forming interval, avoiding gaps and duplicate bars.
-Unavailability is shown in the status text; the last provisional quote may remain
-visible without being labelled live. Precision otherwise comes from stored prices; it is display formatting,
-not an exchange tick-size contract. The ingestion runner is unchanged.
-The old `/api/live_candle` endpoint returns 410; live preview is part of
-`/api/bars?live=1`, rather than a separate browser candle request. Older cursor
-pages never request a live snapshot.
+automatic refresh. `live_candle` defaults to true. The chart polls
+`/api/live_snapshot` once a second, independently of the configured stored
+history refresh. Both pause while browsing history. The server fetches Binance
+quotes in the background and publishes OHLCV before provisional feature
+calculations finish. Set `live_candle` to false for stored-only browsing.
+
+The forming candle uses the same record shape as stored bars. Provisional
+features may arrive later, decisions remain null, and provisional candles
+stay in a bounded chart-only buffer. A new forming interval can appear before
+the stored close arrives. The stored candle replaces the matching provisional
+candle when it arrives. Feed availability is shown in the status text.
+Precision is display formatting. The ingestion runner is unchanged.
+Existing clients can still use `/api/bars?live=1` to include a live snapshot
+in the latest stored page. Older cursor pages never request live data.
 
 The dedicated live browser scenario uses a controlled source, without network:
 

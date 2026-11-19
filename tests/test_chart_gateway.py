@@ -116,6 +116,14 @@ class ChartGatewayTests(unittest.TestCase):
             self.assertNotIn('live',packet)
             live.assert_not_called()
 
+    def test_live_snapshot_does_not_read_stored_chart_rows(self):
+        snapshot = {"bar": None, "status": "loading", "as_of": None}
+        with patch.object(routes.db, 'read_state_page', side_effect=AssertionError('read history')), \
+             patch.object(routes.live_candle, 'get_snapshot', return_value=snapshot) as live:
+            status, packet = routes.handle_get('/api/live_snapshot', 'symbol=BTCUSDT&interval=1m', None)
+        self.assertEqual((status, packet), (200, snapshot))
+        live.assert_called_once_with('BTCUSDT', '1m')
+
     def test_invalid_cursor_and_page_size_are_rejected(self):
         for query in ['limit=0','limit=1001','before=wrong','limit=wrong']:
             status,_ = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&'+query,None)

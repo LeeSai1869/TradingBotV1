@@ -98,6 +98,28 @@ async def exercise_live(base, library):
             assert db.count_klines('BTCUSDT','15m') == count+1
             print('PASS: rollover follows the next candle while storage catches up and reconciles the closed candle once',flush=True)
 
+            # Hold a stored-page request while the lightweight endpoint updates the chart.
+            import asyncio
+            started, release = asyncio.Event(), asyncio.Event()
+            async def delay_stored_page(route):
+                started.set()
+                await release.wait()
+                await route.continue_()
+            await page.route('**/api/bars?*', delay_stored_page)
+            await page.evaluate('() => { window.pendingHistory = DataCache.refreshStored({includeLive:false}); }')
+            try:
+                await asyncio.wait_for(started.wait(), timeout=5)
+                state['bar'] = quote(T+STEP, 134)
+                await page.evaluate("async () => (await import('/web_root/stored_poll.js')).start(60000, true)")
+                await page.wait_for_function('liveSeries.data().at(-1).close === 134', timeout=5000)
+                assert await page.evaluate('Boolean(DataCache._refreshPromise)')
+            finally:
+                await page.evaluate("async () => (await import('/web_root/stored_poll.js')).stop()")
+                release.set()
+                await page.evaluate('window.pendingHistory')
+                await page.unroute('**/api/bars?*', delay_stored_page)
+            print('PASS: live candle updates while a stored history request is blocked',flush=True)
+
             state.update(bar=None,status='unavailable',error='test upstream unavailable')
             await page.evaluate('DataCache.refreshStored()')
             await settle(page)

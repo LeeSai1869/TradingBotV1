@@ -1,6 +1,8 @@
 """HTTP dispatch for /api/* endpoints."""
 from __future__ import annotations
+
 import json
+import re
 import sqlite3
 from urllib.parse import urlparse, parse_qs
 
@@ -67,6 +69,15 @@ def handle_get(path, raw_qs, server):
     qs = parse_qs(raw_qs)
     for k in list(qs.keys()):
         qs[k] = [clean(x) for x in qs[k]]
+
+    if path == "/api/live_snapshot":
+        symbol = qs.get("symbol", [""])[0].upper()
+        interval = qs.get("interval", [""])[0]
+        if not re.fullmatch(r"[A-Z0-9]{2,30}", symbol) or interval not in data_policy.INTERVALS:
+            return 400, {"error": "Valid symbol and interval required"}
+        if not data_policy.enabled(symbol, interval):
+            return 200, {"bar": None, "status": "inactive", "as_of": None, "error": None}
+        return 200, live_candle.get_snapshot(symbol, interval)
 
     if path == "/api/bars":
         symbol = qs.get("symbol", [None])[0]

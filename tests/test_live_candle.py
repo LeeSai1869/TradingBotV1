@@ -1,6 +1,7 @@
 """Nonblocking forming-candle snapshots; no market data is written to disk."""
 import threading
 import unittest
+from unittest.mock import patch
 from Section_11_UI_UX.server.live_candle import FormingCandleCache
 
 
@@ -28,6 +29,29 @@ class LiveCandleTests(unittest.TestCase):
         self.assertEqual(snapshot['bar']['client']['close'],11)
         self.assertIsNone(snapshot['bar']['features'])
         self.assertIsNone(snapshot['bar']['adcn'])
+
+    def test_slow_feature_preview_does_not_delay_successive_quotes(self):
+        from Section_11_UI_UX.server import live_features
+        entered = threading.Event()
+        release = threading.Event()
+        close = iter((11, 9))
+        def calculate(*args, **kwargs):
+            entered.set()
+            release.wait(3)
+            return {'ema50': 10}
+        cache = FormingCandleCache(lambda *_: raw(next(close)), poll_seconds=0, wall_clock=lambda: 100)
+        try:
+            with patch.object(live_features, 'calculate', side_effect=calculate):
+                cache.snapshot('BTCUSDT', '1m')
+                self.assertTrue(entered.wait(1))
+                self.assertEqual(cache.snapshot('BTCUSDT', '1m')['bar']['client']['close'], 11)
+                cache._pool.shutdown(wait=True)
+                cache.poll_seconds = float('inf')
+                self.assertEqual(cache.snapshot('BTCUSDT', '1m')['bar']['client']['close'], 9)
+                self.assertFalse(release.is_set())
+        finally:
+            release.set()
+            cache.close()
 
     def test_expired_snapshot_is_not_labelled_live(self):
         clock=[0];wall=[100]

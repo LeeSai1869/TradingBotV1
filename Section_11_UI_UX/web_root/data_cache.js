@@ -18,6 +18,8 @@ const DataCache = {
     srSnapshot:null,
     srFrames:{},
     liveStatus: "loading",
+    liveError: null,
+    _liveAsOf: null,
     activeBars: [],
     latestBar: null,
     nextBefore: null,
@@ -43,7 +45,11 @@ const DataCache = {
     },
 
     _applyLive(live) {
-        const previous = JSON.stringify([this.liveBars, this.liveStatus]);
+        if (live?.as_of != null) {
+            if (this._liveAsOf != null && live.as_of < this._liveAsOf) live = null;
+            else this._liveAsOf = live.as_of;
+        }
+        const previous = JSON.stringify([this.liveBars, this.liveStatus, this.liveError]);
         const latest = this.bars.at(-1);
         if (!this.liveEnabled || live?.status === "inactive") {
             this.liveBars = [];
@@ -61,8 +67,32 @@ const DataCache = {
                 }
             }
         }
-        if (live && this.liveEnabled) this.liveStatus = live.status;
-        return previous !== JSON.stringify([this.liveBars, this.liveStatus]);
+        if (live && this.liveEnabled) {
+            this.liveStatus = live.status;
+            this.liveError = live.status === "unavailable" ? (live.error || "No current quote from Binance") : null;
+        }
+        return previous !== JSON.stringify([this.liveBars, this.liveStatus, this.liveError]);
+    },
+
+    async refreshLive() {
+        if (!this.liveEnabled || this.loading || !this.atLiveEdge || !this.symbol) return false;
+        const generation = this._reloadGeneration;
+        const query = new URLSearchParams({symbol: this.symbol, interval: this.timeframe});
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        let live;
+        try {
+            const response = await fetch(`/api/live_snapshot?${query}`, {cache: "no-store", signal: controller.signal});
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            live = await response.json();
+        } catch (error) {
+            live = {status: "unavailable", error: error.name === "AbortError" ? "Live quote request timed out" : error.message};
+        } finally {
+            clearTimeout(timeout);
+        }
+        if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge || !this._applyLive(live)) return false;
+        this.emit("live");
+        return true;
     },
 
     subscribe(fn) { this.listeners.push(fn); },
@@ -70,7 +100,7 @@ const DataCache = {
         for (const fn of this.listeners) fn(this, op, meta);
     },
 
-    async _fetchPage(symbol, timeframe, limit, before = null) {
+    async _fetchPage(symbol, timeframe, limit, before = null, { includeLive = true } = {}) {
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
         if(before===null){
             const reference=this.symbol===symbol&&this.timeframe===timeframe?[...this.bars].reverse().find(b=>b.signal_context)?.signal_context:null;
@@ -93,7 +123,7 @@ const DataCache = {
         if(before===null&&['liquidity_bids','liquidity_asks','liquidity_heatmap'].some(k=>window.Composer?.config.featureStyles?.[k]?.visible))qs.set('liquidity','1');
         if(before===null && Object.entries(window.Composer?.config.featureStyles||{}).some(([k,v])=>k.startsWith('vp_')&&v.visible))qs.set('volume_profile','1');
         if (before !== null) qs.set("before", before);
-        else if (this.liveEnabled) qs.set("live", "1");
+        else if (this.liveEnabled && includeLive) qs.set("live", "1");
         for (let attempt = 0; attempt < 3; attempt++) {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 12000);
@@ -148,6 +178,7 @@ const DataCache = {
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
             historyPending: false, liveBars: preserveViewport ? this.liveBars : [],
+            _liveAsOf: preserveViewport ? this._liveAsOf : null, liveError: preserveViewport ? this.liveError : null,
             volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{},
             liveStatus: preserveViewport ? this.liveStatus : (this.liveEnabled ? "loading" : "disabled") };
         this.loading = true;
@@ -211,7 +242,7 @@ const DataCache = {
         return work;
     },
 
-    refreshStored({full=false}={}) {
+    refreshStored({full=false, includeLive=true}={}) {
         if(full)++this._fullRefreshVersion;
         if (this.loading || !this.atLiveEdge) return Promise.resolve(false);
         if (this._refreshPromise) return this._refreshPromise;
@@ -221,7 +252,7 @@ const DataCache = {
         const fullVersion=this._fullRefreshVersion;
         const replaying=this.historyPending||this.featureProgress?.status!=='features current';
         const limit=fullVersion>this._appliedFullRefreshVersion||(++this._refreshCount%12===0&&replaying)?WINDOW_BARS:2;
-        const request = this._fetchPage(this.symbol, this.timeframe, limit);
+        const request = this._fetchPage(this.symbol, this.timeframe, limit, null, { includeLive });
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
             if(limit===WINDOW_BARS)this._appliedFullRefreshVersion=fullVersion;

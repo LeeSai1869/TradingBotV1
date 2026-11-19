@@ -1,26 +1,35 @@
-// One local combined-stream request: stored bars plus the server's provisional
-// live snapshot. Exchange I/O is independent of HTTP/history requests.
-let timer = null;
+// Stored history and live quotes have independent schedules and timeouts.
+let storedTimer = null;
+let liveTimer = null;
 let cycle = 0;
 
-async function run(token, interval) {
+async function run(token, interval, live) {
     try {
-        await DataCache.refreshStored();
+        if (live) await DataCache.refreshLive();
+        else await DataCache.refreshStored({includeLive: false});
     } catch (error) {
-        console.warn("[stored bars] refresh failed:", error);
+        console.warn(live ? "[live quote] refresh failed:" : "[stored bars] refresh failed:", error);
     } finally {
-        if (token === cycle) timer = setTimeout(() => run(token, interval), interval);
+        if (token === cycle) schedule(token, interval, live);
     }
 }
+
+function schedule(token, interval, live) {
+    const timer = setTimeout(() => run(token, interval, live), interval);
+    if (live) liveTimer = timer;
+    else storedTimer = timer;
+}
+
 export function stop() {
     ++cycle;
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
+    if (storedTimer !== null) clearTimeout(storedTimer);
+    if (liveTimer !== null) clearTimeout(liveTimer);
+    storedTimer = liveTimer = null;
 }
-export function start(interval = 5000) {
+export function start(interval = 5000, live = false) {
     stop();
     if (Number.isFinite(interval) && interval > 0) {
-        const token = cycle;
-        timer = setTimeout(() => run(token, interval), interval);
+        schedule(cycle, interval, false);
+        if (live) schedule(cycle, 1000, true);
     }
 }
