@@ -182,6 +182,23 @@ def compact(path,*,batch=10000,report=None):
         return state
 
 
+def service_belongs_to_checkout(config,label,module,root):
+    root=Path(root).resolve()
+    directory=config.get('WorkingDirectory')
+    args=config.get('ProgramArguments',[])
+    if not directory or not isinstance(args,list):return False
+    directory=Path(directory).resolve()
+    if directory==root and any(args[i:i+2]==['-m',module] for i in range(len(args)-1)):
+        return True
+    # The installed chart app also supports the repository's shell launcher.
+    # Match its exact script and directory; never accept arbitrary shell text.
+    launcher=(root/'Section_11_UI_UX'/'binance_chart'/'run_chart.sh').resolve()
+    return (label=='com.tradingindicator.chart' and len(args)==2 and args[0]=='/bin/bash'
+        and launcher.is_relative_to(root) and launcher.is_file()
+        and directory==launcher.parent and Path(args[1]).is_absolute()
+        and Path(args[1]).resolve()==launcher)
+
+
 @contextmanager
 def stopped_services():
     if sys.platform!='darwin':raise RuntimeError('--manage-services requires macOS launchd')
@@ -194,7 +211,7 @@ def stopped_services():
         if loaded.returncode:continue
         path=Path.home()/'Library'/'LaunchAgents'/(label+'.plist')
         with path.open('rb') as stream:config=plistlib.load(stream)
-        if not config.get('WorkingDirectory') or Path(config['WorkingDirectory']).resolve()!=root or module not in config.get('ProgramArguments',[]):
+        if not service_belongs_to_checkout(config,label,module,root):
             raise RuntimeError('Service does not belong to this checkout: '+label)
         selected.append((label,path))
     try:
