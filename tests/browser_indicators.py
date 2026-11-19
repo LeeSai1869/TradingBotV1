@@ -141,7 +141,8 @@ async def exercise(base,library):
         volume_values = page.locator('.indicator-values[aria-label="Volume values"]')
         assert '2,620 USDT' in await volume_values.inner_text()
         assert '11.00 BTC' in await volume_values.inner_text()
-        assert 'Turnover' not in await volume_values.inner_text()
+        assert await volume_values.locator('span').all_text_contents() == ['11.00 BTC', '— BTC', '2,620 USDT']
+        assert not await page.get_by_role('group',name='Volume pane controls').get_by_text('Volume',exact=True).count()
         await page.get_by_role('button',name='Volume settings',exact=True).click()
         await settings.get_by_label('Volume in USDT',exact=True).uncheck()
         await settings.get_by_role('button',name='Apply',exact=True).click()

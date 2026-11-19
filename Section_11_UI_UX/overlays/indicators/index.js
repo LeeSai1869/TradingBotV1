@@ -12,7 +12,8 @@ function values(){
     for(const state of groups.values())if(state.valueLabel){
         const labels = [];
         for(const [key,label] of FEATURE_STYLES[state.feature].outputs)if(available(key) && (styles()[key]?.visible||window.Composer.config.hiddenFeatures?.[state.feature]?.includes(key))){
-            let text = `${label} ${formatValue(bar ? value(bar,key) : null)}`;
+            const formatted = formatValue(bar ? value(bar,key) : null);
+            let text = state.feature === 'Volume' ? formatted : `${label} ${formatted}`;
             if (key === 'volume_usdt') text = formatTurnover(turnover(bar));
             if (quoteVolume && (key === 'volume' || key === 'volume_ma') && bar) text += ` ${(bar.symbol ?? bar.client.symbol).slice(0, -4)}`;
             labels.push([text, styles()[key].color]);
@@ -70,7 +71,9 @@ function create(feature){
             for(const [key,line] of state.lines)line.applyOptions({visible:!state.collapsed && available(key) && styles()[key]?.visible===true});
             state.pane.setHeight(state.collapsed?34:150);requestAnimationFrame(positionHeaders);
         });collapse.setAttribute('aria-expanded','true');
-        const title=document.createElement('strong');title.textContent=feature;header.append(title);
+        if (feature !== 'Volume') {
+            const title=document.createElement('strong');title.textContent=feature;header.append(title);
+        }
         state.valueLabel=document.createElement("span");state.valueLabel.className="indicator-values";state.valueLabel.setAttribute("aria-label",`${feature} values`);header.append(state.valueLabel);
         button(`${feature} settings`,'⚙',header,()=>window.dispatchEvent(new CustomEvent('open-feature-settings',{detail:feature})));
         state.toggle=button(`Hide ${feature} on chart`,'◎',header,()=>window.dispatchEvent(new CustomEvent('feature-legend-action',{detail:{feature,action:state.hidden?'show':'hide'}})));
