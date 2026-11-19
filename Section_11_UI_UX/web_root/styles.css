@@ -283,6 +283,11 @@ button:hover { background: #333; }
 #symbol-search-results {min-height:0;max-height:280px;overflow-y:auto;overscroll-behavior:contain;}
 #symbol-search-results [role=option],#symbol-search-results .symbol-empty {padding:9px;font-size:12px;}
 #symbol-search-results [role=option] {cursor:pointer;}
+.symbol-result-row {display:flex;align-items:stretch;}
+.symbol-result-row [role=option] {flex:1;min-width:0;}
+.symbol-favorite {flex:none;width:32px;padding:0;border:0;background:transparent;color:#aab6c4;font-size:18px;cursor:pointer;}
+.symbol-favorite[aria-pressed=true] {color:#f5c542;}
+.symbol-favorite:focus-visible {outline:2px solid #8cb5ff;outline-offset:-2px;}
 #symbol-search-results [aria-selected=true],#symbol-search-results [role=option]:hover {background:#30435c;}
 
 #drawing-input {position:absolute;left:0;top:0;z-index:25;cursor:crosshair;touch-action:none;background:transparent;}

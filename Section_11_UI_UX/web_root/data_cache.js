@@ -43,9 +43,22 @@ const DataCache = {
         return this.liveBars.length ? [...this.bars, ...this.liveBars] : this.bars;
     },
 
+    _acceptQuote(live) {
+        if (!live || !this.liveEnabled) return false;
+        const asOf = Number.isFinite(live.as_of) ? live.as_of : null;
+        if (asOf !== null && this._quoteAsOf != null && asOf < this._quoteAsOf) return false;
+        if (live.bar && this.liveQuote && live.bar.open_time < this.liveQuote.open_time) return false;
+        if (asOf !== null) this._quoteAsOf = asOf;
+        if (live.status === "inactive") this.liveQuote = null;
+        else if (live.bar) this.liveQuote = live.bar;
+        this.liveStatus = live.status;
+        return true;
+    },
+
     _applyLive(live) {
-        if (live) this.liveQuote = this.liveEnabled ? (live.bar ?? null) : null;
-        const previous = JSON.stringify([this.liveBars, this.liveStatus]);
+        const previousStatus = this.liveStatus;
+        if (!this._acceptQuote(live)) live = null;
+        const previous = JSON.stringify([this.liveBars, previousStatus]);
         const latest = this.bars.at(-1);
         if (!this.liveEnabled || live?.status === "inactive") {
             this.liveBars = [];
@@ -61,7 +74,6 @@ const DataCache = {
                 }
             }
         }
-        if (live && this.liveEnabled) this.liveStatus = live.status;
         const changed = previous !== JSON.stringify([this.liveBars, this.liveStatus]);
         if (changed) this._liveVersion = (this._liveVersion || 0) + 1;
         return changed;
@@ -189,6 +201,7 @@ const DataCache = {
     },
 
     async loadInitial(symbol, timeframe, before=null, {pricesFirst = false} = {}) {
+        const keepQuote = before === null && this.liveEnabled && symbol === this.symbol && timeframe === this.timeframe;
         const generation = ++this._reloadGeneration;
         for(const controller of this._requests)controller.abort();
         this._requests.clear();
@@ -196,7 +209,10 @@ const DataCache = {
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _livePromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
-            historyPending: false, liveBars: [], liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, liveBars: [],
+            liveQuote: keepQuote ? this.liveQuote : null, _quoteAsOf: keepQuote ? this._quoteAsOf : null,
+            volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{},
+            liveStatus: keepQuote ? this.liveStatus : (this.liveEnabled ? "loading" : "disabled") });
         this.emit("loading");
         let prices = null;
         try {
@@ -300,14 +316,14 @@ const DataCache = {
                 const priorQuote=JSON.stringify(this.liveQuote?.client??null),priorStatus=this.liveStatus;
                 let changed=false;
                 if(!this.loading&&this.atLiveEdge)changed=this._applyLive(packet.live);
-                else {this.liveQuote=packet.live?.bar??null;this.liveStatus=packet.live?.status??'unavailable';}
+                else this._acceptQuote(packet.live);
                 if(changed)this.emit('live');
                 if(priorQuote!==JSON.stringify(this.liveQuote?.client??null)||priorStatus!==this.liveStatus)this.emit('quote');
                 return changed;
             }).catch(error=>{
                 if(generation!==this._reloadGeneration)return false;
                 if(error.name==='ChartIdentityError'){
-                    this.liveQuote=null;this.liveStatus='response mismatch';this.error=error.message;
+                    this.liveStatus='response mismatch';this.error=error.message;
                     this.emit('quote');this.emit('error');
                 }
                 throw error;

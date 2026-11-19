@@ -58,7 +58,7 @@ async function loadAll() {
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${visible} candles in view | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
-              (DataCache.liveEnabled ? ` | ${DataCache.liveQuote?.client?.close!=null?'Live price: '+DataCache.liveQuote.client.close+' | ':''}${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
+              (DataCache.liveEnabled ? ` | ${DataCache.liveQuote?.client?.close!=null?(DataCache.liveStatus==='live'?'Live price: ':'Last live price: ')+DataCache.liveQuote.client.close+' | ':''}${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
         if (status().textContent !== text) status().textContent = text;
     }
 
@@ -138,7 +138,7 @@ async function loadAll() {
         if (op === "loading") latestControl.update(chart, cache);
         if (op === "error") { updateStatus(); return; }
         if (op === "liquidity" && !dragging && !pending && !rendering) { Composer.updateLiquidity(chart, cache); return; }
-        if(op==='quote'){Composer.visuals.find(v=>v.name==='candles')?.updateQuote?.(chart,cache.liveQuote||cache.latestBar);updateStatus();return;}
+        if(op==='quote'){Composer.visuals.find(v=>v.name==='candles')?.updateQuote?.(chart,cache.liveQuote||cache.latestBar, cache.liveStatus !== 'live' && !!cache.liveQuote);updateStatus();return;}
         if (op === "live" && !dragging && !rendering && !pending && renderedScope===`${cache.symbol}:${cache.timeframe}` && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {

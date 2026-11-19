@@ -20,8 +20,9 @@ class CurrentPriceRay {
         this.chart = this.series = this.requestUpdate = null;
     }
 
-    setBar(bar) {
+    setBar(bar, stale) {
         this.bar = bar;
+        this.stale = stale;
         this.requestUpdate?.();
     }
 
@@ -44,7 +45,7 @@ class CurrentPriceRay {
             context.strokeStyle = this.bar.client.close >= this.bar.client.open
                 ? this.series.options().upColor : this.series.options().downColor;
             context.lineWidth = 1;
-            context.setLineDash(visible ? [] : [2, 3]);
+            context.setLineDash(visible && !this.stale ? [] : [2, 3]);
             context.beginPath();
             context.moveTo(visible ? x : 0, y);
             context.lineTo(mediaSize.width, y);
@@ -86,8 +87,8 @@ function _toPoints(bars) {
     }));
 }
 
-function updateCurrentPrice(bar) {
-    currentPriceRay.setBar(bar);
+function updateCurrentPrice(bar, stale = false) {
+    currentPriceRay.setBar(bar, stale);
     if (!bar) {
         if (currentPriceLine) series.removePriceLine(currentPriceLine);
         currentPriceLine = null;
@@ -114,7 +115,8 @@ export function update(chart, data, options = {}) {
     series.applyOptions({ ...window.Composer?.config.candleStyle, visible: options.visible !== false });
     series.setData(_toPoints(data.bars));
     latestPlottedTime=data.bars?.at(-1)?.time??null;
-    updateCurrentPrice(data.liveQuote||data.bars?.findLast(bar=>!bar.provisional));
+    updateCurrentPrice(data.liveQuote||data.bars?.findLast(bar=>!bar.provisional),
+        !!data.liveQuote && data.liveStatus !== "live");
 
     // Only an explicit reload establishes autoscale. Prefetch preserves
     // the user's vertical scale; the "A" control can reset it manually.
@@ -134,7 +136,7 @@ export function updateLive(chart, bar) {
     if (!series || !bar) return;
     series.update({ ...bar.client, time: bar.time });
     latestPlottedTime=bar.time;
-    updateCurrentPrice(bar);
+    currentPriceRay.requestUpdate?.();
 }
 
 export function setPriceFormat(fmt) {
@@ -148,6 +150,6 @@ export function getSeries() {
     return series;
 }
 
-export function updateQuote(chart,bar){if(series)updateCurrentPrice(bar);}
+export function updateQuote(chart,bar,stale){if(series)updateCurrentPrice(bar,stale);}
 
 export function clear(){if(series){series.setData([]);latestPlottedTime=null;updateCurrentPrice(null);}}
