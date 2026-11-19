@@ -44,7 +44,7 @@ python3 check_ema_distance_readers.py
 python3 check_atr_slope_readers.py
 ```
 
-Live prices are independently displayed as a `Live` price-axis label and in the
+Live prices are independently displayed on the price-axis line and in the
 status line. Stored refresh being disabled, historical navigation, a slow initial
 page, or a missing stored close cannot suppress that quote. They still prevent
 inserting a fictitious candle across a history gap. Provisional indicator work
