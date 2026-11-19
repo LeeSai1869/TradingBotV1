@@ -77,3 +77,16 @@ class CleanupRecovery(unittest.TestCase):
         self.git('restore','--source=HEAD','--staged','--worktree','--','tests/example.py')
         finish(self.root,'cleanup',stash,stop_services=self.stopped)
         self.assertIn(b'# saved test edit',(self.root/'Section_13_Development/tests/example.py').read_bytes())
+
+    def test_merge_conflicts_are_reported_before_any_services_are_stopped(self):
+        self.git('stash','push','-qm','temporary runtime')
+        self.git('switch','-q','cleanup')
+        self.write('conflict.txt',b'cleanup branch');self.git('add','.');self.git('commit','-qm','cleanup extra')
+        self.git('switch','-q','main')
+        self.write('conflict.txt',b'local branch');self.git('add','.');self.git('commit','-qm','local extra')
+        self.git('stash','pop','-q')
+        with self.assertRaisesRegex(RuntimeError,'(?s)preview found conflicts.*conflict.txt'):
+            finish(self.root,'cleanup',self.stash,stop_services=self.stopped)
+        self.assertEqual(self.services,[])
+        self.assertEqual((self.root/RUNTIME[0]).read_bytes(),b'{"cursor":987}')
+        self.assertEqual((self.root/'conflict.txt').read_bytes(),b'local branch')

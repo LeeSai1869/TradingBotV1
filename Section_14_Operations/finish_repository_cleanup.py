@@ -51,6 +51,9 @@ def finish(root, target, stash, *, stop_services):
     root = Path(root).resolve()
     if git(root, 'rev-parse', '-q', '--verify', 'MERGE_HEAD', check=False).returncode == 0:
         raise RuntimeError('A merge is already active. No files changed; send git status output.')
+    preview = git(root, 'merge-tree', '--write-tree', 'HEAD', target, check=False)
+    if preview.returncode:
+        raise RuntimeError('Cleanup merge preview found conflicts; services and files were not changed.\n'+(preview.stdout+preview.stderr).decode())
     dirty = changed(root, 'HEAD')
     other = [p for p in dirty if p not in RUNTIME]
     if other:
@@ -84,7 +87,7 @@ def finish(root, target, stash, *, stop_services):
             if result.returncode:
                 if git(root, 'rev-parse', '-q', '--verify', 'MERGE_HEAD', check=False).returncode == 0:
                     git(root, 'merge', '--abort')
-                raise RuntimeError('Cleanup merge stopped; saved edits were not applied.\n'+result.stderr.decode())
+                raise RuntimeError('Cleanup merge stopped; saved edits were not applied.\n'+(result.stdout+result.stderr).decode())
             if any(p.startswith('Section_11_UI_UX/') for p in changed(root, '--cached')):
                 git(root, 'merge', '--abort')
                 raise RuntimeError('The merge would change UI/UX files; it was aborted. Current UI preserved.')
