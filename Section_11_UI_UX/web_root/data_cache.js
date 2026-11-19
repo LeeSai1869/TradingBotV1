@@ -39,6 +39,7 @@ const DataCache = {
     },
 
     _applyLive(live) {
+        if(live)this.liveQuote=this.liveEnabled?(live.bar??null):null;
         const previous = JSON.stringify([this.formingBar, this.liveStatus]);
         const latest = this.bars.at(-1);
         if (!this.liveEnabled || !latest || this.formingBar?.open_time <= latest.open_time) {
@@ -152,7 +153,7 @@ const DataCache = {
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _livePromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, formingBar: null, liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
@@ -216,7 +217,7 @@ const DataCache = {
     },
 
     refreshLive() {
-        if (!this.liveEnabled || this.loading || !this.atLiveEdge) return Promise.resolve(false);
+        if (!this.liveEnabled || !this.symbol || !this.timeframe) return Promise.resolve(false);
         if (this._livePromise) return this._livePromise;
         const generation=this._reloadGeneration;
         const controller=new AbortController();this._requests.add(controller);
@@ -226,9 +227,13 @@ const DataCache = {
             .then(async response=>{
                 const packet=await response.json();
                 if(!response.ok)throw new Error(packet.error||'Live snapshot unavailable');
-                if(generation!==this._reloadGeneration||!this.atLiveEdge||this.loading)return false;
-                const changed=this._applyLive(packet.live);
+                if(generation!==this._reloadGeneration)return false;
+                const priorQuote=JSON.stringify(this.liveQuote?.client??null),priorStatus=this.liveStatus;
+                let changed=false;
+                if(!this.loading&&this.atLiveEdge)changed=this._applyLive(packet.live);
+                else {this.liveQuote=packet.live?.bar??null;this.liveStatus=packet.live?.status??'unavailable';}
                 if(changed)this.emit('live');
+                if(priorQuote!==JSON.stringify(this.liveQuote?.client??null)||priorStatus!==this.liveStatus)this.emit('quote');
                 return changed;
             }).finally(()=>{
                 clearTimeout(timer);this._requests.delete(controller);

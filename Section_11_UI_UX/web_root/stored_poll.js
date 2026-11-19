@@ -16,6 +16,6 @@ export function start(interval=5000, live=false) {
     if(Number.isFinite(interval)&&interval>0){
         const token=cycle;
         timers[0]=setTimeout(()=>run(token,interval,false),interval);
-        if(live)timers[1]=setTimeout(()=>run(token,1000,true),1000);
     }
+    if(live){const token=cycle;timers[1]=setTimeout(()=>run(token,1000,true),1000);}
 }

@@ -293,3 +293,13 @@ test('live polling continues while the stored-history request is blocked',async(
     pending.resolve(false);await new Promise(r=>setImmediate(r));
     assert.equal(scheduled.length,count,'stopped pending loop must not reschedule');
 });
+
+test('live quote polling runs when stored refresh is disabled',async()=>{
+    const jobs=[];let live=0;
+    const context=vm.createContext({DataCache:{refreshLive:async()=>{live++;},refreshStored:()=>{throw Error('stored refresh disabled');}},
+        console,setTimeout:(fn,ms)=>{jobs.push({fn,ms});return jobs.length;},clearTimeout(){}});
+    const source=fs.readFileSync(new URL('../Section_11_UI_UX/web_root/stored_poll.js',import.meta.url),'utf8').replace(/export function/g,'function');
+    vm.runInContext(source+'\nglobalThis.controls={start,stop};',context);
+    context.controls.start(0,true);assert.equal(jobs.length,1);assert.equal(jobs[0].ms,1000);
+    await jobs[0].fn();assert.equal(live,1);context.controls.stop();
+});

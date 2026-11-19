@@ -89,6 +89,7 @@ function updateCurrentPrice(bar) {
     }
     const options = {
         price: bar.client.close,
+        title:bar.provisional?'Live':'Stored',
         color: bar.client.close >= bar.client.open ? series.options().upColor : series.options().downColor,
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
@@ -106,7 +107,7 @@ export function update(chart, data, options = {}) {
 
     series.applyOptions({ ...window.Composer?.config.candleStyle, visible: options.visible !== false });
     series.setData(_toPoints(data.bars));
-    updateCurrentPrice(data.bars?.at(-1));
+    updateCurrentPrice(data.liveQuote||data.bars?.findLast(bar=>!bar.provisional));
 
     // Only an explicit reload establishes autoscale. Prefetch preserves
     // the user's vertical scale; the "A" control can reset it manually.
@@ -138,3 +139,5 @@ export function setPriceFormat(fmt) {
 export function getSeries() {
     return series;
 }
+
+export function updateQuote(chart,bar){if(series)updateCurrentPrice(bar);}
