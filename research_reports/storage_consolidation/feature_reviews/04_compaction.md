@@ -59,3 +59,10 @@ stops or starts services. Check it before attempting recovery after a logout.
 `caffeinate -i` prevents idle sleep; it does not prevent macOS automatic logout.
 A logout may terminate the terminal job and GUI services. A partial copy must not
 be resumed against a source file modified by restarted writers.
+
+After successful post-compaction operation, `python3 remove_compaction_backup.py`
+runs both reader checks and validates eligibility without deleting anything.
+Use `--apply` to delete only the exact pre-compaction backup after the checks pass.
+It requires the completed full-verification report, matching active/backup file
+identities, no backup readers, and confirmed new version-3 feature writes. The
+active database and original compaction report are retained unchanged.
