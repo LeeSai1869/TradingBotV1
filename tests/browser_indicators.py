@@ -129,12 +129,16 @@ async def exercise(base,library):
         try:
             await asyncio.wait_for(requested.wait(), timeout=5)
             await settle(page)
-            assert await latest_candle() is None
+            assert (await latest_candle())['close'] == 239
+            assert await page.evaluate('DataCache.bars.length') == 240
+            assert 'Loading indicators' in await page.locator('#status').text_content()
+            preview_range = await page.evaluate('Canvas.chart.timeScale().getVisibleRange()')
         finally:
             release.set()
         await page.wait_for_function("!DataCache.loading && DataCache.bars.length === 2000 && !DataCache._olderPromise")
         await settle(page)
         assert (await latest_candle())['close'] == 239
+        assert await page.evaluate('Canvas.chart.timeScale().getVisibleRange()') == preview_range
         visible = await page.evaluate('Canvas.chart.timeScale().getVisibleLogicalRange()')
         assert 115 <= visible['to'] - visible['from'] <= 130, visible
         assert len(five_minute_pages) == 2, five_minute_pages

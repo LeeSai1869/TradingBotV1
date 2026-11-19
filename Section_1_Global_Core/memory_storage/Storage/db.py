@@ -236,6 +236,22 @@ def _read_derived(store, symbol, interval, start_ms, end_ms):
         conn.close()
 
 
+def read_chart_prices(symbol, interval, limit):
+    """Read the initial chart candles without joining or projecting features."""
+    if not klines_store.DB_PATH.exists():
+        return []
+    conn = _read_connection(klines_store.DB_PATH)
+    try:
+        rows = klines_store.read_page(conn, symbol, interval, limit, include_quote_volume=True)
+    finally:
+        conn.close()
+    return [
+        {"symbol": symbol, "interval": interval, "open_time": row[2], "time": row[2] // 1000,
+         "client": dict(zip((*_KLINE_COLUMNS, "quote_volume"), row)), "features": None, "adcn": None}
+        for row in rows
+    ]
+
+
 def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slippage_bps=2.,analysis_reference=None,context_history=False):
     """One combined record per stored candle, with an exclusive older cursor.
 

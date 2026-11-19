@@ -129,6 +129,26 @@ class ChartGatewayTests(unittest.TestCase):
             self.assertNotIn('live',packet)
             live.assert_not_called()
 
+    def test_chart_prices_skip_derived_history(self):
+        with patch.object(routes.db, '_read_derived', side_effect=AssertionError('read features')):
+            status, packet = routes.handle_get('/api/chart_price', 'symbol=BTCUSDT&interval=1m', None)
+        self.assertEqual(status, 200)
+        self.assertEqual(packet['symbol'], 'BTCUSDT')
+        self.assertEqual(len(packet['bars']), 3)
+        self.assertTrue(all(bar['features'] is None and bar['adcn'] is None for bar in packet['bars']))
+
+    def test_compact_chart_payload_keeps_values_and_omits_null_fields(self):
+        query = 'symbol=BTCUSDT&interval=1m&limit=3'
+        _, full = routes.handle_get('/api/bars', query, None)
+        _, compact = routes.handle_get('/api/bars', query + '&compact=1', None)
+        self.assertEqual(len(compact['bars']), len(full['bars']))
+        for original, trimmed in zip(full['bars'], compact['bars']):
+            features = original['features']
+            self.assertEqual(trimmed, {**original, 'features': (
+                None if features is None else {key: value for key, value in features.items() if value is not None}
+            )})
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
+
     def test_invalid_cursor_and_page_size_are_rejected(self):
         for query in ['limit=0','limit=1001','before=wrong','limit=wrong']:
             status,_ = routes.handle_get('/api/bars', 'symbol=BTCUSDT&interval=1m&'+query,None)

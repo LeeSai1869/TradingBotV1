@@ -20,7 +20,7 @@ async function loadAll() {
     const timeframe = timeframeControl.value();
     status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
-        if (await DataCache.loadInitial(symbol, timeframe) && id === loadId) {
+        if (await DataCache.loadInitial(symbol, timeframe, null, {pricesFirst: true}) && id === loadId) {
             await DataCache.prefetchOlder({limit: 1000});
         }
     } catch (error) {
@@ -108,6 +108,7 @@ async function loadAll() {
             // its own candles/features/decisions, and no visible history is evicted.
             Composer.updateAll(chart, { ...DataCache, formingBar: DataCache.formingBar, bars }, op, { resetViewport: reset });
             renderedBars = bars;renderedScope=bars.length ? scope : null;needsRecovery=false;
+            if (op === "prices") status().textContent = `${DataCache.symbol} ${DataCache.timeframe} | Loading indicators…`;
             if(DataCache.error===renderError)DataCache.error=null;
             renderError=null;
             if (target) chart.timeScale().setVisibleLogicalRange(target);
@@ -143,7 +144,7 @@ async function loadAll() {
             updateStatus();
             return;
         }
-        const reset=needsRecovery || op === "reload" || op === "loading";
+        const reset=needsRecovery || op === "reload" || op === "loading" || op === "prices";
         pending = { op:pending?.op==='settings'&&!reset?'settings':op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
             latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
         render();

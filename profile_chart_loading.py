@@ -44,6 +44,11 @@ def measure(symbol, interval, limit, *, profile=False):
             stack.enter_context(patch.object(module,field,wrap(getattr(module,field),label)))
         print(json.dumps(dict(symbol=symbol,interval=interval,limit=limit,
             batched_feature_reader='resolve_rows' in __import__('inspect').getsource(features_store.read_range))),flush=True)
+        started = time.perf_counter()
+        prices = db.read_chart_prices(symbol, interval, min(240, limit))
+        elapsed = time.perf_counter() - started
+        print('PRICES: ' + json.dumps(dict(rows=len(prices), read_ms=round(elapsed * 1000, 2),
+            payload_KiB=round(len(json.dumps(prices).encode()) / 1024, 2))), flush=True)
         reference=None
         for run in ('first','repeat'):
             stages.clear();started=time.perf_counter()
