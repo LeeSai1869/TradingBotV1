@@ -39,7 +39,6 @@ async function loadAll() {
     let renderedBars = [];
     let rendering = false;
     let pending = null;
-    let renderGeneration = 0;
 
     function updateStatus() {
         const bar=DataCache.latestBar, client=bar?.client;
@@ -73,11 +72,10 @@ async function loadAll() {
     }
 
     function render() {
-        if (rendering || !pending) return;
+        if (rendering || !pending || DataCache.loading) return;
         const { op, reset, latest, span } = pending;
         pending = null;
         rendering = true;
-        const generation = ++renderGeneration;
         const range = chart.timeScale().getVisibleLogicalRange();
         const bars = DataCache.renderBars;
         let target = null;
@@ -94,7 +92,7 @@ async function loadAll() {
                 range.to >= renderedBars.length - 2;
             const shift = following ? bars.length - renderedBars.length
                 : logicalShift(renderedBars, bars);
-            target = { from: range.from + shift, to: range.to + shift };
+            if (shift) target = { from: range.from + shift, to: range.to + shift };
         }
         // All consumers receive the same canonical bars. No visual fetches
         // its own candles/features/decisions, and no visible history is evicted.
@@ -102,7 +100,6 @@ async function loadAll() {
         renderedBars = bars;
         if (target) chart.timeScale().setVisibleLogicalRange(target);
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (generation !== renderGeneration) return;
             rendering = false;
             if (pending) render();
             else checkBoundary();
@@ -110,13 +107,13 @@ async function loadAll() {
     }
 
     DataCache.subscribe((cache, op) => {
-        if (op === "loading") latestControl.update(chart, cache);
+        if (op === "loading") { latestControl.update(chart, cache); return; }
         if (op === "error") { updateStatus(); return; }
         if (op === "live" && !rendering && !pending && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {
             Composer.updateLive(chart, cache);
-            renderedBars[renderedBars.length - 1] = cache.formingBar;
+            renderedBars = cache.renderBars;
             updateStatus();
             return;
         }

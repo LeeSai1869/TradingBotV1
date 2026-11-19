@@ -14,14 +14,14 @@ async def exercise(base,library):
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1800,'height':1200})
         errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
-        page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
+        page.on('console',lambda message:errors.append(f"{message.text} ({message.location})") if message.type=='error' else None)
         requests=[];page.on('request',lambda request:requests.append(request.url))
         await page.route('https://unpkg.com/**',lambda route:route.fulfill(path=str(library),content_type='application/javascript'))
         await page.goto(base);await sign_in(page,'user')
         await page.wait_for_function('window.Composer?.mounted && DataCache.bars.length===2000 && !DataCache._olderPromise')
-        await page.get_by_role('button',name='Open settings',exact=True).click()
+        await page.evaluate("window.dispatchEvent(new CustomEvent('open-feature-settings', {detail:'WMA'}))")
         settings=page.get_by_role('dialog',name='Settings',exact=True)
-        await settings.get_by_role('tab',name='Features',exact=True).click()
+        await settings.get_by_role('button',name='Display',exact=True).click()
         for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI','DI dominance']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
             await settings.get_by_role('button',name=feature,exact=True).click()
             for field in fields:await settings.get_by_label(field,exact=True).check()
@@ -72,6 +72,22 @@ async def exercise(base,library):
         await settings.get_by_role('button',name='Apply',exact=True).click();await settle(page)
         assert await page.evaluate('Composer.config.rsiLevels.lower')==25
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').options().color;})()")=='#12abef'
+        await page.get_by_role('button',name='Volume settings',exact=True).click()
+        await settings.get_by_label('Volume display',exact=True).select_option('line')
+        await settings.get_by_label('Volume width',exact=True).select_option('4')
+        await settings.get_by_label('Volume line style',exact=True).select_option('2')
+        await settings.get_by_label('Volume color',exact=True).fill('#18abfe')
+        await settings.get_by_role('button',name='Apply',exact=True).click();await settle(page)
+        await page.evaluate("""async()=>{
+            const indicators=await import('/overlays/indicators/index.js');
+            const series=indicators.getSeries('volume');
+            const {lineWidth,lineStyle,color}=series.options();
+            if(series.seriesType()!=='Line'||lineWidth!==4||lineStyle!==2||color!=='#18abfe')
+                throw Error('Volume line style did not apply');
+            const bar=DataCache.bars.at(-1);
+            indicators.updateLive(Canvas.chart,{...bar,client:{...bar.client,volume:123.45}});
+            if(series.data().at(-1).value!==123.45)throw Error('Volume line missed live update');
+        }""")
         await page.get_by_role('button',name='Close RSI',exact=True).click();await settle(page)
         assert await page.evaluate('Canvas.chart.panes().length')==5
         assert not await page.get_by_role('group',name='RSI pane controls').count()
@@ -80,6 +96,7 @@ async def exercise(base,library):
         await settle(page)
         assert await page.evaluate('Canvas.chart.panes().length')==5
         assert await page.evaluate('Composer.config.featureStyles.rsi.visible') is False
+        assert await page.evaluate("Composer.config.featureStyles.volume.presentation === 'line' && Composer.config.featureStyles.volume.style === 2")
         assert not errors,errors
         forbidden=['/api/chart_window','/api/flags_current','/api/live_candle']
         assert not any(any(path in url for path in forbidden) for url in requests)

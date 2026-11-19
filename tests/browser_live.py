@@ -16,7 +16,7 @@ STEP = 900000
 def quote(t, close=130):
     return dict(symbol='BTCUSDT',interval='15m',open_time=t,time=t//1000,provisional=True,
         client=dict(symbol='BTCUSDT',interval='15m',open_time=t,close_time=t+STEP-1,
-                    open=125,high=max(131,close+1),low=124,close=close,volume=5),
+                    open=125,high=max(131,close+1),low=min(124,close-1),close=close,volume=close-120),
         features=None,adcn=None)
 
 
@@ -73,12 +73,20 @@ async def exercise_live(base, library):
             assert await page.evaluate('liveSeries.data().at(-1).close') == 132
             print('PASS: history browsing pauses live requests and returning to newest resumes ticks',flush=True)
 
-            # A new forming interval must not jump over a missing audited close.
+            # The live chart advances even if the storage runner misses the turn.
             state['bar']=quote(T+STEP,133)
             await page.evaluate('DataCache.refreshStored()')
             await settle(page)
-            assert await page.evaluate('DataCache.formingBar.time') == T//1000
-            assert await page.evaluate('DataCache.liveStatus') == 'waiting for stored bar'
+            assert await page.evaluate('DataCache.formingBar.time') == (T+STEP)//1000
+            assert await page.evaluate('DataCache.liveStatus') == 'live'
+            assert await page.evaluate('liveAudit.setData') == 0
+            assert await page.evaluate('liveSeries.data().at(-2).close') == 132
+            state['bar']=quote(T+STEP,122)
+            await page.evaluate('DataCache.refreshStored()')
+            await settle(page)
+            assert await page.evaluate('liveSeries.data().at(-1).close') == 122
+            assert await page.evaluate('liveSeries.data().at(-1).low') == 121
+            assert await page.evaluate('liveAudit.setData') == 0
             db.write_klines([quote(T,132)['client']])
             db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=T,ema50=129)])
             await page.evaluate('DataCache.refreshStored()')
@@ -88,13 +96,31 @@ async def exercise_live(base, library):
             assert await page.evaluate('(t)=>DataCache.bars.find(b=>b.open_time === t).features.ema50',T) == 129
             assert await page.evaluate('(t)=>DataCache.bars.find(b=>b.open_time === t).provisional',T) is None
             assert db.count_klines('BTCUSDT','15m') == count+1
-            print('PASS: rollover waits for stored closure, replaces provisional bar once, then follows the next live candle',flush=True)
+            print('PASS: rollover follows the next candle while storage catches up and reconciles the closed candle once',flush=True)
 
             state.update(bar=None,status='unavailable',error='test upstream unavailable')
             await page.evaluate('DataCache.refreshStored()')
             await settle(page)
             assert await page.evaluate('DataCache.liveStatus') == 'unavailable'
             assert 'unavailable' in await page.locator('#status').text_content()
+            await page.evaluate("""async () => {
+                const original = DataCache._fetchPage;
+                const visible = liveSeries.data().length;
+                try {
+                    DataCache._fetchPage = (...args) => new Promise(resolve => {
+                        window.resumeChartReload = () => resolve(original.call(DataCache, ...args));
+                    });
+                    window.chartReload = DataCache.loadInitial(DataCache.symbol, DataCache.timeframe);
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    if (liveSeries.data().length !== visible || !DataCache.loading)
+                        throw Error('Chart cleared while replacement history was loading');
+                    window.resumeChartReload();
+                    await window.chartReload;
+                } finally {
+                    DataCache._fetchPage = original;
+                }
+            }""")
+            print('PASS: existing candles remain visible while replacement history loads',flush=True)
             assert not errors,errors
             assert not [u for u in requests if 'binance.com' in u or '/api/live_candle' in u]
             assert any('/api/bars?' in u and 'live=1' in u for u in requests)

@@ -265,6 +265,24 @@ function renderFeature() {
             input.onchange=()=>{draft.outputs[profileKey][key]=Math.max(min,Math.min(max,Number(input.value)||min));};
         }
     }
+    if (item === 'Volume') {
+        const volume = draft.outputs.volume;
+        const display = el('label', 'Volume display ', content, 'settings-row');
+        const select = el('select', '', display);
+        select.setAttribute('aria-label', 'Volume display');
+        for (const [value, label] of [['histogram', 'Bars'], ['line', 'Line']]) {
+            el('option', label, select).value = value;
+        }
+        select.value = volume.presentation;
+        select.onchange = () => { volume.presentation = select.value; render(); };
+        if (volume.presentation === 'histogram') {
+            const label = el('label', 'Down volume color ', content, 'settings-row');
+            const input = el('input', '', label);
+            input.type = 'color';
+            input.value = volume.downColor;
+            input.oninput = () => { volume.downColor = input.value; };
+        }
+    }
     const table = el("div", "", content, "settings-style-table");
     const heading = el("div", "", table, "settings-style-row settings-style-heading");
     for (const title of ["Output", "Color", item==='Momentum Indicator'?"Size":"Width", item==='Momentum Indicator'?"Shape":"Line style"]) el("span", title, heading);
@@ -303,9 +321,9 @@ function renderFeature() {
             for (const [value, text] of options) { const option = el("option", text, select); option.value = value; }
             select.value = state[field];
             select.onchange = () => { state[field] = Number(select.value); };
-            if (presentation === "histogram") {
+            if (presentation === "histogram" && state.presentation !== "line") {
                 select.disabled = true;
-                select.title = "Bars use color and opacity. Profile length applies to all bins; each bar spans its full price range.";
+                select.title = "Switch Volume display to Line to edit width and line style.";
             }
         }
     }

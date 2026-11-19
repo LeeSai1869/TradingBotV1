@@ -70,6 +70,10 @@ export function normalizeStyles(value = {}) {
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
             };
+            if (key === 'volume') {
+                result[key].presentation = input.presentation === 'line' ? 'line' : 'histogram';
+                result[key].downColor = /^#[0-9a-f]{6}$/i.test(input.downColor) ? input.downColor : '#ef5350';
+            }
             if(presentation==='zone')result[key].scores=typeof input.scores==='boolean'?input.scores:true;
             if(['zone','profile'].includes(presentation))result[key].opacity=Number.isFinite(input.opacity)?Math.max(0,Math.min(100,input.opacity)):(presentation==='profile'?65:20);
             if(['inst_support_zones','inst_resistance_zones'].includes(key))result[key].higher=typeof input.higher==='boolean'?input.higher:true;

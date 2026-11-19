@@ -148,17 +148,30 @@ test('forming price shares the bar shape but never enters permanent cached rows'
     assert.equal(c.renderBars.at(-1).features,null);assert.equal(op,'live');
 });
 
-test('rollover waits for audited closure and replaces provisional bar exactly once',async()=>{
+test('live rollover advances before storage catches up and replaces provisional bars exactly once',async()=>{
     const c=cache();c.bars=[closed(60)];c._latestSignature=JSON.stringify(c.bars);
     c._applyLive({bar:provisional(120),status:'live'});
     c._fetchPage=async()=>({bars:[closed(60)],live:{bar:provisional(180),status:'live'}});
     await c.refreshStored();
-    assert.equal(c.formingBar.time,120);assert.equal(c.liveStatus,'waiting for stored bar');
+    assert.equal(c.formingBar.time,180);assert.equal(c.liveStatus,'live');
+    assert.deepEqual(Array.from(c.renderBars,b=>b.time),[60,120,180]);
+    assert.equal(c.bars.length,1);
     c._fetchPage=async()=>({bars:[closed(60),closed(120)],live:{bar:provisional(180),status:'live'}});
     await c.refreshStored();
     assert.deepEqual(Array.from(c.renderBars,b=>b.time),[60,120,180]);
     assert.equal(c.renderBars[1].provisional,undefined);
     assert.equal(c.formingBar.time,180);
+});
+
+test('live-only chart retains a bounded tail while storage is empty',()=>{
+    const c=cache();
+    for (let t=60;t<=360;t+=60) c._applyLive({bar:provisional(t),status:'live'});
+    assert.deepEqual(Array.from(c.renderBars,b=>b.time),[180,240,300,360]);
+    assert.equal(c.bars.length,0);
+    c._applyLive({bar:provisional(300),status:'live'});
+    assert.equal(c.formingBar.time,360);
+    c._applyLive({status:'inactive'});
+    assert.equal(c.renderBars.length,0);
 });
 
 test('stale forming response cannot follow a new symbol selection',async()=>{

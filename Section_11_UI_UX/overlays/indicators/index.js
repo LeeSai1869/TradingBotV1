@@ -23,6 +23,20 @@ function positionHeaders(){
     const outer=document.getElementById('chart').getBoundingClientRect();
     for(const state of groups.values())if(state.header){const row=state.pane.getHTMLElement();if(row){row.dataset.featurePane=state.feature;state.header.style.top=(row.getBoundingClientRect().top-outer.top+5)+'px';}}
 }
+function addOutput(state, presentation) {
+    return chart.addSeries(presentation === 'histogram' ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries,
+        {visible: false, title: '', priceLineVisible: false, lastValueVisible: true,
+         crosshairMarkerVisible: true, priceFormat: featurePriceFormat}, state.pane?.paneIndex() ?? 0);
+}
+function indicatorPoint(bar, key, style) {
+    const n = value(bar, key);
+    if (n === null) return {time: bar.time};
+    const point = {time: bar.time, value: n};
+    if (key === 'volume' && style.presentation !== 'line') {
+        point.color = bar.client.close >= bar.client.open ? style.color : (style.downColor ?? '#ef5350');
+    }
+    return point;
+}
 function create(feature){
     const state={feature,lines:new Map(),pane:['VWAP','WMA','Volume Profile','Market Structure'].includes(feature)?null:chart.addPane(true),header:null,collapsed:false,levels:[]};
     if(state.pane){
@@ -43,12 +57,11 @@ function create(feature){
         state.toggle.dataset.featureToggle='';
         button(`Close ${feature}`,'×',header,()=>window.dispatchEvent(new CustomEvent('feature-legend-action',{detail:{feature,action:'remove'}})));
     }
-    for(const [key,label,,presentation='line'] of FEATURE_STYLES[feature].outputs){
+    for(const [key,,,presentation='line'] of FEATURE_STYLES[feature].outputs){
         if(['zone','profile'].includes(presentation))continue;
-        const line=chart.addSeries(presentation==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,
-            {visible:false,title:'',priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:true,
-             priceFormat:featurePriceFormat},state.pane?.paneIndex()??0);
-        state.lines.set(key,line);
+        const type = key === 'volume' ? (styles()[key]?.presentation ?? presentation) : presentation;
+        state.lines.set(key, addOutput(state, type));
+        if (key === 'volume') state.volumePresentation = type;
     }
     groups.set(feature,state);
     if(state.pane){const node=state.pane.getHTMLElement();if(node)observer.observe(node);}
@@ -89,17 +102,21 @@ export function update(instance,data){
             state.toggle.textContent=hidden?'◉':'◎';state.toggle.setAttribute('aria-label',label);state.toggle.title=label;
             state.toggle.setAttribute('aria-pressed',String(!hidden));
         }
-        for(const [key,line] of state.lines){
-            const style=styles()[key];line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
+        for(const [key,output] of state.lines){
+            const style = styles()[key];
+            let line = output;
+            const presentation = style?.presentation ?? 'histogram';
+            if (key === 'volume' && state.volumePresentation !== presentation) {
+                line = addOutput(state, presentation);
+                chart.removeSeries(output);
+                state.lines.set(key, line);
+                state.volumePresentation = presentation;
+            }
+            line.applyOptions({visible:!!style?.visible && !state.collapsed,color:style?.color,
                 priceFormat:featurePriceFormat,
                 lineWidth:style?.width||2,lineStyle:style?.style||0,lastValueVisible:!!style?.visible && !state.collapsed});
             if(!style?.visible)continue;
-            line.setData((data.bars||[]).map(bar=>{
-                const n=value(bar,key);if(n===null)return {time:bar.time};
-                const point={time:bar.time,value:n};
-                if(key==='volume')point.color=bar.client.close>=bar.client.open?style.color:'#ef5350';
-                return point;
-            }));
+            line.setData((data.bars||[]).map(bar => indicatorPoint(bar, key, style)));
         }
         levels(state);
     }
@@ -109,10 +126,8 @@ export function updateLive(instance,bar){
     if(!bar)return;
     latestBar=bar;barsByTime.set(bar.time,bar);values();
     for(const state of groups.values())for(const [key,line] of state.lines){
-        if(!styles()[key]?.visible)continue;
-        const n=value(bar,key);const point=n===null?{time:bar.time}:{time:bar.time,value:n};
-        if(key==='volume' && n!==null)point.color=bar.client.close>=bar.client.open?styles()[key].color:'#ef5350';
-        line.update(point);
+        const style = styles()[key];
+        if (style?.visible) line.update(indicatorPoint(bar, key, style));
     }
 }
 export function getSeries(key){for(const state of groups.values())if(state.lines.has(key))return state.lines.get(key);return null;}

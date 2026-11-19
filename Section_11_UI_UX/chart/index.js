@@ -17,7 +17,7 @@ const Canvas = {
             },
             grid: { vertLines: { color: "#222222" }, horzLines: { color: "#222222" } },
             rightPriceScale: { borderColor: "#444444" },
-            timeScale: { borderColor: "#444444", timeVisible: true, secondsVisible: false },
+            timeScale: { borderColor: "#444444", timeVisible: true, secondsVisible: false, shiftVisibleRangeOnNewBar: false },
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
             attributionLogo: true,
         });

@@ -5,6 +5,7 @@ export const name = "candles";
 let series = null;
 let currentPriceLine = null;
 let currentPriceRay = null;
+let renderedBars = [];
 
 // A native price line spans the entire pane. Draw the live-price ray ourselves
 // so it begins at the newest candle, with a dotted reference in history.
@@ -56,6 +57,8 @@ let priceFormat = {
 };
 
 export function mount(chart) {
+    renderedBars = [];
+    currentPriceLine = null;
     series = chart.addSeries(
         LightweightCharts.CandlestickSeries,
         {
@@ -73,11 +76,29 @@ export function mount(chart) {
     series.attachPrimitive(currentPriceRay);
 }
 
-function _toPoints(bars) {
-    return (bars || []).map(bar => ({
-        ...bar.client,
-        time: bar.time,
-    }));
+function point(bar) {
+    const { open, high, low, close } = bar.client;
+    return { time: bar.time, open, high, low, close };
+}
+
+function sameCandle(a, b) {
+    return a === b || (a.time === b.time &&
+        a.client.open === b.client.open && a.client.high === b.client.high &&
+        a.client.low === b.client.low && a.client.close === b.client.close);
+}
+
+function updateData(bars, reset) {
+    let firstChange = 0;
+    while (firstChange < Math.min(renderedBars.length, bars.length) &&
+        sameCandle(renderedBars[firstChange], bars[firstChange])) firstChange++;
+
+    if (reset || bars.length < renderedBars.length || firstChange < renderedBars.length - 1 ||
+        (firstChange < renderedBars.length && renderedBars[firstChange].time !== bars[firstChange].time)) {
+        series.setData(bars.map(point));
+    } else {
+        for (let i = firstChange; i < bars.length; i++) series.update(point(bars[i]));
+    }
+    renderedBars = bars;
 }
 
 function updateCurrentPrice(bar) {
@@ -99,13 +120,12 @@ function updateCurrentPrice(bar) {
     else currentPriceLine = series.createPriceLine(options);
 }
 
-// Full historical packet replacement.
-// Used for initial load, symbol change, timeframe change and explicit reload.
+// Replace the series on reload or when history changes beyond its right edge.
 export function update(chart, data, options = {}) {
     if (!series) return;
 
     series.applyOptions({ ...window.Composer?.config.candleStyle, visible: options.visible !== false });
-    series.setData(_toPoints(data.bars));
+    updateData(data.bars || [], options.op === "reload");
     updateCurrentPrice(data.bars?.at(-1));
 
     // Only an explicit reload establishes autoscale. Prefetch preserves
@@ -124,7 +144,8 @@ export function update(chart, data, options = {}) {
 // A forming-price tick updates one point, without rebuilding history/EMA/markers.
 export function updateLive(chart, bar) {
     if (!series || !bar) return;
-    series.update({ ...bar.client, time: bar.time });
+    series.update(point(bar));
+    renderedBars = [...renderedBars.slice(0, -1), bar];
     updateCurrentPrice(bar);
 }
 

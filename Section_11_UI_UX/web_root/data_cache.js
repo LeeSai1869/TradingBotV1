@@ -2,6 +2,7 @@
 // Retain visited history for smooth reversal; only fetch the next older page.
 const WINDOW_BARS = 1000;
 const BLOCK_BARS = 500;
+const LIVE_TAIL_BARS = 4;
 
 const DataCache = {
     symbol: null,
@@ -9,7 +10,7 @@ const DataCache = {
     bars: [],
     liveEnabled: true,
     historyPending: false,
-    formingBar: null,
+    liveBars: [],
     featureProgress: null,
     volumeProfile: null,
     liquidity:null,
@@ -33,31 +34,35 @@ const DataCache = {
     _storageEpoch: "0:0",
     listeners: [],
 
+    get formingBar() {
+        return this.liveBars.at(-1) ?? null;
+    },
+
     get renderBars() {
-        return this.formingBar ? [...this.bars, this.formingBar] : this.bars;
+        return this.liveBars.length ? [...this.bars, ...this.liveBars] : this.bars;
     },
 
     _applyLive(live) {
-        const previous = JSON.stringify([this.formingBar, this.liveStatus]);
+        const previous = JSON.stringify([this.liveBars, this.liveStatus]);
         const latest = this.bars.at(-1);
-        if (!this.liveEnabled || !latest || this.formingBar?.open_time <= latest.open_time) {
-            this.formingBar = null;
-        }
-        if (live && this.liveEnabled) {
-            this.liveStatus = live.status;
-            if (live.status === "inactive") this.formingBar = null;
-            const candidate = live.bar;
-            if (candidate && latest) {
-                // Do not jump over missing audited history. At rollover keep
-                // the prior provisional bar until the store replaces it.
-                if (candidate.open_time === latest.client.close_time + 1) {
-                    this.formingBar = candidate;
-                } else if (candidate.open_time > latest.open_time) {
-                    this.liveStatus = "waiting for stored bar";
+        if (!this.liveEnabled || live?.status === "inactive") {
+            this.liveBars = [];
+        } else {
+            // Stored bars replace overlapping previews. A bounded tail keeps
+            // rollover visible even when the storage runner is behind.
+            if (latest) this.liveBars = this.liveBars.filter(bar => bar.open_time > latest.open_time);
+            const candidate = live?.bar;
+            if (candidate && (!latest || candidate.open_time > latest.open_time)) {
+                const last = this.formingBar;
+                if (!last || candidate.open_time > last.open_time) {
+                    this.liveBars = [...this.liveBars, candidate].slice(-LIVE_TAIL_BARS);
+                } else if (candidate.open_time === last.open_time) {
+                    this.liveBars[this.liveBars.length - 1] = candidate;
                 }
             }
         }
-        return previous !== JSON.stringify([this.formingBar, this.liveStatus]);
+        if (live && this.liveEnabled) this.liveStatus = live.status;
+        return previous !== JSON.stringify([this.liveBars, this.liveStatus]);
     },
 
     subscribe(fn) { this.listeners.push(fn); },
@@ -136,17 +141,22 @@ const DataCache = {
         this.atLiveEdge = range.to >= this.bars.length - 2;
     },
 
-    async loadInitial(symbol, timeframe, before=null) {
+    async loadInitial(symbol, timeframe, before=null, { preserveViewport = false } = {}) {
         const generation = ++this._reloadGeneration;
-        Object.assign(this, { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
-            nextBefore: null, loading: true, atLiveEdge: true, error: null,
+        const initialState = { symbol, timeframe, bars: [], activeBars: [], latestBar: null,
+            nextBefore: null, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
-            historyPending: false, formingBar: null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, liveBars: preserveViewport ? this.liveBars : [],
+            volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{},
+            liveStatus: preserveViewport ? this.liveStatus : (this.liveEnabled ? "loading" : "disabled") };
+        this.loading = true;
+        if (!preserveViewport) Object.assign(this, initialState);
         this.emit("loading");
         try {
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
             if (generation !== this._reloadGeneration) return false;
+            if (preserveViewport) Object.assign(this, initialState);
             this.featureProgress=packet.feature_progress??null;
             this.srSnapshot=packet.sr_snapshot??null;
             this.srFrames=packet.sr_frames??{};
@@ -163,7 +173,7 @@ const DataCache = {
             this._applyLive(packet.live);
             if(before!==null)this.atLiveEdge=false;
             this.loading = false;
-            this.emit("reload");
+            this.emit(preserveViewport ? "stored-refresh" : "reload");
             return true;
         } finally {
             if (generation === this._reloadGeneration) this.loading = false;
@@ -220,12 +230,14 @@ const DataCache = {
             }
             const wasHistoryPending=this.historyPending;
             const historyChanged=this.historyPending!==!!packet.history_pending;
-            this.historyPending=!!packet.history_pending;
-            if(wasHistoryPending&&!this.historyPending)return this.loadInitial(this.symbol,this.timeframe);
+            if (wasHistoryPending && !packet.history_pending) {
+                return this.loadInitial(this.symbol, this.timeframe, null, { preserveViewport: true });
+            }
             const prior=this.latestBar;
             if(prior?.client?.close_time && packet.bars.length && packet.bars[0].open_time>prior.client.close_time+1){
-                return this.loadInitial(this.symbol,this.timeframe);
+                return this.loadInitial(this.symbol,this.timeframe, null, { preserveViewport: true });
             }
+            this.historyPending=!!packet.history_pending;
             const progressChanged=JSON.stringify(this.featureProgress)!==JSON.stringify(packet.feature_progress??null);
             if(limit<WINDOW_BARS&&this.featureProgress&&this.featureProgress.status!=='features current'&&packet.feature_progress?.status==='features current')++this._fullRefreshVersion;
             this.featureProgress=packet.feature_progress??null;
@@ -242,7 +254,7 @@ const DataCache = {
             if (changed) {
                 this._latestSignature = signature;
                 this._merge(packet.bars);
-                this.latestBar = packet.bars.at(-1) || null;
+                this.latestBar = this.bars.at(-1) || null;
             }
             const liveChanged = this._applyLive(packet.live);
             if (changed) this.emit("stored-refresh");
