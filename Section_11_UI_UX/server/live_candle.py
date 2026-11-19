@@ -52,6 +52,7 @@ class FormingCandleCache:
         self.wall_clock = wall_clock
         self._lock = threading.Lock()
         self._entries = {}
+        self._features = ThreadPoolExecutor(max_workers=2, thread_name_prefix="forming-features")
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="forming-candle")
 
     def snapshot(self, symbol, interval):
@@ -68,7 +69,7 @@ class FormingCandleCache:
                 if len(self._entries) >= 64:
                     return {"bar": None, "status": "unavailable", "error": "Live feed busy"}
                 entry = {"bar": None, "requested": float('-inf'), "received": float('-inf'),
-                         "as_of": None, "pending": False, "error": None}
+                         "as_of": None, "pending": False, "feature_pending":False, "quote_id":0, "error": None}
                 self._entries[key] = entry
             if not entry['pending'] and now - entry['requested'] >= self.poll_seconds:
                 entry['pending'] = True
@@ -105,16 +106,15 @@ class FormingCandleCache:
                 # restore/deepcopy/indicator work. Readers must never wait for it.
                 first_tick=entry['bar'] is None or entry['bar']['open_time']!=open_time
                 with self._lock:
+                    entry['quote_id']+=1
+                    quote_id=entry['quote_id']
                     entry.update(bar={**bar, 'features_status': 'calculating'},
                         received=received, as_of=as_of, error=None)
-                try:
-                    from .live_features import calculate
-                    bar['features'] = calculate(symbol, interval, bar['client'],is_new=first_tick)
-                    bar['features_status'] = 'provisional' if bar['features'] else 'waiting for stored history'
-                except Exception as feature_error:
-                    # Missing dependencies/history must not interrupt the price feed.
-                    bar['features_status'] = 'unavailable'
-                    bar['features_error'] = str(feature_error)
+                with self._lock:
+                    if not entry['feature_pending']:
+                        entry['feature_pending']=True
+                        self._features.submit(self._calculate_features,key,entry,bar,first_tick,quote_id)
+                return
             with self._lock:
                 entry.update(bar=bar, received=received, as_of=as_of, error=None)
         except Exception as error:
@@ -124,8 +124,21 @@ class FormingCandleCache:
             with self._lock:
                 entry['pending'] = False
 
+    def _calculate_features(self,key,entry,bar,first_tick,quote_id):
+        try:
+            from .live_features import calculate
+            result={**bar,'features':calculate(*key,bar['client'],is_new=first_tick)}
+            result['features_status']='provisional' if result['features'] else 'waiting for stored history'
+        except Exception as error:
+            result={**bar,'features_status':'unavailable','features_error':str(error)}
+        finally:
+            with self._lock:
+                if entry['quote_id']==quote_id:entry['bar']=result
+                entry['feature_pending']=False
+
     def close(self):
         self._pool.shutdown(wait=True)
+        self._features.shutdown(wait=True)
 
 
 _LIVE = FormingCandleCache()

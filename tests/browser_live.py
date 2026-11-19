@@ -80,6 +80,10 @@ async def exercise_live(base, library):
             await settle(page)
             assert await page.evaluate('DataCache.formingBar.time') == T//1000
             assert await page.evaluate('DataCache.liveStatus') == 'waiting for stored bar'
+            assert 'Live price: 133' in await page.locator('#status').text_content()
+            assert await page.evaluate("liveSeries.priceLines().find(line=>line.options().title==='Live').options().price")==133
+            assert await page.evaluate('liveSeries.data().at(-1).time') == T//1000
+            print('PASS: independent live price remains visible while stored candle rollover is behind',flush=True)
             db.write_klines([quote(T,132)['client']])
             db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=T,ema50=129)])
             await page.evaluate('DataCache.refreshStored().then(()=>DataCache.refreshLive())')
