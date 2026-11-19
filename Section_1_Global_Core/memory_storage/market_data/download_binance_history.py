@@ -22,6 +22,7 @@ Interruptible. Re-run to resume from the last stored bar.
 from __future__ import annotations
 
 from Section_1_Global_Core import data_policy
+from Section_1_Global_Core.memory_storage.Storage import klines_store
 
 import sqlite3
 import time
@@ -136,45 +137,8 @@ def insert_page(conn, symbol, interval, page, now_ms):
 
 
 def _insert_page(conn, symbol, interval, page, now_ms):
-    """
-    Insert a page of klines. Skips any candle whose close_time >= now_ms.
+    return klines_store.insert_binance_page(conn, symbol, interval, page, now_ms)
 
-    This is the ONLY place the closed-candle invariant is enforced.
-    The caller passes the raw Binance page; this function decides
-    what is safe to store.
-
-    Returns rows actually written (deduped by PK).
-    """
-    rows = []
-    for k in page:
-        close_time = int(k[6])
-        if close_time >= now_ms:
-            continue
-        rows.append((
-            symbol,
-            interval,
-            int(k[0]),
-            float(k[1]),
-            float(k[2]),
-            float(k[3]),
-            float(k[4]),
-            float(k[5]),
-            close_time,
-        ))
-
-    if not rows:
-        return 0
-
-    cur = conn.executemany(
-        """
-        INSERT OR IGNORE INTO klines
-        (symbol, interval, open_time, open, high, low, close, volume, close_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        rows,
-    )
-    conn.commit()
-    return cur.rowcount
 
 
 # ==============================================================================

@@ -20,11 +20,8 @@ async function loadAll() {
     const timeframe = timeframeControl.value();
     status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
-        await DataCache.loadInitial(symbol, timeframe);
-        // Keep an older buffer ready even though the readable initial view
-        // now contains fewer candles than the cached active window.
-        for (let page = 0; page < 2 && id === loadId && DataCache.nextBefore !== null; page++) {
-            await DataCache.prefetchOlder();
+        if (await DataCache.loadInitial(symbol, timeframe) && id === loadId) {
+            await DataCache.prefetchOlder({limit: 1000});
         }
     } catch (error) {
         if (id === loadId) status().textContent = `Error: ${error.message}`;
@@ -81,7 +78,7 @@ async function loadAll() {
         pending = null;
         if(op==='live'&&!reset&&!latest&&renderedScope===`${DataCache.symbol}:${DataCache.timeframe}`&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
             Composer.updateLive(chart,DataCache);
-            renderedBars[renderedBars.length-1]=DataCache.formingBar;
+            renderedBars=DataCache.renderBars;
             updateStatus();return;
         }
         rendering = true;
@@ -107,7 +104,7 @@ async function loadAll() {
             }
             // All consumers receive the same canonical bars. No visual fetches
             // its own candles/features/decisions, and no visible history is evicted.
-            Composer.updateAll(chart, { ...DataCache, bars }, op, { resetViewport: reset });
+            Composer.updateAll(chart, { ...DataCache, formingBar: DataCache.formingBar, bars }, op, { resetViewport: reset });
             renderedBars = bars;renderedScope=`${DataCache.symbol}:${DataCache.timeframe}`;needsRecovery=false;
             if(DataCache.error===renderError)DataCache.error=null;
             renderError=null;
@@ -134,12 +131,13 @@ async function loadAll() {
     DataCache.subscribe((cache, op) => {
         if (op === "loading") latestControl.update(chart, cache);
         if (op === "error") { updateStatus(); return; }
+        if (op === "liquidity" && !pending && !rendering) { Composer.updateLiquidity(chart, cache); return; }
         if(op==='quote'){Composer.visuals.find(v=>v.name==='candles')?.updateQuote?.(chart,cache.liveQuote||cache.latestBar);updateStatus();return;}
         if (op === "live" && !rendering && !pending && renderedScope===`${cache.symbol}:${cache.timeframe}` && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {
             Composer.updateLive(chart, cache);
-            renderedBars[renderedBars.length - 1] = cache.formingBar;
+            renderedBars = cache.renderBars;
             updateStatus();
             return;
         }

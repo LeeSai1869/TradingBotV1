@@ -248,9 +248,9 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
         return {"bars": [], "next_before": None}
     conn = _read_connection(klines_store.DB_PATH)
     try:
-        rows = klines_store.read_page(conn, symbol, interval, limit + 2, before=before)
+        rows = klines_store.read_page(conn, symbol, interval, limit + 2, before=before, include_quote_volume=True)
         if analysis_reference is not None and any(row[2]==analysis_reference for row in rows[:2]):
-            rows=klines_store.read_page(conn,symbol,interval,2,before=rows[0][2])+rows
+            rows=klines_store.read_page(conn,symbol,interval,2,before=rows[0][2],include_quote_volume=True)+rows
         cursor=klines_store.history_cursor(conn,symbol,interval)
     finally:
         conn.close()
@@ -264,7 +264,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
     decisions_by_time = {int(row["open_time"]): row for row in decisions}
     bars = []
     for row in rows:
-        client = dict(zip(_KLINE_COLUMNS, row))
+        client = dict(zip((*_KLINE_COLUMNS, "quote_volume"), row))
         open_time = int(client["open_time"])
         bars.append({
             "symbol": symbol, "interval": interval, "open_time": open_time,

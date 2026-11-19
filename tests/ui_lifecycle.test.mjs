@@ -148,12 +148,13 @@ test('forming price shares the bar shape but never enters permanent cached rows'
     assert.equal(c.renderBars.at(-1).features,null);assert.equal(op,'live');
 });
 
-test('rollover waits for audited closure and replaces provisional bar exactly once',async()=>{
+test('rollover advances before stored closure and replaces provisional bars exactly once',async()=>{
     const c=cache();c.bars=[closed(60)];c._latestSignature=JSON.stringify(c.bars);
     c._applyLive({bar:provisional(120),status:'live'});
     c._fetchPage=async()=>({bars:[closed(60)],live:{bar:provisional(180),status:'live'}});
     await c.refreshStored();
-    assert.equal(c.formingBar.time,120);assert.equal(c.liveStatus,'waiting for stored bar');
+    assert.equal(c.formingBar.time,180);assert.equal(c.liveStatus,'live');
+    assert.deepEqual(Array.from(c.renderBars,b=>b.time),[60,120,180]);
     c._fetchPage=async()=>({bars:[closed(60),closed(120)],live:{bar:provisional(180),status:'live'}});
     await c.refreshStored();
     assert.deepEqual(Array.from(c.renderBars,b=>b.time),[60,120,180]);

@@ -105,41 +105,8 @@ def _fetch(symbol, interval, start_ms):
 
 
 def _insert(conn, symbol, interval, page, now_ms):
-    """
-    Insert a page of klines. Skips any candle whose close_time >= now_ms.
+    return klines_store.insert_binance_page(conn, symbol, interval, page, now_ms)
 
-    This is the ONLY place the closed-candle invariant is enforced.
-    """
-    rows = []
-    for k in page:
-        close_time = int(k[6])
-        if close_time >= now_ms:
-            continue
-        rows.append((
-            symbol,
-            interval,
-            int(k[0]),
-            float(k[1]),
-            float(k[2]),
-            float(k[3]),
-            float(k[4]),
-            float(k[5]),
-            close_time,
-        ))
-
-    if not rows:
-        return 0
-
-    cur = conn.executemany(
-        """
-        INSERT OR IGNORE INTO klines
-        (symbol, interval, open_time, open, high, low, close, volume, close_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        rows,
-    )
-    conn.commit()
-    return cur.rowcount
 
 
 def _pair_epoch(symbol,interval):

@@ -24,6 +24,30 @@ from ...paths import data_path
 DB_PATH = data_path('storage/klines.db',Path(__file__).resolve().parent / "klines.db")
 
 
+def has_quote_volume(conn):
+    return any(row[1] == 'quote_volume' for row in conn.execute('PRAGMA table_info(klines)'))
+
+
+def ensure_quote_volume(conn):
+    if has_quote_volume(conn):
+        return
+    try:
+        conn.execute('ALTER TABLE klines ADD COLUMN quote_volume REAL')
+    except sqlite3.OperationalError:
+        # Another writer may have added the column while we waited.
+        if not has_quote_volume(conn):
+            raise
+
+
+def insert_binance_page(conn, symbol, interval, page, now_ms):
+    return insert_rows(conn, (
+        dict(symbol=symbol, interval=interval, open_time=k[0], open=k[1], high=k[2],
+             low=k[3], close=k[4], volume=k[5], close_time=k[6],
+             quote_volume=k[7] if len(k) > 7 else None)
+        for k in page if int(k[6]) < now_ms
+    ))
+
+
 def open_db() -> sqlite3.Connection:
     return sqlite3.connect(str(DB_PATH), timeout=10)
 
@@ -66,7 +90,7 @@ def read_last_n(conn, symbol, interval, n: int):
     return list(reversed(rows))
 
 
-def read_page(conn, symbol, interval, limit, *, before=None):
+def read_page(conn, symbol, interval, limit, *, before=None, include_quote_volume=False):
     """Latest stored rows, or rows strictly before an existing candle key.
 
     Count rows rather than estimating a duration: gaps and calendar months
@@ -80,9 +104,12 @@ def read_page(conn, symbol, interval, limit, *, before=None):
         where += " AND open_time<?"
         params.append(before)
     params.append(limit)
+    quote_column = ''
+    if include_quote_volume:
+        quote_column = ', quote_volume' if has_quote_volume(conn) else ', NULL'
     rows = conn.execute(
         "SELECT symbol, interval, open_time, open, high, low, close, "
-        f"volume, close_time FROM klines WHERE {where} "
+        f"volume, close_time{quote_column} FROM klines WHERE {where} "
         "ORDER BY open_time DESC LIMIT ?", params,
     ).fetchall()
     return list(reversed(rows))
@@ -145,15 +172,22 @@ def insert_rows(conn, rows: Iterable[dict]) -> int:
             r["symbol"], r["interval"], int(r["open_time"]),
             float(r["open"]), float(r["high"]), float(r["low"]),
             float(r["close"]), float(r["volume"]), int(r["close_time"]),
+            float(r["quote_volume"]) if r.get("quote_volume") is not None else None,
         ))
     if not batch:
         return 0
+    ensure_quote_volume(conn)
     cur = conn.executemany(
         "INSERT OR IGNORE INTO klines "
-        "(symbol, interval, open_time, open, high, low, close, volume, close_time) "
-        "VALUES (?,?,?,?,?,?,?,?,?)",
+        "(symbol, interval, open_time, open, high, low, close, volume, close_time, quote_volume) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
         batch,
     )
+    if cur.rowcount < len(batch):
+        conn.executemany(
+            "UPDATE klines SET quote_volume=? WHERE symbol=? AND interval=? AND open_time=? AND quote_volume IS NULL",
+            ((row[9], *row[:3]) for row in batch if row[9] is not None),
+        )
     conn.commit()
     return cur.rowcount
 

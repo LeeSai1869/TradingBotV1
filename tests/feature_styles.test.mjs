@@ -29,9 +29,9 @@ test('live EMA ticks replace the current point without rebuilding history', asyn
     const overlay = await import('../Section_11_UI_UX/overlays/ema50/index.js');
     globalThis.LightweightCharts = {LineSeries: {}};
     const lines = [];
-    overlay.mount({addSeries() {
+    overlay.mount({addSeries(type, options) {
         const points = new Map();
-        const line = {points, update(point) {points.set(point.time, point);}};
+        const line = {points, options: () => options, update(point) {points.set(point.time, point);}};
         lines.push(line);return line;
     }});
     overlay.updateLive(null, {time: 60, features: {ema50: 101}});
