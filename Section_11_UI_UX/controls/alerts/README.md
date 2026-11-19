@@ -50,7 +50,7 @@ status. **Settings → Coins** has the same switches per coin. Desktop delivery
 requires the master switch AND the timeframe AND the coin to allow it. Switching
 off Desktop suppresses OS popups and in-app toasts for that scope. It does not
 change downloads, calculations, sound choices or durable activity recording.
-Mobile stays disabled until the laptop HTTPS/push setup is complete. See docs/MOBILE_SETUP.md for the private 4–5-person setup; no rented server is required.
+Mobile stays disabled until the laptop HTTPS/push setup is complete. See MOBILE_SETUP.md for the private 4–5-person setup; no rented server is required.
 Notification switches are per account; download policy retains its admin checks.
 
 ## Sounds
@@ -79,7 +79,7 @@ lag also means alert lag. No old downloaded history is announced as a new signal
 App logout does not stop independent calculation/recording services. Desktop browser
 sound/notifications still require an open, signed-in app. Enrolled mobile Web Push works with the phone app closed. Reopening shows history
 without replaying old sounds. Existing login agents stop at macOS logout; see
-docs/SERVER_MODE.md for reviewed system-service exports. No phone services or system
+SERVER_MODE.md for reviewed system-service exports. No phone services or system
 jobs are installed by a code update.
 
 Rules, preferences, uploads and events live in ~/.tradingbot/alerts.sqlite3,
@@ -106,7 +106,7 @@ candle. Recent activity also links to the chart. Phone OS banner lifetime is
 controlled by the phone, rather than an unreliable background JavaScript timer.
 
 The companion is at /web_root/mobile.html. Once the private HTTPS address,
-optional packaging/requirements/mobile.txt and VAPID configuration are ready, users install
+optional requirements-mobile.txt and VAPID configuration are ready, users install
 it and explicitly enroll their phones. A separate worker performs encrypted Web
 Push without blocking calculations or alert evaluation. Subscription ownership,
 provider endpoint validation, retry/expiry and device removal are tested. Default
@@ -122,8 +122,8 @@ Desktop permission and the existing sound enable/volume preferences still apply.
 Regression checks:
 
 ```bash
-node Section_13_Development/tests/alert_feed.test.mjs
-PYTHONPATH=. python3 Section_13_Development/tests/browser_alert_delivery.py
+node tests/alert_feed.test.mjs
+PYTHONPATH=. python3 tests/browser_alert_delivery.py
 ```
 
 The browser test uses the actual alert control with mocked API, OS notification and

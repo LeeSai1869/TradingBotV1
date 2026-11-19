@@ -30,7 +30,7 @@ def status():
         cfg=configuration()
         if not cfg:return {'ready':False,'reason':'HTTPS address and push keys have not been configured','public_key':None,'origin':None}
         ready=bool(cfg.get('public_key') and Path(cfg.get('private_key_file','')).is_file() and cfg.get('contact') and importlib.util.find_spec('pywebpush'))
-        return {'ready':ready,'reason':'' if ready else 'Install packaging/requirements/mobile.txt and configure push keys','public_key':cfg.get('public_key') if ready else None,'origin':cfg.get('origin')}
+        return {'ready':ready,'reason':'' if ready else 'Install requirements-mobile.txt and configure push keys','public_key':cfg.get('public_key') if ready else None,'origin':cfg.get('origin')}
     except (ValueError,OSError):return {'ready':False,'reason':'Mobile push configuration needs attention','public_key':None,'origin':None}
 
 
