@@ -59,3 +59,10 @@ reports worker availability and pending status. Stored metadata refreshes skip
 unchanged candle/EMA/indicator/marker datasets; live ticks queued behind another
 render keep their incremental path. Real stored-row changes and settings still
 refresh the complete relevant series.
+
+The current-price ray falls back to the latest plotted candle when an independent
+quote is ahead of the stored time axis. If that anchor is unavailable/offscreen,
+a dotted horizontal reference remains visible. The numeric price stays current,
+extra price-line text remains blank, and no provisional candle is invented across
+a storage gap. Drawing uses the retained last-plotted timestamp without copying
+series history on each paint.
