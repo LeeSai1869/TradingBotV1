@@ -5,6 +5,7 @@ export const name = "candles";
 let series = null;
 let currentPriceLine = null;
 let currentPriceRay = null;
+let latestPlottedTime = null;
 
 // A native price line spans the entire pane. Draw the live-price ray ourselves
 // so it begins at the newest candle, with a dotted reference in history.
@@ -31,10 +32,14 @@ class CurrentPriceRay {
     draw(target) {
         if (!this.bar || !this.series?.options().visible) return;
         const y = this.series.priceToCoordinate(this.bar.client.close);
-        const x = this.chart.timeScale().timeToCoordinate(this.bar.time);
-        if (y === null || x === null) return;
+        const scale=this.chart.timeScale();
+        const quoteX=scale.timeToCoordinate(this.bar.time);
+        // A quote can lead committed candles. It still owns the current price,
+        // but its timestamp need not exist on the stored chart's time axis.
+        const x=quoteX??(latestPlottedTime!=null?scale.timeToCoordinate(latestPlottedTime):null);
+        if (y === null || !Number.isFinite(y)) return;
         target.useMediaCoordinateSpace(({ context, mediaSize }) => {
-            const visible = x >= 0 && x <= mediaSize.width;
+            const visible = Number.isFinite(x) && x >= 0 && x <= mediaSize.width;
             context.save();
             context.strokeStyle = this.bar.client.close >= this.bar.client.open
                 ? this.series.options().upColor : this.series.options().downColor;
@@ -56,6 +61,7 @@ let priceFormat = {
 };
 
 export function mount(chart) {
+    latestPlottedTime=null;
     series = chart.addSeries(
         LightweightCharts.CandlestickSeries,
         {
@@ -107,6 +113,7 @@ export function update(chart, data, options = {}) {
 
     series.applyOptions({ ...window.Composer?.config.candleStyle, visible: options.visible !== false });
     series.setData(_toPoints(data.bars));
+    latestPlottedTime=data.bars?.at(-1)?.time??null;
     updateCurrentPrice(data.liveQuote||data.bars?.findLast(bar=>!bar.provisional));
 
     // Only an explicit reload establishes autoscale. Prefetch preserves
@@ -126,6 +133,7 @@ export function update(chart, data, options = {}) {
 export function updateLive(chart, bar) {
     if (!series || !bar) return;
     series.update({ ...bar.client, time: bar.time });
+    latestPlottedTime=bar.time;
     updateCurrentPrice(bar);
 }
 
