@@ -90,3 +90,30 @@ class CleanupRecovery(unittest.TestCase):
         self.assertEqual(self.services,[])
         self.assertEqual((self.root/RUNTIME[0]).read_bytes(),b'{"cursor":987}')
         self.assertEqual((self.root/'conflict.txt').read_bytes(),b'local branch')
+
+    def test_known_styles_conflict_keeps_local_fixture_and_only_rebases_imports(self):
+        from Section_14_Operations.finish_repository_cleanup import KNOWN_TEST_CONFLICT
+        root=self.root.parent/'Styles repo';root.mkdir()
+        def run(*args):return subprocess.check_output(['git',*args],cwd=root,stderr=subprocess.STDOUT).decode()
+        def write(name,data):
+            p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+        run('init','-q','-b','main');run('config','user.email','test@example.invalid');run('config','user.name','Test')
+        old='tests/feature_styles.test.mjs'
+        base=b"import x from '../Section_11_UI_UX/example.js';\nconst options = 'base';\n"+b"// unchanged test assertions\n"*30
+        write(old,base);write(REPORT,b'\0report');write(RUNTIME[0],b'{"cursor":1}')
+        write('Section_11_UI_UX/example.js',b'unchanged UI');run('add','.');run('commit','-qm','base')
+        run('switch','-qc','cleanup')
+        target=root/KNOWN_TEST_CONFLICT;target.parent.mkdir(parents=True,exist_ok=True);(root/old).rename(target)
+        write(KNOWN_TEST_CONFLICT,base.replace(b"'../",b"'../../").replace(b"'base'",b"'cleanup version'"))
+        new_report='Section_12_Research/reports/report.gz';(root/new_report).parent.mkdir(parents=True,exist_ok=True);(root/REPORT).rename(root/new_report)
+        write('Section_13_Development/repository_layout/moves.json',json.dumps(dict(moves=[dict(old=old,new=KNOWN_TEST_CONFLICT),dict(old=REPORT,new=new_report)])).encode())
+        run('add','-A');run('commit','-qm','cleanup');run('switch','-q','main')
+        local=base.replace(b"'base'",b"'user version'")+b'// Keep this user assertion\n'
+        write(old,local);run('add','.');run('commit','-qm','user fixture change')
+        write(REPORT,b'\0local report');run('stash','push','-qm','report-before-cleanup');stash=report_stash(root)
+        write(RUNTIME[0],b'{"cursor":999}')
+        finish(root,'cleanup',stash,stop_services=self.stopped)
+        self.assertEqual((root/KNOWN_TEST_CONFLICT).read_bytes(),local.replace(b"'../Section_11_UI_UX/",b"'../../Section_11_UI_UX/"))
+        self.assertEqual((root/'Section_11_UI_UX/example.js').read_bytes(),b'unchanged UI')
+        self.assertEqual((root/RUNTIME[0]).read_bytes(),b'{"cursor":999}')
+        self.assertEqual((root/new_report).read_bytes(),b'\0local report')

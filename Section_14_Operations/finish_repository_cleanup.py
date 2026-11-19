@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import importlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -11,6 +12,7 @@ import sys
 RUNTIME = ('Section_1_Global_Core/section_1_9_state.json', 'Section_1_Global_Core/Symbols/symbols.json')
 REPORT = 'research_reports/BTC_1h_sequences/strategy_analyzer/strategy_analysis.json.gz'
 TARGET = 'origin/chore/separate-app-research-tools'
+KNOWN_TEST_CONFLICT = 'Section_13_Development/tests/feature_styles.test.mjs'
 
 
 def git(root, *args, check=True):
@@ -52,7 +54,8 @@ def finish(root, target, stash, *, stop_services):
     if git(root, 'rev-parse', '-q', '--verify', 'MERGE_HEAD', check=False).returncode == 0:
         raise RuntimeError('A merge is already active. No files changed; send git status output.')
     preview = git(root, 'merge-tree', '--write-tree', 'HEAD', target, check=False)
-    if preview.returncode:
+    conflicts = set(re.findall(r'^[0-7]{6} [0-9a-f]+ [123]\t(.+)$', preview.stdout.decode(), re.M))
+    if preview.returncode and not (preview.returncode == 1 and conflicts == {KNOWN_TEST_CONFLICT}):
         raise RuntimeError('Cleanup merge preview found conflicts; services and files were not changed.\n'+(preview.stdout+preview.stderr).decode())
     dirty = changed(root, 'HEAD')
     other = [p for p in dirty if p not in RUNTIME]
@@ -85,9 +88,18 @@ def finish(root, target, stash, *, stop_services):
                 git(root, 'restore', '--source=HEAD', '--staged', '--worktree', '--', *saved)
             result = git(root, '-c', 'merge.autoStash=false', 'merge', '--no-ff', '--no-commit', target, check=False)
             if result.returncode:
-                if git(root, 'rev-parse', '-q', '--verify', 'MERGE_HEAD', check=False).returncode == 0:
-                    git(root, 'merge', '--abort')
-                raise RuntimeError('Cleanup merge stopped; saved edits were not applied.\n'+(result.stdout+result.stderr).decode())
+                unresolved = set(p for p in git(root, 'diff', '--name-only', '--diff-filter=U', '-z').stdout.decode().split('\0') if p)
+                if unresolved == {KNOWN_TEST_CONFLICT}:
+                    # Keep the user's complete fixture; only rebase its two app imports.
+                    local = git(root, 'show', ':2:'+KNOWN_TEST_CONFLICT).stdout.decode()
+                    local = local.replace("'../Section_11_UI_UX/", "'../../Section_11_UI_UX/").replace('"../Section_11_UI_UX/', '"../../Section_11_UI_UX/')
+                    (root/KNOWN_TEST_CONFLICT).write_text(local)
+                    git(root, 'add', '--', KNOWN_TEST_CONFLICT)
+                    print('Kept local feature-styles test; adjusted imports for its new folder.', flush=True)
+                else:
+                    if git(root, 'rev-parse', '-q', '--verify', 'MERGE_HEAD', check=False).returncode == 0:
+                        git(root, 'merge', '--abort')
+                    raise RuntimeError('Cleanup merge stopped; saved edits were not applied.\n'+(result.stdout+result.stderr).decode())
             if any(p.startswith('Section_11_UI_UX/') for p in changed(root, '--cached')):
                 git(root, 'merge', '--abort')
                 raise RuntimeError('The merge would change UI/UX files; it was aborted. Current UI preserved.')

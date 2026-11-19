@@ -49,3 +49,8 @@ Before the branch is installed, extract the recovery command from the fetched
 branch into `/tmp` and run it from the original application checkout. Afterward,
 use the organizer for the `.py.before-slope-*` backup files. Keep
 `features.db.compaction.json` beside the database; maintenance checks use it.
+
+The known `feature_styles.test.mjs` relocation conflict is resolved by retaining
+stage 2 (the local checkout's complete test fixture) and rebasing its relative
+Section 11 imports for the new test folder. No other content in that fixture is
+replaced. Other conflicts still stop the recovery for review.
