@@ -20,7 +20,7 @@ async function loadAll() {
     const timeframe = timeframeControl.value();
     status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
-        if (await DataCache.loadInitial(symbol, timeframe) && id === loadId) {
+        if (await DataCache.loadInitial(symbol, timeframe, null, {pricesFirst: true}) && id === loadId) {
             await DataCache.prefetchOlder({limit: 1000});
         }
     } catch (error) {
@@ -36,6 +36,8 @@ async function loadAll() {
     let renderedBars = [],renderedScope=null,needsRecovery=false,renderError=null;
     let rendering = false;
     let pending = null;
+    let dragging = false;
+    let boundaryFrame = 0;
     let renderGeneration = 0;
 
     function updateStatus() {
@@ -51,12 +53,13 @@ async function loadAll() {
         const zoneNotice=zonesPending?` | ${zonesPending}`:'';
         const featureNotice=progress?progress.repair?` | Feature repair${progress.active===false?' paused':''}: ${progress.repair.columns} columns through ${stamp(progress.repair.through)}; target ${stamp(progress.repair.target)}`:
             progress.active===false?` | Features paused at ${stamp(progress.through)}`:progress.status==='features current'?' | Features current':` | Features through ${stamp(progress.through)} (${progress.status})`:'';
-        status().textContent = DataCache.error
+        const text = DataCache.error
             ? `History error: ${DataCache.error} — move the chart to retry`
             : `${DataCache.symbol} ${DataCache.timeframe} | ` +
               `${visible} candles in view | ` +
               `${DataCache.activeBars.length} active candles | ${DataCache.bars.length} cached` +
               (DataCache.liveEnabled ? ` | ${DataCache.liveQuote?.client?.close!=null?'Live price: '+DataCache.liveQuote.client.close+' | ':''}${DataCache.liveStatus}` : "") + historyNotice + featureNotice + zoneNotice;
+        if (status().textContent !== text) status().textContent = text;
     }
 
     function checkBoundary() {
@@ -67,13 +70,13 @@ async function loadAll() {
         updateStatus();
         // The preceding page is already part of the render dataset before
         // it enters view. Arrival runs this check again and prepares the next.
-        if (range && range.from <= PREFETCH_BARS && DataCache.nextBefore !== null) {
+        if (!dragging && range && range.from <= PREFETCH_BARS && DataCache.nextBefore !== null) {
             void DataCache.prefetchOlder();
         }
     }
 
     function render() {
-        if (rendering || !pending) return;
+        if (rendering || !pending || (dragging && !pending.reset && !pending.latest)) return;
         const { op, latest, span } = pending;
         const scope = `${DataCache.symbol}:${DataCache.timeframe}`;
         const reset = pending.reset || renderedScope !== scope;
@@ -108,6 +111,7 @@ async function loadAll() {
             // its own candles/features/decisions, and no visible history is evicted.
             Composer.updateAll(chart, { ...DataCache, formingBar: DataCache.formingBar, bars }, op, { resetViewport: reset });
             renderedBars = bars;renderedScope=bars.length ? scope : null;needsRecovery=false;
+            if (op === "prices") status().textContent = `${DataCache.symbol} ${DataCache.timeframe} | Loading indicators…`;
             if(DataCache.error===renderError)DataCache.error=null;
             renderError=null;
             if (target) chart.timeScale().setVisibleLogicalRange(target);
@@ -133,9 +137,9 @@ async function loadAll() {
     DataCache.subscribe((cache, op) => {
         if (op === "loading") latestControl.update(chart, cache);
         if (op === "error") { updateStatus(); return; }
-        if (op === "liquidity" && !pending && !rendering) { Composer.updateLiquidity(chart, cache); return; }
+        if (op === "liquidity" && !dragging && !pending && !rendering) { Composer.updateLiquidity(chart, cache); return; }
         if(op==='quote'){Composer.visuals.find(v=>v.name==='candles')?.updateQuote?.(chart,cache.liveQuote||cache.latestBar);updateStatus();return;}
-        if (op === "live" && !rendering && !pending && renderedScope===`${cache.symbol}:${cache.timeframe}` && cache.formingBar &&
+        if (op === "live" && !dragging && !rendering && !pending && renderedScope===`${cache.symbol}:${cache.timeframe}` && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {
             Composer.updateLive(chart, cache);
@@ -143,12 +147,27 @@ async function loadAll() {
             updateStatus();
             return;
         }
-        const reset=needsRecovery || op === "reload" || op === "loading";
+        const reset=needsRecovery || op === "reload" || op === "loading" || op === "prices";
         pending = { op:pending?.op==='settings'&&!reset?'settings':op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
             latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
         render();
     });
-    chart.timeScale().subscribeVisibleLogicalRangeChange(checkBoundary);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        if (!boundaryFrame) boundaryFrame = requestAnimationFrame(() => {
+            boundaryFrame = 0;
+            checkBoundary();
+        });
+    });
+    document.getElementById("chart").addEventListener("pointerdown", event => {
+        if (event.isPrimary && event.button === 0) dragging = true;
+    }, {capture: true, passive: true});
+    function finishDrag() {
+        if (!dragging) return;
+        dragging = false;
+        if (pending) render();
+        checkBoundary();
+    }
+    for (const event of ["pointerup", "pointercancel", "blur"]) window.addEventListener(event, finishDrag);
     window.addEventListener("chart-settings-change", () => {
         pending = { op: "settings", reset: !!pending?.reset,
             latest: pending?.latest, span: pending?.span };

@@ -107,6 +107,7 @@ const Composer = {
         const key=`${data.symbol}:${data.timeframe}:${data._barsVersion}:${data._liveVersion||0}`;
         const unchanged=op==='stored-refresh'&&!options.resetViewport&&Number.isFinite(data._barsVersion)&&this._seriesKey===key;
         for (const v of this.visuals) {
+            if (op === "prices" && !["candles", "indicators", "candle_details"].includes(v.name)) continue;
             const before=performance.now();
             try {
                 if (v.update && !(unchanged&&['candles','ema50','indicators','markers'].includes(v.name))) {

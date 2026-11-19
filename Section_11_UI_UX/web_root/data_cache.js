@@ -95,7 +95,7 @@ const DataCache = {
 
     async _fetchPage(symbol, timeframe, limit, before = null, includeLive = true) {
         const generation=this._reloadGeneration;
-        const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
+        const qs = new URLSearchParams({ symbol, interval: timeframe, limit, compact: "1" });
         if(before===null){
             const reference=this.symbol===symbol&&this.timeframe===timeframe?[...this.bars].reverse().find(b=>b.signal_context)?.signal_context:null;
             if(Number.isFinite(reference?.open_time))qs.set('analysis_reference',String(reference.open_time));
@@ -170,7 +170,25 @@ const DataCache = {
         this.atLiveEdge = range.to >= this.bars.length - 2;
     },
 
-    async loadInitial(symbol, timeframe, before=null) {
+    async _fetchChartPrices(symbol, timeframe) {
+        const controller = new AbortController();
+        this._requests.add(controller);
+        const timer = setTimeout(() => controller.abort(), 2000);
+        try {
+            const query = new URLSearchParams({symbol, interval: timeframe});
+            const response = await fetch(`/api/chart_price?${query}`, {cache: 'no-store', signal: controller.signal});
+            if (!response.ok) return null;
+            return this._validatePacket(await response.json(), symbol, timeframe);
+        } catch {
+            // The complete page is still authoritative if the fast read fails.
+            return null;
+        } finally {
+            clearTimeout(timer);
+            this._requests.delete(controller);
+        }
+    },
+
+    async loadInitial(symbol, timeframe, before=null, {pricesFirst = false} = {}) {
         const generation = ++this._reloadGeneration;
         for(const controller of this._requests)controller.abort();
         this._requests.clear();
@@ -180,9 +198,24 @@ const DataCache = {
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
             historyPending: false, liveBars: [], liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
         this.emit("loading");
+        let prices = null;
         try {
+            if (pricesFirst && before === null) {
+                prices = await this._fetchChartPrices(symbol, timeframe);
+                if (generation !== this._reloadGeneration) return false;
+                if (prices?.bars.length) {
+                    this._storageEpoch = prices.storage_epoch ?? "0:0";
+                    this.bars = prices.bars;
+                    this.activeBars = this.bars;
+                    this.latestBar = this.bars.at(-1);
+                    this._barsVersion = (this._barsVersion || 0) + 1;
+                    this.emit("prices");
+                }
+            }
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
             if (generation !== this._reloadGeneration) return false;
+            const preservesView = prices?.bars.length && prices.storage_epoch === packet.storage_epoch &&
+                packet.bars.some(bar => bar.open_time === prices.bars.at(-1).open_time);
             this.featureProgress=packet.feature_progress??null;
             this.srSnapshot=packet.sr_snapshot??null;
             this.srFrames=packet.sr_frames??{};
@@ -200,10 +233,19 @@ const DataCache = {
             this._applyLive(packet.live);
             if(before!==null)this.atLiveEdge=false;
             this.loading = false;
-            this.emit("reload");
+            this.emit(preservesView ? "history" : "reload");
             return true;
         } catch(error) {
             if(generation!==this._reloadGeneration)return false;
+            if (prices?.bars.length && error.name === 'ChartIdentityError') {
+                this.bars = [];
+                this.activeBars = [];
+                this.latestBar = null;
+                this._barsVersion = (this._barsVersion || 0) + 1;
+                this.emit("loading");
+            } else if (prices?.bars.length) {
+                ++this._fullRefreshVersion;
+            }
             this.error = error.message;
             throw error;
         } finally {
