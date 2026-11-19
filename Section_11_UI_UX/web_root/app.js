@@ -36,7 +36,7 @@ async function loadAll() {
     const chart = Canvas.init(document.getElementById("chart"));
     await Composer.mountAll(chart);
     DataCache.liveEnabled = Composer.config.live_candle !== false;
-    let renderedBars = [];
+    let renderedBars = [],renderedScope=null,needsRecovery=false,renderError=null;
     let rendering = false;
     let pending = null;
     let renderGeneration = 0;
@@ -79,49 +79,63 @@ async function loadAll() {
         if (rendering || !pending) return;
         const { op, reset, latest, span } = pending;
         pending = null;
-        if(op==='live'&&!reset&&!latest&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
+        if(op==='live'&&!reset&&!latest&&renderedScope===`${DataCache.symbol}:${DataCache.timeframe}`&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
             Composer.updateLive(chart,DataCache);
             renderedBars[renderedBars.length-1]=DataCache.formingBar;
             updateStatus();return;
         }
         rendering = true;
         const generation = ++renderGeneration;
-        const range = chart.timeScale().getVisibleLogicalRange();
-        const bars = DataCache.renderBars;
-        let target = null;
-        if (latest && bars.length) {
-            const last = bars.length - 1;
-            target = { from: last - span, to: last };
-            chart.priceScale("right").applyOptions({ autoScale: true });
-        } else if (reset && bars.length) {
-            target = readableRange(bars.length,chart.timeScale().width());
-            symbolControl.applyPriceFormat(DataCache.symbol, bars,
-                Composer.config.price_precision?.[DataCache.symbol]);
-        } else if (range && renderedBars.length && bars.length) {
-            const following = (op === "stored-refresh" || op === "live") && DataCache.atLiveEdge &&
-                range.to >= renderedBars.length - 2;
-            const shift = following ? bars.length - renderedBars.length
-                : logicalShift(renderedBars, bars);
-            target = { from: range.from + shift, to: range.to + shift };
+        try {
+            const range = chart.timeScale().getVisibleLogicalRange();
+            const bars = DataCache.renderBars;
+            let target = null;
+            if (latest && bars.length) {
+                const last = bars.length - 1;
+                target = { from: last - span, to: last };
+                chart.priceScale("right").applyOptions({ autoScale: true });
+            } else if (reset && bars.length) {
+                target = readableRange(bars.length,chart.timeScale().width());
+                symbolControl.applyPriceFormat(DataCache.symbol, bars,
+                    Composer.config.price_precision?.[DataCache.symbol]);
+            } else if (range && renderedBars.length && bars.length) {
+                const following = (op === "stored-refresh" || op === "live") && DataCache.atLiveEdge &&
+                    range.to >= renderedBars.length - 2;
+                const shift = following ? bars.length - renderedBars.length
+                    : logicalShift(renderedBars, bars);
+                target = { from: range.from + shift, to: range.to + shift };
+            }
+            // All consumers receive the same canonical bars. No visual fetches
+            // its own candles/features/decisions, and no visible history is evicted.
+            Composer.updateAll(chart, { ...DataCache, bars }, op, { resetViewport: reset });
+            renderedBars = bars;renderedScope=`${DataCache.symbol}:${DataCache.timeframe}`;needsRecovery=false;
+            if(DataCache.error===renderError)DataCache.error=null;
+            renderError=null;
+            if (target) chart.timeScale().setVisibleLogicalRange(target);
+        } catch(error) {
+            // A format/viewport error must not leave old-market candles frozen
+            // behind a new market's independent quote label.
+            console.error('[chart render]',error);
+            const empty={...DataCache,bars:[],renderBars:[],formingBar:null,liveQuote:null,fvgFrames:{},srSnapshot:null,srFrames:{}};
+            for(const visual of [...Composer.visuals,...Composer.panels])try{if(visual.clear)visual.clear(chart);else visual.update?.(chart,empty,{op:'loading',resetViewport:true});}catch{}
+            renderedBars=[];renderedScope=null;needsRecovery=true;Composer._seriesKey=null;
+            renderError=`Chart render failed: ${error.message}. Reload or change settings to retry.`;
+            DataCache.error=renderError;status().textContent=renderError;
+        } finally {
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (generation !== renderGeneration) return;
+                rendering = false;
+                if (pending) render();
+                else checkBoundary();
+            }));
         }
-        // All consumers receive the same canonical bars. No visual fetches
-        // its own candles/features/decisions, and no visible history is evicted.
-        Composer.updateAll(chart, { ...DataCache, bars }, op, { resetViewport: reset });
-        renderedBars = bars;
-        if (target) chart.timeScale().setVisibleLogicalRange(target);
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (generation !== renderGeneration) return;
-            rendering = false;
-            if (pending) render();
-            else checkBoundary();
-        }));
     }
 
     DataCache.subscribe((cache, op) => {
         if (op === "loading") latestControl.update(chart, cache);
         if (op === "error") { updateStatus(); return; }
         if(op==='quote'){Composer.visuals.find(v=>v.name==='candles')?.updateQuote?.(chart,cache.liveQuote||cache.latestBar);updateStatus();return;}
-        if (op === "live" && !rendering && !pending && cache.formingBar &&
+        if (op === "live" && !rendering && !pending && renderedScope===`${cache.symbol}:${cache.timeframe}` && cache.formingBar &&
             renderedBars.at(-1)?.provisional &&
             renderedBars.at(-1).time === cache.formingBar.time) {
             Composer.updateLive(chart, cache);
@@ -129,8 +143,8 @@ async function loadAll() {
             updateStatus();
             return;
         }
-        const reset=op === "reload" || op === "loading";
-        pending = { op:op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
+        const reset=needsRecovery || op === "reload" || op === "loading";
+        pending = { op:pending?.op==='settings'&&!reset?'settings':op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
             latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
         render();
     });

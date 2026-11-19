@@ -69,6 +69,27 @@ const DataCache = {
         for (const fn of this.listeners) fn(this, op, meta);
     },
 
+    _validatePacket(packet,symbol,timeframe,liveOnly=false) {
+        const fail=where=>{throw Object.assign(new Error(`Rejected mismatched chart response for ${symbol} ${timeframe}: ${where}`),{name:'ChartIdentityError'});};
+        if(packet?.symbol!==symbol||packet?.interval!==timeframe)fail('response identity');
+        const check=(bar,where)=>{
+            if(bar?.symbol!==symbol||bar?.interval!==timeframe||bar?.client?.symbol!==symbol||bar?.client?.interval!==timeframe)fail(where+' identity');
+            if(!Number.isSafeInteger(bar.open_time)||bar.client.open_time!==bar.open_time||bar.time!==Math.floor(bar.open_time/1000)||!Number.isSafeInteger(bar.client.close_time)||bar.client.close_time<bar.open_time)fail(where+' timestamp');
+            if(!['open','high','low','close','volume'].every(field=>Number.isFinite(bar.client[field])))fail(where+' candle values');
+            for(const key of ['features','adcn'])if(bar[key]){
+                const value=bar[key];
+                if((value.symbol!=null&&value.symbol!==symbol)||(value.interval!=null&&value.interval!==timeframe)||(value.open_time!=null&&value.open_time!==bar.open_time))fail(where+' '+key+' identity');
+            }
+        };
+        if(!liveOnly){
+            if(!Array.isArray(packet.bars))fail('missing bars');
+            let previous=-Infinity;
+            for(const bar of packet.bars){check(bar,'stored bar');if(bar.provisional||bar.time<=previous)fail('stored ordering');previous=bar.time;}
+        }
+        if(packet.live?.bar)check(packet.live.bar,'live quote');
+        return packet;
+    },
+
     async _fetchPage(symbol, timeframe, limit, before = null, includeLive = true) {
         const generation=this._reloadGeneration;
         const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
@@ -107,10 +128,11 @@ const DataCache = {
                     continue;
                 }
                 if (!response.ok) throw new Error(packet.error || `Stored bars: HTTP ${response.status}`);
-                if (!Array.isArray(packet.bars)) throw new Error("Invalid stored-bar packet");
+                this._validatePacket(packet,symbol,timeframe);
                 return packet;
             } catch (error) {
                 if(generation!==this._reloadGeneration)throw error;
+                if(error.name==='ChartIdentityError'){this.error=error.message;this.emit('error');}
                 if (error.name === "AbortError") throw new Error("Chart server timed out. Use Reload to retry.");
                 if (error instanceof TypeError) throw new Error("Cannot reach the chart server. Run python3 restart_ui.py, then Reload.");
                 throw error;
@@ -228,6 +250,7 @@ const DataCache = {
                 const packet=await response.json();
                 if(!response.ok)throw new Error(packet.error||'Live snapshot unavailable');
                 if(generation!==this._reloadGeneration)return false;
+                this._validatePacket(packet,qs.get('symbol'),qs.get('interval'),true);
                 const priorQuote=JSON.stringify(this.liveQuote?.client??null),priorStatus=this.liveStatus;
                 let changed=false;
                 if(!this.loading&&this.atLiveEdge)changed=this._applyLive(packet.live);
@@ -235,6 +258,13 @@ const DataCache = {
                 if(changed)this.emit('live');
                 if(priorQuote!==JSON.stringify(this.liveQuote?.client??null)||priorStatus!==this.liveStatus)this.emit('quote');
                 return changed;
+            }).catch(error=>{
+                if(generation!==this._reloadGeneration)return false;
+                if(error.name==='ChartIdentityError'){
+                    this.liveQuote=null;this.liveStatus='response mismatch';this.error=error.message;
+                    this.emit('quote');this.emit('error');
+                }
+                throw error;
             }).finally(()=>{
                 clearTimeout(timer);this._requests.delete(controller);
                 if(this._livePromise===work)this._livePromise=null;

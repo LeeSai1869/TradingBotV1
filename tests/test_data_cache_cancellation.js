@@ -10,7 +10,11 @@ const context={window:{},URLSearchParams,AbortController,setTimeout,clearTimeout
     })};
 vm.runInNewContext(fs.readFileSync('Section_11_UI_UX/web_root/data_cache.js','utf8'),context);
 const cache=context.window.DataCache;cache.liveEnabled=false;
-function finish(call,stamp){call.resolve({ok:true,status:200,json:async()=>({bars:[{time:stamp/1000,open_time:stamp,client:{close_time:stamp+59999}}],next_before:null})});}
+function finish(call,stamp){
+    const qs=new URL(call.url,'http://localhost').searchParams,symbol=qs.get('symbol'),interval=qs.get('interval');
+    const client={symbol,interval,open_time:stamp,close_time:stamp+59999,open:10,high:12,low:9,close:11,volume:1};
+    call.resolve({ok:true,status:200,json:async()=>({symbol,interval,bars:[{symbol,interval,time:stamp/1000,open_time:stamp,client}],next_before:null})});
+}
 (async()=>{
     const old=cache.loadInitial('BTCUSDT','1m');
     const fresh=cache.loadInitial('BTCUSDT','1h');

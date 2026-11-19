@@ -117,3 +117,5 @@ export function updateLive(instance,bar){
     }
 }
 export function getSeries(key){for(const state of groups.values())if(state.lines.has(key))return state.lines.get(key);return null;}
+
+export function clear(){barsByTime=new Map();latestBar=null;for(const state of groups.values())for(const line of state.lines.values())line.setData([]);values();}

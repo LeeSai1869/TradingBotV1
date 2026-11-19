@@ -66,3 +66,14 @@ a dotted horizontal reference remains visible. The numeric price stays current,
 extra price-line text remains blank, and no provisional candle is invented across
 a storage gap. Drawing uses the retained last-plotted timestamp without copying
 series history on each paint.
+
+Stored/live response admission checks the requested symbol/timeframe, each bar's
+client identity, matching timestamps, chronological order, finite candle values,
+and any supplied feature/decision identity. A mismatched response is rejected with
+an explicit chart warning. The render scheduler always releases after exceptions;
+failed critical candle/indicator renders clear stale series and force a full retry.
+Incremental live updates also require the last rendered market to match. Pending
+settings updates retain priority over metadata refreshes, so series-skip logic
+cannot swallow a display/style change. The signed-in market regression covers a
+BTC/ETH switch, injected viewport failure, volume-average styles during concurrent
+refresh, wrong-market candle rejection and a subsequent valid reload.

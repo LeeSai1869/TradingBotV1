@@ -44,3 +44,5 @@ export function updateLive(chart, bar) {
         line.update(Number.isFinite(value) ? {time: bar.time, value} : {time: bar.time});
     }
 }
+
+export function clear(){for(const line of series.values())line.setData([]);}
