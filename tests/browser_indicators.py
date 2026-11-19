@@ -1,4 +1,5 @@
 """Completed indicators render in synchronized panes with independent settings."""
+import asyncio
 from pathlib import Path
 import sys
 from playwright.async_api import async_playwright
@@ -10,6 +11,13 @@ async def exercise(base,library):
     db.write_features([dict(symbol='BTCUSDT',interval='15m',open_time=row[2],ema50=row[6]-.5,
         wma50=row[6]-.3,rsi=45+i%25,adx=25+i%10,di_plus=30,di_minus=15,di_direction=15,di_spread=15,di_dominance=1/3,
         atr=2.5,atr_ma=2.2,volume_ma=9,vwap=row[6]-.2,vwap_upper1=row[6]+1,vwap_lower1=row[6]-1) for i,row in enumerate(rows)])
+    last_open = rows[-1][2]
+    db.write_klines([
+        dict(symbol='BTCUSDT', interval='5m', open_time=last_open - (2100-i)*300_000,
+             close_time=last_open - (2099-i)*300_000 - 1, open=237, high=241, low=235,
+             close=239, volume=11, quote_volume=2620.0)
+        for i in range(2100)
+    ])
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=await browser.new_page(viewport={'width':1800,'height':1200})
@@ -99,6 +107,33 @@ async def exercise(base,library):
         assert await page.evaluate('Canvas.chart.panes().length')==5
         assert await page.evaluate('Composer.config.featureStyles.rsi.visible') is False
         assert await page.evaluate("Composer.config.featureStyles.volume.presentation === 'line' && Composer.config.featureStyles.volume.style === 2")
+        requested, release = asyncio.Event(), asyncio.Event()
+        five_minute_pages = []
+
+        async def delay_btc_five_minute(route):
+            if 'interval=5m' in route.request.url:
+                five_minute_pages.append(route.request.url)
+                if 'before=' not in route.request.url:
+                    requested.set()
+                    await release.wait()
+            await route.continue_()
+
+        async def latest_candle():
+            return await page.evaluate("Canvas.chart.panes()[0].getSeries()[0].data().at(-1)")
+        previous_candle = await latest_candle()
+        await page.route('**/api/bars?*', delay_btc_five_minute)
+        await page.locator('#interval').select_option('5m')
+        try:
+            await asyncio.wait_for(requested.wait(), timeout=5)
+            assert await latest_candle() == previous_candle
+        finally:
+            release.set()
+        await page.wait_for_function("!DataCache.loading && DataCache.bars.length === 2000 && !DataCache._olderPromise")
+        await settle(page)
+        assert (await latest_candle())['close'] == 239
+        assert len(five_minute_pages) == 2, five_minute_pages
+        assert '2,620 USDT' in await page.locator('.indicator-values[aria-label="Volume values"]').inner_text()
+        await page.unroute('**/api/bars?*', delay_btc_five_minute)
         # Dense BTC depth packets must render and leave the main time scale draggable.
         await page.evaluate("""async () => {
             const {update} = await import('/overlays/liquidity/index.js');

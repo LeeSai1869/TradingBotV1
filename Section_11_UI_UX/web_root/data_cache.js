@@ -211,12 +211,12 @@ const DataCache = {
         }
     },
 
-    prefetchOlder() {
+    prefetchOlder({limit = BLOCK_BARS} = {}) {
         if (this.loading || this.nextBefore === null) return Promise.resolve(false);
         if (this._olderPromise) return this._olderPromise;
         const generation = this._reloadGeneration;
         const cursor = this.nextBefore;
-        const request = this._fetchPage(this.symbol, this.timeframe, BLOCK_BARS, cursor);
+        const request = this._fetchPage(this.symbol, this.timeframe, limit, cursor);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || cursor !== this.nextBefore) return false;
             if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {

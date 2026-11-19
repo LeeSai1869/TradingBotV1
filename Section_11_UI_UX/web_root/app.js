@@ -20,11 +20,10 @@ async function loadAll() {
     const timeframe = timeframeControl.value();
     status().textContent = `Loading ${symbol} ${timeframe}...`;
     try {
-        await DataCache.loadInitial(symbol, timeframe);
-        // Keep an older buffer ready even though the readable initial view
-        // now contains fewer candles than the cached active window.
-        for (let page = 0; page < 2 && id === loadId && DataCache.nextBefore !== null; page++) {
-            await DataCache.prefetchOlder();
+        if (await DataCache.loadInitial(symbol, timeframe) && id === loadId) {
+            // Warm the history buffer in one batch so opening a market does
+            // not repeatedly replace the chart series on consecutive frames.
+            await DataCache.prefetchOlder({limit: 1000});
         }
     } catch (error) {
         if (id === loadId) status().textContent = `Error: ${error.message}`;

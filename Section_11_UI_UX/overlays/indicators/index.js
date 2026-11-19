@@ -115,7 +115,11 @@ function levels(state){
     if(state.feature==='RSI')line.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})});
     else line.applyOptions({autoscaleInfoProvider:original=>{
         const info=original();
-        return info?{...info,priceRange:{minValue:Math.min(0,info.priceRange.minValue),maxValue:Math.max(30,info.priceRange.maxValue)}}:null;
+        if (!info?.priceRange) return info;
+        return {...info, priceRange:{
+            minValue: Math.min(0, info.priceRange.minValue),
+            maxValue: Math.max(30, info.priceRange.maxValue)
+        }};
     }});
 }
 export function mount(instance){
