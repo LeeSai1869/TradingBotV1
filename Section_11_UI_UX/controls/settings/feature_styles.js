@@ -43,7 +43,7 @@ export const FEATURE_STYLES = {
         ["di_dominance", "DI dominance", "#f59e0b"],
     ] },
     ATR: { connected: true, outputs: [["atr", "ATR", "#f18a35"], ["atr_ma", "ATR average", "#4b7bff"]] },
-    Volume: { connected: true, outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"]] },
+    Volume: { connected: true, outputs: [["volume", "Volume", "#26a69a", "histogram"], ["volume_ma", "Volume average", "#f5c542"], ["volume_usdt", "Volume in USDT", "#63a9ff"]] },
     'Volume Profile': { connected: true, outputs: [
         ['vp_poc','Point of control (POC)','#f5c542'],
         ['vp_va_high','Value area high (VAH)','#38bdf8'],['vp_va_low','Value area low (VAL)','#38bdf8'],
@@ -70,6 +70,9 @@ export function normalizeStyles(value = {}) {
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
             };
+            if (key === 'volume_usdt' && typeof input.visible !== 'boolean') {
+                result[key].visible = value?.volume?.visible === true || value?.volume_ma?.visible === true;
+            }
             if (key === 'volume') {
                 result[key].presentation = input.presentation === 'line' ? 'line' : 'histogram';
                 result[key].downColor = /^#[0-9a-f]{6}$/i.test(input.downColor) ? input.downColor : '#ef5350';

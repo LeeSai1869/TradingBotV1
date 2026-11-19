@@ -1,7 +1,8 @@
 // Preserve the same candle positions when a bounded window changes.
-export function readableRange(length,width){
-    // Fresh datasets reset to 200 candles; narrow plots keep thicker bodies.
-    const count=Number.isFinite(width)&&width>0?Math.max(30,Math.min(200,Math.floor(width/6))):200;
+export function readableRange(length,width,timeframe){
+    const maximum = timeframe === '5m' ? 120 : 200;
+    const count = Number.isFinite(width) && width > 0
+        ? Math.max(30, Math.min(maximum, Math.floor(width / 6))) : maximum;
     return {from:Math.max(0,length-count),to:length+7};
 }
 

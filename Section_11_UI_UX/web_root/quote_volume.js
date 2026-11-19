@@ -19,4 +19,3 @@ export function formatTurnover(point) {
 }
 
 export const turnoverPriceFormat = {type: 'custom', minMove: .01, formatter: value => `${amount.format(value)} USDT`};
-export const TURNOVER_AVERAGE_BARS = 20;

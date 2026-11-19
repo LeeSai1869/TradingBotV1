@@ -30,7 +30,7 @@ async def exercise(base,library):
         await page.evaluate("window.dispatchEvent(new CustomEvent('open-feature-settings', {detail:'WMA'}))")
         settings=page.get_by_role('dialog',name='Settings',exact=True)
         await settings.get_by_role('button',name='Display',exact=True).click()
-        for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI','DI dominance']),('ATR',['ATR']),('Volume',['Volume','Volume average']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
+        for feature,fields in [('WMA',['WMA 50']),('RSI',['RSI']),('ADX',['ADX']),('DI',['+DI','−DI','DI dominance']),('ATR',['ATR']),('Volume',['Volume','Volume average','Volume in USDT']),('VWAP',['VWAP','Upper band 1','Lower band 1'])]:
             await settings.get_by_role('button',name=feature,exact=True).click()
             for field in fields:await settings.get_by_label(field,exact=True).check()
         await settings.get_by_role('tab',name='Candles',exact=True).click()
@@ -58,7 +58,7 @@ async def exercise(base,library):
         assert await page.evaluate("Canvas.chart.panes()[0].getSeries().filter(s=>s.options().title==='EMA 50' || s.options().color===Composer.config.featureStyles.ema50.color).some(s=>s.options().lastValueVisible && s.priceFormatter().format(34.40199)==='34.40')")
         assert 'O' in await page.get_by_role('region',name='Candle details').inner_text()
         details=page.get_by_role('region',name='Candle details')
-        assert await details.locator('dt').filter(has_text='Vol').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
+        assert await details.locator('dt[title="Volume"]').locator('xpath=following-sibling::dd[1]').inner_text()==await page.evaluate('DataCache.bars.at(-1).client.volume.toFixed(2)')
         assert 'USDT' in await page.locator('.indicator-values[aria-label="Volume values"]').inner_text()
         assert '≈' in await details.inner_text()
         await page.evaluate("""async()=>{
@@ -83,6 +83,7 @@ async def exercise(base,library):
         assert await page.evaluate('Composer.config.rsiLevels.lower')==25
         assert await page.evaluate("(async()=>{const x=await import('/overlays/indicators/index.js');return x.getSeries('rsi').options().color;})()")=='#12abef'
         await page.get_by_role('button',name='Volume settings',exact=True).click()
+        await settings.get_by_role('button',name='Style',exact=True).click()
         await settings.get_by_label('Volume display',exact=True).select_option('line')
         await settings.get_by_label('Volume width',exact=True).select_option('4')
         await settings.get_by_label('Volume line style',exact=True).select_option('2')
@@ -96,7 +97,8 @@ async def exercise(base,library):
                 throw Error('Volume line style did not apply');
             const bar=DataCache.bars.at(-1);
             indicators.updateLive(Canvas.chart,{...bar,client:{...bar.client,volume:123.45,quote_volume:246.9}});
-            if(series.data().at(-1).value!==246.9)throw Error('Volume line missed live update');
+            if(series.data().at(-1).value!==123.45 || indicators.getSeries('volume_usdt').data().at(-1).value!==246.9)
+                throw Error('Volume series missed live update');
         }""")
         await page.get_by_role('button',name='Close RSI',exact=True).click();await settle(page)
         assert await page.evaluate('Canvas.chart.panes().length')==5
@@ -121,6 +123,8 @@ async def exercise(base,library):
         async def latest_candle():
             return await page.evaluate("Canvas.chart.panes()[0].getSeries()[0].data().at(-1)")
         await page.route('**/api/bars?*', delay_btc_five_minute)
+        await page.evaluate('Canvas.chart.timeScale().setVisibleLogicalRange({from:1300,to:2000})')
+        await settle(page)
         await page.locator('#interval').select_option('5m')
         try:
             await asyncio.wait_for(requested.wait(), timeout=5)
@@ -131,8 +135,26 @@ async def exercise(base,library):
         await page.wait_for_function("!DataCache.loading && DataCache.bars.length === 2000 && !DataCache._olderPromise")
         await settle(page)
         assert (await latest_candle())['close'] == 239
+        visible = await page.evaluate('Canvas.chart.timeScale().getVisibleLogicalRange()')
+        assert 115 <= visible['to'] - visible['from'] <= 130, visible
         assert len(five_minute_pages) == 2, five_minute_pages
-        assert '2,620 USDT' in await page.locator('.indicator-values[aria-label="Volume values"]').inner_text()
+        volume_values = page.locator('.indicator-values[aria-label="Volume values"]')
+        assert '2,620 USDT' in await volume_values.inner_text()
+        assert '11.00 BTC' in await volume_values.inner_text()
+        assert 'Turnover' not in await volume_values.inner_text()
+        await page.get_by_role('button',name='Volume settings',exact=True).click()
+        await settings.get_by_label('Volume in USDT',exact=True).uncheck()
+        await settings.get_by_role('button',name='Apply',exact=True).click()
+        await settle(page)
+        assert '11.00 BTC' in await volume_values.inner_text()
+        assert 'USDT' not in await volume_values.inner_text()
+        await page.get_by_role('button',name='Volume settings',exact=True).click()
+        await settings.get_by_label('Volume in USDT',exact=True).check()
+        await settings.get_by_label('Volume',exact=True).uncheck()
+        await settings.get_by_role('button',name='Apply',exact=True).click()
+        await settle(page)
+        assert '2,620 USDT' in await volume_values.inner_text()
+        assert '11.00 BTC' not in await volume_values.inner_text()
         await page.unroute('**/api/bars?*', delay_btc_five_minute)
         # Dense BTC depth packets must render and leave the main time scale draggable.
         await page.evaluate("""async () => {

@@ -16,8 +16,8 @@ function render(){
     box.replaceChildren();
     box.title=`${bar.provisional?'Live':'Closed'} · ${new Date(bar.open_time).toLocaleString()}`;
     const list=document.createElement('dl');
-    for(const [label,n] of [['Open',candle.open],['High',candle.high],['Low',candle.low],['Close',candle.close],['Volume',candle.volume],...(isUSDT(bar)?[['Turnover',formatTurnover(turnover(bar))]]:[]),['Change %',change]]){
-        const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=({Open:'O',High:'H',Low:'L',Close:'C',Volume:'Vol',Turnover:'Turnover','Change %':'Δ%'})[label];term.title=label;value.textContent=formatValue(n,`client.${label.toLowerCase()}`)+(label==='Change %' && n!==null?'%':'');list.append(term,value);
+    for(const [label,n] of [['Open',candle.open],['High',candle.high],['Low',candle.low],['Close',candle.close],['Volume',candle.volume],...(isUSDT(bar)?[['Volume in USDT',formatTurnover(turnover(bar))]]:[]),['Change %',change]]){
+        const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=({Open:'O',High:'H',Low:'L',Close:'C',Volume:'Vol','Volume in USDT':'','Change %':'Δ%'})[label];term.title=label;value.textContent=formatValue(n,`client.${label.toLowerCase()}`)+(label==='Change %' && n!==null?'%':'');list.append(term,value);
     }box.append(list);
 }
 export function mount(chart){
