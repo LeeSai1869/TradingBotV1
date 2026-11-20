@@ -68,6 +68,17 @@ def handle_get(path, raw_qs, server):
     for k in list(qs.keys()):
         qs[k] = [clean(x) for x in qs[k]]
 
+    if path == "/api/chart_price":
+        symbol = qs.get("symbol", [""])[0]
+        interval = qs.get("interval", [""])[0]
+        if not symbol or interval not in data_policy.INTERVALS:
+            return 400, {"error": "Valid symbol and interval required"}
+        with data_policy.snapshot_guard():
+            epochs = data_policy.read()['epochs']
+            epoch = f"{epochs.get(f'symbol:{symbol}', 0)}:{epochs.get(f'interval:{interval}', 0)}"
+            return 200, {"symbol": symbol, "interval": interval, "storage_epoch": epoch,
+                         "bars": db.read_chart_prices(symbol, interval, 240)}
+
     if path == "/api/bars":
         symbol = qs.get("symbol", [None])[0]
         interval = qs.get("interval", [None])[0]
@@ -116,6 +127,10 @@ def handle_get(path, raw_qs, server):
                 packet['liquidity']=liquidity.snapshot(symbol)
             if before is None and qs.get('volume_profile',['0'])[0]=='1':
                 packet['volume_profile']=volume_profile.snapshot(symbol,interval,packet['bars'][-1] if packet['bars'] else None,packet['storage_epoch'])
+        if qs.get("compact", ["0"])[0] == "1":
+            for bar in packet["bars"]:
+                if bar["features"] is not None:
+                    bar["features"] = {key: value for key, value in bar["features"].items() if value is not None}
         if before is None and qs.get("live", ["0"])[0] == "1":
             packet["live"] = live_candle.get_snapshot(symbol, interval) if active else {
                 "bar": None, "status": "inactive", "as_of": None, "error": None}

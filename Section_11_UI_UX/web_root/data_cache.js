@@ -43,9 +43,22 @@ const DataCache = {
         return this.liveBars.length ? [...this.bars, ...this.liveBars] : this.bars;
     },
 
+    _acceptQuote(live) {
+        if (!live || !this.liveEnabled) return false;
+        const asOf = Number.isFinite(live.as_of) ? live.as_of : null;
+        if (asOf !== null && this._quoteAsOf != null && asOf < this._quoteAsOf) return false;
+        if (live.bar && this.liveQuote && live.bar.open_time < this.liveQuote.open_time) return false;
+        if (asOf !== null) this._quoteAsOf = asOf;
+        if (live.status === "inactive") this.liveQuote = null;
+        else if (live.bar) this.liveQuote = live.bar;
+        this.liveStatus = live.status;
+        return true;
+    },
+
     _applyLive(live) {
-        if (live) this.liveQuote = this.liveEnabled ? (live.bar ?? null) : null;
-        const previous = JSON.stringify([this.liveBars, this.liveStatus]);
+        const previousStatus = this.liveStatus;
+        if (!this._acceptQuote(live)) live = null;
+        const previous = JSON.stringify([this.liveBars, previousStatus]);
         const latest = this.bars.at(-1);
         if (!this.liveEnabled || live?.status === "inactive") {
             this.liveBars = [];
@@ -61,7 +74,6 @@ const DataCache = {
                 }
             }
         }
-        if (live && this.liveEnabled) this.liveStatus = live.status;
         const changed = previous !== JSON.stringify([this.liveBars, this.liveStatus]);
         if (changed) this._liveVersion = (this._liveVersion || 0) + 1;
         return changed;
@@ -95,7 +107,7 @@ const DataCache = {
 
     async _fetchPage(symbol, timeframe, limit, before = null, includeLive = true) {
         const generation=this._reloadGeneration;
-        const qs = new URLSearchParams({ symbol, interval: timeframe, limit });
+        const qs = new URLSearchParams({ symbol, interval: timeframe, limit, compact: "1" });
         if(before===null){
             const reference=this.symbol===symbol&&this.timeframe===timeframe?[...this.bars].reverse().find(b=>b.signal_context)?.signal_context:null;
             if(Number.isFinite(reference?.open_time))qs.set('analysis_reference',String(reference.open_time));
@@ -170,7 +182,26 @@ const DataCache = {
         this.atLiveEdge = range.to >= this.bars.length - 2;
     },
 
-    async loadInitial(symbol, timeframe, before=null) {
+    async _fetchChartPrices(symbol, timeframe) {
+        const controller = new AbortController();
+        this._requests.add(controller);
+        const timer = setTimeout(() => controller.abort(), 2000);
+        try {
+            const query = new URLSearchParams({symbol, interval: timeframe});
+            const response = await fetch(`/api/chart_price?${query}`, {cache: 'no-store', signal: controller.signal});
+            if (!response.ok) return null;
+            return this._validatePacket(await response.json(), symbol, timeframe);
+        } catch {
+            // The complete page is still authoritative if the fast read fails.
+            return null;
+        } finally {
+            clearTimeout(timer);
+            this._requests.delete(controller);
+        }
+    },
+
+    async loadInitial(symbol, timeframe, before=null, {pricesFirst = false} = {}) {
+        const keepQuote = before === null && this.liveEnabled && symbol === this.symbol && timeframe === this.timeframe;
         const generation = ++this._reloadGeneration;
         for(const controller of this._requests)controller.abort();
         this._requests.clear();
@@ -178,11 +209,29 @@ const DataCache = {
             nextBefore: null, loading: true, atLiveEdge: true, error: null,
             _olderPromise: null, _refreshPromise: null, _livePromise: null, _latestSignature: null, _refreshCount: 0,
             _fullRefreshVersion: 0, _appliedFullRefreshVersion: 0,
-            historyPending: false, liveBars: [], liveQuote:null, volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{}, liveStatus: this.liveEnabled ? "loading" : "disabled" });
+            historyPending: false, liveBars: [],
+            liveQuote: keepQuote ? this.liveQuote : null, _quoteAsOf: keepQuote ? this._quoteAsOf : null,
+            volumeProfile:null, liquidity:null, featureProgress:null, fvgFrames:{}, srSnapshot:null, srFrames:{},
+            liveStatus: keepQuote ? this.liveStatus : (this.liveEnabled ? "loading" : "disabled") });
         this.emit("loading");
+        let prices = null;
         try {
+            if (pricesFirst && before === null) {
+                prices = await this._fetchChartPrices(symbol, timeframe);
+                if (generation !== this._reloadGeneration) return false;
+                if (prices?.bars.length) {
+                    this._storageEpoch = prices.storage_epoch ?? "0:0";
+                    this.bars = prices.bars;
+                    this.activeBars = this.bars;
+                    this.latestBar = this.bars.at(-1);
+                    this._barsVersion = (this._barsVersion || 0) + 1;
+                    this.emit("prices");
+                }
+            }
             const packet = await this._fetchPage(symbol, timeframe, WINDOW_BARS, before);
             if (generation !== this._reloadGeneration) return false;
+            const preservesView = prices?.bars.length && prices.storage_epoch === packet.storage_epoch &&
+                packet.bars.some(bar => bar.open_time === prices.bars.at(-1).open_time);
             this.featureProgress=packet.feature_progress??null;
             this.srSnapshot=packet.sr_snapshot??null;
             this.srFrames=packet.sr_frames??{};
@@ -200,10 +249,19 @@ const DataCache = {
             this._applyLive(packet.live);
             if(before!==null)this.atLiveEdge=false;
             this.loading = false;
-            this.emit("reload");
+            this.emit(preservesView ? "history" : "reload");
             return true;
         } catch(error) {
             if(generation!==this._reloadGeneration)return false;
+            if (prices?.bars.length && error.name === 'ChartIdentityError') {
+                this.bars = [];
+                this.activeBars = [];
+                this.latestBar = null;
+                this._barsVersion = (this._barsVersion || 0) + 1;
+                this.emit("loading");
+            } else if (prices?.bars.length) {
+                ++this._fullRefreshVersion;
+            }
             this.error = error.message;
             throw error;
         } finally {
@@ -258,14 +316,14 @@ const DataCache = {
                 const priorQuote=JSON.stringify(this.liveQuote?.client??null),priorStatus=this.liveStatus;
                 let changed=false;
                 if(!this.loading&&this.atLiveEdge)changed=this._applyLive(packet.live);
-                else {this.liveQuote=packet.live?.bar??null;this.liveStatus=packet.live?.status??'unavailable';}
+                else this._acceptQuote(packet.live);
                 if(changed)this.emit('live');
                 if(priorQuote!==JSON.stringify(this.liveQuote?.client??null)||priorStatus!==this.liveStatus)this.emit('quote');
                 return changed;
             }).catch(error=>{
                 if(generation!==this._reloadGeneration)return false;
                 if(error.name==='ChartIdentityError'){
-                    this.liveQuote=null;this.liveStatus='response mismatch';this.error=error.message;
+                    this.liveStatus='response mismatch';this.error=error.message;
                     this.emit('quote');this.emit('error');
                 }
                 throw error;
