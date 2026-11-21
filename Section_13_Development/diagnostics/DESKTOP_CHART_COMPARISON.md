@@ -26,3 +26,11 @@ compact the database as part of this comparison.
 reports active/inactive policy, raw/feature progress, runner PID/checkout and log
 age. It does not activate 1m or any other timeframe. Run it on the Mac; cloud
 fixtures cannot report the health of a local launchd service.
+
+Version 2 captures new `updateAll`, `updateLive` and `updateLiquidity` calls during
+its sample and restores those methods afterward. It observes new resource entries
+instead of relying on the page's possibly full shared resource buffer. Historical
+entries in the old ten-item render ring are not evidence of a stall during the
+sample; lifetime zone build counts likewise do not measure builds per second.
+The report explicitly states whether long-task observation is supported and lists
+visible feature keys to help compare client configurations.

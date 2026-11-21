@@ -77,3 +77,10 @@ settings updates retain priority over metadata refreshes, so series-skip logic
 cannot swallow a display/style change. The signed-in market regression covers a
 BTC/ETH switch, injected viewport failure, volume-average styles during concurrent
 refresh, wrong-market candle rejection and a subsequent valid reload.
+
+Liquidity-only notifications retain their incremental path even when they arrive
+between a render and its animation-frame release. They cannot replace queued
+history, settings, market resets or live-candle work. The composer also avoids
+rebuilding unchanged candle, indicator and zone series for a liquidity-only
+render. Actual bar/version changes and viewport resets still run the full path;
+this changes scheduling, not chart settings, data retention or visual styles.
