@@ -84,3 +84,10 @@ history, settings, market resets or live-candle work. The composer also avoids
 rebuilding unchanged candle, indicator and zone series for a liquidity-only
 render. Actual bar/version changes and viewport resets still run the full path;
 this changes scheduling, not chart settings, data retention or visual styles.
+
+The drawing SVG is retained during crosshair-only pointer motion. Its viewport key
+includes the market/timeframe, pane dimensions, logical time range and two price
+coordinates, so horizontal/vertical panning and scaling invalidate the geometry.
+Drawing edits, selection/dragging, settings and data notifications still request
+a content redraw. This avoids repeatedly clearing/recreating SVG nodes when their
+coordinates are unchanged; it does not hide or simplify any drawing.

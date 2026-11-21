@@ -6,8 +6,8 @@ let capture;
 let chart,svg,select={value:'pointer'},hint,popup,menu,menuButton,buttons=[],drawings=[],draft=[],selected=-1,key='',drag=null,undo=[],frame=0,state,toolStatus,clipboard=null,interactionOptions;
 const collections=new Map();
 const INTERVALS=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'];
-let width=0,height=0,paneNode,observer,lastTimeframe='';
-function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;render();});}
+let width=0,height=0,paneNode,observer,lastTimeframe='',dirty=true,lastGeometry=null;
+function schedule(force=true){if(force!==false)dirty=true;if(!frame)frame=requestAnimationFrame(()=>{frame=0;render();});}
 function node(tag,attrs,parent=svg,text){const n=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(text)n.textContent=text;parent.append(n);return n;}
 async function request(symbol,data){
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
@@ -106,10 +106,20 @@ function stroke(a,b,parent,color='#58b9ff',hit=false,style={}){
         class:hit?'drawing-hit':'','pointer-events':hit?'stroke':'none'},parent);
 }
 function render(){
-    market();svg.replaceChildren();
+    market();
     const pane=chart.panes()[0];if(!pane)return;
-    if(pane.getHTMLElement()!==paneNode){if(paneNode)observer.unobserve(paneNode);paneNode=pane.getHTMLElement();if(paneNode)observer.observe(paneNode);}
-    width=chart.timeScale().width();height=pane.getHeight();svg.style.width=width+'px';svg.style.height=height+'px';svg.setAttribute('viewBox',`0 0 ${width} ${height}`);if(capture){capture.style.width=width+'px';capture.style.height=height+'px';}
+    if(pane.getHTMLElement()!==paneNode){dirty=true;if(paneNode)observer.unobserve(paneNode);paneNode=pane.getHTMLElement();if(paneNode)observer.observe(paneNode);}
+    width=chart.timeScale().width();height=pane.getHeight();
+    const range=chart.timeScale().getVisibleLogicalRange?.();
+    const reference=drawings[0]?.anchors[0]?.price||window.DataCache?.latestBar?.client?.close||1;
+    const series=getSeries();
+    const geometry=JSON.stringify([key,lastTimeframe,width,height,range?.from,range?.to,
+        series?.priceToCoordinate(reference),series?.priceToCoordinate(reference*1.01)]);
+    // Crosshair motion does not change drawing coordinates. In particular, do
+    // not invalidate SVG/layout on every pointer event in macOS WebKit.
+    if(!dirty&&geometry===lastGeometry)return;
+    svg.replaceChildren();
+    svg.style.width=width+'px';svg.style.height=height+'px';svg.setAttribute('viewBox',`0 0 ${width} ${height}`);if(capture){capture.style.width=width+'px';capture.style.height=height+'px';}
     function paint(d,index){
         if(d.timeframes?.length && !d.timeframes.includes(window.DataCache.timeframe))return;
         const style=d.style||{},color=style.color||"#58b9ff";
@@ -142,6 +152,7 @@ function render(){
         if(draft.length===required)paint({type:select.value,anchors:draft},-1);
         else for(const a of draft){const p=point(a);if(p)node('circle',{cx:p.x,cy:p.y,r:4,fill:'#f5c542','pointer-events':'none'});}
     }
+    lastGeometry=geometry;dirty=false;
 }
 function local(event){const bounds=svg.getBoundingClientRect();return {x:event.clientX-bounds.left,y:event.clientY-bounds.top};}
 function copyDrawing(){
@@ -277,9 +288,9 @@ export function mount(instance){
         }
     });
     window.addEventListener('resize',closeMenu);window.addEventListener('blur',cancelDrag);toolbar.addEventListener('scroll',closeMenu,{passive:true});
-    chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);chart.subscribeCrosshairMove(schedule);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);chart.subscribeCrosshairMove(()=>schedule(false));
     observer=new ResizeObserver(schedule);observer.observe(document.getElementById('chart'));
-    window.addEventListener('pointermove',schedule,{passive:true});window.addEventListener('wheel',schedule,{passive:true});
+    window.addEventListener('pointermove',()=>schedule(false),{passive:true});window.addEventListener('wheel',()=>schedule(false),{passive:true});
     window.addEventListener('chart-settings-change',()=>requestAnimationFrame(schedule));
     window.DataCache.subscribe(()=>{market();schedule();});
     const timer=setInterval(()=>{if(state?.ready&&!state.saving&&!state.error&&!drag&&!draft.length&&!popup.open)void load(state,true);},10000);window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});mode();
