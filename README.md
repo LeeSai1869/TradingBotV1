@@ -14,6 +14,7 @@ context, and produces decisions and chart data. See the
 | [Section_12_Research](Section_12_Research/README.md) | Studies, reports, research UI and exports |
 | [Section_13_Development](Section_13_Development/README.md) | Tests, diagnostics, profiling and archives |
 | [Section_14_Operations](Section_14_Operations/README.md) | Service, account, configuration and storage tools |
+| [Section_15_Execution_Bot](Section_15_Execution_Bot/README.md) | Independent Spot paper worker and execution ledger; real orders disabled |
 | [docs](docs/) | Setup, storage and operational documentation |
 | `packaging/` | Standalone builds, dependencies and vendor assets |
 | `mobile/` | Mobile application source |
