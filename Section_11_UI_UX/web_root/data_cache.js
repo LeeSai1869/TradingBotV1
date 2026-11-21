@@ -32,6 +32,7 @@ const DataCache = {
     _fullRefreshVersion: 0,
     _appliedFullRefreshVersion: 0,
     _storageEpoch: "0:0",
+    _strategyRevision: 0,
     _requests: new Set(),
     listeners: [],
 
@@ -191,6 +192,7 @@ const DataCache = {
             this.liquidity=packet.liquidity??null;
             this.historyPending=!!packet.history_pending;
             this._storageEpoch = packet.storage_epoch ?? "0:0";
+            this._strategyRevision=packet.strategy_revision??0;
             this.bars = packet.bars;
             this._barsVersion=(this._barsVersion||0)+1;
             this.activeBars = this.bars;
@@ -219,7 +221,7 @@ const DataCache = {
         const request = this._fetchPage(this.symbol, this.timeframe, limit, cursor);
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || cursor !== this.nextBefore) return false;
-            if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
+            if ((packet.strategy_revision??0)!==this._strategyRevision || (packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
                 return this.loadInitial(this.symbol, this.timeframe);
             }
             this._merge(packet.bars);
@@ -290,7 +292,7 @@ const DataCache = {
         const work = request.then(packet => {
             if (generation !== this._reloadGeneration || this.loading || !this.atLiveEdge) return false;
             if(limit===WINDOW_BARS)this._appliedFullRefreshVersion=fullVersion;
-            if ((packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
+            if ((packet.strategy_revision??0)!==this._strategyRevision || (packet.storage_epoch ?? "0:0") !== this._storageEpoch) {
                 return this.loadInitial(this.symbol, this.timeframe);
             }
             const wasHistoryPending=this.historyPending;

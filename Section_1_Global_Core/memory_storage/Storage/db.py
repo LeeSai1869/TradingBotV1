@@ -185,9 +185,12 @@ def read_state_range(symbol, interval, start_ms, end_ms):
         feature_rows = features_store.read_range(
             f_conn, symbol, interval, start_ms, end_ms
         )
+        a_conn.execute('BEGIN')
         adcn_rows = adcn_store.read_range(
             a_conn, symbol, interval, start_ms, end_ms
         )
+        from .strategy_store import snapshot_status
+        decision_status=snapshot_status(a_conn,symbol,interval)
 
     features_by_time = {
         int(row["open_time"]): row
@@ -213,6 +216,8 @@ def read_state_range(symbol, interval, start_ms, end_ms):
             "adcn": adcn_by_time.get(open_time),
         })
 
+    from .strategy_store import annotate_status
+    annotate_status(state,symbol,interval,snapshot=decision_status)
     return state
 
 
@@ -221,16 +226,20 @@ def _read_connection(path):
     return sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True, timeout=1)
 
 
-def _read_derived(store, symbol, interval, start_ms, end_ms):
+def _read_derived(store, symbol, interval, start_ms, end_ms, *, with_status=False):
     if not store.DB_PATH.exists():
-        return []
+        return ([],dict(managed=False,enabled=True,through=-1,revision=0)) if with_status else []
     conn = _read_connection(store.DB_PATH)
     try:
+        if store is adcn_store:conn.execute('BEGIN')
         rows=store.read_range(conn, symbol, interval, start_ms, end_ms)
-        if store is adcn_store:
+        if store is adcn_store and not any(row.get('strategy_instance_id') for row in rows):
             from ...decision_evidence import epoch_key
             snapshots=adcn_store.evidence_range(conn,symbol,interval,start_ms,end_ms,epoch_key(symbol,interval))
             for row in rows:row['analysis_snapshot']=snapshots.get((row['open_time'],row.get('signal_type')))
+        if with_status:
+            from .strategy_store import snapshot_status
+            return rows,snapshot_status(conn,symbol,interval)
         return rows
     finally:
         conn.close()
@@ -259,7 +268,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
         return {"bars": [], "next_before": None}
     start_ms, end_ms = int(rows[0][2]), int(rows[-1][2]) + 1
     features = _read_derived(features_store, symbol, interval, start_ms, end_ms)
-    decisions = _read_derived(adcn_store, symbol, interval, start_ms, end_ms)
+    decisions,decision_status = _read_derived(adcn_store, symbol, interval, start_ms, end_ms,with_status=True)
     features_by_time = {int(row["open_time"]): row for row in features}
     decisions_by_time = {int(row["open_time"]): row for row in decisions}
     bars = []
@@ -276,10 +285,12 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
     # Two predecessor rows seed the same Section 8 gate at page boundaries.
     # This is a bounded read-only projection; it does not backfill ADCN memory.
     from Section_8_Decision_Engine.presentation import annotate
+    from . import strategy_store
+    status=strategy_store.annotate_status(bars,symbol,interval,snapshot=decision_status)
     bars=annotate(bars)
     # Most recent windows can still lack replayed features. Never search their
     # entire older history when there is no candidate to display in this page.
-    if any(bar.get('momentum',{}).get('signal_type') for bar in bars[-limit:] if bar.get('momentum')):
+    if status is None and any(bar.get('momentum',{}).get('signal_type') for bar in bars[-limit:] if bar.get('momentum')):
         first_evaluated=bars[2]['open_time'] if len(bars)>2 else bars[0]['open_time']
         last_signal=read_previous_decision_candidate(symbol,interval,first_evaluated)
         bars=annotate(bars,last_signal)
@@ -296,7 +307,7 @@ def read_state_page(symbol, interval, limit=1000, *, before=None,fee_bps=4.,slip
                 (epochs.get(f'symbol:{symbol}',0),epochs.get(f'interval:{interval}',0)))
         finally:raw.close();derived.close()
     bars=evidence(bars,fee_bps=fee_bps,slippage_bps=slippage_bps,seed=seed,context_history=context_history,inventory_seed=inventory_seed)[-limit:]
-    return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None}
+    return {"bars": bars, "next_before": bars[0]['open_time'] if has_more else None, "history_pending":cursor is not None,"strategy_revision":status["revision"] if status else 0}
 
 
 def read_analysis_reference(symbol,interval,reference,before,fee_bps=4.,slippage_bps=2.):
@@ -422,7 +433,7 @@ def read_decision_inputs(symbol,interval,after,limit=200):
 
 
 
-def read_decision_seed(symbol,interval):
+def read_decision_seed(symbol,interval,*,before=None):
     """Latest three raw candles at the committed feature prefix; never a live tail."""
     if not features_store.DB_PATH.exists() or not klines_store.DB_PATH.exists():return []
     from Section_1_Global_Core import data_policy
@@ -431,7 +442,7 @@ def read_decision_seed(symbol,interval):
         features.execute('BEGIN')
         through=features_store.replay_through(features,symbol,interval)
         if through is None:return []
-        rows=klines_store.read_page(raw,symbol,interval,3,before=through+1)
+        rows=klines_store.read_page(raw,symbol,interval,3,before=min(through+1,before) if before is not None else through+1)
         if not rows:return []
         values=features_store.read_di_inputs(features,symbol,interval,rows[0][2],rows[-1][2]+1)
         return [dict(open_time=row[2],close_time=row[8],close=row[6],features=values.get(row[2])) for row in rows]
@@ -639,3 +650,27 @@ def read_sr_snapshot(symbol, interval):
             finally:candles.close()
         return dict(through=row[0]//1000,valid_until=valid_until,current=current,zones=scored,ob_zones=ob_zones,status='feature repair pending' if sr_pending else 'ready')
     finally:conn.close()
+
+
+def read_strategy_inputs(symbol,interval,fields,*,after=-1,limit=100,before=None):
+    """Bounded, read-only requested-feature projection for registered strategies."""
+    requested=set(fields)-{'close'}
+    if requested-set(features_store.COLUMNS):raise ValueError('Strategy requests unknown feature columns')
+    if not 0<=limit<=1000:raise ValueError('Strategy input limit must be 0..1000')
+    if not limit or not features_store.DB_PATH.is_file() or not klines_store.DB_PATH.is_file():return []
+    from Section_1_Global_Core import data_policy
+    with data_policy.snapshot_guard(),ExitStack() as stack:
+        derived=stack.enter_context(closing(_read_connection(features_store.DB_PATH)))
+        raw=stack.enter_context(closing(_read_connection(klines_store.DB_PATH)))
+        derived.execute('BEGIN')
+        cap=derived.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+        if not cap or cap[0] is None:return []
+        through=cap[0];task=features_store.pending_replay(derived,symbol,interval)
+        if task and requested&set(task[2]):through=min(through,task[0])
+        if before is not None:rows=klines_store.read_page(raw,symbol,interval,limit,before=min(before,through+1))
+        else:rows=[r for r in klines_store.read_after_page(raw,symbol,interval,after,limit) if r[2]<=through]
+        if not rows:return []
+        values=features_store.read_replay_inputs(derived,symbol,interval,rows[0][2],rows[-1][2]+1,requested)
+        features_store.mask_replays(derived,symbol,interval,values)
+        indexed={row['open_time']:row for row in values if row.get('formula_version')==3}
+        return [dict(open_time=row[2],close_time=row[8],close=row[6],features=indexed.get(row[2])) for row in rows]

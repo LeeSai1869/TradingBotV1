@@ -28,10 +28,10 @@ let events=[];c.subscribe((cache,event)=>events.push(event));
     await first;
     assert.equal(c.formingBar.client.close,101);
     assert.deepEqual(events,['live','quote']);assert.equal(calls,1);
-    // A missing closed candle must still block a forward jump.
+    // Existing bounded preview tails continue across a delayed stored candle.
     context.fetch=async()=>({ok:true,json:async()=>({symbol:'BTCUSDT',interval:'5m',live:{status:'live',bar:{...forming,time:900,open_time:900000,client:{...forming.client,open_time:900000,close_time:1199999}}}})});
-    await c.refreshLive();assert.equal(c.formingBar.open_time,300000);
-    assert.equal(c.liveStatus,'waiting for stored bar');
+    await c.refreshLive();assert.equal(c.formingBar.open_time,900000);
+    assert.equal(c.liveStatus,'live');assert.equal(c.liveBars.length,2);
     // Loading or browsing old candles must not hide the independent current quote.
     c.loading=true;c.atLiveEdge=false;
     context.fetch=async()=>({ok:true,json:async()=>({symbol:'BTCUSDT',interval:'5m',live:{status:'live',bar:{...forming,client:{...forming.client,close:105}}}})});
@@ -40,7 +40,7 @@ let events=[];c.subscribe((cache,event)=>events.push(event));
     c.loading=false;c.atLiveEdge=true;
     let release;
     context.fetch=()=>new Promise(resolve=>release=resolve);
-    const old=c.refreshLive();++c._reloadGeneration;c.formingBar=null;
+    const old=c.refreshLive();++c._reloadGeneration;c.liveBars=[];
     release({ok:true,json:async()=>({symbol:'BTCUSDT',interval:'5m',live:{status:'live',bar:forming}})});await old;
     assert.equal(c.formingBar,null,'late live response cannot enter another timeframe');
     c.liveEnabled=false;await c.refreshLive();

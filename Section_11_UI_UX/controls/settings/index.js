@@ -7,6 +7,7 @@ import * as admin from "./admin_controls.js";
 import {normalizeMomentum,SOUNDS} from '../../overlays/markers/preferences.js';
 import {renderNotificationSettings,renderSoundSettings,renderCoinDelivery} from '../alerts/index.js';
 import {renderAdcnMemory} from './adcn.js';
+import {renderStrategies} from './strategies.js';
 import {normalizeCandleStyle} from './candle_style.js';
 export const name = "settings";
 const STORAGE = "tradingbot.chart-settings.v1";
@@ -18,7 +19,7 @@ let section = "general", item = "Chart", registry = null, registryError = "";
 const selectedCoins = new Set();
 const sections = {
     general: ["Chart", "Account"], inputs: ["Overview"],
-    features: [ "ADCN Memory", "EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Confidence", "Opportunity", "Momentum Indicator"],
+    features: [ "ADCN Memory", "Strategies", "EMA", "WMA", "RSI", "ADX", "DI", "ATR", "Volume", "Volume Profile", "VWAP", "Market Structure", "Support / Resistance", "FVG", "Order Blocks", "Liquidity", "Confidence", "Opportunity", "Momentum Indicator"],
     notifications:["Delivery"], sounds:["Audio"], hud: ["Comparison"], candles: ["Display"], timeframes: ["Downloads"],
     coins: ["Approved", "Inactive", "Disapproved", "Ineligible", "Pending", "Staged"],
 };
@@ -88,6 +89,7 @@ function reserved(label, explanation) {
     note(explanation);
 }
 function renderFeature() {
+    if(item==='Strategies'){void renderStrategies(content);return;}
     if(item==='ADCN Memory'){void renderAdcnMemory(content);return;}
     if(featureTab==='Data'&&!['Liquidity','Confidence','Opportunity'].includes(item))featureTab='Display';
     if(item==='Confidence'&&featureTab==='Style')featureTab='Display';

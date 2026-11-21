@@ -48,6 +48,9 @@ def _sr_frame(symbol,interval):
 
 
 def handle_get(path, raw_qs, server):
+    from . import strategy_routes
+    status,payload=strategy_routes.dispatch(path,raw_qs,server)
+    if status is not None:return status,payload
     status,payload=event_routes.handle_get(path,raw_qs)
     if status is not None:return status,payload
     status, payload = drawing_routes.handle_get(path, raw_qs, server)

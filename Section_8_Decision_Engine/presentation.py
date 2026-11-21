@@ -5,6 +5,13 @@ from .sequence import alternate
 
 
 def annotate(bars,last_signal=None):
+    if bars and bars[0].get('strategy_managed'):
+        now=int(time.time()*1000)
+        for bar in bars:
+            event=bar.get('adcn') or {}
+            bar['momentum']=({**event,'rule':event.get('trigger')} if
+                event.get('signal_type') in ('BUY','SELL') and bar['client']['close_time']<now else None)
+        return bars
     previous=[];last_close=None;now=int(time.time()*1000)
     for bar in bars:
         client=bar['client'];features=bar.get('features') or {}

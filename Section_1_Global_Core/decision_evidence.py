@@ -6,7 +6,7 @@ provenance. Neither an HTTP read nor a chart refresh writes memory.
 import json
 import time
 from . import data_policy
-from .memory_storage.Storage import adcn_store,features_store
+from .memory_storage.Storage import adcn_store,features_store,strategy_store
 
 _RECOVERY_CURSOR={}
 
@@ -18,6 +18,7 @@ def epoch_key(symbol,interval):
 
 
 def capture(symbol,interval,open_times,*,provenance='closed decision worker',deadline=None):
+    if strategy_store.read_pair(symbol,interval) is not None:return 0
     from .memory_storage.Storage import db
     count=0;epoch=epoch_key(symbol,interval)
     for opened in open_times:
@@ -28,7 +29,7 @@ def capture(symbol,interval,open_times,*,provenance='closed decision worker',dea
         if bar['open_time']!=opened or not context or context['open_time']!=opened:continue
         if context['opportunity'].get('status')!='ready':continue
         with data_policy.locked():
-            if epoch_key(symbol,interval)!=epoch:return count
+            if epoch_key(symbol,interval)!=epoch or strategy_store.read_pair(symbol,interval) is not None:return count
             conn=adcn_store.open_db()
             try:
                 row=adcn_store.read_row(conn,symbol,interval,opened)
@@ -40,6 +41,7 @@ def capture(symbol,interval,open_times,*,provenance='closed decision worker',dea
 
 
 def recover_one(symbol,interval,*,deadline=None):
+    if strategy_store.read_pair(symbol,interval) is not None:return 0
     if not adcn_store.DB_PATH.exists():return 0
     conn=adcn_store.open_db()
     key=(str(adcn_store.DB_PATH),symbol,interval,epoch_key(symbol,interval))
@@ -53,6 +55,7 @@ def recover_one(symbol,interval,*,deadline=None):
 
 def recover_history_page(symbol,interval,*,deadline=None):
     """Persist older chart-projected signals even when ADCN had no original row."""
+    if strategy_store.read_pair(symbol,interval) is not None:return 0
     from .memory_storage.Storage import db
     epoch=epoch_key(symbol,interval);conn=adcn_store.open_db()
     try:state=adcn_store.evidence_scan_state(conn,symbol,interval,epoch)
@@ -64,7 +67,7 @@ def recover_history_page(symbol,interval,*,deadline=None):
               and b['signal_context']['opportunity'].get('status')=='ready']
     count=0
     with data_policy.locked():
-        if epoch_key(symbol,interval)!=epoch:return 0
+        if epoch_key(symbol,interval)!=epoch or strategy_store.read_pair(symbol,interval) is not None:return 0
         conn=adcn_store.open_db()
         try:
             for context in contexts:

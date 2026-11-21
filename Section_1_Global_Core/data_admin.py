@@ -95,6 +95,11 @@ def delete_data(*, interval=None, symbol=None):
                 conn.execute(f'DELETE FROM decisions_memory.decision_rule_state WHERE {column}=?',(value,))
                 conn.execute(f'DELETE FROM decisions_memory.decision_evidence WHERE {column}=?',(value,))
                 conn.execute(f'DELETE FROM decisions_memory.decision_evidence_scan WHERE {column}=?',(value,))
+                for table in ('strategy_events','strategy_checkpoints'):
+                    removed=conn.execute(f'DELETE FROM decisions_memory.{table} WHERE instance_id IN (SELECT id FROM decisions_memory.strategy_instances WHERE {column}=?)',(value,)).rowcount
+                    if table=='strategy_events':counts['decisions']+=removed
+                conn.execute(f'UPDATE decisions_memory.strategy_instances SET enabled=0 WHERE {column}=?',(value,))
+                conn.execute(f'UPDATE decisions_memory.strategy_pairs SET selected_id=NULL,revision=revision+1 WHERE {column}=?',(value,))
                 if conn.execute("SELECT 1 FROM sqlite_master WHERE name='first_close_waits'").fetchone():
                     conn.execute(f'DELETE FROM first_close_waits WHERE {column}=?',(value,))
                 if conn.execute("SELECT 1 FROM sqlite_master WHERE name='history_progress'").fetchone():
@@ -111,3 +116,10 @@ def adcn_maintenance(action='catalog',data=None):
     if action=='apply':return maintenance.apply(data or {})
     if action=='restore':return maintenance.restore((data or {}).get('field'))
     raise ValueError('Unknown ADCN maintenance action')
+
+
+def strategy_management(action='catalog',data=None):
+    from . import strategy_management as manager
+    if action=='catalog':return manager.catalog()
+    if action=='history':return manager.history((data or {}).get('instance_id'),(data or {}).get('limit',100))
+    return manager.change(action,data or {})

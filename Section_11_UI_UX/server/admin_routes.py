@@ -35,6 +35,9 @@ def handle_get(path, server):
 
 
 def handle_post(path, body, server):
+    from . import strategy_routes
+    status,payload=strategy_routes.dispatch(path,'',server,body=body)
+    if status is not None:return status,payload
     if path not in {'/api/login','/api/logout','/api/settings/timeframes','/api/settings/coins','/api/settings/coins/batch','/api/settings/delete','/api/settings/adcn'}:
         return None, None
     origin = server.headers.get('Origin')

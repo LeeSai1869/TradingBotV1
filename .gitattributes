@@ -1,2 +1,5 @@
 # Preserve the Pine reference's existing CRLF format in whitespace checks.
 Section_4_Features/conversion/reference/sections_4_and_5.pine whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Immutable strategy fingerprints must match across checkout platforms.
+Section_8_Decision_Engine/rules/di_turning_point_v*.py text eol=lf

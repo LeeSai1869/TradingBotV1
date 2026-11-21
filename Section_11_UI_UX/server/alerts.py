@@ -188,9 +188,9 @@ def number(bar,field):
     group,key=field.split('.',1)
     if group=='decision':
         decision=bar.get('adcn')
-        if not decision:return None
+        if not decision:return 0 if bar.get('decision_ready') or (bar.get('strategy_managed') and not bar.get('strategy_instance_id')) else None
         if decision.get('signal_type') is None:return 0
-        if decision.get('trigger')!='DI_TURNING_POINT_V3':return None
+        if not decision.get('strategy_instance_id') and decision.get('trigger')!='DI_TURNING_POINT_V3':return None
         return int(decision.get('signal_type')==key.upper())
     packet=bar.get(group)
     value=packet.get(key) if packet else None

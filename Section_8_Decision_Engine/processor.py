@@ -10,6 +10,7 @@ from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import db,adcn_store,features_store
 from .rules import di_turning_point as rule
 from .sequence import alternate
+from Section_1_Global_Core.memory_storage.Storage import strategy_store
 
 _LOCK=threading.RLock()
 _CACHE={}
@@ -57,6 +58,9 @@ def _record(item):
 
 def _advance(symbol,interval,limit=BATCH,deadline=None,*,recent_only=False):
     if not data_policy.enabled(symbol,interval):return 0
+    if strategy_store.read_pair(symbol,interval) is not None:
+        from .strategy_worker import advance_pair
+        return advance_pair(symbol,interval,limit=limit,deadline=deadline)
     # A turn can own many pages; the public raw reader accepts at most 1,000.
     limit=min(1000,limit)
     if limit<=0:return 0
@@ -97,7 +101,10 @@ def _advance(symbol,interval,limit=BATCH,deadline=None,*,recent_only=False):
         if not data_policy.enabled(symbol,interval) or _epoch(symbol,interval)!=epoch:
             reset_pair(symbol,interval);return 0
         conn=adcn_store.open_db()
-        try:adcn_store.commit_rule_rows(conn,symbol,interval,rows,last,json.dumps(new_state,allow_nan=False,separators=(',',':')))
+        try:
+            if strategy_store.pair(conn,symbol,interval) is not None:
+                reset_pair(symbol,interval);return 0
+            adcn_store.commit_rule_rows(conn,symbol,interval,rows,last,json.dumps(new_state,allow_nan=False,separators=(',',':')))
         finally:conn.close()
     state.update(new_state)
     signals=[row['open_time'] for row in rows if row['signal_type'] in ('BUY','SELL')]
@@ -150,6 +157,10 @@ def catch_up(symbol,interval):
 def process_bar(ev):
     if not data_policy.enabled(ev.symbol,ev.timeframe):return False
     with _LOCK:
+        if strategy_store.read_pair(ev.symbol,ev.timeframe) is not None:
+            from .strategy_worker import advance_pair,caught_up
+            advance_pair(ev.symbol,ev.timeframe,deadline=time.monotonic()+.15)
+            return caught_up(ev.symbol,ev.timeframe,ev.open_time)
         state=_load(ev.symbol,ev.timeframe)
         if state['last']<ev.open_time:
             from Section_1_Global_Core import work_priority
@@ -167,6 +178,10 @@ def pending_history(symbol,intervals):
                 with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=.2)) as source:
                     target=source.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
                 if not target or target[0] is None:continue
+                if strategy_store.pair(conn,symbol,interval) is not None:
+                    from .strategy_worker import caught_up
+                    if not caught_up(symbol,interval,target[0]):return True
+                    continue
                 row=conn.execute('SELECT state FROM decision_rule_state WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
                 state=json.loads(row[0]) if row else {}
                 if state.get('version')!=rule.VERSION or state.get('epoch')!=_epoch(symbol,interval) or state.get('last',-1)<target[0]:return True

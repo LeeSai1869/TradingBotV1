@@ -246,6 +246,13 @@
     ],
     "Section_8_Decision_Engine/candle_calendar.py": [
       "Section_1_Global_Core.aggregation_processor"
+    ],
+    "Section_8_Decision_Engine/strategy_worker.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage"
+    ],
+    "Section_11_UI_UX/server/strategy_routes.py": [
+      "Section_1_Global_Core"
     ]
   }
 }

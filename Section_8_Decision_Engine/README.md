@@ -1,6 +1,6 @@
 # Closed-candle DI turning-point decisions
 
-The single active strategy is [rules/di_turning_point.py](rules/di_turning_point.py).
+The default legacy strategy is [rules/di_turning_point.py](rules/di_turning_point.py).
 It applies to every enabled timeframe. Sections 6 and 7 and the old Section 8
 scoring engine have been removed. Sections 9 and 10 are retained; their existing
 score packet import now points at `contracts.py`. They are not newly activated,
@@ -120,3 +120,59 @@ Section 8 never imports confidence/opportunity calculation internals. Chart read
 prefer persisted evidence and never write it. Stored reference prices remain signal closes. Compact arrow flags are drawn
 above/below the decision candle for readability; BUY/SELL and confidence occupy
 two lines. Visual flag placement never changes the recorded price or decision.
+
+
+## Configurable strategy lifecycle
+
+Settings → Features → **Strategies** manages explicit coin/timeframe instances.
+The production catalog currently contains **DI turning point v3**. The selector
+lists reviewed runtime definitions, not arbitrary research reports or executable
+user input. Register later strategies/versions in `strategy_registry.py`; retain
+older implementation files while their instances remain enabled.
+
+- Enable/select a strategy for a registered coin and supported timeframe.
+- Selection changes only which strategy feeds chart markers, decision alerts and
+  future execution consumers. Previously enabled strategies continue computing
+  independently for comparison. They cannot overwrite each other's events/state.
+- Deactivate stops new calculations and event writes. History is retained. If the
+  selected strategy is deactivated, no comparison strategy is silently selected.
+- Re-enable resumes from now and retains the preceding accepted direction;
+  candles observed while paused are not silently backfilled.
+- Explicit history start requests bounded backfill. A blank start means now;
+  the currently forming candle can emit its first event only after it closes.
+  Existing legacy history is retained separately; no bulk migration is performed.
+  When first selecting a different version on a legacy pair, its implicit v3
+  rule is retained as an enabled comparison and adopts its committed checkpoint.
+- Preview/delete requires an inactive instance, an unchanged preview token and
+  its typed confirmation. Only that instance's configuration, events and small
+  checkpoint are removed. A managed-pair tombstone prevents legacy recovery from
+  recreating deleted history. Shared candles/features/analytical data are retained.
+
+ADCN adds a small immutable `strategy_versions` registry plus `strategy_pairs`, `strategy_instances`, `strategy_checkpoints` and
+`strategy_events`. Event identity is instance + calculation epoch + candle time;
+instances pin symbol, timeframe, strategy identifier, immutable version and
+source fingerprint. Only accepted confirmed **BUY/SELL** events acquire event
+rows. Immutable payloads retain the decision, signal close, version identity and
+causal rule inputs. WAIT, WARMUP and SUPPRESSED candles have no new event row.
+Checkpoints retain bounded lookback and alternation state atomically with events.
+Changes to source-data epochs retain older generations for comparison while the
+chart uses the current generation. Source changes require a new registered
+version; editing a pinned implementation stops that instance's calculation.
+
+Legacy pairs continue to work until explicitly managed. Their future rule writes
+are also sparse; existing archive rows and evidence are not bulk-deleted. A
+recalculated non-signal clears obsolete DI flags without erasing unrelated
+archived columns. Consumers use checkpoint readiness rather than fake WAIT rows.
+
+The selected chart history and checkpoint readiness come from one read snapshot.
+Selection revisions force cached chart history to reload, including in another
+browser session. Administration is authenticated, admin-only and same-origin.
+
+This change creates no exchange orders, credentials, capital allocations or
+position ledger. The Binance execution service is a subsequent integration and
+must pin each open position's original strategy/version/exit policy independently
+of later chart selection or signal-history deletion.
+
+Validation uses isolated SQLite databases and a signed-in browser flow covering
+configuration, selection, comparison isolation, pause/resume, deletion and cache
+invalidation. Version 4 in the tests is a fixture, not a shipped strategy.

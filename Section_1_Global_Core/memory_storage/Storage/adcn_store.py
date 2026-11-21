@@ -8,7 +8,8 @@ Holds:
     Current Section 8 decisions
     Archived Section 6/7 columns retained for stored-data compatibility
 
-One row per (symbol, interval, open_time).
+Legacy decisions: one row per (symbol, interval, open_time).
+Managed strategies: sparse, version-isolated strategy_events and checkpoints.
 
 Interpretations change when engine logic changes. Section 4's
 permanent per-bar features live in features_store.py instead.
@@ -95,6 +96,8 @@ def open_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     try:
         conn.executescript(_SCHEMA)
+        from .strategy_store import SCHEMA as STRATEGY_SCHEMA
+        conn.executescript(STRATEGY_SCHEMA)
         conn.execute('CREATE TABLE IF NOT EXISTS retired_fields(field TEXT PRIMARY KEY)')
         conn.execute("CREATE TABLE IF NOT EXISTS decision_rule_state (symbol TEXT, interval TEXT, last_open_time INTEGER, state TEXT NOT NULL, PRIMARY KEY(symbol,interval))")
         conn.execute("""CREATE TABLE IF NOT EXISTS decision_evidence (
@@ -132,6 +135,8 @@ def insert_rows(conn: sqlite3.Connection, rows: list[dict]) -> int:
 
 
 def has_row(conn, symbol, interval, open_time) -> bool:
+    from .strategy_store import selected
+    if selected(conn,symbol,interval) is not None:return read_row(conn,symbol,interval,open_time) is not None
     cur = conn.execute(
         "SELECT 1 FROM decisions WHERE symbol=? AND interval=? AND open_time=?",
         (symbol, interval, open_time),
@@ -140,6 +145,9 @@ def has_row(conn, symbol, interval, open_time) -> bool:
 
 
 def read_row(conn, symbol, interval, open_time):
+    from .strategy_store import projection
+    managed=projection(conn,symbol,interval,open_time,open_time+1)
+    if managed is not None:return managed[0] if managed else None
     cur = conn.execute(
         f"""
         SELECT {",".join(COLUMNS)} FROM decisions
@@ -159,6 +167,9 @@ def read_range(conn, symbol, interval, start_ms, end_ms):
 
     Returns dictionaries keyed by COLUMNS.
     """
+    from .strategy_store import projection
+    managed=projection(conn,symbol,interval,start_ms,end_ms)
+    if managed is not None:return managed
     cur = conn.execute(
         f"""
         SELECT {",".join(COLUMNS)} FROM decisions
@@ -176,6 +187,9 @@ def read_previous_state(conn, symbol, interval, open_time):
     Most recent decisions row strictly before open_time.
     Carries swing state forward from the previous bar.
     """
+    from .strategy_store import previous_projection
+    managed=previous_projection(conn,symbol,interval,open_time)
+    if managed is not None:return managed[0] if managed else None
     cur = conn.execute(
         f"""
         SELECT {",".join(COLUMNS)} FROM decisions
@@ -195,6 +209,9 @@ def last_signal_for(conn, symbol: str, interval: str):
     Most recent fired BUY or SELL for (symbol, interval).
     Returns (signal_type, open_time) or (None, None).
     """
+    from .strategy_store import previous_projection
+    managed=previous_projection(conn,symbol,interval,2**63-1)
+    if managed is not None:return (managed[0]['signal_type'],managed[0]['open_time']) if managed else (None,None)
     cur = conn.execute(
         """
         SELECT signal_type, open_time FROM decisions
@@ -213,6 +230,15 @@ def last_signal_for(conn, symbol: str, interval: str):
 def read_signals(conn, symbol, interval, limit=None):
     """Every BUY/SELL row for (symbol, interval), oldest first.
     One query. No range, no loop."""
+    from . import strategy_store
+    choice=strategy_store.selected(conn,symbol,interval)
+    if choice is not None:
+        item=choice['instance']
+        if not item:return []
+        sql='SELECT open_time,side FROM strategy_events WHERE instance_id=? AND epoch=? ORDER BY open_time DESC'
+        args=[item['id'],strategy_store.epoch(symbol,interval)]
+        if limit is not None:sql+=' LIMIT ?';args.append(limit)
+        return [(symbol,interval,r[0],r[1],None) for r in reversed(conn.execute(sql,args).fetchall())]
     if limit is not None:
         cur = conn.execute(
             "SELECT symbol, interval, open_time, signal_type, final_score "
@@ -235,7 +261,10 @@ def read_signals(conn, symbol, interval, limit=None):
 
 
 def last_open_time(conn, symbol, interval):
-    """Latest open_time in decisions for (symbol, interval). Any row."""
+    """Latest stored decision/event for the selected strategy (legacy: any row)."""
+    from .strategy_store import previous_projection
+    managed=previous_projection(conn,symbol,interval,2**63-1)
+    if managed is not None:return managed[0]["open_time"] if managed else None
     cur = conn.execute(
         "SELECT MAX(open_time) FROM decisions WHERE symbol=? AND interval=?",
         (symbol, interval),
@@ -271,7 +300,12 @@ def commit_rule_rows(conn,symbol,interval,rows,last_open_time,state):
     """Update this rule's decision fields without erasing unrelated score columns."""
     with conn:
         conn.executemany('INSERT INTO decisions(symbol,interval,open_time,signal_type,decision_state,trigger,final_score) VALUES (?,?,?,?,?,?,NULL) ON CONFLICT(symbol,interval,open_time) DO UPDATE SET signal_type=excluded.signal_type,decision_state=excluded.decision_state,trigger=excluded.trigger,final_score=NULL',
-                         [(symbol,interval,row['open_time'],row['signal_type'],row['decision_state'],row['trigger']) for row in rows])
+                         [(symbol,interval,row['open_time'],row['signal_type'],row['decision_state'],row['trigger']) for row in rows if row['signal_type'] in ('BUY','SELL')])
+        # A recalculated non-signal must not leave an older accepted flag behind.
+        # Clear only this rule's fields in existing legacy rows; never insert a
+        # WAIT row or erase unrelated archived interpretations/scores.
+        conn.executemany("UPDATE decisions SET signal_type=NULL,decision_state=NULL,trigger=NULL,final_score=NULL WHERE symbol=? AND interval=? AND open_time=? AND trigger='DI_TURNING_POINT_V3'",
+            [(symbol,interval,row['open_time']) for row in rows if row['signal_type'] not in ('BUY','SELL')])
         conn.execute('INSERT OR REPLACE INTO decision_rule_state VALUES (?,?,?,?)',(symbol,interval,last_open_time,state))
 
 
