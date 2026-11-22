@@ -13,6 +13,8 @@ class Element {
     replaceChildren(...nodes){for(const child of this.children)child.parent=null;this.children=[];this.append(...nodes);}
     setAttribute(key,value){this.attributes[key]=String(value);if(key==='id')this.id=String(value);if(key.startsWith('data-'))this.dataset[key.slice(5)]=String(value);}
     getAttribute(key){return this.attributes[key]??null;}
+    removeAttribute(key){delete this.attributes[key];if(key.startsWith('data-'))delete this.dataset[key.slice(5)];}
+    insertBefore(node,before){node.remove();node.parent=this;this.children.splice(this.children.indexOf(before),0,node);}
     hasAttribute(key){return key in this.attributes;}
     contains(node){return this===node||this.children.some(child=>child.contains(node));}
     closest(selector){if(selector==='[data-drawing]'&&this.hasAttribute('data-drawing'))return this;return this.parent?.closest(selector)||null;}
@@ -160,12 +162,14 @@ test('unchanged pointer motion retains SVG nodes; scaling and content edits inva
     for(let i=0;i<100;i++)f.motion();
     assert.equal(f.group(),initial,'crosshair-only motion must not rebuild SVG');
     f.series.priceToCoordinate=p=>1100-p;f.motion();
-    const scaled=f.group();assert.notEqual(scaled,initial,'vertical scaling must redraw geometry');
+    const scaled=f.group();assert.equal(scaled,initial,'vertical scaling updates retained drawing geometry');
     assert.equal(scaled.children[0].getAttribute('y1'),'300');
     f.motion();assert.equal(f.group(),scaled);
     const scale=f.chart.timeScale();scale.getVisibleLogicalRange=()=>({from:10,to:50});
+    const oldCoordinate=scale.timeToCoordinate;scale.timeToCoordinate=t=>oldCoordinate(t)+20;
     f.chart.timeScale=()=>scale;f.motion();
-    const panned=f.group();assert.notEqual(panned,scaled,'time range changes must redraw geometry');
+    const panned=f.group();assert.equal(panned,scaled,'time range changes retain nodes');
+    assert.equal(panned.children[0].getAttribute('x1'),'120','horizontal pan updates the existing line');
     f.motion();assert.equal(f.group(),panned);
-    f.invalidate();assert.notEqual(f.group(),panned,'content/style invalidations still redraw');
+    f.invalidate();assert.equal(f.group(),panned,'an unchanged forced render retains node identity');
 });
