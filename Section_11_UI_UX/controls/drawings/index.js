@@ -2,13 +2,27 @@ import {getSeries} from '../../overlays/candles/index.js';
 import {TOOLS,fibLevels,normalizeDrawings} from './geometry.js';
 export const name='drawings';
 const NS='http://www.w3.org/2000/svg';
-let capture;
+let capture,renderNodes=null;
 let chart,svg,select={value:'pointer'},hint,popup,menu,menuButton,buttons=[],drawings=[],draft=[],selected=-1,key='',drag=null,undo=[],frame=0,state,toolStatus,clipboard=null,interactionOptions;
 const collections=new Map();
 const INTERVALS=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'];
 let width=0,height=0,paneNode,observer,lastTimeframe='',dirty=true,lastGeometry=null;
 function schedule(force=true){if(force!==false)dirty=true;if(!frame)frame=requestAnimationFrame(()=>{frame=0;render();});}
-function node(tag,attrs,parent=svg,text){const n=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(text)n.textContent=text;parent.append(n);return n;}
+function node(tag,attrs,parent=svg,text){
+    const index=renderNodes?.get(parent)||0;
+    let n=renderNodes?parent.children[index]:null;
+    if(!n||n.tagName.toLowerCase()!==tag){
+        const created=document.createElementNS(NS,tag);
+        if(n){parent.insertBefore(created,n);n.remove();}else parent.append(created);
+        n=created;
+    }
+    for(const key of n._drawingAttributes||[])if(!(key in attrs))n.removeAttribute(key);
+    for(const [key,value] of Object.entries(attrs))if(n.getAttribute(key)!==String(value))n.setAttribute(key,value);
+    n._drawingAttributes=Object.keys(attrs);
+    if(text!==undefined&&n.textContent!==text)n.textContent=text;
+    if(renderNodes)renderNodes.set(parent,index+1);
+    return n;
+}
 async function request(symbol,data){
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
     try{
@@ -118,7 +132,8 @@ function render(){
     // Crosshair motion does not change drawing coordinates. In particular, do
     // not invalidate SVG/layout on every pointer event in macOS WebKit.
     if(!dirty&&geometry===lastGeometry)return;
-    svg.replaceChildren();
+    renderNodes=new Map([[svg,0]]);
+    try{
     svg.style.width=width+'px';svg.style.height=height+'px';svg.setAttribute('viewBox',`0 0 ${width} ${height}`);if(capture){capture.style.width=width+'px';capture.style.height=height+'px';}
     function paint(d,index){
         if(d.timeframes?.length && !d.timeframes.includes(window.DataCache.timeframe))return;
@@ -152,6 +167,8 @@ function render(){
         if(draft.length===required)paint({type:select.value,anchors:draft},-1);
         else for(const a of draft){const p=point(a);if(p)node('circle',{cx:p.x,cy:p.y,r:4,fill:'#f5c542','pointer-events':'none'});}
     }
+    for(const [parent,count] of renderNodes)while(parent.children.length>count)parent.children[parent.children.length-1].remove();
+    }finally{renderNodes=null;}
     lastGeometry=geometry;dirty=false;
 }
 function local(event){const bounds=svg.getBoundingClientRect();return {x:event.clientX-bounds.left,y:event.clientY-bounds.top};}

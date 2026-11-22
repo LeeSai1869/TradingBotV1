@@ -49,6 +49,18 @@ async def exercise(base,library):
         await settle(page)
         assert await page.evaluate('document.querySelector("#drawing-overlay > g")===drawingBeforeMotion')
         print('PASS: crosshair motion retains existing SVG drawing nodes',flush=True)
+        await page.evaluate('''() => {
+            window.drawingRange=Canvas.chart.timeScale().getVisibleLogicalRange();
+            window.drawingLine=document.querySelector('#drawing-overlay > g line');
+            window.drawingX=drawingLine.getAttribute('x1');
+            Canvas.chart.timeScale().setVisibleLogicalRange({from:drawingRange.from-3,to:drawingRange.to-3});
+        }''')
+        await settle(page)
+        assert await page.evaluate("document.querySelector('#drawing-overlay > g line')===drawingLine && drawingLine.getAttribute('x1')!==drawingX")
+        await page.evaluate('Canvas.chart.timeScale().setVisibleLogicalRange(drawingRange)')
+        await settle(page)
+        print('PASS: panning updates existing drawing coordinates without replacing SVG nodes',flush=True)
+
 
         await click(490,280);await settle(page)
         popup=page.get_by_role('dialog',name='Drawing style')

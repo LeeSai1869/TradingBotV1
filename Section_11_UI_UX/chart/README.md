@@ -102,3 +102,7 @@ boxes are discarded. Heatmap timestamp-to-candle assignment is prepared on data
 updates, and observations share one viewport-coordinate lookup per candle during
 panning, with exact gap rejection retained. `getPaintStats()` reports cache use
 for diagnostic checks, without changing saved settings.
+Drawing geometry updates during pan/zoom also retain compatible SVG groups,
+lines, text and handles, updating only changed attributes and removing surplus
+nodes. This avoids allocating/replacing the drawing tree on every drag frame;
+selection, hit targets, saved geometry and cross-timeframe filtering are retained.
