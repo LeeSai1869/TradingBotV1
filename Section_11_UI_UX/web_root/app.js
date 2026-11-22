@@ -1,4 +1,5 @@
 import { requireSignIn } from "./login.js";
+import { coalesceRender } from "./render_queue.js";
 import { logicalShift, readableRange } from "./window_state.js";
 import * as symbolControl from "../controls/symbol/index.js";
 import * as timeframeControl from "../controls/timeframe/index.js";
@@ -78,6 +79,9 @@ async function loadAll() {
         const scope = `${DataCache.symbol}:${DataCache.timeframe}`;
         const reset = pending.reset || renderedScope !== scope;
         pending = null;
+        if(op==='liquidity'&&!reset&&!latest&&renderedScope===scope){
+            Composer.updateLiquidity(chart,DataCache);return;
+        }
         if(op==='live'&&!reset&&!latest&&renderedScope===`${DataCache.symbol}:${DataCache.timeframe}`&&DataCache.formingBar&&renderedBars.at(-1)?.provisional&&renderedBars.at(-1).time===DataCache.formingBar.time){
             Composer.updateLive(chart,DataCache);
             renderedBars=DataCache.renderBars;
@@ -144,8 +148,7 @@ async function loadAll() {
             return;
         }
         const reset=needsRecovery || op === "reload" || op === "loading";
-        pending = { op:pending?.op==='settings'&&!reset?'settings':op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
-            latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
+        pending = coalesceRender(pending,op,reset);
         render();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(checkBoundary);

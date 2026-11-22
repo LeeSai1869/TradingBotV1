@@ -48,6 +48,18 @@ async def exercise(base,library):
             assert await page.evaluate("import('/overlays/candles/index.js').then(m=>m.getSeries().data().map(({time,open,high,low,close})=>({time,open,high,low,close})))")==candle_points
             assert await page.locator('.liquidity-status').count()==0
             assert await page.evaluate('DataCache.liquidity.history.length')==30
+            before=await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.getPaintStats())")
+            chart_box=await page.locator('#chart').bounding_box()
+            await page.mouse.move(chart_box['x']+100,chart_box['y']+100)
+            await page.mouse.move(chart_box['x']+500,chart_box['y']+130,steps=20)
+            await settle(page)
+            await page.evaluate("async()=>{const m=await import('/overlays/liquidity/index.js');m.updateLive();}")
+            await settle(page)
+            after=await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.getPaintStats())")
+            assert after['heatmap']['hits']>before['heatmap']['hits'],(before,after)
+            assert after['profile']['hits']>before['profile']['hits'],(before,after)
+            print('PASS: real chart unchanged live repaints reuse heatmap and depth-profile pixels',flush=True)
+
             assert await page.locator('.liquidity-book').count()==0
             assert await page.evaluate("import('/overlays/liquidity/index.js').then(m=>m.profileRows(DataCache.liquidity.latest,Composer.config.featureStyles).some(r=>r.bid>0&&r.ask>0))")
             assert await page.evaluate('Composer.config.featureStyles.liquidity_bids.lengthPercent')==35

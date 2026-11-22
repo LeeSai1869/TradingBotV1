@@ -43,6 +43,13 @@ async def exercise(base,library):
                 await page.get_by_role('button',name='Retry saving drawings',exact=True).click()
                 await page.wait_for_function("document.querySelector('.drawing-notice').textContent==='Drawings saved to your account.'")
         assert await overlay.locator(':scope > g').count()==5
+        await page.evaluate('window.drawingBeforeMotion=document.querySelector("#drawing-overlay > g")')
+        await page.mouse.move(chart['x']+50,chart['y']+80)
+        await page.mouse.move(chart['x']+600,chart['y']+120,steps=20)
+        await settle(page)
+        assert await page.evaluate('document.querySelector("#drawing-overlay > g")===drawingBeforeMotion')
+        print('PASS: crosshair motion retains existing SVG drawing nodes',flush=True)
+
         await click(490,280);await settle(page)
         popup=page.get_by_role('dialog',name='Drawing style')
         await popup.wait_for()

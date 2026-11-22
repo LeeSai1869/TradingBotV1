@@ -77,3 +77,28 @@ settings updates retain priority over metadata refreshes, so series-skip logic
 cannot swallow a display/style change. The signed-in market regression covers a
 BTC/ETH switch, injected viewport failure, volume-average styles during concurrent
 refresh, wrong-market candle rejection and a subsequent valid reload.
+
+Liquidity-only notifications retain their incremental path even when they arrive
+between a render and its animation-frame release. They cannot replace queued
+history, settings, market resets or live-candle work. The composer also avoids
+rebuilding unchanged candle, indicator and zone series for a liquidity-only
+render. Actual bar/version changes and viewport resets still run the full path;
+this changes scheduling, not chart settings, data retention or visual styles.
+
+The drawing SVG is retained during crosshair-only pointer motion. Its viewport key
+includes the market/timeframe, pane dimensions, logical time range and two price
+coordinates, so horizontal/vertical panning and scaling invalidate the geometry.
+Drawing edits, selection/dragging, settings and data notifications still request
+a content redraw. This avoids repeatedly clearing/recreating SVG nodes when their
+coordinates are unchanged; it does not hide or simplify any drawing.
+
+Liquidity heatmap/depth and filled volume-profile layers retain a transparent
+Retina-resolution bitmap for an unchanged viewport. Their original paint commands
+run again on data/style changes, pan, price-scale changes, resize, DPR changes or
+liquidity expiry. The cache is capped at 16 MiB per layer; unsupported transforms,
+allocation failures and oversized viewports use the original direct renderer.
+Hidden/detached layers release their bitmaps. No samples, prices, styles or hover
+boxes are discarded. Heatmap timestamp-to-candle assignment is prepared on data
+updates, and observations share one viewport-coordinate lookup per candle during
+panning, with exact gap rejection retained. `getPaintStats()` reports cache use
+for diagnostic checks, without changing saved settings.

@@ -46,6 +46,21 @@ async def exercise_live(base, library):
                 series.setData=(...args)=>{liveAudit.setData++;return set(...args);};
                 series.update=(...args)=>{liveAudit.update++;return tick(...args);};
             }''')
+            await page.evaluate('''() => {
+                const visual=Composer.visuals.find(v=>v.name==='indicators');
+                window.queueAudit={indicators:0,original:visual.update,visual,index:Composer.visuals.indexOf(visual)};
+                Composer.visuals[queueAudit.index]={...visual,update(...args){queueAudit.indicators++;return queueAudit.original.apply(visual,args);}};
+                DataCache.emit('history');DataCache.emit('liquidity');
+            }''')
+            await settle(page)
+            assert await page.evaluate('queueAudit.indicators') == 1, await page.evaluate('({calls:queueAudit.indicators,ops:ChartRenderTimings.map(t=>t.op)})')
+            await page.evaluate("queueAudit.indicators=0;DataCache.emit('history');DataCache.emit('history');DataCache.emit('liquidity');")
+            await settle(page)
+            assert await page.evaluate('queueAudit.indicators') == 2
+            assert await page.evaluate('ChartRenderTimings.at(-1).op') == 'history'
+            await page.evaluate('Composer.visuals[queueAudit.index]=queueAudit.visual;liveAudit.setData=0;liveAudit.update=0')
+            print('PASS: queued liquidity avoids full indicator redraw and preserves queued history',flush=True)
+
             count=db.count_klines('BTCUSDT','15m')
             state['bar']=quote(T,131)
             await page.evaluate('DataCache.refreshLive()')

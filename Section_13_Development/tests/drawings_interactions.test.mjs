@@ -63,7 +63,7 @@ async function fixture(){
     function pointer(type,target,x,y){const event={button:0,pointerId:7,target,clientX:x,clientY:y,preventDefault(){},stopPropagation(){}};if(type==='pointerdown')document.dispatch(type,event);svg.dispatch(type,event);flush();}
     function key(value,extra={}){const event={key:value,target:document.body,preventDefault(){this.prevented=true;},...extra};document.dispatch('keydown',event);flush();return event;}
     function group(index=0){return svg.children.find(n=>n.dataset.drawing===String(index));}
-    return {document,toolbar,chartElement,svg,popup,menu,button,pointer,key,group,settle,flush,data,original,options:()=>options,saved:()=>saved,requests,failSave:()=>failNext=true};
+    return {motion:()=>{context.schedule(false);flush();},invalidate:()=>{context.schedule();flush();},series,chart,document,toolbar,chartElement,svg,popup,menu,button,pointer,key,group,settle,flush,data,original,options:()=>options,saved:()=>saved,requests,failSave:()=>failNext=true};
 }
 
 test('one toolbar button contains all tools including both Fibonacci tools and dismisses outside',async()=>{
@@ -152,4 +152,20 @@ test('failed drawing saves remain recoverable from inside the compact menu',asyn
     f.button('Drawings').onclick();const retry=f.button('Retry saving drawings');assert.equal(retry.parent,f.menu);
     retry.onclick();await f.settle();assert.equal(f.requests.length,1);assert.equal(f.saved()[0].anchors[0].price,780);
     assert.equal(f.button('Trend line').disabled,false);assert.equal(f.menu.hidden,true);
+});
+
+
+test('unchanged pointer motion retains SVG nodes; scaling and content edits invalidate them',async()=>{
+    const f=await fixture(),initial=f.group();
+    for(let i=0;i<100;i++)f.motion();
+    assert.equal(f.group(),initial,'crosshair-only motion must not rebuild SVG');
+    f.series.priceToCoordinate=p=>1100-p;f.motion();
+    const scaled=f.group();assert.notEqual(scaled,initial,'vertical scaling must redraw geometry');
+    assert.equal(scaled.children[0].getAttribute('y1'),'300');
+    f.motion();assert.equal(f.group(),scaled);
+    const scale=f.chart.timeScale();scale.getVisibleLogicalRange=()=>({from:10,to:50});
+    f.chart.timeScale=()=>scale;f.motion();
+    const panned=f.group();assert.notEqual(panned,scaled,'time range changes must redraw geometry');
+    f.motion();assert.equal(f.group(),panned);
+    f.invalidate();assert.notEqual(f.group(),panned,'content/style invalidations still redraw');
 });

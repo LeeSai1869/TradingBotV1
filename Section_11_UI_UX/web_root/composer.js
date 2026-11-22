@@ -105,11 +105,13 @@ const Composer = {
     updateAll(chart, data, op = "reload", options = {}) {
         const timings=[],started=performance.now();
         const key=`${data.symbol}:${data.timeframe}:${data._barsVersion}:${data._liveVersion||0}`;
+        const sameSeries=Number.isFinite(data._barsVersion)&&this._seriesKey===key;
+        const liquidityOnly=op==='liquidity'&&!options.resetViewport&&sameSeries;
         const unchanged=op==='stored-refresh'&&!options.resetViewport&&Number.isFinite(data._barsVersion)&&this._seriesKey===key;
         for (const v of this.visuals) {
             const before=performance.now();
             try {
-                if (v.update && !(unchanged&&['candles','ema50','indicators','markers'].includes(v.name))) {
+                if (v.update && (!liquidityOnly||v.name==='liquidity') && !(unchanged&&['candles','ema50','indicators','markers'].includes(v.name))) {
                     v.update(chart, data, { ...options, op, visible: this.config.display?.[v.name] !== false });
                 }
             } catch (e) {
@@ -136,7 +138,7 @@ const Composer = {
         }
         this._seriesKey=key;
         const records=window.ChartRenderTimings??=[];
-        records.push({op,bars:data.bars?.length??0,ms:Math.round((performance.now()-started)*100)/100,visuals:timings});
+        records.push({at:started,op,bars:data.bars?.length??0,ms:Math.round((performance.now()-started)*100)/100,visuals:timings});
         if(records.length>10)records.shift();
     },
 };
