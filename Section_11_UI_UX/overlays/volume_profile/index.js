@@ -1,5 +1,6 @@
 // One current closed-candle profile, projected from the runner's stored bins.
 import {getSeries} from '../candles/index.js';
+import {PaintCache,viewportKey} from '../../chart/paint_cache.js';
 export const name='volumeProfile';
 let primitive,status,profile=null;
 const styles=()=>window.Composer.config.featureStyles||{};
@@ -24,12 +25,14 @@ export function barGeometry(row,coordinate,paneWidth,config){
     return {left:paneWidth-5-width,top:Math.min(a,b),width,height};
 }
 class Profile {
-    attached({series,requestUpdate}){this.series=series;this.requestUpdate=requestUpdate;}
-    detached(){this.series=null;this.requestUpdate=null;}
+    constructor(){this.paintCache=new PaintCache();this.paintRevision=0;}
+    attached({chart,series,requestUpdate}){this.chart=chart;this.series=series;this.requestUpdate=requestUpdate;}
+    detached(){this.paintCache.clear();this.chart=null;this.series=null;this.requestUpdate=null;}
     paneViews(){return [this];}renderer(){return this;}zOrder(){return 'bottom';}
     draw(target){
         if(!this.series||!profile)return;
-        target.useMediaCoordinateSpace(({context,mediaSize})=>{
+        const key=[this.paintRevision,...viewportKey(this.chart,this.series,profile.bins?.[0]?.low||1)];
+        target.useMediaCoordinateSpace(scope=>this.paintCache.draw(scope,key,({context,mediaSize})=>{
             const config=styles();
             for(const row of histogramRows(profile,config)){
                 const box=barGeometry(row,value=>this.series.priceToCoordinate(value),mediaSize.width,config);
@@ -38,7 +41,7 @@ class Profile {
                 context.save();context.fillStyle=style.color;context.globalAlpha=style.opacity/100;
                 context.fillRect(box.left,box.top,box.width,box.height);context.restore();
             }
-        });
+        }));
     }
 }
 export function mount(){
@@ -48,11 +51,13 @@ export function mount(){
     document.getElementById('chart').append(status);
 }
 export function update(chart,data){
+    primitive.paintRevision++;primitive.paintCache.invalidate();
     const config=styles(),enabled=['vp_histogram','vp_hvn_nodes','vp_lvn_nodes'].some(key=>config[key]?.visible);
     const latest=(data.bars||[]).findLast(b=>!b.provisional),candidate=data.volumeProfile;
     const matching=candidate?.as_of===latest?.open_time;
     const updating=candidate?.stale===true&&candidate.as_of<latest?.open_time&&candidate.requested_time===latest?.open_time;
     profile=enabled&&candidate?.status==='ready'&&(matching||updating)?candidate:null;
+    if(!profile)primitive.paintCache.clear();
     status.hidden=!enabled;
     const stamp=time=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(time))+' PKT';
     status.title=profile?`Volume profile · ${profile.lookback} closed candles · source candle ${stamp(profile.as_of)}${profile.stale?`; updating toward ${stamp(profile.requested_time)}`:''}`:(candidate?.reason||'Waiting for closed-candle volume profile');
@@ -61,3 +66,5 @@ export function update(chart,data){
 }
 export function updateLive(){/* Current profile changes on committed closed candles only. */}
 export function getProfile(){return profile;}
+
+export function getPaintStats(){return {...primitive?.paintCache.stats};}

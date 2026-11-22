@@ -90,3 +90,21 @@ test('subpixel observed profile bins stay legible without changing price bounds 
     assert.equal(segment.band,band);assert.equal(band.high,100.01);assert.equal(band.notional_usdt,50);
     assert.ok(Math.abs(segment.y+segment.height/2-(1000-(row.low+row.high)/2))<1e-10);
 });
+
+test('heatmap samples retain exact candle/gap alignment and share viewport coordinates',async()=>{
+    const {samplePosition,sampleX}=await import('../../Section_11_UI_UX/overlays/liquidity/index.js');
+    const bars=[{time:0,open_time:0,client:{close_time:299999}},
+                {time:600,open_time:600000,client:{close_time:899999}}];
+    assert.equal(samplePosition(bars,-1),null);
+    assert.equal(samplePosition(bars,450000),null,'never project through a candle gap');
+    assert.deepEqual(samplePosition(bars,150000),{time:0,fraction:.5});
+    assert.deepEqual(samplePosition(bars,600000),{time:600,fraction:0});
+    let calls=0;
+    const scale={timeToCoordinate:time=>{calls++;return time?100:50;}},cache=new Map();
+    for(let t=0;t<300000;t+=5000){
+        const x=sampleX(samplePosition(bars,t),scale,10,cache);
+        assert.ok(Math.abs(x-(45+10*t/300000))<1e-10);
+    }
+    assert.equal(calls,1,'60 book observations share one candle-coordinate lookup per paint');
+    assert.equal(sampleX(null,scale,10,cache),null);
+});

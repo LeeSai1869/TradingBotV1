@@ -34,3 +34,8 @@ entries in the old ten-item render ring are not evidence of a stall during the
 sample; lifetime zone build counts likewise do not measure builds per second.
 The report explicitly states whether long-task observation is supported and lists
 visible feature keys to help compare client configurations.
+
+The current report also includes optional `paint_stats` from the liquidity and
+volume-profile primitives. These are lifetime counters, not sampled rates. Native
+Mac verification remains distinct from the Linux Chromium pixel/interaction
+regressions; a successful synthetic cache benchmark is not a Mac FPS claim.

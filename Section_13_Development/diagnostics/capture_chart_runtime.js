@@ -42,6 +42,10 @@
     const quantile=p=>{const sorted=[...samples].sort((a,b)=>a-b);return Math.round(sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))]||0);};
     let zones=null;
     try{zones=(await import('/overlays/zones/index.js')).getProjectionStats?.();}catch(error){zones={error:String(error)};}
+    const paintStats={};
+    for(const path of ['/overlays/liquidity/index.js','/overlays/volume_profile/index.js']){
+        try{paintStats[path]=(await import(path)).getPaintStats?.()??null;}catch{}
+    }
     const entries=resourceObserver?requests:performance.getEntriesByType('resource');
     const resources=entries.filter(e=>{
         try{return e.startTime>=started&&e.responseEnd<=ended&&new URL(e.name).pathname.startsWith('/api/');}catch{return false;}
@@ -53,7 +57,7 @@
         visible_features:Object.entries(window.Composer?.config?.featureStyles||{}).filter(([,v])=>v.visible).map(([k])=>k).sort(),
         market:{symbol:cache?.symbol,interval:cache?.timeframe,cached_bars:cache?.bars?.length,rendered_bars:cache?.renderBars?.length,
             loading:cache?.loading,live_status:cache?.liveStatus,last_stored_open:cache?.bars?.at(-1)?.open_time,
-            last_live_open:cache?.formingBar?.open_time,live_price:cache?.liveQuote?.client?.close},zones,
+            last_live_open:cache?.formingBar?.open_time,live_price:cache?.liveQuote?.client?.close},zones,paint_stats:paintStats,
         render_timings:renders,recent_requests:resources};
     console.log('CHART RUNTIME COMPARISON',JSON.stringify(report));return report;
 })();

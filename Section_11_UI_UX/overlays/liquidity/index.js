@@ -1,6 +1,7 @@
 // Observed perpetual depth has its own market identity and availability clock.
 // Draw only on actual chart times; no synthetic pre-collection heatmap/history.
 import {getSeries} from '../candles/index.js';
+import {PaintCache,viewportKey} from '../../chart/paint_cache.js';
 export const name='liquidity';
 let primitive,status,tooltip,snapshot=null,expiryTimer=null;
 const keys=['liquidity_bids','liquidity_asks','liquidity_heatmap'];
@@ -59,19 +60,35 @@ export function stackedSegments(row,maximum,coordinate,paneWidth,lengthPercent=4
     return result;
 }
 export function bandLabel(band){return `${band.side==='bid'?'Resting bids':'Resting asks'} · ${band.low.toPrecision(7)}–${band.high.toPrecision(7)} · ${band.notional_usdt.toLocaleString(undefined,{maximumFractionDigits:0})} USDT · Binance perpetual · sampled presence ${Math.floor((band.sampled_presence_ms||0)/1000)}s${band.observed_ms?' · '+new Date(band.observed_ms).toLocaleTimeString():''}`;}
+// Candle assignment is data-dependent, not pointer/viewport-dependent.
+export function samplePosition(bars,ms){
+    let lo=0,hi=bars.length;
+    while(lo<hi){const mid=(lo+hi)>>1;if(bars[mid].open_time<=ms)lo=mid+1;else hi=mid;}
+    const bar=bars[lo-1],end=bar?.client?.close_time+1;
+    if(!bar||!Number.isFinite(end)||end<=bar.open_time||ms>end)return null;
+    return {time:bar.time,fraction:(ms-bar.open_time)/(end-bar.open_time)};
+}
+export function sampleX(position,scale,spacing,coordinates){
+    if(!position)return null;
+    if(!coordinates.has(position.time))coordinates.set(position.time,scale.timeToCoordinate(position.time));
+    const x=coordinates.get(position.time);
+    return x===null?null:x-spacing/2+spacing*position.fraction;
+}
 class Liquidity {
+    constructor(){this.paintCaches={heatmap:new PaintCache(),profile:new PaintCache()};this.paintRevision=0;}
     attached({chart,series,requestUpdate}){
         Object.assign(this,{chart,series,requestUpdate});
         this.views=['heatmap','profile'].map(layer=>({zOrder:()=>layer==='profile'?'normal':'bottom',renderer:()=>({draw:target=>this.draw(target,layer)})}));
     }
-    detached(){this.chart=this.series=this.requestUpdate=null;}
+    detached(){for(const cache of Object.values(this.paintCaches))cache.clear();this.chart=this.series=this.requestUpdate=null;}
     paneViews(){return this.views||[];}
     setHistory(history, config) {
         let maximum = 1;
         this.history = config.liquidity_heatmap?.visible ? history.map(sample => {
             const bands = bandRows(sample, config);
             for (const band of bands) maximum = Math.max(maximum, band.notional_usdt);
-            return {sample, bands};
+            const t=sample.sampled_ms??sample.available_ms;
+            return {sample,bands,start:samplePosition(this.bars,t),stop:samplePosition(this.bars,t+5000)};
         }) : [];
         this.historyMaximum = maximum;
     }
@@ -89,18 +106,12 @@ class Liquidity {
         }
         return null;
     }
-    xAt(ms){
-        let lo=0,hi=this.bars.length;
-        while(lo<hi){const mid=(lo+hi)>>1;if(this.bars[mid].open_time<=ms)lo=mid+1;else hi=mid;}
-        const bar=this.bars[lo-1];if(!bar||ms>bar.client?.close_time+1)return null;
-        const x=this.chart.timeScale().timeToCoordinate(bar.time);if(x===null)return null;
-        const spacing=this.chart.timeScale().options().barSpacing;
-        return x-spacing/2+spacing*(ms-bar.open_time)/(bar.client.close_time+1-bar.open_time);
-    }
     draw(target,layer){
         if(!this.series||!snapshot)return;
-        target.useMediaCoordinateSpace(({context,mediaSize})=>{
-            const config=styles(),latest=fresh(snapshot),boxes=[];
+        const latest=fresh(snapshot),reference=latest?.metrics.mid??snapshot.history?.[0]?.metrics?.mid??1;
+        const key=[this.paintRevision,!!latest,...viewportKey(this.chart,this.series,reference)];
+        target.useMediaCoordinateSpace(scope=>this.paintCaches[layer].draw(scope,key,({context,mediaSize})=>{
+            const config=styles(),boxes=[];
             const columns = [];
             if (layer === 'heatmap') this.heatmapColumns = columns;
             else this.profileBoxes = boxes;
@@ -129,9 +140,9 @@ class Liquidity {
             };
             context.save();
             const visibleSamples = new Map();
-            if (layer === 'heatmap') for (const {sample, bands} of this.history) {
-                const t = sample.sampled_ms ?? sample.available_ms;
-                const start = this.xAt(t), stop = this.xAt(t + 5000);
+            const timeCoordinates=new Map(),scale=this.chart.timeScale();
+            if (layer === 'heatmap') for (const {sample,bands,start:begin,stop:finish} of this.history) {
+                const start=sampleX(begin,scale,spacing,timeCoordinates),stop=sampleX(finish,scale,spacing,timeCoordinates);
                 if (start === null || stop === null || stop <= start || stop <= 0 || start >= mediaSize.width) continue;
                 // Several book observations can fall inside one pixel at 5m/15m.
                 // Draw the latest observation per pixel until zoom reveals the rest.
@@ -166,7 +177,7 @@ class Liquidity {
                 statusText();
             }
             context.restore();
-        });
+        }));
     }
 }
 export function mount(){
@@ -204,9 +215,11 @@ function statusText(){
 }
 export function update(chart,data){
     const enabled=keys.some(k=>styles()[k]?.visible);
+    primitive.paintRevision++;
+    for(const cache of Object.values(primitive.paintCaches))cache.invalidate();
     snapshot=enabled?data.liquidity:null;primitive.bars=data.bars||[];primitive.following=data.atLiveEdge!==false;primitive.projectionHint='';status.hidden=!enabled;tooltip.hidden=true;
     primitive.setHistory(snapshot?.history || [], styles());
-    if(!enabled){primitive.heatmapColumns=[];primitive.profileBoxes=[];}
+    if(!enabled){primitive.heatmapColumns=[];primitive.profileBoxes=[];for(const cache of Object.values(primitive.paintCaches))cache.clear();}
     clearTimeout(expiryTimer);
     if(enabled)statusText();primitive.requestUpdate?.();
     if(enabled&&snapshot?.latest){
@@ -216,3 +229,5 @@ export function update(chart,data){
 }
 export function updateLive(){if(snapshot){statusText();primitive.requestUpdate?.();}}
 export function getSnapshot(){return snapshot;}
+
+export function getPaintStats(){return Object.fromEntries(Object.entries(primitive?.paintCaches||{}).map(([key,value])=>[key,{...value.stats}]));}
