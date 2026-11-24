@@ -50,6 +50,7 @@ def main():
     for command in ('enable','pause'):
         sub.add_parser(command).add_argument('name')
     sub.add_parser('status')
+    dashboard=sub.add_parser('dashboard');dashboard.add_argument('--port',type=int,default=8002)
     diagnostic=sub.add_parser('diagnose');diagnostic.add_argument('name',nargs='?')
     history=sub.add_parser('history');history.add_argument('name');history.add_argument('--limit',type=int,default=100)
     sub.add_parser('demo')
@@ -69,6 +70,10 @@ def main():
             ledger.create(config,now);print('Paper account created PAUSED. No exchange credentials or orders.')
         elif args.command in ('enable','pause'):
             ledger.enabled(args.name,args.command=='enable',now)
+        elif args.command=='dashboard':
+            if not 1<=args.port<=65535:raise ValueError('Choose a port from 1..65535')
+            from .dashboard import serve
+            serve(args.db,args.port)
         elif args.command=='diagnose':
             from .diagnostics import diagnose
             print(json.dumps(diagnose(args.db,name=args.name),indent=2))

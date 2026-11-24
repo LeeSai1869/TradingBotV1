@@ -107,5 +107,5 @@ class PaperLedger(unittest.TestCase):
         self.assertEqual(before,self.ledger.path.read_bytes())
 
     def test_invalid_capital_nan_and_live_mode_rejected(self):
-        for values in ({'initial_capital':'NaN'},{'capital_cap':'10'},{'stop_loss_pct':'0'},{'mode':'live'},{'symbol':'BTCUSDT&foo=1'}):
+        for values in ({'initial_capital':'NaN'},{'capital_cap':'0'},{'stop_loss_pct':'0'},{'mode':'live'},{'symbol':'BTCUSDT&foo=1'}):
             with self.assertRaises(ValueError):config(**values)
