@@ -78,3 +78,40 @@ def snapshot(config, after, limit=100, *, armed_at=0):
             (config.symbol,config.interval,start,row[0],rule.RULE_ID,limit)).fetchall()
         return dict(epoch=json.dumps(['current',rule.RULE_ID,fingerprint,epoch],separators=(',',':')),
                     events=[dict(open_time=r[0],side=r[1],close_time=r[2]) for r in rows])
+
+
+def health(config, *, now_ms):
+    """Bounded, read-only signal-path liveness; never runs a calculation."""
+    # Validate the same binding/fingerprint/epoch as the worker. No network I/O.
+    snapshot(config,-1,limit=1,armed_at=now_ms)
+    with closing(sqlite3.connect(adcn_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as conn:
+        conn.execute('BEGIN')
+        managed=conn.execute("SELECT 1 FROM sqlite_master WHERE name='strategy_pairs'").fetchone()
+        if managed:managed=conn.execute('SELECT selected_id FROM strategy_pairs WHERE symbol=? AND interval=?',(config.symbol,config.interval)).fetchone()
+        lower=max(0,now_ms-86400000)
+        if managed:
+            epoch=json.dumps(_epoch(config.symbol,config.interval),separators=(',',':'))
+            state=conn.execute('SELECT last_open_time FROM strategy_checkpoints WHERE instance_id=? AND epoch=?',(managed[0],epoch)).fetchone()
+            signal=conn.execute('SELECT open_time,side FROM strategy_events WHERE instance_id=? AND epoch=? AND open_time>=? AND open_time<=? ORDER BY open_time DESC LIMIT 1',
+                (managed[0],epoch,lower,state[0] if state else -1)).fetchone()
+        else:
+            state=conn.execute('SELECT last_open_time FROM decision_rule_state WHERE symbol=? AND interval=?',(config.symbol,config.interval)).fetchone()
+            signal=conn.execute("SELECT open_time,signal_type FROM decisions WHERE symbol=? AND interval=? AND open_time>=? AND trigger=? AND signal_type IN ('BUY','SELL') AND decision_state=signal_type AND open_time<=? ORDER BY open_time DESC LIMIT 1",
+                (config.symbol,config.interval,lower,_current_rule().RULE_ID,state[0] if state else -1)).fetchone()
+    with closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as conn:
+        raw=conn.execute('SELECT open_time,close_time FROM klines WHERE symbol=? AND interval=? AND close_time<? ORDER BY open_time DESC LIMIT 1',
+            (config.symbol,config.interval,now_ms)).fetchone()
+        signal_close=conn.execute('SELECT close_time FROM klines WHERE symbol=? AND interval=? AND open_time=?',
+            (config.symbol,config.interval,signal[0])).fetchone() if signal else None
+    feature=None
+    with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as conn:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='feature_engine_state'").fetchone():
+            feature=conn.execute('SELECT last_open_time FROM feature_engine_state WHERE symbol=? AND interval=?',(config.symbol,config.interval)).fetchone()
+    from Section_1_Global_Core.memory_storage.market_data.update_klines import INTERVAL_MS
+    duration=31*86400000 if config.interval=='1M' else INTERVAL_MS[config.interval]
+    return dict(raw_open_ms=raw[0] if raw else None,raw_close_ms=raw[1] if raw else None,
+        raw_age_seconds=round((now_ms-raw[1])/1000,1) if raw else None,
+        feature_through_ms=feature[0] if feature else None,decision_through_ms=state[0] if state else None,
+        decision_lag_seconds=max(0,(raw[0]-state[0])/1000) if raw and state else None,
+        raw_stale=not raw or now_ms-raw[1]>2*duration,
+        latest_signal_last_24h=dict(open_time=signal[0],side=signal[1],close_time=signal_close[0] if signal_close else None) if signal else None)

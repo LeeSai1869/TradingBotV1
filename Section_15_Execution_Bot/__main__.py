@@ -8,6 +8,7 @@ import time
 from .config import Config, money
 from .engine import Ledger
 from . import quotes, source
+from .reporting import Reporter
 
 DEFAULT_DB=Path.home()/'.tradingindicator'/'paper-bot.sqlite3'
 
@@ -49,9 +50,11 @@ def main():
     for command in ('enable','pause'):
         sub.add_parser(command).add_argument('name')
     sub.add_parser('status')
+    diagnostic=sub.add_parser('diagnose');diagnostic.add_argument('name',nargs='?')
     history=sub.add_parser('history');history.add_argument('name');history.add_argument('--limit',type=int,default=100)
     sub.add_parser('demo')
     run=sub.add_parser('run');run.add_argument('--once',action='store_true');run.add_argument('--poll-seconds',type=float,default=5)
+    run.add_argument('--heartbeat-seconds',type=float,default=30);run.add_argument('--verbose',action='store_true')
     args=parser.parse_args();ledger=Ledger(args.db);now=int(time.time()*1000)
     try:
         if args.command=='demo':
@@ -66,14 +69,21 @@ def main():
             ledger.create(config,now);print('Paper account created PAUSED. No exchange credentials or orders.')
         elif args.command in ('enable','pause'):
             ledger.enabled(args.name,args.command=='enable',now)
+        elif args.command=='diagnose':
+            from .diagnostics import diagnose
+            print(json.dumps(diagnose(args.db,name=args.name),indent=2))
         elif args.command=='history':print(json.dumps(ledger.history(args.name,args.limit),indent=2))
         elif args.command=='run':
             if not 1<=args.poll_seconds<=60:raise ValueError('Poll interval must be 1..60 seconds')
+            if not 5<=args.heartbeat_seconds<=3600:raise ValueError('Heartbeat must be 5..3600 seconds')
+            reporter=Reporter(args.heartbeat_seconds)
             import threading
             stopped=threading.Event()
             for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stopped.set())
             while not stopped.is_set():
-                print(json.dumps(turn(ledger)),flush=True)
+                results=turn(ledger)
+                packet=results if args.once or args.verbose else reporter.packet(results,time.monotonic())
+                if packet is not None:print(json.dumps(packet),flush=True)
                 if args.once:break
                 stopped.wait(args.poll_seconds)
         else:print(json.dumps(ledger.report(),indent=2))
