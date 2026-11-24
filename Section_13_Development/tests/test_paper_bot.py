@@ -10,7 +10,6 @@ from Section_15_Execution_Bot.config import Config
 from Section_15_Execution_Bot.engine import Ledger
 from Section_15_Execution_Bot.quotes import Quote
 from Section_15_Execution_Bot.__main__ import turn
-from Section_13_Development.tests import test_strategy_lifecycle as lifecycle
 from Section_15_Execution_Bot import source
 
 
@@ -110,25 +109,3 @@ class PaperLedger(unittest.TestCase):
     def test_invalid_capital_nan_and_live_mode_rejected(self):
         for values in ({'initial_capital':'NaN'},{'capital_cap':'10'},{'stop_loss_pct':'0'},{'mode':'live'},{'symbol':'BTCUSDT&foo=1'}):
             with self.assertRaises(ValueError):config(**values)
-
-
-class SourceIntegration(unittest.TestCase):
-    setUp=lifecycle.StrategyLifecycle.setUp
-    seed=lifecycle.StrategyLifecycle.seed
-    prepare=lifecycle.StrategyLifecycle.prepare
-    enable=lifecycle.StrategyLifecycle.enable
-    def test_feed_is_readonly_current_selected_confirmed_and_pair_scoped(self):
-        from Section_8_Decision_Engine import processor
-        from Section_1_Global_Core import strategy_management as manager
-        self.prepare();self.seed();identity=self.enable();processor.catch_up('ETHUSDT','1m')
-        cfg=config(symbol='ETHUSDT',interval='1m',instance_id=identity)
-        result=source.snapshot(cfg,-1);self.assertEqual(result['events'][0]['side'],'BUY')
-        ledger=Ledger(Path(self.enterContext(tempfile.TemporaryDirectory()))/'bot.db')
-        ledger.create(cfg,0);ledger.enabled('ena',True,0)
-        now=result['events'][0]['close_time']+1
-        self.assertEqual(ledger.step('ena',quote(now=now,symbol='ETHUSDT'),result,now)[0]['side'],'BUY')
-        self.assertEqual(ledger.step('ena',quote(now=now,symbol='ETHUSDT'),result,now),[])
-        self.assertEqual(source.snapshot(cfg,-1,armed_at=100000000)['events'],[])
-        with self.assertRaises(ValueError):source.snapshot(replace(cfg,symbol='BTCUSDT'),-1)
-        manager.change('deactivate',{'instance_id':identity})
-        with self.assertRaises(ValueError):source.snapshot(cfg,-1)

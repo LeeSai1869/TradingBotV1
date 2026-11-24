@@ -39,7 +39,10 @@ def main():
     parser.add_argument('--db',type=Path,default=DEFAULT_DB)
     sub=parser.add_subparsers(dest='command',required=True)
     create=sub.add_parser('create');create.add_argument('--name',required=True);create.add_argument('--symbol',required=True)
-    create.add_argument('--interval',required=True);create.add_argument('--instance-id',required=True)
+    create.add_argument('--interval',required=True)
+    strategy=create.add_mutually_exclusive_group()
+    strategy.add_argument('--instance-id',help='Optional explicitly selected strategy instance')
+    strategy.add_argument('--strategy',choices=['current'],default='current',help='Use the existing live strategy (default)')
     create.add_argument('--capital',required=True);create.add_argument('--capital-cap',required=True)
     create.add_argument('--stop-loss-pct',required=True);create.add_argument('--take-profit-pct',required=True)
     create.add_argument('--fee-bps',default='10');create.add_argument('--slippage-bps',default='5')
@@ -55,8 +58,10 @@ def main():
             from .demo import demonstrate
             print(json.dumps(demonstrate(),indent=2))
         elif args.command=='create':
-            config=Config(args.name,args.symbol,args.interval,args.instance_id,args.capital,args.capital_cap,
-                          args.stop_loss_pct,args.take_profit_pct,args.fee_bps,args.slippage_bps)
+            config=Config(args.name,args.symbol,args.interval,args.instance_id or 'current',args.capital,args.capital_cap,
+                          args.stop_loss_pct,args.take_profit_pct,args.fee_bps,args.slippage_bps,
+                          strategy_source='selected' if args.instance_id else 'current')
+            config=source.bind_current(config)
             source.snapshot(config,-1,armed_at=now)  # read-only selection/identity validation
             ledger.create(config,now);print('Paper account created PAUSED. No exchange credentials or orders.')
         elif args.command in ('enable','pause'):

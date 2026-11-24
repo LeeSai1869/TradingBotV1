@@ -25,8 +25,12 @@ class Config:
     slippage_bps: str = '5'
     max_signal_age_seconds: int = 180
     mode: str = 'paper'
+    strategy_source: str = 'selected'
+    strategy_fingerprint: str = ''
 
     def __post_init__(self):
+        if self.strategy_source not in ('selected','current'):raise ValueError('Choose current or selected strategy source')
+        if self.strategy_source=='current' and self.instance_id!='current':raise ValueError('Use current as the identity for the existing strategy')
         if self.mode!='paper':raise ValueError('Only paper mode is implemented; live orders are disabled')
         if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',self.name):raise ValueError('Use a short account name: letters, numbers, _ or -')
         if not re.fullmatch(r'[A-Z0-9]{2,30}USDT',self.symbol):raise ValueError('Choose a USDT Spot pair')

@@ -7,9 +7,17 @@ order endpoint, API-key setting, TradingView webhook, or real-money mode.
 
 The existing chart and market-data runner do not import or start this worker.
 One worker can manage multiple named coin/timeframe allocations. It reads only
-confirmed events from the enabled, selected strategy instance for each pair.
-Comparison instances cannot place paper orders. No signals or indicators are
-recomputed by the bot. Strategy source/version fingerprints must match.
+confirmed BUY/SELL decisions already committed by the existing live Section 8
+strategy for each pair. The default `--strategy current` needs no new strategy
+selection screen, registry or per-strategy tables. The rule is not duplicated or
+recalculated by the bot. Its installed source fingerprint is pinned at allocation
+creation; later source changes block new strategy orders until reviewed.
+
+If the optional strategy lifecycle extension is installed and manages that pair,
+current mode reads its selected instance instead. Inactive/comparison instances
+cannot execute. `--instance-id ID` remains available for explicit binding. A
+selection/strategy-generation change halts strategy orders for an existing
+allocation; its configured protective exits remain active.
 
 Each allocation has a separate USDT paper balance and one long Spot position.
 SELL closes its position; it never shorts or sells another allocation's holdings.
@@ -20,17 +28,25 @@ Binance account balance. A future live adapter must enforce shared wallet limits
 
 ## Setup
 
-First enable/select a strategy through Settings → Features → Strategies, or use
-Core's strategy-management API. This does not activate an inactive market pair.
-Get its `instance_id` from the strategy catalog. Then, from the repository root:
+Use an already active coin/timeframe with a current committed decision checkpoint.
+No chart settings or runner changes are required. From the repository root:
 
 ```bash
 python3 -m Section_15_Execution_Bot create --name ena-5m \
-  --symbol ENAUSDT --interval 5m --instance-id YOUR_SELECTED_INSTANCE_ID \
+  --symbol ENAUSDT --interval 5m --strategy current \
   --capital 100 --capital-cap 200 --stop-loss-pct 2 --take-profit-pct 4
 python3 -m Section_15_Execution_Bot enable ena-5m
 python3 -m Section_15_Execution_Bot run
 ```
+
+Coin and timeframe remain configurable; ENAUSDT/5m are examples. The bot reads the
+existing rule's accepted `DI_TURNING_POINT_V3` BUY/SELL rows, bounded by the
+matching committed rule checkpoint. It joins the same pair's canonical candle
+close times, so monthly candles and gaps do not use guessed durations. WAIT,
+WARMUP, SUPPRESSED, unrelated triggers and uncommitted future rows do not execute.
+It does not calculate features, write ADCN, activate markets or backfill history.
+If the live rule has not committed a current checkpoint, creation reports that
+it is waiting instead of inventing a strategy or signal.
 
 The numbers above are examples for paper testing, not recommended trading
 parameters. Supply your chosen capital, cap and exit percentages. Default modeled
