@@ -95,3 +95,27 @@ requests, uses no app data and leaves your normal ledger untouched. To review a
 running allocation's fills: `python3 -m Section_15_Execution_Bot history ena-5m`.
 Errors appear in worker output and account status; a failed quote never fabricates
 a fill, and the last successful quote timestamp remains visible for liveness.
+
+## Waiting, quote errors and pipeline health
+
+`python3 -m Section_15_Execution_Bot diagnose ena-5m` performs a bounded read-only
+check of the paper account, last successful quote receipt, latest closed raw
+candle, feature checkpoint, decision checkpoint and latest accepted signal in the
+last 24 hours. It makes no network requests, does not recalculate the strategy,
+and cannot create a missing ledger. It distinguishes `WAITING_FOR_NEW_CONFIRMED_BUY`
+from `DECISION_WORKER_BEHIND`, `FEATURE_WORKER_BEHIND`, `MARKET_DATA_STALE`,
+`QUOTE_UNAVAILABLE_OR_STALE`, and `STRATEGY_FEED_UNAVAILABLE`. All timestamps are
+milliseconds since Unix epoch; ages and lag are seconds. The worker's `Watching`
+label alone is not proof that upstream calculations are current.
+
+By default, `run` prints fills, changes in errors and recovery immediately, plus a
+heartbeat every 30 seconds. `--heartbeat-seconds N` changes only console frequency,
+not polling or stop evaluation. `--verbose` restores every-turn output; `--once`
+always prints its single turn. Handshake/read timeouts or requests taking more
+than five seconds still produce no fill; the loop tries again on its next turn.
+No stale cached quote is substituted. Protective exits require a successful fresh
+quote and therefore cannot be guaranteed to trigger during a network outage.
+
+After upgrading worker code, stop/restart only `run`. Do not recreate the allocation
+or run `enable` again merely to restart: its balance, position, consumed-signal
+cursor and activation time already persist in the private ledger.
