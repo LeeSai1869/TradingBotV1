@@ -246,6 +246,11 @@
     ],
     "Section_8_Decision_Engine/candle_calendar.py": [
       "Section_1_Global_Core.aggregation_processor"
+    ],
+    "Section_15_Execution_Bot/source.py": [
+      "Section_1_Global_Core",
+      "Section_1_Global_Core.memory_storage.Storage",
+      "Section_1_Global_Core.memory_storage.market_data.update_klines"
     ]
   }
 }
