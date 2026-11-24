@@ -1,6 +1,8 @@
 """Restart-safe paper Spot ledger: single position, idempotent fills, capped compounding."""
 from contextlib import closing
-from decimal import Decimal
+import hashlib
+from dataclasses import replace
+import uuid
 import json
 from pathlib import Path
 import sqlite3
@@ -11,10 +13,24 @@ CREATE TABLE IF NOT EXISTS accounts(name TEXT PRIMARY KEY,config TEXT NOT NULL,s
 CREATE TABLE IF NOT EXISTS fills(id INTEGER PRIMARY KEY,account TEXT NOT NULL,event_key TEXT NOT NULL,side TEXT NOT NULL,
  reason TEXT NOT NULL,at_ms INTEGER NOT NULL,price TEXT NOT NULL,quantity TEXT NOT NULL,fee TEXT NOT NULL,pnl TEXT,
  UNIQUE(account,event_key));
+CREATE INDEX IF NOT EXISTS fills_account_id ON fills(account,id DESC);
+CREATE TABLE IF NOT EXISTS configuration_changes(id INTEGER PRIMARY KEY,account TEXT NOT NULL,at_ms INTEGER NOT NULL,before_config TEXT NOT NULL,after_config TEXT NOT NULL);
 '''
 
 
 def dump(value):return json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False)
+
+
+class Conflict(ValueError):pass
+
+
+def config_token(config):return hashlib.sha256(dump(config).encode()).hexdigest()
+
+
+def position_token(conn,name,state):
+    last=conn.execute("SELECT MAX(id) FROM fills WHERE account=? AND side='BUY'",(name,)).fetchone()[0]
+    return hashlib.sha256(dump([last,state['quantity'],state['cost'],state['entry']]).encode()).hexdigest()
+
 
 
 class Ledger:
@@ -51,12 +67,16 @@ class Ledger:
                 state=json.loads(row[0]);state.update(status='No fill: '+message[:300],last_error_ms=now)
                 c.execute('UPDATE accounts SET state=? WHERE name=?',(dump(state),name))
 
-    def enabled(self,name,value,now):
+    def enabled(self,name,value,now,*,expected_config=None):
         with closing(self.connect()) as c,c:
             c.execute('BEGIN IMMEDIATE')
-            row=c.execute('SELECT state FROM accounts WHERE name=?',(name,)).fetchone()
+            row=c.execute('SELECT config,state FROM accounts WHERE name=?',(name,)).fetchone()
             if row is None:raise ValueError('Unknown paper account')
-            state=json.loads(row[0]);state['enabled']=value
+            if expected_config is not None and config_token(json.loads(row[0]))!=expected_config:raise Conflict('Configuration changed; refresh the dashboard')
+            state=json.loads(row[1])
+            if value and state['halted']:raise ValueError('Allocation is halted; create a new reviewed allocation')
+            if state['enabled']==value:return
+            state['enabled']=value
             if value:
                 state.update(armed_at=now,status='Enabled; awaiting fresh signal')
                 # A stopped position remains owned and risk exits stay enabled.
@@ -111,6 +131,57 @@ class Ledger:
                     elif event['side']=='BUY' and s['enabled'] and not protected and D(s['quantity'])==0 and D(s['cash'])>0:
                         execute('BUY','STRATEGY_BUY',key)
                 if not s['halted']:s['status']='Watching' if s['enabled'] else 'Entries paused; risk exits active'
-            s['last_quote_ms']=quote.observed_ms
+            s.update(last_quote_ms=quote.observed_ms,last_bid=quote.bid,last_ask=quote.ask)
             c.execute('UPDATE accounts SET state=? WHERE name=?',(dump(s),name))
             return fills
+
+
+    def view(self,name=None):
+        """Consistent read-only dashboard snapshot; never creates a missing ledger."""
+        if not self.path.is_file():return dict(accounts=[],fills=[],fills_account=name)
+        with closing(sqlite3.connect(self.path.resolve().as_uri()+'?mode=ro',uri=True,timeout=1)) as c:
+            c.execute('BEGIN')
+            accounts=[]
+            for label,config,state in c.execute('SELECT name,config,state FROM accounts ORDER BY name'):
+                cfg=json.loads(config);saved=json.loads(state)
+                accounts.append(dict(name=label,config=cfg,state=saved,config_token=config_token(cfg),position_token=position_token(c,label,saved)))
+            fills=[]
+            if name:
+                cursor=c.execute('SELECT * FROM fills WHERE account=? ORDER BY id DESC LIMIT 100',(name,))
+                columns=[d[0] for d in cursor.description];fills=[dict(zip(columns,row)) for row in cursor.fetchall()]
+            return dict(accounts=accounts,fills=fills,fills_account=name)
+
+    def configure(self,name,changes,now,*,expected_config):
+        allowed={'capital_cap','stop_loss_pct','take_profit_pct','fee_bps','slippage_bps','max_signal_age_seconds'}
+        if not isinstance(changes,dict) or not changes or set(changes)-allowed:
+            raise ValueError('Edit only entry cap, exits, modeled costs and signal age; use a new allocation for other changes')
+        with closing(self.connect()) as c,c:
+            c.execute('BEGIN IMMEDIATE')
+            row=c.execute('SELECT config,state FROM accounts WHERE name=?',(name,)).fetchone()
+            if row is None:raise ValueError('Unknown paper account')
+            before=json.loads(row[0]);state=json.loads(row[1])
+            if config_token(before)!=expected_config:raise Conflict('Configuration changed; reopen settings to review it')
+            if state['enabled'] or D(state['quantity'])!=0:raise Conflict('Pause entries and close the position before editing settings')
+            cfg=replace(Config(**before),**changes)
+            after=cfg.data()
+            c.execute('UPDATE accounts SET config=? WHERE name=?',(dump(after),name))
+            c.execute('INSERT INTO configuration_changes(account,at_ms,before_config,after_config) VALUES (?,?,?,?)',
+                (name,now,dump(before),dump(after)))
+
+    def close_position(self,name,quote,now,*,expected_position):
+        """Explicit manual PAPER exit plus pause; reject an old position preview."""
+        with closing(self.connect()) as c,c:
+            c.execute('BEGIN IMMEDIATE')
+            row=c.execute('SELECT config,state FROM accounts WHERE name=?',(name,)).fetchone()
+            if row is None:raise ValueError('Unknown paper account')
+            cfg=Config(**json.loads(row[0]));state=json.loads(row[1]);quote.validate(cfg.symbol,now)
+            if position_token(c,name,state)!=expected_position or D(state['quantity'])<=0:
+                raise Conflict('Position changed; refresh before closing it')
+            price=D(quote.bid)*(1-D(cfg.slippage_bps)/10000);quantity=D(state['quantity'])
+            gross=price*quantity;fee=gross*D(cfg.fee_bps)/10000;pnl=gross-fee-D(state['cost'])
+            c.execute('INSERT INTO fills(account,event_key,side,reason,at_ms,price,quantity,fee,pnl) VALUES (?,?,?,?,?,?,?,?,?)',
+                (name,'manual:'+uuid.uuid4().hex,'SELL','MANUAL_CLOSE',now,str(price),str(quantity),str(fee),str(pnl)))
+            state.update(cash=str(D(state['cash'])+gross-fee),quantity='0',cost='0',entry='0',enabled=False,
+                realized_pnl=str(D(state['realized_pnl'])+pnl),last_quote_ms=quote.observed_ms,last_bid=quote.bid,last_ask=quote.ask,
+                status='Paper position closed; entries paused')
+            c.execute('UPDATE accounts SET state=? WHERE name=?',(dump(state),name))
