@@ -49,7 +49,8 @@ class DashboardLedger(unittest.TestCase):
         self.ledger.close_position('ena',Quote('ENAUSDT','1.1','1.1',2000),2000,expected_position=account['position_token'])
         state=self.account()['state'];self.assertFalse(state['enabled']);self.assertEqual(D(state['quantity']),0)
         self.assertEqual(D(state['cash']),110);self.assertEqual(self.ledger.history('ena')[0]['reason'],'MANUAL_CLOSE')
-        self.assertEqual(self.ledger.view('other')['accounts'][1]['state']['cash'],'100')
+        self.assertEqual(D(self.ledger.view('other')['accounts'][1]['state']['cash']),110)
+        self.assertEqual(D(self.ledger.view()['wallet']['cash']),110)
         with self.assertRaises(Conflict):self.ledger.close_position('ena',Quote('ENAUSDT','1.1','1.1',2000),2000,expected_position=account['position_token'])
         self.assertEqual(len(self.ledger.history('ena')),2)
     def test_old_position_token_cannot_close_a_later_position(self):
@@ -76,7 +77,7 @@ class DashboardLedger(unittest.TestCase):
         self.buy()
         with patch('Section_15_Execution_Bot.quotes.fetch',side_effect=AssertionError('GET must not fetch exchange data')):
             data=Dashboard(self.ledger.path).state('ena')
-        self.assertEqual(D(data['accounts'][0]['estimated_equity']),100)
+        self.assertEqual(D(data['wallet']['estimated_equity']),100)
         self.assertEqual(data['fills_account'],'ena')
 
 

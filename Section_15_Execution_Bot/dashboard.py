@@ -21,19 +21,24 @@ class Dashboard:
 
     def state(self,name=None):
         result=self.ledger.view(name);now=int(time.time()*1000)
+        wallet=result['wallet'];marked=money('0');cost=money('0');complete=True;fresh=True
         for account in result['accounts']:
             cfg=Config(**account['config']);s=account['state'];bid=s.get('last_bid')
             age=(now-s['last_quote_ms'])/1000 if s.get('last_quote_ms') is not None else None
-            estimate=None
-            if money(s['quantity'])==0:estimate=money(s['cash'])
-            elif bid is not None:
-                estimate=money(s['cash'])+money(s['quantity'])*money(bid)*(1-money(cfg.slippage_bps)/10000)*(1-money(cfg.fee_bps)/10000)
+            value=money('0') if money(s['quantity'])==0 else (
+                money(s['quantity'])*money(bid)*(1-money(cfg.slippage_bps)/10000)*(1-money(cfg.fee_bps)/10000) if bid is not None else None)
+            is_fresh=age is not None and 0<=age<=10
+            if money(s['quantity'])>0:
+                cost+=money(s['cost']);complete=complete and value is not None;fresh=fresh and is_fresh
+                if value is not None:marked+=value
             account.update(quote_age_seconds=round(age,1) if age is not None else None,
-                quote_fresh=age is not None and 0<=age<=10,
-                estimated_equity=str(estimate) if estimate is not None else None,
-                unrealized_pnl=str(estimate-money(s['cash'])-money(s['cost'])) if estimate is not None else None,
+                quote_fresh=is_fresh,position_value=str(value) if value is not None else None,
+                unrealized_pnl=str(value-money(s['cost'])) if value is not None else None,
                 activity_age_seconds=round((now-max(s.get('last_quote_ms',0),s.get('last_error_ms',0)))/1000,1)
                     if s.get('last_quote_ms') or s.get('last_error_ms') else None)
+        if wallet is not None:
+            wallet.update(estimated_equity=str(money(wallet['cash'])+marked) if complete else None,
+                unrealized_pnl=str(marked-cost) if complete else None,quotes_fresh=fresh)
         result.update(server_time_ms=now,mode='paper',intervals=['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'])
         return result
 
@@ -43,7 +48,11 @@ class Dashboard:
             raw=data.get('config')
             allowed={'name','symbol','interval','initial_capital',*EDITABLE}
             if not isinstance(raw,dict) or set(raw)-allowed:raise ValueError('Use the supported paper allocation fields')
-            config=dict(raw);config.update(instance_id='current',strategy_source='current')
+            config=dict(raw);wallet=self.ledger.wallet()
+            if wallet is not None and 'initial_capital' in config:
+                raise ValueError('This bot already has a wallet. Add a strategy slot without starting capital')
+            if wallet is not None:config['initial_capital']=wallet['initial_capital']
+            config.update(instance_id='current',strategy_source='current')
             if isinstance(config.get('symbol'),str):config['symbol']=config['symbol'].upper().strip()
             cfg=source.bind_current(Config(**config))
             source.snapshot(cfg,-1,armed_at=now)
@@ -77,7 +86,7 @@ class Dashboard:
 class Server(ThreadingHTTPServer):
     daemon_threads=True
     def __init__(self,path,port=8002):
-        self.dashboard=Dashboard(path);self.csrf=secrets.token_urlsafe(32)
+        self.dashboard=Dashboard(path);self.dashboard.ledger.prepare();self.csrf=secrets.token_urlsafe(32)
         super().__init__(('127.0.0.1',port),Handler)
 
 

@@ -44,12 +44,13 @@ def main():
     strategy=create.add_mutually_exclusive_group()
     strategy.add_argument('--instance-id',help='Optional explicitly selected strategy instance')
     strategy.add_argument('--strategy',choices=['current'],default='current',help='Use the existing live strategy (default)')
-    create.add_argument('--capital',required=True);create.add_argument('--capital-cap',required=True)
+    create.add_argument('--capital',help='Starting shared wallet, first slot only');create.add_argument('--capital-cap',required=True)
     create.add_argument('--stop-loss-pct',required=True);create.add_argument('--take-profit-pct',required=True)
     create.add_argument('--fee-bps',default='10');create.add_argument('--slippage-bps',default='5')
     for command in ('enable','pause'):
         sub.add_parser(command).add_argument('name')
     sub.add_parser('status')
+    migration=sub.add_parser('migrate-wallet');migration.add_argument('--combine-existing',action='store_true')
     dashboard=sub.add_parser('dashboard');dashboard.add_argument('--port',type=int,default=8002)
     diagnostic=sub.add_parser('diagnose');diagnostic.add_argument('name',nargs='?')
     history=sub.add_parser('history');history.add_argument('name');history.add_argument('--limit',type=int,default=100)
@@ -61,13 +62,22 @@ def main():
         if args.command=='demo':
             from .demo import demonstrate
             print(json.dumps(demonstrate(),indent=2))
+        elif args.command=='migrate-wallet':
+            preview=ledger.view()
+            if not args.combine_existing:
+                print(json.dumps(dict(wallet=preview['wallet'],legacy_wallets=[dict(name=a['name'],cash=a['state'].get('cash'),initial_capital=a['config']['initial_capital'],quantity=a['state']['quantity']) for a in preview['accounts']] if preview['wallet'] is None else []),indent=2))
+            else:print(json.dumps(ledger.migrate(combine=True),indent=2))
         elif args.command=='create':
-            config=Config(args.name,args.symbol,args.interval,args.instance_id or 'current',args.capital,args.capital_cap,
+            ledger.prepare();wallet=ledger.wallet()
+            if wallet is not None and args.capital is not None:raise ValueError('Wallet already funded; omit --capital when adding another strategy slot')
+            capital=wallet['initial_capital'] if wallet is not None else args.capital
+            if capital is None:raise ValueError('Use --capital once to initialize the shared paper wallet')
+            config=Config(args.name,args.symbol,args.interval,args.instance_id or 'current',capital,args.capital_cap,
                           args.stop_loss_pct,args.take_profit_pct,args.fee_bps,args.slippage_bps,
                           strategy_source='selected' if args.instance_id else 'current')
             config=source.bind_current(config)
             source.snapshot(config,-1,armed_at=now)  # read-only selection/identity validation
-            ledger.create(config,now);print('Paper account created PAUSED. No exchange credentials or orders.')
+            ledger.create(config,now);print('Strategy slot created PAUSED. All slots use the single shared paper wallet.')
         elif args.command in ('enable','pause'):
             ledger.enabled(args.name,args.command=='enable',now)
         elif args.command=='dashboard':
@@ -81,6 +91,7 @@ def main():
         elif args.command=='run':
             if not 1<=args.poll_seconds<=60:raise ValueError('Poll interval must be 1..60 seconds')
             if not 5<=args.heartbeat_seconds<=3600:raise ValueError('Heartbeat must be 5..3600 seconds')
+            ledger.prepare()
             reporter=Reporter(args.heartbeat_seconds)
             import threading
             stopped=threading.Event()
@@ -91,7 +102,8 @@ def main():
                 if packet is not None:print(json.dumps(packet),flush=True)
                 if args.once:break
                 stopped.wait(args.poll_seconds)
-        else:print(json.dumps(ledger.report(),indent=2))
+        else:
+            ledger.prepare();print(json.dumps(ledger.view(),indent=2))
     except (ValueError,OSError,sqlite3.Error) as error:parser.exit(2,str(error)+'\n')
 
 
