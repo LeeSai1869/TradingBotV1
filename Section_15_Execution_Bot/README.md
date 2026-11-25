@@ -211,3 +211,41 @@ reset histories. It also combines their original starting-capital totals for the
 audit. Repeating it cannot add funds. A later legacy-writer record is rejected
 instead of silently granting another balance. Do not run old worker code against
 an upgraded ledger. The simulation still has no real-order capability.
+
+## Automatic macOS login services and desktop shortcut
+
+One-time setup: stop the manually launched **paper worker and bot dashboard** with
+Ctrl+C, leaving the market runner and chart running, then run from your checkout
+with its virtual environment active:
+
+```bash
+python3 -m Section_15_Execution_Bot services install
+```
+
+This installs and starts two user LaunchAgents: `com.tradingindicator.paperbot`
+and `com.tradingindicator.paperbotdashboard`. Both use this checkout, its current
+Python interpreter, and the same paper ledger. They start at login and restart
+after exit/crash, with a 30-second throttle. They never import the worker into the
+market runner's calculation loop. A per-ledger process lock rejects duplicate
+paper workers. Stop manual processes before installation to free dashboard port 8002.
+
+Double-click **Paper Bot Dashboard.webloc** on your Desktop, or visit
+`http://127.0.0.1:8002/` in your browser. Closing that page does not stop the worker.
+The shortcut uses your default browser. No Terminal needs to stay open.
+
+```bash
+python3 -m Section_15_Execution_Bot services status
+python3 -m Section_15_Execution_Bot services uninstall
+```
+
+Status reports registered jobs and their current PIDs. Uninstall stops only these
+paper services and removes their LaunchAgent files, retaining the ledger, history,
+logs and shortcut. Installation refuses to overwrite service files belonging to
+another checkout or ledger. It does not modify the chart or market-runner service.
+Logs are in `~/Library/Logs/TradingBotV1/com.tradingindicator.paperbot*.log`.
+Re-run `services install` after paper code updates to load the updated code.
+
+The worker uses `caffeinate -i` to prevent idle sleep while running. Shutdown,
+logout, forced sleep and network outages still interrupt it; login services are
+not an always-on remote host. No paper fills/protective exits run while offline.
+These services perform only paper simulation and do not submit real orders.

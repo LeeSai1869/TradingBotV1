@@ -50,6 +50,7 @@ def main():
     for command in ('enable','pause'):
         sub.add_parser(command).add_argument('name')
     sub.add_parser('status')
+    service=sub.add_parser('services');service.add_argument('action',choices=['install','status','uninstall'])
     migration=sub.add_parser('migrate-wallet');migration.add_argument('--combine-existing',action='store_true')
     dashboard=sub.add_parser('dashboard');dashboard.add_argument('--port',type=int,default=8002)
     diagnostic=sub.add_parser('diagnose');diagnostic.add_argument('name',nargs='?')
@@ -59,7 +60,10 @@ def main():
     run.add_argument('--heartbeat-seconds',type=float,default=30);run.add_argument('--verbose',action='store_true')
     args=parser.parse_args();ledger=Ledger(args.db);now=int(time.time()*1000)
     try:
-        if args.command=='demo':
+        if args.command=='services':
+            from .services import manage
+            print(json.dumps(manage(args.action,args.db),indent=2))
+        elif args.command=='demo':
             from .demo import demonstrate
             print(json.dumps(demonstrate(),indent=2))
         elif args.command=='migrate-wallet':
@@ -91,17 +95,19 @@ def main():
         elif args.command=='run':
             if not 1<=args.poll_seconds<=60:raise ValueError('Poll interval must be 1..60 seconds')
             if not 5<=args.heartbeat_seconds<=3600:raise ValueError('Heartbeat must be 5..3600 seconds')
-            ledger.prepare()
-            reporter=Reporter(args.heartbeat_seconds)
-            import threading
-            stopped=threading.Event()
-            for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stopped.set())
-            while not stopped.is_set():
-                results=turn(ledger)
-                packet=results if args.once or args.verbose else reporter.packet(results,time.monotonic())
-                if packet is not None:print(json.dumps(packet),flush=True)
-                if args.once:break
-                stopped.wait(args.poll_seconds)
+            from .services import worker_lock
+            with worker_lock(args.db):
+                ledger.prepare()
+                reporter=Reporter(args.heartbeat_seconds)
+                import threading
+                stopped=threading.Event()
+                for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stopped.set())
+                while not stopped.is_set():
+                    results=turn(ledger)
+                    packet=results if args.once or args.verbose else reporter.packet(results,time.monotonic())
+                    if packet is not None:print(json.dumps(packet),flush=True)
+                    if args.once:break
+                    stopped.wait(args.poll_seconds)
         else:
             ledger.prepare();print(json.dumps(ledger.view(),indent=2))
     except (ValueError,OSError,sqlite3.Error) as error:parser.exit(2,str(error)+'\n')
