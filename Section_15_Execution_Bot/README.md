@@ -119,3 +119,51 @@ quote and therefore cannot be guaranteed to trigger during a network outage.
 After upgrading worker code, stop/restart only `run`. Do not recreate the allocation
 or run `enable` again merely to restart: its balance, position, consumed-signal
 cursor and activation time already persist in the private ledger.
+
+## Independent bot dashboard
+
+Run `python3 -m Section_15_Execution_Bot dashboard` in a **second Terminal** while the
+paper worker continues running. Open `http://127.0.0.1:8002/`. `--port PORT` selects
+another free local port. The global `--db PATH` option selects the same private
+ledger for either command; the default displays your existing `ena-5m` allocation.
+The dashboard does not install/start/stop workers, fetch chart history, activate
+markets, change the strategy, or bind to external interfaces. No chart server or
+market-runner restart is required. It is a separate loopback-only web page, with
+no real-order or API-key controls.
+
+The page shows paper cash, net equity/unrealized estimates, realized P&L, last
+bid/ask and quote age, open position, current exits, last 100 fills, and signal-path
+diagnostics. Stale quote estimates are labeled as last observed, not live equity.
+Quote/activity timestamps show observations from the separate worker; the web
+server being available alone does not establish worker liveness. Read-only state
+polls use the private ledger; pipeline diagnostics are bounded read-only queries.
+No exchange requests occur during these reads.
+
+- **Pause entries** prevents new BUY entries while keeping protective/strategy
+  exits active in a running worker. **Resume entries** validates the existing
+  source and starts with fresh signals. Repeated resume requests do not move the
+  activation time again.
+- **Edit settings** is enabled only while paused and flat. It changes the entry
+  cap, stop/take-profit, modeled fees/slippage and maximum signal age, preserving
+  cash, history, cursor and P&L. The cap can be below the wallet balance: the rest
+  remains reserve. Changes are audited in the private `configuration_changes`
+  table, and stale browser edits are rejected.
+- **New allocation** configures another coin/timeframe with the current strategy;
+  creation starts paused. Starting capital, pair and strategy of an existing
+  allocation are immutable so its records cannot be repurposed accidentally.
+- **Close paper position** explicitly obtains a fresh public quote, simulates the
+  exit with modeled fees/slippage, and pauses entries in one ledger transaction.
+  A stale position preview cannot close a different/new position. If quotes are
+  unavailable, it leaves the position unchanged and reports an error.
+
+After installing this version, restart the **paper worker** once before using the
+dashboard. Do not recreate or re-enable existing accounts. This loads the updated
+configuration validation and bid/ask reporting while retaining existing balances,
+positions and signals. Thereafter the worker reads permitted settings changes on
+its next turn; no worker restart is required for those edits. Stopping the web
+server does not stop a separately running worker.
+
+HTTP controls require the local Host/origin and a session token, and the dashboard
+accepts JSON actions only. It intentionally has no remote/mobile exposure or
+shared chart-login integration. Refresh the page if its server was restarted and
+the dashboard session expired.
