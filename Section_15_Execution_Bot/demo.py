@@ -16,4 +16,4 @@ def demonstrate():
             feed=dict(epoch='demo',events=[dict(side=side,open_time=now-1,close_time=now-1)] if side else [])
             turns.append(ledger.step('demo',Quote('ENAUSDT',price,price,now),feed,now))
         return dict(mode='PAPER OFFLINE DEMO',network_requests=0,turns=turns,
-                    final_account=ledger.report()[0],fills=ledger.history('demo'),temporary_ledger_deleted_on_return=True)
+                    wallet=ledger.wallet(),final_account=ledger.report()[0],fills=ledger.history('demo'),temporary_ledger_deleted_on_return=True)
