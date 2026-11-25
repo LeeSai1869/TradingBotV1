@@ -6,7 +6,7 @@ let edit=null,closePreview=null,lastDiagnostic=0,lastFillSignature='',lastNavSig
 const form=$('allocation-form'),dialog=$('allocation-dialog');
 const editable=['capital_cap','stop_loss_pct','take_profit_pct','fee_bps','slippage_bps','max_signal_age_seconds'];
 const labels={STRATEGY_BUY:'Strategy BUY',STRATEGY_SELL:'Strategy SELL',STOP_LOSS:'Stop-loss',TAKE_PROFIT:'Take-profit',MANUAL_CLOSE:'Manual paper exit'};
-const explanations={WAITING_FOR_NEW_CONFIRMED_BUY:'Waiting for a new confirmed BUY. No position is open.',DECISION_WORKER_BEHIND:'Decision processing is behind the latest stored candle.',FEATURE_WORKER_BEHIND:'Feature processing is behind the latest stored candle.',MARKET_DATA_STALE:'Stored market candles are stale.',QUOTE_UNAVAILABLE_OR_STALE:'A fresh worker quote is not available.',STRATEGY_FEED_UNAVAILABLE:'The strategy feed is unavailable.',HALTED_REVIEW_REQUIRED:'This allocation is halted and needs review.',FRESH_BUY_PENDING:'A fresh BUY is waiting for a worker turn.',RECENT_BUY_TOO_OLD_TO_EXECUTE:'A recent BUY is too old to execute.',POSITION_OPEN_MONITORING_EXITS:'Position open. The worker monitors strategy and protective exits.',ENTRIES_PAUSED:'New entries are paused.'};
+const explanations={WAITING_FOR_SHARED_CASH:'Shared cash is in use. This slot needs available funds and a new confirmed BUY.',WAITING_FOR_NEW_CONFIRMED_BUY:'Waiting for a new confirmed BUY. No position is open.',DECISION_WORKER_BEHIND:'Decision processing is behind the latest stored candle.',FEATURE_WORKER_BEHIND:'Feature processing is behind the latest stored candle.',MARKET_DATA_STALE:'Stored market candles are stale.',QUOTE_UNAVAILABLE_OR_STALE:'A fresh worker quote is not available.',STRATEGY_FEED_UNAVAILABLE:'The strategy feed is unavailable.',HALTED_REVIEW_REQUIRED:'This allocation is halted and needs review.',FRESH_BUY_PENDING:'A fresh BUY is waiting for a worker turn.',RECENT_BUY_TOO_OLD_TO_EXECUTE:'A recent BUY is too old to execute.',POSITION_OPEN_MONITORING_EXITS:'Position open. The worker monitors strategy and protective exits.',ENTRIES_PAUSED:'New entries are paused.'};
 const active=()=>packet.accounts.find(a=>a.name===selected);
 function text(id,value){const next=String(value??'—');if($(id).textContent!==next)$(id).textContent=next;}
 function number(value,digits=6){if(value===null||value===undefined||!Number.isFinite(Number(value)))return '—';return new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(Number(value));}
@@ -38,10 +38,11 @@ function render(){
     for(const button of $('allocations').children)button.setAttribute('aria-current',String(button.dataset.name===selected));
     const account=active();$('empty').hidden=!!account;$('detail').hidden=!account;if(!account)return;
     const cfg=account.config,s=account.state,open=Number(s.quantity)>0;
-    text('market',cfg.symbol+' / '+cfg.interval);text('account-name',account.name+' · independent paper allocation');
+    text('market',cfg.symbol+' / '+cfg.interval);text('account-name',account.name+' · strategy slot in one paper bot');
     text('state-badge',s.halted?'HALTED':s.enabled?'ENTRIES ENABLED':'ENTRIES PAUSED');$('state-badge').className='badge '+(s.halted?'bad':s.enabled?'good':'');
-    text('equity',number(account.estimated_equity));text('equity-estimate',open&&!account.quote_fresh?'· last observed':'');
-    text('cash',number(s.cash));profit('pnl',s.realized_pnl);profit('unrealized',account.unrealized_pnl);
+    const wallet=packet.wallet||{};
+    text('equity',number(wallet.estimated_equity));text('equity-estimate',wallet.quotes_fresh?'':'· last observed');
+    text('cash',number(wallet.cash));profit('pnl',wallet.realized_pnl);profit('unrealized',wallet.unrealized_pnl);
     text('position',open?number(s.quantity,9)+' '+cfg.symbol.slice(0,-4):'No open position');
     text('entry',open?number(s.entry,9)+' USDT':'—');
     text('quote',s.last_bid!=null?number(s.last_bid,9)+' / '+number(s.last_ask,9)+' USDT':'Not yet reported by this worker');
@@ -51,7 +52,7 @@ function render(){
     const divisor=1-Number(cfg.slippage_bps)/10000;
     text('thresholds',open?number(Number(s.entry)*(1-Number(cfg.stop_loss_pct)/100)/divisor,9)+' / '+number(Number(s.entry)*(1+Number(cfg.take_profit_pct)/100)/divisor,9)+' USDT':'Shown after entry');
     text('strategy',cfg.strategy_source==='current'?'Current live strategy':'Selected strategy instance');
-    text('initial',number(cfg.initial_capital)+' USDT');text('cap',number(cfg.capital_cap)+' USDT');
+    text('initial',number(packet.wallet?.initial_capital)+' USDT');text('cap',number(cfg.capital_cap)+' USDT');
     text('costs',cfg.fee_bps+' / '+cfg.slippage_bps+' bps per side');text('signal-age',cfg.max_signal_age_seconds+' seconds');text('worker-status',s.status);
     text('worker-activity',account.activity_age_seconds==null?'No activity reported':number(account.activity_age_seconds,1)+' seconds ago');
     $('enable').disabled=busy||s.enabled||s.halted;$('pause').disabled=busy||!s.enabled;$('close-position').disabled=busy||!open;
@@ -123,9 +124,10 @@ function openForm(account=null){
     form.elements.interval.value=account?.config.interval||'5m';
     const cfg=account?.config||{name:'ena-5m',symbol:'ENAUSDT',initial_capital:'100',capital_cap:'200',stop_loss_pct:'2',take_profit_pct:'4',fee_bps:'10',slippage_bps:'5',max_signal_age_seconds:180};
     for(const name of ['name','symbol','initial_capital',...editable])form.elements[name].value=cfg[name];
-    for(const name of ['name','symbol','interval','initial_capital','strategy'])form.elements[name].disabled=!!account;
+    for(const name of ['name','symbol','interval','strategy'])form.elements[name].disabled=!!account;
+    const funding=!account&&!packet.wallet;form.elements.initial_capital.disabled=!funding;form.elements.initial_capital.parentElement.hidden=!funding;
     text('form-title',account?'Edit allocation settings':'New paper allocation');text('save',account?'Save settings':'Create paused allocation');
-    text('form-help',account?'Changes preserve the balance and fill history. Use a new allocation to change its coin, timeframe, strategy or starting wallet.':'Uses the existing strategy for an active coin/timeframe. New allocations start paused. These are virtual USDT amounts.');
+    text('form-help',account?'Changes preserve the balance and fill history. Use a new allocation to change its coin, timeframe, or strategy.':'Uses the existing strategy for an active coin/timeframe. Slots share the bot wallet and start paused. Starting funds are set only for the first slot.');
     dialog.showModal();
 }
 $('new').onclick=$('empty-new').onclick=()=>openForm();$('settings').onclick=()=>openForm(active());
@@ -135,7 +137,7 @@ form.onsubmit=async event=>{
     event.preventDefault();if(busy)return;
     const values={};for(const name of editable)values[name]=name==='max_signal_age_seconds'?Number(form.elements[name].value):form.elements[name].value;
     const data=edit?{action:'configure',name:edit.name,expected_config:edit.token,changes:values}:
-        {action:'create',config:{...values,name:form.elements.name.value,symbol:form.elements.symbol.value.trim().toUpperCase(),interval:form.elements.interval.value,initial_capital:form.elements.initial_capital.value}};
+        {action:'create',config:{...values,name:form.elements.name.value,symbol:form.elements.symbol.value.trim().toUpperCase(),interval:form.elements.interval.value,...(!packet.wallet?{initial_capital:form.elements.initial_capital.value}:{})}};
     for(const id of ['save','form-close','form-cancel','form-fields'])$(id).disabled=true;
     text('save','Saving…');text('form-error','');
     try{const result=await action(data);if(result){selected=result.name;history.replaceState(null,'','#'+encodeURIComponent(selected));dialog.close();lastDiagnostic=0;void refresh();}}

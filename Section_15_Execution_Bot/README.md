@@ -19,12 +19,17 @@ cannot execute. `--instance-id ID` remains available for explicit binding. A
 selection/strategy-generation change halts strategy orders for an existing
 allocation; its configured protective exits remain active.
 
-Each allocation has a separate USDT paper balance and one long Spot position.
-SELL closes its position; it never shorts or sells another allocation's holdings.
-Initial capital and maximum capital per entry are configured separately. Net
-realized proceeds, after fees, automatically compound; cash above the cap stays
-in reserve. These allocations are virtual wallets, not a claim against an actual
-Binance account balance. A future live adapter must enforce shared wallet limits.
+There is **one bot and one shared simulated USDT wallet per ledger**. Named
+coin/timeframe allocations are strategy slots, not separately funded accounts.
+Each slot owns its position and history. A BUY uses the smaller of shared available
+cash and that slot's entry cap, including modeled entry fees. SELL returns net
+proceeds to the same pool. Profits compound across the bot. SQLite transactions
+prevent concurrent slots from spending the same cash twice. A slot cannot short
+or sell another slot's position. Slots with no available cash skip the BUY and
+require a new confirmed BUY after funds become available; old signals are not queued.
+When signals compete, the worker's existing slot iteration order determines which
+slot receives funds first. This release does not implement portfolio rebalancing.
+Adding a slot never adds, resets or duplicates starting funds.
 
 ## Setup
 
@@ -39,7 +44,9 @@ python3 -m Section_15_Execution_Bot enable ena-5m
 python3 -m Section_15_Execution_Bot run
 ```
 
-Coin and timeframe remain configurable; ENAUSDT/5m are examples. The bot reads the
+`--capital` initializes the shared wallet **once**. When adding further slots, omit
+`--capital`; configure only their entry caps and exits. The CLI rejects another
+starting deposit into an existing wallet. Coin and timeframe remain configurable; ENAUSDT/5m are examples. The bot reads the
 existing rule's accepted `DI_TURNING_POINT_V3` BUY/SELL rows, bounded by the
 matching committed rule checkpoint. It joins the same pair's canonical candle
 close times, so monthly candles and gaps do not use guessed durations. WAIT,
@@ -52,7 +59,7 @@ The numbers above are examples for paper testing, not recommended trading
 parameters. Supply your chosen capital, cap and exit percentages. Default modeled
 fee is 10 bps and slippage is 5 bps on each side; both are configurable at creation.
 `--db PATH` before the subcommand selects another private ledger; default is
-`~/.tradingindicator/paper-bot.sqlite3`. `status` shows configuration, cash,
+`~/.tradingindicator/paper-bot.sqlite3`. `status` returns one top-level `wallet` plus slot configurations,
 position, realized P&L and last successful quote receipt. `run --once` performs one
 bounded turn. `pause NAME` stops new entries, **not protection of an open position**.
 Keep the worker running to monitor exits. Ctrl+C stops it; positions/state survive
@@ -83,7 +90,7 @@ always-on host after paper validation. A sleeping/offline Mac cannot provide
 
 A separate implementation/review must add Binance symbol filters and quantity
 rounding, authenticated testnet orders, idempotent client order IDs, partial fills,
-exchange reconciliation, shared wallet reservations, exchange-native protection,
+exchange reconciliation, exchange-native protection,
 and credential storage. Paper fractions do not enforce LOT_SIZE/MIN_NOTIONAL and
 paper fills do not model order-book depth. No real-money trading is enabled here.
 
@@ -131,7 +138,9 @@ markets, change the strategy, or bind to external interfaces. No chart server or
 market-runner restart is required. It is a separate loopback-only web page, with
 no real-order or API-key controls.
 
-The page shows paper cash, net equity/unrealized estimates, realized P&L, last
+The four summary cards show the whole bot's shared cash, total equity, realized
+and unrealized P&L, regardless of the selected slot. Position, exits and history
+below them belong to the selected slot. The page also shows last
 bid/ask and quote age, open position, current exits, last 100 fills, and signal-path
 diagnostics. Stale quote estimates are labeled as last observed, not live equity.
 Quote/activity timestamps show observations from the separate worker; the web
@@ -149,8 +158,9 @@ No exchange requests occur during these reads.
   remains reserve. Changes are audited in the private `configuration_changes`
   table, and stale browser edits are rejected.
 - **New allocation** configures another coin/timeframe with the current strategy;
-  creation starts paused. Starting capital, pair and strategy of an existing
-  allocation are immutable so its records cannot be repurposed accidentally.
+  creation starts paused and draws from the existing shared wallet. Starting
+  capital appears only when initializing the first slot. Pair and strategy of an
+  existing slot are immutable so its records cannot be repurposed accidentally.
 - **Close paper position** explicitly obtains a fresh public quote, simulates the
   exit with modeled fees/slippage, and pauses entries in one ledger transaction.
   A stale position preview cannot close a different/new position. If quotes are
@@ -167,3 +177,37 @@ HTTP controls require the local Host/origin and a session token, and the dashboa
 accepts JSON actions only. It intentionally has no remote/mobile exposure or
 shared chart-login integration. Refresh the page if its server was restarted and
 the dashboard session expired.
+
+## Upgrading from separate paper wallets
+
+Stop **both the paper worker and bot dashboard** before installing this update;
+restart them using the updated code. Do not recreate or re-enable the existing
+ENA slot. Chart and market runner processes do not need restarting.
+
+A ledger with one legacy allocation migrates automatically at startup. Its exact
+cash, position, cost, realized P&L, activation time, cursor and fills are preserved.
+The original allocation records are retained in `wallet_migrations` for audit.
+The wallet is stored once in `bot_wallet`; slot records no longer contain cash.
+For compatibility, read-only account reports still expose `state.cash` with
+`cash_scope: shared_bot_wallet`: it is the same pool, **never sum those aliases**.
+The top-level `wallet` is authoritative. Slot `realized_pnl` remains attribution;
+the wallet's realized P&L is the aggregate.
+
+If multiple old wallets exist, automatic conversion stops without changing their
+balances or positions. With old paper processes stopped, review them first:
+
+```bash
+python3 -m Section_15_Execution_Bot migrate-wallet
+```
+
+Only if preserving their **combined existing** cash and positions is intended:
+
+```bash
+python3 -m Section_15_Execution_Bot migrate-wallet --combine-existing
+```
+
+This consolidates their existing funds once; it does not create a new deposit or
+reset histories. It also combines their original starting-capital totals for the
+audit. Repeating it cannot add funds. A later legacy-writer record is rejected
+instead of silently granting another balance. Do not run old worker code against
+an upgraded ledger. The simulation still has no real-order capability.

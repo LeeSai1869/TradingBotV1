@@ -77,10 +77,10 @@ class PaperLedger(unittest.TestCase):
         state=self.ledger.report('fees')[0]['state']
         self.assertLess(D(state['cash']),100);self.assertLess(D(state['realized_pnl']),0)
         with self.ledger.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM fills WHERE account='fees'").fetchone()[0],2)
-    def test_two_allocations_do_not_share_positions_or_cash(self):
+    def test_slots_own_positions_but_share_cash(self):
         self.ledger.create(config(name='btc',symbol='BTCUSDT'),800000);self.ledger.enabled('btc',True,800000)
         self.step(events=feed())
-        self.assertEqual(D(self.ledger.report('btc')[0]['state']['cash']),100)
+        self.assertEqual(D(self.ledger.report('btc')[0]['state']['cash']),0)
         self.assertEqual(D(self.ledger.report('btc')[0]['state']['quantity']),0)
     def test_one_quote_failure_does_not_stop_other_allocations(self):
         self.ledger.create(config(name='btc',symbol='BTCUSDT'),800000);self.ledger.enabled('btc',True,800000)

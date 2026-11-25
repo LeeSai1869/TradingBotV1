@@ -58,14 +58,17 @@ async def exercise(base,ledger):
         assert await page.get_by_role('cell',name='Manual paper exit',exact=True).count()==1
         state=ledger.view('ena-5m')['accounts'][0]['state']
         assert state['quantity']=='0' and not state['enabled']
+        shared_cash=ledger.wallet()['cash']
         await page.get_by_role('button',name='New allocation',exact=True).click()
         new=page.get_by_role('dialog',name='New paper allocation',exact=True)
+        await expect(new.locator('[name=initial_capital]')).to_be_hidden()
         await new.get_by_label('Allocation name',exact=True).fill('eth-15m')
         await new.get_by_label('Coin',exact=True).fill('ETHUSDT')
         await new.get_by_label('Strategy timeframe',exact=True).select_option('15m')
         await new.get_by_role('button',name='Create paused allocation',exact=True).click()
         await new.wait_for(state='hidden')
         await page.get_by_role('heading',name='ETHUSDT / 15m',exact=True).wait_for()
+        assert ledger.wallet()['cash']==shared_cash
         assert await page.locator('#state-badge').inner_text()=='ENTRIES PAUSED'
         assert await page.locator('#fills').inner_text()=='No paper executions yet. New confirmed signals will appear here.'
         await page.get_by_role('button',name='ENAUSDT · 5m ena-5m · Paused',exact=True).click()
