@@ -8,6 +8,7 @@ import json
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import logging
 import sqlite3
+import webbrowser
 from pathlib import Path
 from urllib.parse import urlparse,unquote
 import posixpath
@@ -128,6 +129,19 @@ class Handler(SimpleHTTPRequestHandler):
             self._json({"error": "Invalid request size"}, 413)
             return
         body = self.rfile.read(length).decode("utf-8") if length else ""
+        if parsed.path == "/api/open_paper_dashboard":
+            host = self.headers.get("Host")
+            port = self.server.server_port
+            if (host not in {f"localhost:{port}", f"127.0.0.1:{port}"}
+                or self.client_address[0] not in {"127.0.0.1", "::1"}
+                or self.headers.get("Origin") != f"http://{host}"):
+                self._json({"error": "Open the paper dashboard from the local chart app."}, 403)
+                return
+            if not webbrowser.open_new_tab("http://127.0.0.1:8002/"):
+                self._json({"error": "Could not open the default browser."}, 503)
+                return
+            self._json({"ok": True})
+            return
         status, payload = routes.handle_post(parsed.path, body, self)
         if status is not None:
             self._json(payload, status)

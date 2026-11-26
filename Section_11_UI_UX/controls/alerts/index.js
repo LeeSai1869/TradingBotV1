@@ -282,6 +282,27 @@ export function mount() {
         open.disabled=true;deliveryFeedback.hidden=true;
         try{await openEditor(null,open);}catch(error){desktopError(error);}finally{open.disabled=false;}
     };
+    if (['localhost', '127.0.0.1'].includes(location.hostname)) {
+        const dashboard = el('button', 'Paper Bot Dashboard', toolbar);
+        dashboard.type = 'button';
+        open.after(dashboard);
+        dashboard.onclick = async () => {
+            if (!window.__TAURI__?.core?.invoke) {
+                window.open('http://127.0.0.1:8002/', '_blank', 'noopener');
+                return;
+            }
+            dashboard.disabled = true;
+            deliveryFeedback.hidden = true;
+            try {
+                await request('/api/open_paper_dashboard', {});
+            } catch (error) {
+                deliveryFeedback.textContent = error.message;
+                deliveryFeedback.hidden = false;
+            } finally {
+                dashboard.disabled = false;
+            }
+        };
+    }
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
     const feed=createAlertFeed({request,
