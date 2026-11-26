@@ -196,7 +196,7 @@ function renderFeature() {
     }
     if (featureTab === "Display") {
         if (item === 'Market Structure') {
-            note('The band shades the stored upper and lower boundaries of an established range. Candidate tags appear after the next candle closes if the pivot is still unconfirmed.');
+            note('The band shades the stored upper and lower boundaries of an established range. Only the current pending swing is tagged, after the next candle closes. A new extreme replaces the pending swing.');
         }
         for (const [key, label,,presentation] of feature.outputs) {
             if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Per-candle lines',content);
