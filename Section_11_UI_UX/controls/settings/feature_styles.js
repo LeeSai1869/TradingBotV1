@@ -26,6 +26,10 @@ export const FEATURE_STYLES = {
         ['candidate_high_tag','Candidate pivot high (CPH)','#e879f9','structureTag'],
         ['candidate_low_tag','Candidate pivot low (CPL)','#a78bfa','structureTag'],
     ] },
+    FVG: { connected: true, outputs: [
+        ['bull_fvg_zones','Bullish FVG','#26a69a','zone'],['bear_fvg_zones','Bearish FVG','#ef5350','zone'],
+        ...['4h','1d','1w'].flatMap(tf=>[[`bull_fvg_${tf}_zones`,`${tf.toUpperCase()} bullish FVG`,'#26a69a','zone'],[`bear_fvg_${tf}_zones`,`${tf.toUpperCase()} bearish FVG`,'#ef5350','zone']]),
+    ] },
     EMA: { connected: true, outputs: [
         ["ema7", "EMA 7", "#f5c542"], ["ema25", "EMA 25", "#e747ae"],
         ["ema50", "EMA 50", "#ad83f5"], ["ema100", "EMA 100", "#60ab64"],
