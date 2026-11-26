@@ -126,7 +126,6 @@ class StructureTags {
                 used.push(y);context.save();context.strokeStyle=level.color;context.fillStyle=level.color;context.font='bold 11px sans-serif';
                 if(!outside){context.setLineDash([5,4]);context.beginPath();context.moveTo(0,priceY);context.lineTo(mediaSize.width,priceY);context.stroke();}
                 const text=level.label+' '+Number(level.price.toPrecision(8))+(outside?(priceY<0?' ↑':' ↓'):'');
-                const width=context.measureText(text).width+10;context.fillStyle='#101820';context.fillRect(mediaSize.width-width,y-8,width,16);
                 context.fillStyle=level.color;context.textAlign='right';context.textBaseline='middle';context.fillText(text,mediaSize.width-5,y);context.restore();
             }
             context.save();
@@ -146,8 +145,6 @@ class StructureTags {
                 positions.set(position, y);
                 const width = context.measureText(tag.label).width + 8;
                 const labelX = Math.max(width / 2, Math.min(mediaSize.width - width / 2, x));
-                context.fillStyle = '#101820';
-                context.fillRect(labelX - width / 2, y - 7, width, 14);
                 context.fillStyle = tag.color;
                 context.fillText(tag.label, labelX, y);
             }
