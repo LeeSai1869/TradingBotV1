@@ -3,8 +3,8 @@ import {getSeries} from '../candles/index.js';
 export const name = 'structure_tags';
 
 const levels = [
-    {side: 'high', direction: 1, protected: 'PH', confirmed: 'SH', candidate: 'CPH'},
-    {side: 'low', direction: -1, protected: 'PL', confirmed: 'SL', candidate: 'CPL'},
+    {side: 'high', direction: 1, protected: 'PH', confirmed: 'SH', candidate: 'CH'},
+    {side: 'low', direction: -1, protected: 'PL', confirmed: 'SL', candidate: 'CL'},
 ];
 
 export function structureTags(bars, styles) {
