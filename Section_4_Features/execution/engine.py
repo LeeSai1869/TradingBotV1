@@ -15,7 +15,7 @@ STEPS=(*STEPS,(importlib.import_module(EXTRA_STEP['module']),EXTRA_STEP['functio
 from ..features.momentum_anchors import EXPORTS as MOMENTUM_ANCHOR_FIELDS
 from ..features.shared_measurements import EXPORTS as SHARED_MEASUREMENT_FIELDS
 from ..features.structure_events import EXPORTS as STRUCTURE_EVENT_FIELDS
-EXTRA_FIELDS=(*STRUCTURE_EVENT_FIELDS,*SHARED_MEASUREMENT_FIELDS,'obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh',*MOMENTUM_ANCHOR_FIELDS)
+EXTRA_FIELDS=('pivotRulesVersion','pivotReferenceRange','pivotConfirmationLevel','pivotReverseCloses',*STRUCTURE_EVENT_FIELDS,*SHARED_MEASUREMENT_FIELDS,'obZoneEvents','srZoneEvents','instSupportZoneLow','instSupportZoneHigh','instResistanceZoneLow','instResistanceZoneHigh',*MOMENTUM_ANCHOR_FIELDS)
 
 class Engine:
     def __init__(self,symbol,timeframe,parameters=None):

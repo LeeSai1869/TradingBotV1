@@ -216,7 +216,7 @@ class Catalog:
         # A persistent write can change consumers earlier in the next candle.
         # Forward-only dependencies miss state-machine feedback (e.g. a BOS
         # cleanup changing the next candle's protected levels/foundations).
-        persistent=set(MANIFEST['persistent'])|{'lastStructureResetBar'}
+        persistent=set(MANIFEST['persistent'])|{'lastStructureResetBar','swingPivotRulesState'}
         for unit in self.units:
             for field in unit.reads & persistent:
                 for producer in self.producers.get(field,()):

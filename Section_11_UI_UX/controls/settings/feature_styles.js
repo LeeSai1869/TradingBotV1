@@ -23,6 +23,8 @@ export const FEATURE_STYLES = {
         ['protected_low','Protected low (PL)','#26a69a','structureTag'],
         ['latest_confirmed_pivot_high','Swing high (SH)','#f59e0b','structureTag'],
         ['latest_confirmed_pivot_low','Swing low (SL)','#38bdf8','structureTag'],
+        ['structure_high_trendline','Confirmed-high trend line','#f59e0b','structureLine'],
+        ['structure_low_trendline','Confirmed-low trend line','#38bdf8','structureLine'],
         ['candidate_high_tag','Candidate high (CH)','#e879f9','structureTag'],
         ['candidate_low_tag','Candidate low (CL)','#a78bfa','structureTag'],
     ] },
@@ -77,6 +79,9 @@ export function normalizeStyles(value = {}) {
             if (key.startsWith('candidate_') && presentation === 'structureTag' && typeof input.visible !== 'boolean') {
                 result[key].visible = ['structure_range_zones', 'protected_high', 'protected_low',
                     'latest_confirmed_pivot_high', 'latest_confirmed_pivot_low'].some(output => value?.[output]?.visible === true);
+            }
+            if (presentation === 'structureLine' && typeof input.visible !== 'boolean') {
+                result[key].visible = value?.[key === 'structure_high_trendline' ? 'latest_confirmed_pivot_high' : 'latest_confirmed_pivot_low']?.visible === true;
             }
             if (key === 'volume_usdt' && typeof input.visible !== 'boolean') {
                 result[key].visible = value?.volume?.visible === true || value?.volume_ma?.visible === true;

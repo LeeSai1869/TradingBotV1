@@ -37,6 +37,8 @@ from ..features.shared_measurements import EXPORTS as SHARED_MEASUREMENT_FIELDS
 FIELDS.update(SHARED_MEASUREMENT_FIELDS)
 from ..features.structure_events import EXPORTS as STRUCTURE_EVENT_FIELDS
 FIELDS.update(STRUCTURE_EVENT_FIELDS)
+from ..features.pivot_rules import EXPORTS as PIVOT_RULE_FIELDS
+FIELDS.update(PIVOT_RULE_FIELDS)
 FIELDS['sr_zone_events']='string'
 FIELDS['ob_zone_events']='string'
 for side in ('support','resistance','inst_support','inst_resistance'):

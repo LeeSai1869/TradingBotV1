@@ -196,7 +196,7 @@ function renderFeature() {
     }
     if (featureTab === "Display") {
         if (item === 'Market Structure') {
-            note('The band shades the stored upper and lower boundaries of an established range. Only the current pending swing is tagged, after the next candle closes. A new extreme replaces the pending swing.');
+            note('PH/PL show current protected prices; arrows indicate off-screen levels. Trend lines join confirmed swing origins. The band appears only for a valid established range, not every trend. Only the current pending candidate is shown; a new extreme replaces it.');
         }
         for (const [key, label,,presentation] of feature.outputs) {
             if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Per-candle lines',content);
@@ -286,6 +286,7 @@ function renderFeature() {
             input.oninput = () => { volume.downColor = input.value; };
         }
     }
+    if(item==='Market Structure')el('p','PH/PL use the engine’s current protected levels; arrows indicate off-screen prices. Trend lines join confirmed swing origins once known. The established range band appears only when the engine publishes a valid STRUCTURE_RANGE.',content,'settings-note');
     const table = el("div", "", content, "settings-style-table");
     const heading = el("div", "", table, "settings-style-row settings-style-heading");
     for (const title of ["Output", "Color", item==='Momentum Indicator'?"Size":"Width", item==='Momentum Indicator'?"Shape":"Line style"]) el("span", title, heading);
