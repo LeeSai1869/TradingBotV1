@@ -18,13 +18,13 @@ export const FEATURE_STYLES = {
         ...['normal','strict'].flatMap(level=>['ob','breaker'].flatMap(kind=>['bull','bear'].map(side=>[`${level}_${side}_${kind}_zones`,`${level==='strict'?'Strict ':''}${side==='bull'?'Bullish':'Bearish'} ${kind==='ob'?'order blocks':'breakers'}`,side==='bull'?'#26a69a':'#ef5350','zone']))),
     ]},
     'Market Structure': {connected:true,outputs:[
-        ['structure_range_zones','Structure range','#748298','zone'],
-        ['protected_high','Protected high','#ef5350'],['protected_low','Protected low','#26a69a'],
-        ['latest_confirmed_pivot_high','Confirmed swing high','#f59e0b'],['latest_confirmed_pivot_low','Confirmed swing low','#38bdf8'],
-    ]},
-    FVG: { connected: true, outputs: [
-        ['bull_fvg_zones','Bullish FVG','#26a69a','zone'],['bear_fvg_zones','Bearish FVG','#ef5350','zone'],
-        ...['4h','1d','1w'].flatMap(tf=>[[`bull_fvg_${tf}_zones`,`${tf.toUpperCase()} bullish FVG`,'#26a69a','zone'],[`bear_fvg_${tf}_zones`,`${tf.toUpperCase()} bearish FVG`,'#ef5350','zone']]),
+        ['structure_range_zones','Established range band','#748298','zone'],
+        ['protected_high','Protected high (PH)','#ef5350','structureTag'],
+        ['protected_low','Protected low (PL)','#26a69a','structureTag'],
+        ['latest_confirmed_pivot_high','Confirmed swing high (CSH)','#f59e0b','structureTag'],
+        ['latest_confirmed_pivot_low','Confirmed swing low (CSL)','#38bdf8','structureTag'],
+        ['candidate_high_tag','Candidate pivot high (CPH)','#e879f9','structureTag'],
+        ['candidate_low_tag','Candidate pivot low (CPL)','#a78bfa','structureTag'],
     ] },
     EMA: { connected: true, outputs: [
         ["ema7", "EMA 7", "#f5c542"], ["ema25", "EMA 25", "#e747ae"],
@@ -70,6 +70,10 @@ export function normalizeStyles(value = {}) {
                 width: [1,2,3,4].includes(input.width) ? input.width : 2,
                 style: (presentation==='zone'?[0,1,2,3]:[0,1,2]).includes(input.style) ? input.style : 0,
             };
+            if (key.startsWith('candidate_') && presentation === 'structureTag' && typeof input.visible !== 'boolean') {
+                result[key].visible = ['structure_range_zones', 'protected_high', 'protected_low',
+                    'latest_confirmed_pivot_high', 'latest_confirmed_pivot_low'].some(output => value?.[output]?.visible === true);
+            }
             if (key === 'volume_usdt' && typeof input.visible !== 'boolean') {
                 result[key].visible = value?.volume?.visible === true || value?.volume_ma?.visible === true;
             }
