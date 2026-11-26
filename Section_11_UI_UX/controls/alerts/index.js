@@ -283,7 +283,7 @@ export function mount() {
         try{await openEditor(null,open);}catch(error){desktopError(error);}finally{open.disabled=false;}
     };
     if (['localhost', '127.0.0.1'].includes(location.hostname)) {
-        const dashboard = el('button', 'Paper Bot Dashboard', toolbar);
+        const dashboard = el('button', 'TRADING BOT', toolbar);
         dashboard.type = 'button';
         open.after(dashboard);
         dashboard.onclick = async () => {
