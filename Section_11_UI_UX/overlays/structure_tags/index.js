@@ -3,8 +3,8 @@ import {getSeries} from '../candles/index.js';
 export const name = 'structure_tags';
 
 const levels = [
-    {side: 'high', direction: 1, protected: 'PH', confirmed: 'CSH', candidate: 'CPH'},
-    {side: 'low', direction: -1, protected: 'PL', confirmed: 'CSL', candidate: 'CPL'},
+    {side: 'high', direction: 1, protected: 'PH', confirmed: 'SH', candidate: 'CPH'},
+    {side: 'low', direction: -1, protected: 'PL', confirmed: 'SL', candidate: 'CPL'},
 ];
 
 export function structureTags(bars, styles) {
@@ -12,19 +12,20 @@ export function structureTags(bars, styles) {
         'candidate_' + side + '_tag'].some(key => styles[key]?.visible))) return [];
 
     const tags = [];
-    const candidates = new Map();
+    let pending = null;
     const visibleTimes = new Set(bars.filter(bar => !bar.provisional).map(bar => bar.time));
     const add = (key, label, side, time, price) => {
         if (!styles[key]?.visible || !visibleTimes.has(time) || !Number.isFinite(price)) return;
-        const tag = {label, side, time, price, color: styles[key].color};
-        if (key.startsWith('candidate_')) candidates.set(side + ':' + time, tag);
-        else tags.push(tag);
+        tags.push({label, side, time, price, color: styles[key].color});
     };
     let previous = null;
     for (const bar of bars) {
         if (bar.provisional) continue;
         const f = bar.features ?? {};
         const prior = previous?.features;
+        const contiguous = previous?.client?.close_time + 1 === bar.open_time;
+        if (pending && (!contiguous || f.candidate_pivot !== pending.direction ||
+            f[pending.originField] !== pending.origin)) pending = null;
         for (const level of levels) {
             const {side} = level;
             const protectedKey = 'protected_' + side;
@@ -39,10 +40,14 @@ export function structureTags(bars, styles) {
                 add(confirmedKey, level.confirmed, side, bar.time, f[confirmedKey]);
             }
             const candidate = 'candidate_pivot_' + side;
-            if (previous && previous.client?.close_time + 1 === bar.open_time &&
+            if (contiguous &&
                 f.candidate_pivot === level.direction && prior?.candidate_pivot === level.direction &&
                 f[candidate + '_time'] === previous.open_time && prior[candidate + '_time'] === previous.open_time) {
-                add('candidate_' + side + '_tag', level.candidate, side, previous.time, f[candidate + '_price']);
+                pending = {
+                    direction: level.direction, originField: candidate + '_time', origin: previous.open_time,
+                    key: 'candidate_' + side + '_tag', label: level.candidate, side,
+                    time: previous.time, price: f[candidate + '_price'],
+                };
             }
         }
 
@@ -54,14 +59,15 @@ export function structureTags(bars, styles) {
                 const level = levels.find(({side}) => event?.type === 'PIVOT_' + side.toUpperCase());
                 if (level && event.confirmation_time === bar.open_time && Number.isFinite(event.origin_time)) {
                     const originTime = Math.floor(event.origin_time / 1000);
-                    candidates.delete(level.side + ':' + originTime);
+                    if (pending?.side === level.side && pending.origin === event.origin_time) pending = null;
                     add('latest_confirmed_pivot_' + level.side, level.confirmed, level.side, originTime, event.price);
                 }
             }
         }
         previous = bar;
     }
-    return [...tags, ...candidates.values()];
+    if (pending) add(pending.key, pending.label, pending.side, pending.time, pending.price);
+    return tags;
 }
 
 class StructureTags {
