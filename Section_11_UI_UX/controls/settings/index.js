@@ -195,6 +195,9 @@ function renderFeature() {
         }
     }
     if (featureTab === "Display") {
+        if (item === 'Market Structure') {
+            note('The band shades the stored upper and lower boundaries of an established range. Candidate tags appear after the next candle closes if the pivot is still unconfirmed.');
+        }
         for (const [key, label,,presentation] of feature.outputs) {
             if(item==='Volume Profile'&&(key==='vp_poc'||key==='vp_histogram'))el('h4',presentation==='profile'?'Histogram bars':'Per-candle lines',content);
             const row = el("label", "", content, "settings-row");
@@ -298,6 +301,7 @@ function renderFeature() {
         color.value = state.color; color.setAttribute("aria-label", `${label} color`);
         color.oninput = () => { state.color = color.value; };
         if(key==='liquidity_heatmap'){color.disabled=true;color.title='Heatmap uses the bid and ask colors above';}
+        if (presentation === 'structureTag') { el('span', '—', row); el('span', '—', row); continue; }
         if(presentation==='marker') {
             const size=el('select','',row);size.setAttribute('aria-label',`${label} size`);
             for(const n of [1,2,3,4]){const o=el('option',String(n),size);o.value=n;}
