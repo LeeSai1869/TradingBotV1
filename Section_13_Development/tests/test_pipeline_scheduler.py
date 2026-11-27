@@ -23,7 +23,7 @@ class PipelineScheduling(TestCase):
     def test_download_features_classifications_decisions_then_new_coin(self):
         self.runner.download();self.assertEqual(self.mocks[-1].call_args.kwargs['symbols'],['OLD'])
         self.runner.maintain()
-        self.assertEqual(self.calls,[p.FEATURES,p.ANALYTICS,p.DECISIONS,p.FEATURES])
+        self.assertEqual(self.calls,[p.FEATURES,p.ANALYTICS,p.DECISIONS,p.FEATURES,p.FEATURES])
         self.assertEqual(self.mocks[-1].call_args.kwargs['symbols'],['NEW'])
         self.assertEqual(self.state['__pipeline_existing__'],['OLD','NEW'])
         self.assertTrue(self.runner.allow_event(p.DECISIONS+'.process_bar','OLD','5m'))
@@ -82,7 +82,7 @@ class PipelineScheduling(TestCase):
         self.mods[p.FEATURES].maintenance.side_effect=lambda *a,**kw:order.append('bulk features') or 0
         self.mods[p.DECISIONS].maintenance.side_effect=lambda *a,**kw:1
         self.runner.download();self.runner.maintain()
-        self.assertEqual(order,['recent downloads','recent features','bulk downloads','bulk features'])
+        self.assertEqual(order,['recent downloads','recent features','bulk features','bulk downloads'])
 
     def test_bulk_focus_selection_does_not_precede_current_downloads_or_features(self):
         order=[]
@@ -91,6 +91,19 @@ class PipelineScheduling(TestCase):
         self.mods[p.FEATURES].maintain_recent.side_effect=lambda *a,**kw:order.append('features') or 0
         self.runner.download();self.runner.maintain()
         self.assertEqual(order[:3],['downloads','features','bulk selection'])
+
+    def test_rotating_repairs_include_ena_even_with_bnb_permanently_selected(self):
+        self.state['__pipeline_existing__']=['OLD','NEW']
+        self.mocks[0].return_value=True
+        self.mocks[-2].return_value=[('NEW','5m')]
+        for _ in range(3):self.runner.maintain()
+        self.assertEqual(self.runner.focus,'OLD')
+        self.assertEqual(self.mods[p.FEATURES].maintenance.call_count,3)
+        for call in self.mods[p.FEATURES].maintenance.call_args_list:
+            self.assertEqual(call.args[0],['OLD','NEW'])
+            self.assertIs(call.kwargs['rotation'],self.state)
+            self.assertEqual(call.kwargs['time_budget'],.5)
+            self.assertEqual(call.kwargs['max_bars'],1000)
 
     def test_ready_pair_advances_while_other_pair_remains_blocked_across_turns(self):
         self.state['__pipeline_existing__']=['OLD','NEW']
@@ -117,7 +130,8 @@ class PipelineScheduling(TestCase):
         self.assertEqual(self.state['__pipeline_focus__'],'OLD')
         self.assertEqual(self.mods[p.ANALYTICS].maintenance.call_args.kwargs['history_pairs'],[('OLD','5m')])
         self.assertEqual(self.mods[p.ANALYTICS].maintenance.call_args.kwargs['pairs'],[('OLD','5m'),('NEW','5m')])
-        self.assertEqual(self.mods[p.FEATURES].maintenance.call_args.args[0],['OLD'])
+        self.assertEqual(self.mods[p.FEATURES].maintenance.call_args.args[0],['OLD','NEW'])
+        self.assertIs(self.mods[p.FEATURES].maintenance.call_args.kwargs['rotation'],self.state)
         self.assertEqual(self.mocks[-1].call_args.kwargs['symbols'],['OLD'])
         self.mocks[0].side_effect=lambda symbol,intervals:symbol=='NEW'
         self.mods[p.DECISIONS].pending_history.side_effect=lambda symbol,intervals:symbol=='OLD'

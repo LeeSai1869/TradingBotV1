@@ -111,7 +111,7 @@ class PipelineScheduler:
         self.state['__pipeline_focus__']=self.focus
         work_priority.set_bulk_symbol(self.focus)
         if self.focus!=self._focus_message:
-            print(f'[pipeline] bulk focus={self.focus}; retain coin through downloads, features and full intelligence history; recent closes remain serviced',flush=True)
+            print(f'[pipeline] bulk focus={self.focus}; retain coin for downloads/intelligence; feature repairs rotate across active pairs; recent closes remain first',flush=True)
             self._focus_message=self.focus
         return self.focus
 
@@ -176,14 +176,14 @@ class PipelineScheduler:
             # analytical engine or another symbol's historical classifications.
             rows[DECISIONS]=self.modules[DECISIONS].maintenance(existing,intervals,
                 pairs=decision_ready,max_bars=100000,time_budget=.5,bulk_symbol=self.focus)
-        if self.focus and not recovering_recent:
-            rows['history_downloads']=update_klines.update_all(symbols=[self.focus],
-                include_recent=False,time_budget=.5)
-            from . import feature_runtime
-            preference=feature_runtime.read().get("priority") or {}
-            repair_owner=preference.get("symbol") if preference.get("symbol") in existing and preference.get("timeframe") in intervals else self.focus
-            rows[FEATURES]+=features.maintenance([repair_owner],intervals,
-                max_bars=100000,time_budget=.5)
+        if not recovering_recent:
+            # Repairs rotate across the entire active cohort. A sticky analytical
+            # owner must never exclude another coin from the feature queue.
+            rows[FEATURES]+=features.maintenance(existing,intervals,
+                max_bars=1000,time_budget=.5,rotation=self.state)
+            if self.focus:
+                rows['history_downloads']=update_klines.update_all(symbols=[self.focus],
+                    include_recent=False,time_budget=.5)
         # Bulk repairs may change readiness after the recent turn. Events must
         # use the resulting committed state, not the earlier snapshot.
         pending=set(pending_sources(existing,intervals,require_history=False))

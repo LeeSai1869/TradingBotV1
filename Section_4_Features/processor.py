@@ -148,8 +148,45 @@ def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768
     return count
 
 
-def maintenance(symbols,intervals,*,max_bars=None,time_budget=None):
-    """Keep bulk symbol priority while reserving progress for other active pairs."""
+def _rotating_maintenance(symbols,intervals,max_bars,time_budget,rotation,priority):
+    """Bounded pair turns independent of the analytical bulk owner's lifetime.
+
+    Persist the last visited pair in the runner state, including failed turns.
+    Each pair receives at most one batch per visit. An operator preference gets
+    an extra turn on alternating calls, never replacing consecutive fair turns.
+    """
+    from Section_1_Global_Core import work_priority
+    pairs=list(dict.fromkeys((s,t) for s in symbols for t in intervals))
+    if not pairs:return 0
+    deadline=time.monotonic()+time_budget;count=0;seen=set()
+    previous=tuple(rotation.get('__feature_rotation__',()))
+    start=(pairs.index(previous)+1)%len(pairs) if previous in pairs else 0
+    ordered=pairs[start:]+pairs[:start]
+    phase=rotation.get('__feature_preference_turn__',False)
+    rotation['__feature_preference_turn__']=not phase
+    preferred=(priority['symbol'],priority['timeframe']) if priority else None
+    if phase and preferred in pairs:ordered=[preferred]+ordered
+    with _LOCK:
+        for pair in ordered:
+            if time.monotonic()>=deadline or count>=max_bars:break
+            if pair in seen:continue
+            seen.add(pair)
+            # A preferred bonus does not advance/erase the normal queue cursor.
+            bonus=phase and preferred==pair and len(seen)==1
+            if not bonus:rotation['__feature_rotation__']=list(pair)
+            if not work_priority.pending_feature_pair(*pair):continue
+            try:
+                print(f'[processor] rotating feature repair turn: {pair[0]} {pair[1]}',flush=True)
+                count+=_advance(*pair,min(WRITE_BATCH,max_bars-count),deadline)
+            except Exception as error:
+                reset_pair(*pair)
+                print(f'[processor] rotating repair failed {pair[0]} {pair[1]}; next pair retains its turn: {error}',flush=True)
+                traceback.print_exc()
+    return count
+
+
+def maintenance(symbols,intervals,*,max_bars=None,time_budget=None,rotation=None):
+    """Bounded feature work, with optional persisted rotation across active pairs."""
     global _cursor
     from Section_1_Global_Core import work_priority,feature_runtime
     runtime=feature_runtime.read()
@@ -157,6 +194,8 @@ def maintenance(symbols,intervals,*,max_bars=None,time_budget=None):
     if time_budget is None:time_budget=runtime['time_budget']
     if max_bars<=0 or time_budget<=0:return 0
     _recover_runtime_format_job(symbols,intervals)
+    if rotation is not None:
+        return _rotating_maintenance(symbols,intervals,max_bars,time_budget,rotation,runtime['priority'])
     priority=runtime['priority'];priority_interval=None
     if (priority and priority['symbol'] in symbols and priority['timeframe'] in intervals
             and work_priority.pending_feature_pair(priority['symbol'],priority['timeframe'])):

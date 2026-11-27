@@ -14,16 +14,22 @@ The market runner services active pairs in this order:
 3. Service eligible analytical updates and strategy decisions. Decisions require
    their own committed inputs; unrelated pivot repairs do not block DI inputs.
    Repairs that affect required inputs, or have an outdated signature, still block.
-4. Use bounded remaining turns for historical downloads, feature repairs and
-   analytical history. Feature recovery borrows those history turns while active.
+4. Rotate feature repairs across every active coin/timeframe, in bounded
+   batches, independently of the analytical bulk owner. Persist the last visited
+   pair in runner state so restart does not return the queue to its beginning.
+   Failed pairs also yield their next turn. Historical downloads and analytical
+   history keep their bounded bulk turns. Feature recovery borrows those
+   background turns while active.
 
 Current feature rows, the main checkpoint and the moving repair target commit
 atomically. A repair merges only after reaching the current main checkpoint.
 Missing raw candles remain gaps; neither scheduler path jumps over them.
 
 An operator's feature-runtime priority is saved until cleared. It selects a
-background repair pair; it does not precede current downloads or current feature
-updates. Clear just that preference, preserving the configured budgets:
+background repair pair for a bonus turn on alternating background calls. The
+normal queue retains its cursor and continues on the other calls, so a saved
+preference cannot starve other pairs. It does not precede current downloads or
+current feature updates. Clear just that preference, preserving the configured budgets:
 
 ```python
 from Section_1_Global_Core import feature_runtime
