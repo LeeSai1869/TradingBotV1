@@ -9,6 +9,10 @@ from Section_1_Global_Core import orchestrator
 
 
 class DownloadSchedulingTests(TestCase):
+    def setUp(self):
+        due=patch.object(updater,"_current_due",return_value=True)
+        due.start();self.addCleanup(due.stop)
+
     def test_current_refreshes_rotate_before_sticky_symbol_history(self):
         with TemporaryDirectory() as directory:
             path=Path(directory)/'klines.db';path.touch()

@@ -13,6 +13,8 @@ class FairService(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.stack=ExitStack();self.addCleanup(self.stack.close)
+        from Section_1_Global_Core.memory_storage.market_data import update_klines as updater
+        self.stack.enter_context(patch.object(updater,'_current_due',return_value=True))
         self.raw=Path(self.temp.name)/'k.db';self.features=Path(self.temp.name)/'f.db'
         with sqlite3.connect(self.raw) as c:
             c.execute('CREATE TABLE klines(symbol,interval,open_time,PRIMARY KEY(symbol,interval,open_time))')
@@ -145,14 +147,14 @@ class FairService(unittest.TestCase):
         self.assertEqual([s for s,_ in calls],['ENA','SUI','BTC'])
         self.assertEqual(count,12);self.assertEqual(calls[-1][1],198)
 
-    def test_recent_lane_cannot_admit_repairs_long_backlogs_or_excluded_pairs(self):
+    def test_recent_lane_admits_repair_for_unaffected_columns_but_not_long_backlogs(self):
         self._current_versions()
         with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('ENA','1m')")
         with sqlite3.connect(self.raw) as c:c.executemany('INSERT INTO klines VALUES (?,?,?)',[('SUI','1m',i) for i in range(5,20)])
-        self.assertIsNone(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True))
+        self.assertEqual(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True),('ENA','1m'))
         with sqlite3.connect(self.raw) as c:c.execute("DELETE FROM klines WHERE symbol='SUI' AND open_time>=5")
         self.assertEqual(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True),('SUI','1m'))
-        self.assertIsNone(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True,exclude={('SUI','1m')}))
+        self.assertIsNone(work_priority.service_pair(['BTC','ENA','SUI'],['1m'],'BTC','features',live_only=True,exclude={('SUI','1m'),('ENA','1m')}))
 
     def test_slow_first_service_keeps_burst_inside_existing_time_slice(self):
         self._current_versions();clock=[0.];calls=[]
@@ -161,12 +163,13 @@ class FairService(unittest.TestCase):
             processor.maintenance(['BTC','ENA','SUI'],['1m'],max_bars=200,time_budget=1)
         self.assertEqual(calls,['ENA','BTC'])
 
-    def test_dedicated_recent_turn_includes_owner_and_excludes_selective_repairs(self):
+    def test_dedicated_recent_turn_includes_owner_and_repairs_in_current_mode(self):
         self._current_versions()
         with sqlite3.connect(self.features) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('ENA','1m')")
         with patch.object(processor,'_advance',return_value=4) as advance:
-            self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=10),8)
-        self.assertEqual({c.args[:2] for c in advance.call_args_list},{('BTC','1m'),('SUI','1m')})
+            self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=10),12)
+        self.assertEqual({c.args[:2] for c in advance.call_args_list},{('BTC','1m'),('ENA','1m'),('SUI','1m')})
+        self.assertTrue(all(c.kwargs['recent_only'] for c in advance.call_args_list))
         self.assertTrue(all(c.args[2]<=200 for c in advance.call_args_list))
 
     def test_dedicated_recent_turn_retains_raw_prefix_and_time_budget(self):
@@ -177,7 +180,7 @@ class FairService(unittest.TestCase):
             advance.assert_not_called()
         with sqlite3.connect(self.raw) as c:c.execute("UPDATE history_progress SET next_open_time=5")
         clock=[0.]
-        def slow(*a):clock[0]+=1;return 1
+        def slow(*a,**kw):clock[0]+=1;return 1
         with patch.object(processor.time,'monotonic',side_effect=lambda:clock[0]),patch.object(processor,'_advance',side_effect=slow) as advance:
             self.assertEqual(processor.maintain_recent(['BTC','ENA','SUI'],['1m'],time_budget=.5),1)
             self.assertEqual(advance.call_count,1)

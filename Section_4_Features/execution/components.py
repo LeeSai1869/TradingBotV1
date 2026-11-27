@@ -272,6 +272,19 @@ class Catalog:
                     required.update(self.requires[uid].get(field,()))
             if required==execute:break
             execute=required
+        return self._compile_plan(changed,execute)
+
+    @lru_cache(maxsize=32)
+    def unaffected_plan(self,repair_changed):
+        dirty=self.plan(repair_changed).changed
+        stable=set(self.by_id)-set(dirty)
+        plan=self._compile_plan(stable,stable)
+        # Native histogram helpers consume raw histories directly, outside AST
+        # previous() reads. Keep those chronological even during a partial run.
+        plan.history_keys |= HISTORY & {"open","high","low","close","volume","time","hlc3"}
+        return plan
+
+    def _compile_plan(self,changed,execute):
         writes=set().union(*(self.by_id[u].writes for u in changed)) if changed else set()
         columns={self.export[w] for w in writes if w in self.export and self.final.get(w) in changed}
         for alias,source in ALIASES.items():

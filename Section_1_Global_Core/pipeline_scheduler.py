@@ -6,6 +6,7 @@ catch-up. Readiness and downstream work are scoped to each active pair.
 """
 from contextlib import closing
 import importlib
+import json
 import sqlite3
 import time
 from . import data_policy, work_priority
@@ -45,12 +46,12 @@ def checkpoint_symbols():
         return {r[0] for r in db.execute('SELECT DISTINCT symbol FROM feature_engine_state WHERE last_open_time IS NOT NULL')}
 
 
-def pending_sources(symbols, intervals, *, require_history=True):
+def pending_sources(symbols, intervals, *, require_history=True, required_columns=None):
     """Only indexed endpoints/checkpoints; never scan historical candle payloads."""
     pending=[]
     if not symbols or not intervals:return pending
     if not klines_store.DB_PATH.exists():return [(s,t) for s in symbols for t in intervals]
-    checkpoints={};versions={};repairs=set()
+    checkpoints={};versions={};repairs=set();repair_columns={};repair_signatures={}
     if features_store.DB_PATH.exists():
         with closing(sqlite3.connect(features_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True)) as features:
             tables={r[0] for r in features.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -58,7 +59,11 @@ def pending_sources(symbols, intervals, *, require_history=True):
                 checkpoints={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,last_open_time FROM feature_engine_state')}
             if 'feature_calculation_versions' in tables:
                 versions={(s,t):v for s,t,v in features.execute('SELECT symbol,interval,signature FROM feature_calculation_versions')}
-            if 'feature_replay_jobs' in tables:repairs=set(features.execute('SELECT symbol,interval FROM feature_replay_jobs'))
+            if 'feature_replay_jobs' in tables:
+                repairs=set(features.execute('SELECT symbol,interval FROM feature_replay_jobs'))
+                if required_columns is not None:
+                    for s,t,cols,signature in features.execute('SELECT symbol,interval,columns,signature FROM feature_replay_jobs'):
+                        repair_columns[s,t]=set(json.loads(cols));repair_signatures[s,t]=signature
     components=importlib.import_module('Section_4_Features.execution.components')
     signature=components.current_signature();now=int(time.time()*1000)
     with closing(sqlite3.connect(klines_store.DB_PATH.resolve().as_uri()+'?mode=ro',uri=True)) as raw:
@@ -72,8 +77,9 @@ def pending_sources(symbols, intervals, *, require_history=True):
                 pair=(s,t)
                 latest=raw.execute('SELECT MAX(open_time) FROM klines WHERE symbol=? AND interval=?',pair).fetchone()[0]
                 checkpoint=checkpoints.get(pair)
+                safe_repair=required_columns is not None and pair in versions and repair_signatures.get(pair)==signature and pair in repair_columns and not (set(required_columns)&repair_columns[pair])
                 if (latest is None or (require_history and (pair in histories or now-latest>2*work_priority.interval_milliseconds(t)))
-                    or checkpoint is None or checkpoint<latest or pair in repairs or versions.get(pair)!=signature):
+                    or checkpoint is None or checkpoint<latest or (not safe_repair and (pair in repairs or versions.get(pair)!=signature))):
                     pending.append(pair)
     return pending
 
@@ -123,7 +129,6 @@ class PipelineScheduler:
 
     def download(self):
         existing,new=self.cohorts()
-        self.select_focus(data_policy.active_intervals())
         # Cold bootstrap gets one coin, not the entire new-listing universe.
         return update_klines.update_all(symbols=existing or new[:1], include_history=False)
 
@@ -141,7 +146,6 @@ class PipelineScheduler:
         if not existing:
             self.initialize(intervals,rows)
             return rows
-        self.select_focus(intervals)
         # Recent closes get a dedicated turn before any bulk download/replay.
         features=self.modules[FEATURES]
         rows[FEATURES]=features.maintain_recent(existing,intervals,time_budget=.5)
@@ -150,9 +154,12 @@ class PipelineScheduler:
             # Borrow the historical analytical slice for interrupted live
             # calculations. Deep research resumes when recent work goes quiet.
             rows[FEATURES]+=features.maintain_recent(existing,intervals,time_budget=.5)
+        self.select_focus(intervals)
         pending=set(pending_sources(existing,intervals,require_history=False))
         ready=[(s,t) for s in existing for t in intervals if (s,t) not in pending]
-        self.ready_pairs=set(ready)
+        decision_pending=set(pending_sources(existing,intervals,require_history=False,required_columns=features_store.decision_fields()+["c","close"]))
+        decision_ready=[(s,t) for s in existing for t in intervals if (s,t) not in decision_pending]
+        self.ready_pairs=set(decision_ready)
         self.announce('per-pair catch-up',len(pending),sorted(pending)[:5])
         if ready:
             analytics=self.modules[ANALYTICS]
@@ -164,19 +171,24 @@ class PipelineScheduler:
                 max_bars=10000,time_budget=.5,max_pairs=1000,
                 history_time_budget=0 if recovering_recent else .5,history_max_bars=10000,
                 history_max_pairs=1000,skip_complete=True)
+        if decision_ready:
             # DI decisions require committed features, not completion of every
             # analytical engine or another symbol's historical classifications.
             rows[DECISIONS]=self.modules[DECISIONS].maintenance(existing,intervals,
-                pairs=ready,max_bars=100000,time_budget=.5,bulk_symbol=self.focus)
-        if self.focus:
+                pairs=decision_ready,max_bars=100000,time_budget=.5,bulk_symbol=self.focus)
+        if self.focus and not recovering_recent:
             rows['history_downloads']=update_klines.update_all(symbols=[self.focus],
                 include_recent=False,time_budget=.5)
-            rows[FEATURES]+=features.maintenance([self.focus],intervals,
+            from . import feature_runtime
+            preference=feature_runtime.read().get("priority") or {}
+            repair_owner=preference.get("symbol") if preference.get("symbol") in existing and preference.get("timeframe") in intervals else self.focus
+            rows[FEATURES]+=features.maintenance([repair_owner],intervals,
                 max_bars=100000,time_budget=.5)
         # Bulk repairs may change readiness after the recent turn. Events must
         # use the resulting committed state, not the earlier snapshot.
         pending=set(pending_sources(existing,intervals,require_history=False))
-        self.ready_pairs={(s,t) for s in existing for t in intervals if (s,t) not in pending}
+        decision_pending=set(pending_sources(existing,intervals,require_history=False,required_columns=features_store.decision_fields()+["c","close"]))
+        self.ready_pairs={(s,t) for s in existing for t in intervals if (s,t) not in decision_pending}
         if self.focus is None and not pending and rows.get(DECISIONS,0)==0:
             self.initialize(intervals,rows)
         return rows

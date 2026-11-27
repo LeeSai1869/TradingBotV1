@@ -84,6 +84,14 @@ class PipelineScheduling(TestCase):
         self.runner.download();self.runner.maintain()
         self.assertEqual(order,['recent downloads','recent features','bulk downloads','bulk features'])
 
+    def test_bulk_focus_selection_does_not_precede_current_downloads_or_features(self):
+        order=[]
+        self.runner.select_focus=Mock(side_effect=lambda *a:order.append('bulk selection'))
+        self.mocks[-1].side_effect=lambda **kw:order.append('downloads') or 0
+        self.mods[p.FEATURES].maintain_recent.side_effect=lambda *a,**kw:order.append('features') or 0
+        self.runner.download();self.runner.maintain()
+        self.assertEqual(order[:3],['downloads','features','bulk selection'])
+
     def test_ready_pair_advances_while_other_pair_remains_blocked_across_turns(self):
         self.state['__pipeline_existing__']=['OLD','NEW']
         self.mocks[-2].return_value=[('NEW','5m')]
@@ -97,7 +105,7 @@ class PipelineScheduling(TestCase):
 
     def test_bulk_repair_invalidates_event_readiness_in_the_same_turn(self):
         self.runner.select_focus=Mock(return_value=None)
-        self.mocks[-2].side_effect=[[],[('OLD','5m')]]
+        self.mocks[-2].side_effect=[[],[],[('OLD','5m')],[('OLD','5m')]]
         self.runner.maintain()
         self.assertEqual(self.mods[p.ANALYTICS].maintenance.call_args.kwargs['pairs'],[('OLD','5m')])
         self.assertFalse(self.runner.allow_event(p.DECISIONS+'.process_bar','OLD','5m'))
@@ -147,6 +155,8 @@ class PipelineScheduling(TestCase):
         self.mods[p.FEATURES].maintain_recent.side_effect=[8,7]
         rows=self.runner.maintain()
         self.assertEqual(rows[p.FEATURES],15)
+        self.mods[p.FEATURES].maintenance.assert_not_called()
+        self.mocks[-1].assert_not_called()
         self.assertEqual(self.mods[p.FEATURES].maintain_recent.call_count,2)
         self.assertEqual(self.mods[p.ANALYTICS].maintenance.call_args.kwargs['history_time_budget'],0)
         self.assertEqual(self.mods[p.ANALYTICS].maintenance.call_args.kwargs['pairs'],[('OLD','5m')])

@@ -58,13 +58,15 @@ def _backup_legacy():
     finally:conn.close()
 
 
-def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None):
+def _advance(symbol,interval,max_bars=WRITE_BATCH,deadline=None,*,recent_only=False):
     started=time.monotonic()
     epoch=_epoch(symbol,interval)
     if not data_policy.enabled(symbol,interval):return 0
     engine=_load(symbol,interval,epoch)
     _prepare_engine(symbol,interval,engine,epoch)
-    if getattr(engine,'_repair_pending',False):return _advance_targeted(symbol,interval,engine,epoch,max_bars,deadline)
+    if getattr(engine,'_repair_pending',False):
+        if recent_only:return _advance_unaffected(symbol,interval,engine,epoch,max_bars,deadline)
+        return _advance_targeted(symbol,interval,engine,epoch,max_bars,deadline)
     conn=klines_store.open_db()
     try:
         rows=klines_store.read_after_page(conn,symbol,interval,engine.context.last_time if engine.context.last_time is not None else -1,min(1000,max_bars))
@@ -128,8 +130,8 @@ def catch_up(symbol,interval):
 def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768):
     """Recover current-generation live tails before bulk work, including its owner.
 
-    The normal chronological writer owns all commits. Repairs and incomplete
-    history prefixes remain on the existing selective/bulk replay path.
+    The normal chronological writer owns all commits. Changed columns keep
+    repairing in bulk while unchanged columns advance over contiguous raw bars.
     """
     from Section_1_Global_Core import work_priority
     deadline=time.monotonic()+time_budget;count=0;seen=set()
@@ -140,7 +142,7 @@ def maintain_recent(symbols,intervals,*,time_budget=.5,max_pairs=64,max_bars=768
                 live_only=True,exclude=seen,recover_recent=True)
             if pair is None or pair in seen:break
             seen.add(pair)
-            try:count+=_advance(*pair,min(200,max_bars-count),deadline)
+            try:count+=_advance(*pair,min(200,max_bars-count),deadline,recent_only=True)
             except Exception:
                 reset_pair(*pair);traceback.print_exc()
     return count
@@ -315,6 +317,12 @@ def preview(symbol,interval,client,*,is_new=True):
             revision=conn.execute('SELECT signature FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
         stamp=(row[0],revision)
         repair=features_store.pending_replay(conn,symbol,interval)
+        repair_units=None
+        if repair:
+            import json
+            task=conn.execute('SELECT changed FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
+            if task is None:return None  # Repair committed between read-only queries; retry next tick.
+            repair_units=frozenset(json.loads(task[0]))
         key=(str(path),symbol,interval,_epoch(symbol,interval))
         with _LOCK:
             cached=_PREVIEWS.get(key)
@@ -345,10 +353,76 @@ def preview(symbol,interval,client,*,is_new=True):
             # Only current-day open is used; high/low references point to the
             # previous actual daily candle, never to a fabricated weekly range.
             daily.append({'open':opening})
-    result=fork.step(client,is_confirmed=False,is_realtime=True,daily_bars=daily,is_new=is_new)
+    if repair:
+        plan=catalog().unaffected_plan(repair_units)
+        result=selective.PartialEngine(symbol,interval,plan,fork.context.parameters,fork.context).step(client,{},is_confirmed=False,is_realtime=True,daily_bars=daily,is_new=is_new)
+    else:
+        result=fork.step(client,is_confirmed=False,is_realtime=True,daily_bars=daily,is_new=is_new)
     if repair:
         for column in repair[2]:result[column]=None
     return result
+
+
+def _advance_unaffected(symbol,interval,base,epoch,max_bars,deadline):
+    """Advance current valid columns while the recursive changed columns repair.
+
+    Never execute changed units on an old checkpoint or fabricate pivot history.
+    Current rows and the unchanged checkpoint commit atomically with a moving
+    repair target. The background partial state must catch that cursor to merge.
+    """
+    import json
+    from .execution import runtime as rt
+    with closing(features_store.open_db()) as conn:
+        job=selective.read_job(conn,symbol,interval)
+    if not job:return 0
+    plan=catalog().unaffected_plan(frozenset(json.loads(job['changed'])))
+    if not plan.columns:return 0
+    with closing(klines_store.open_db()) as raw:
+        rows=klines_store.read_after_page(raw,symbol,interval,base.context.last_time,min(200,max_bars))
+        cursor=klines_store.history_cursor(raw,symbol,interval)
+        if cursor is not None:rows=[r for r in rows if r[2]<cursor]
+    if not rows:return 0
+    unchanged=selective.PartialEngine(symbol,interval,plan,base.context.parameters,base.context)
+    output=[]
+    for row in rows:
+        if output and deadline is not None and time.monotonic()>=deadline:break
+        client=dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),row))
+        # Never jump a hole to make a newer candle look calculated.
+        if unchanged.context.last_client and client['open_time']!=unchanged.context.last_client['close_time']+1:break
+        daily=None;daily_ready=True
+        if interval in ('3d','1w','1M'):
+            day=db.read_klines_tail(symbol,'1d',client['close_time']+1,3)
+            expected=(client['close_time']+1)//86400000*86400000-1
+            daily_ready=bool(day and day[-1][8]==expected)
+            daily=[dict(zip(('symbol','interval','open_time','open','high','low','close','volume','close_time'),r)) for r in day] if daily_ready else []
+        result=unchanged.step(client,{},daily_bars=daily)
+        result.update(symbol=symbol,interval=interval,formula_version=3)
+        if 'daily_source_ready' in plan.columns:result['daily_source_ready']=daily_ready
+        # Missing/affected outputs are deliberately NULL, not stale prior values.
+        output.append(rt.clean(result))
+    if not output:return 0
+    text=checkpoint.dump(base,epoch)
+    with closing(features_store.open_db()) as conn:
+        columns=features_store.storage_columns(conn)
+    values=[features_store.storage_values(row,columns) for row in output]
+    with data_policy.locked():
+        if epoch!=_epoch(symbol,interval) or not data_policy.enabled(symbol,interval):
+            reset_pair(symbol,interval);return 0
+        try:
+            with closing(features_store.open_db()) as conn,conn:
+                current=selective.read_job(conn,symbol,interval)
+                if not current or current['signature']!=job['signature']:
+                    reset_pair(symbol,interval);raise RuntimeError('Repair changed during current feature calculation')
+                conn.executemany(f'INSERT OR REPLACE INTO features ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})',values)
+                conn.execute('UPDATE feature_engine_state SET last_open_time=?,state=? WHERE symbol=? AND interval=?',(base.context.last_time,text,symbol,interval))
+                conn.execute('UPDATE feature_replay_jobs SET target=MAX(target,?) WHERE symbol=? AND interval=?',(base.context.last_time,symbol,interval))
+                from Section_1_Global_Core.memory_storage.Storage import atr_slope_reads,ema_distance_retirement
+                atr_slope_reads.retire_written(conn,[(symbol,interval,r['open_time']) for r in output],parameters=base.context.parameters)
+                ema_distance_retirement.retire_written(conn,[(symbol,interval,r['open_time']) for r in output])
+        except Exception:
+            reset_pair(symbol,interval);raise
+    print(f'[processor] {symbol} {interval}: current +{len(output)} rows; unchanged columns live; affected columns repairing; through={base.context.last_time}',flush=True)
+    return len(output)
 
 
 def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
@@ -359,6 +433,7 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
     try:job=selective.read_job(conn,symbol,interval)
     finally:conn.close()
     if not job:base._repair_pending=False;return 0
+    job['target']=max(job['target'],base.context.last_time)
     restore_started=time.monotonic()
     plan=catalog().plan(set(json.loads(job['changed'])))
     restored=checkpoint.restore(symbol,interval,job['state'],epoch) if job['state'] else None
@@ -420,7 +495,7 @@ def _advance_targeted(symbol,interval,base,epoch,max_bars,deadline):
                     conn.execute('DELETE FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval))
                     conn.execute('UPDATE feature_calculation_versions SET signature=? WHERE symbol=? AND interval=?',(signature,symbol,interval))
                 else:
-                    conn.execute('UPDATE feature_replay_jobs SET last_time=?,state=? WHERE symbol=? AND interval=?',(last,state_text,symbol,interval))
+                    conn.execute('UPDATE feature_replay_jobs SET last_time=?,state=?,target=? WHERE symbol=? AND interval=?',(last,state_text,job['target'],symbol,interval))
         finally:conn.close()
     if complete:
         key=(str(features_store.DB_PATH),symbol,interval,epoch)

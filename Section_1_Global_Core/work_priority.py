@@ -139,7 +139,8 @@ def service_pair(symbols,intervals,owner,kind,*,owner_interval=None,live_only=Fa
             for _ in pairs:
                 pair=pairs[live_cursor%len(pairs)];live_cursor+=1
                 _live_cursors[identity]=live_cursor
-                if pair in exclude or pair in waiting or pair in jobs or pair not in checkpoints or versions.get(pair)!=signature:continue
+                if pair in exclude or pair in waiting or pair not in checkpoints:continue
+                if not live_only and (pair in jobs or versions.get(pair)!=signature):continue
                 s,t=pair;through=checkpoints[pair]
                 # At most thirteen indexed rows: no full-history COUNT scans.
                 rows=raw.execute('SELECT open_time FROM klines WHERE symbol=? AND interval=? AND open_time>? ORDER BY open_time LIMIT 13',(s,t,through)).fetchall()

@@ -20,6 +20,8 @@ from Section_1_Global_Core import data_policy
 from Section_1_Global_Core.memory_storage.Storage import klines_store
 
 import sqlite3
+from contextvars import ContextVar
+from datetime import datetime, timezone
 import time
 import urllib.request
 import urllib.parse
@@ -91,6 +93,10 @@ def _last_stored_open_time(conn, symbol, interval):
     return row[0] if row and row[0] is not None else None
 
 
+_REQUEST_TIMEOUT = ContextVar("kline_request_timeout", default=15.0)
+_REQUEST_DEADLINE = ContextVar("kline_request_deadline", default=None)
+
+
 def _fetch(symbol, interval, start_ms):
     params = {
         "symbol": symbol,
@@ -100,7 +106,12 @@ def _fetch(symbol, interval, start_ms):
     if start_ms is not None:params["startTime"]=int(start_ms)
     url = BINANCE_KLINES_URL + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"User-Agent": "ScalpV1-UP/1.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    timeout=_REQUEST_TIMEOUT.get()
+    deadline=_REQUEST_DEADLINE.get()
+    if deadline is not None:
+        timeout=min(timeout,deadline-time.monotonic())
+        if timeout<=0:raise TimeoutError("Candle download stage budget exhausted")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return _json.loads(resp.read().decode("utf-8"))
 
 
@@ -168,7 +179,7 @@ def update_one(symbol, interval, conn, *, latest_only=False):
     if stored is None:_LATEST_UPDATE_MS.pop(key,None)
     cursor=klines_store.history_cursor(conn,symbol,interval)
     last_ms = _LAST_UPDATE_MS.get(key) if stored is not None else None
-    if cursor is None and last_ms is not None and last_ms//step==now_ms//step:return 0
+    if cursor is None and last_ms is not None and last_ms//step==now_ms//step and not (latest_only and _current_due(conn,symbol,interval,now_ms)):return 0
     from .download_binance_history import FALLBACK_START_MS
     start_ms=cursor if cursor is not None else stored+1 if stored is not None else FALLBACK_START_MS
     total=0
@@ -186,7 +197,7 @@ def update_one(symbol, interval, conn, *, latest_only=False):
         # that path before downloading another large latest-page response.
         cursor=_reconcile_recent_prefix(conn,symbol,interval,cursor,now_ms,epoch)
         if cursor is None:start_ms=stored+1
-    if cursor is not None and _LATEST_UPDATE_MS.get(key,-1)//step!=now_ms//step:
+    if cursor is not None and (_LATEST_UPDATE_MS.get(key,-1)//step!=now_ms//step or latest_only and _current_due(conn,symbol,interval,now_ms)):
         try:
             latest=_fetch(symbol,interval,None)
             with data_policy.locked():
@@ -249,11 +260,34 @@ def update_one(symbol, interval, conn, *, latest_only=False):
     return total+n
 
 
+def _current_due(conn, symbol, interval, now_ms):
+    """Only fetch when another fully closed candle can exist (UTC calendar months)."""
+    row=conn.execute('SELECT close_time FROM klines WHERE symbol=? AND interval=? ORDER BY open_time DESC LIMIT 1',(symbol,interval)).fetchone()
+    if not row:return False  # Cold initialization belongs to the history lane.
+    next_open=row[0]+1
+    if interval=='1M':
+        dt=datetime.fromtimestamp(next_open/1000,timezone.utc)
+        next_close=int(datetime(dt.year+(dt.month==12),dt.month%12+1,1,tzinfo=timezone.utc).timestamp()*1000)
+    else:next_close=next_open+INTERVAL_MS[interval]
+    return now_ms>=next_close
+
+
+def _bounded_update(symbol,interval,conn,deadline,**kwargs):
+    remaining=deadline-time.monotonic()
+    if remaining<=0:return 0
+    token=_REQUEST_TIMEOUT.set(min(2.0,remaining))
+    deadline_token=_REQUEST_DEADLINE.set(deadline)
+    try:return update_one(symbol,interval,conn,**kwargs)
+    finally:
+        _REQUEST_TIMEOUT.reset(token)
+        _REQUEST_DEADLINE.reset(deadline_token)
+
+
 def update_all(*, max_pairs=512, time_budget=2.0, symbols=None, include_recent=True, include_history=True):
     """
     Update a bounded round-robin slice of pairs. Returns total bars inserted.
 
-    Time is checked between requests; one request retains its network timeout.
+    Network timeouts are bounded by the remaining stage budget.
 
     Safe to call every runner cycle. Interval-boundary tracking means
     caught-up pairs are queried at most once per bar period; history keeps paging.
@@ -273,13 +307,14 @@ def update_all(*, max_pairs=512, time_budget=2.0, symbols=None, include_recent=T
         visited=0
         # Current candles for every existing symbol take priority. A separate cursor
         # prevents a large history owner from delaying their interval-boundary refresh.
-        refresh_deadline=time.monotonic()+time_budget/2
+        refresh_deadline=deadline if not include_history else time.monotonic()+time_budget/2
         for _ in range(min(max_pairs,len(pairs)) if include_recent else 0):
             symbol,interval=pairs[_DOWNLOAD_CURSOR%len(pairs)]
             _DOWNLOAD_CURSOR+=1;visited+=1
-            total+=update_one(symbol,interval,conn,latest_only=True)
+            if _current_due(conn,symbol,interval,int(time.time()*1000)):
+                total+=_bounded_update(symbol,interval,conn,refresh_deadline,latest_only=True)
             if time.monotonic()>=refresh_deadline:break
-        owner=work_priority.work_symbol(symbols,intervals)
+        owner=work_priority.work_symbol(symbols,intervals) if include_history else None
         # Alternate who goes first: one slow request may exceed the soft time
         # budget, but cannot permanently deny either bulk or background work.
         order=('background','owner') if _HISTORY_PHASE%2==0 else ('owner','background')
@@ -290,12 +325,12 @@ def update_all(*, max_pairs=512, time_budget=2.0, symbols=None, include_recent=T
                 service=work_priority.service_pair(symbols,intervals,owner,'downloads')
                 if service:
                     print(f'[update_klines] background history turn: {service[0]} {service[1]}',flush=True)
-                    total+=update_one(*service,conn)
+                    total+=_bounded_update(*service,conn,deadline)
             elif owner is not None:
                 cursor=_HISTORY_CURSORS.get(owner,0)
                 for _ in range(min(max_pairs,len(intervals))):
                     interval=intervals[cursor%len(intervals)];cursor+=1
-                    total+=update_one(owner,interval,conn)
+                    total+=_bounded_update(owner,interval,conn,deadline)
                     if time.monotonic()>=deadline:break
                 _HISTORY_CURSORS[owner]=cursor
         print(f'[update_klines] current refresh: {visited}/{len(pairs)} pairs; history symbol={owner}; yielding to features',flush=True)

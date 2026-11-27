@@ -13,9 +13,10 @@ class PartialEngine:
     def __init__(self,symbol,interval,plan,parameters,context=None):
         self.context=context or Context(symbol,interval,parameters)
         self.plan=plan;self.component_sources=catalog().source
-    def step(self,client,stored,*,daily_bars=None):
-        e=self.context;e._stored=stored;e.begin(client,stored=stored,helpers=self.plan.execute);e.external_daily=daily_bars;memory.update(e)
+    def step(self,client,stored,*,daily_bars=None,is_confirmed=True,is_realtime=False,is_new=True):
+        e=self.context;e._stored=stored;e.begin(client,stored=stored,helpers=self.plan.execute,is_confirmed=is_confirmed,is_realtime=is_realtime,is_new=is_new);e.external_daily=daily_bars;memory.update(e)
         for field in self.plan.reads|self.plan.history_keys|{'regimeState'}:
+            if field in ('open','high','low','close','volume'):continue
             column=catalog().export.get(field)
             if column and field not in self.plan.state_writes:e.values[field]=rt.NA if stored.get(column) is None else stored[column]
         for fn in self.plan.functions:fn(e)
@@ -39,6 +40,7 @@ class PartialEngine:
                     index=dynamic_ids.index(identity) if identity in dynamic_ids else None
                 result[f'{side}_zone_{edge}']=levels[index] if index is not None and index<len(levels) else None
         result['open_time']=client['open_time']
+        if 'regimeState' not in e.values:e.values['regimeState']=e.last_regime
         e.finish(history_keys=self.plan.history_keys);return rt.clean(result)
 
 
@@ -52,7 +54,7 @@ def merge(base,partial):
     for key in plan.state_writes:
         if key in b.persistent:a.persistent[key]=copy.deepcopy(b.persistent[key])
     for key,values in b.histories.items():
-        if key in plan.state_writes or key in catalog().export:a.histories[key]=deque(values,maxlen=a.capacity)
+        if key in plan.state_writes or key in plan.history_keys:a.histories[key]=deque(values,maxlen=a.capacity)
     if 'context:vwap' in plan.execute:a.vwap_sum=b.vwap_sum;a.vwap_volume=b.vwap_volume
     if 'context:volume' in plan.execute:a.volumes=list(b.volumes)
     if 'regimeState' in plan.state_writes:a.last_regime=b.last_regime
