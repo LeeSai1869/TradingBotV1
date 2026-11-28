@@ -56,6 +56,14 @@ def main():
                     expect(page.locator('#setup-section')).to_be_visible()
                     expect(page.locator('#setups')).to_contain_text('Trigger remembered');expect(page.locator('#setups')).to_contain_text('Activated')
                     expect(page.locator('#setups tr')).to_have_count(3)
+                    expect(page.locator('#waiting-candles tr')).to_have_count(3)
+                    page.get_by_role('button',name='Inspect waiting candle',exact=True).first.click()
+                    expect(page.locator('#waiting-detail')).to_contain_text('FAIL')
+                    expect(page.locator('#waiting-detail')).to_contain_text('40.0000')
+                    with page.expect_download() as download:
+                        page.locator('#waiting-download').click()
+                    evidence=json.loads(Path(download.value.path()).read_text())
+                    assert len(evidence['waiting_evaluations'])==2
                     page.get_by_role('button',name='Inspect',exact=True).first.click()
                     expect(page.locator('#detail')).to_contain_text('BUY Trigger remembered')
                     reports=[json.load(gzip.open(path,'rt')) for path in (root/'workspace/runs').glob('*/strategy_analysis.json.gz')]

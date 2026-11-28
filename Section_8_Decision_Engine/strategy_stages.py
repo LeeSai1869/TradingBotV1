@@ -34,3 +34,16 @@ def match(memory,branch,program,index,armed,missing,*,allow_arm=False):
         armed[branch['id']]=setup
     if index<setup['index'] or index==setup['index'] and branch.get('activation_timing','same_or_later')=='later':return False
     return memory.evaluate(activation,index,missing)
+
+
+def explain(memory,node,index,path='Activate'):
+    """Record each activation predicate without changing its grouped truth value."""
+    if 'all' in node or 'any' in node:
+        key='all' if 'all' in node else 'any'
+        return [item for j,child in enumerate(node[key]) for item in explain(memory,child,index,f'{path}/{key}[{j+1}]')]
+    if 'not' in node:return explain(memory,node['not'],index,path+'/not')
+    value,missing=memory.value(index,node['field'],node.get('lag',0))
+    other,other_missing=memory.value(index,node['other_field'],node.get('other_lag',0)) if 'other_field' in node else (node.get('value'),None)
+    result=memory.evaluate(node,index,set())
+    return [dict(path=path,condition=node,result='PASS' if result is True else 'FAIL' if result is False else 'UNKNOWN',
+                 value=value,missing_reason=missing,other_value=other,other_missing_reason=other_missing)]

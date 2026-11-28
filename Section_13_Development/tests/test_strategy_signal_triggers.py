@@ -44,6 +44,26 @@ class SignalTriggers(unittest.TestCase):
         self.assertEqual(a.analyze(p,c)['signals'][0]['candle_open_time'],0)
         c['branches'][0]['activation_timing']='later'
         self.assertFalse(a.analyze(p,c)['signals'])
+    def test_waiting_evidence_accounts_for_every_waiting_evaluation(self):
+        p,c=self.staged();p['candles'][1]['features']['rsi']=None
+        r=a.analyze(p,c);waits=r['waiting_evaluations']
+        self.assertEqual(len(waits),r['branch_diagnostics']['buy']['waiting_activation'])
+        self.assertEqual([w['candle_open_time'] for w in waits],[0,p['candles'][1]['open_time']])
+        self.assertEqual(waits[0]['reason'],'ACTIVATION_FALSE')
+        self.assertEqual(waits[0]['conditions'][0]['value'],10)
+        self.assertEqual(waits[0]['conditions'][0]['other_value'],40)
+        self.assertEqual(waits[0]['conditions'][0]['result'],'FAIL')
+        self.assertEqual(waits[1]['reason'],'ACTIVATION_UNKNOWN')
+        self.assertEqual(waits[1]['conditions'][0]['result'],'UNKNOWN')
+        self.assertTrue(waits[1]['conditions'][0]['missing_reason'])
+        self.assertEqual(waits[1]['trigger_known_time'],p['candles'][0]['close_time']+1)
+
+    def test_later_only_wait_explains_timing_even_if_conditions_pass(self):
+        p,c=self.staged(activation_at=0);c['branches'][0]['activation_timing']='later'
+        first=a.analyze(p,c)['waiting_evaluations'][0]
+        self.assertEqual(first['reason'],'LATER_CLOSE_REQUIRED')
+        self.assertEqual(first['conditions'][0]['result'],'PASS')
+
     def test_all_trigger_conditions_must_match_their_group(self):
         p,c=self.staged();c['branches'][0]['when']['all'].insert(1,dict(field='feature.rsi',op='gt',value=100,stage='trigger'))
         self.assertFalse(a.analyze(p,c)['signals'])

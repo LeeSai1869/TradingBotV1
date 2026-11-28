@@ -324,7 +324,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
     config_id = digest(config)
     signals, trades = [], []
     programs={b['id']:(strategy_stages.project(b['when'],'trigger'),strategy_stages.project(b['when'],'activate')) for b in config['branches']}
-    armed={};setup_events=[]
+    armed={};setup_events=[];waiting_evaluations=[]
     diagnostics = {b['id']: dict(side=b['side'], evaluated=0, true=0, false=0, unknown=0, accepted=0,
                                 same_side_suppressed=0, setups_armed=0, waiting_activation=0, tie_matches=0, missing_fields=Counter()) for b in config['branches']}
     waiting = 'BUY'
@@ -423,7 +423,14 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             result = strategy_stages.match(memory,branch,programs[branch['id']],i,armed,missing,allow_arm=branch['side']==waiting)
             if not before and branch['id'] in armed:
                 stats['setups_armed']+=1;setup_events.append(dict(type='TRIGGER',**armed[branch['id']]))
-            if branch['id'] in armed and result is not True:stats['waiting_activation']+=1
+            if branch['id'] in armed and result is not True:
+                stats['waiting_activation']+=1
+                setup=armed[branch['id']]
+                reason='LATER_CLOSE_REQUIRED' if i==setup['index'] and branch.get('activation_timing')=='later' else 'ACTIVATION_UNKNOWN' if result is UNKNOWN else 'ACTIVATION_FALSE'
+                waiting_evaluations.append(dict(branch_id=branch['id'],side=branch['side'],candle_open_time=row['open_time'],known_time=row['close_time']+1,
+                    trigger_known_time=setup['known_time'],candles_since_trigger=i-setup['index'],reason=reason,
+                    price={key:row[key] for key in ('open','high','low','close')},
+                    conditions=strategy_stages.explain(memory,programs[branch['id']][1],i)))
             stats['missing_fields'].update(missing)
             stats['unknown' if result is UNKNOWN else 'true' if result else 'false'] += 1
             if result is True:
@@ -486,7 +493,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
     result = dict(version=VERSION, config=config, config_digest=config_id, contract=contract,
                   run_id=digest(dict(contract=contract, config_digest=config_id)), candles_scanned=len(selected), candles_evaluated=len(selected)-invalid_prices,
                   test_status='BLOCKED_INPUTS' if blocked else 'COMPLETED',
-                  signals=signals, trades=trades, setup_events=setup_events,pending_setups=list(armed.values()),waiting_for=waiting, branch_diagnostics=diagnostics,
+                  signals=signals, trades=trades, setup_events=setup_events,waiting_evaluations=waiting_evaluations,pending_setups=list(armed.values()),waiting_for=waiting, branch_diagnostics=diagnostics,
                   summary=summarize(trades, execution['initial_capital']), yearly=yearly,
                   invalid_price_candles=invalid_prices, price_gaps=gaps, unavailable_feature_fields=missing_features,
                   fields_used=fields, report_fields=report_fields, available_feature_fields=sorted(memory.features),

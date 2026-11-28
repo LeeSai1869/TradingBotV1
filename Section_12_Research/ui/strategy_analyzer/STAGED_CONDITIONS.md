@@ -65,3 +65,17 @@ are not silently changed: select Off and save to run a take-profit-only test.
 The report header states the resolved setting. With no hard stop, a target that
 is never reached leaves the simulated position open; losses are not converted
 into completed wins. This setting changes offline replay only.
+
+## Waiting candle evidence
+
+Waiting candle evaluations counts every close at which a branch is armed but
+cannot activate, including the trigger close itself when it does not activate.
+It is not a setup count. Click its count in Branch coverage to filter the
+**Waiting for Activate — candle evidence** table. Inspect a candle to see OHLC,
+trigger knowledge time, activation-check time, candles since trigger, predicate
+operands, PASS/FAIL/UNKNOWN, missing reasons, and logical group paths. The full
+group expression governs acceptance; NOT inverts its child. Later-close-only
+restrictions are identified separately from failed conditions. All waiting rows
+are retained in JSON; the table pages through 25 at a time. Download waiting
+evidence JSON exports the full list. Older reports require rerunning to populate
+this evidence. Changing display timezone also updates this table.
