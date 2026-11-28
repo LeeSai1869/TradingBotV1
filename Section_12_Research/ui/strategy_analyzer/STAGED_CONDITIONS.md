@@ -29,3 +29,12 @@ historical repair. Its geometry differs from confirmed-pair-v1, so the old parti
 pivot checkpoint cannot be reused. Unrelated live indicators and the fair repair
 scheduler retain their existing paths. Do not delete databases or manually reset
 replay progress.
+
+## Test periods
+
+Full Life is the default and leaves the replay unbounded, using all available
+history per selected coin. Past 6 Months, Past Year, Past 2 Years, and Past 4 Years
+use calendar months ending at the selected source’s latest candle, rounded up
+to the next UTC minute when necessary. Batch coins share those boundaries.
+Shorter histories are not filled with invented data. Custom dates remain editable,
+and the selected preset is retained with the browser draft.

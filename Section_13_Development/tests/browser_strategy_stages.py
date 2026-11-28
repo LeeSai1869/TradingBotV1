@@ -20,6 +20,20 @@ def main():
                 try:
                     page=browser.new_page(viewport=dict(width=1450,height=1100));errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                     page.goto(f'http://127.0.0.1:{server.server_port}/');expect(page.locator('#run-strategy')).to_be_enabled()
+                    expect(page.locator('#replay-period')).to_have_value('full')
+                    expect(page.locator('#replay-since')).to_have_value('')
+                    page.locator('#replay-period').select_option('6')
+                    expected_end=__import__('datetime').datetime.fromtimestamp((data['candles'][-1]['close_time']//60000+1)*60,__import__('datetime').timezone.utc)
+                    expect(page.locator('#replay-until')).to_have_value(expected_end.strftime('%Y-%m-%dT%H:%M'))
+                    assert page.locator('#replay-since').input_value()<page.locator('#replay-until').input_value()
+                    page.reload();expect(page.locator('#run-strategy')).to_be_enabled()
+                    expect(page.locator('#replay-period')).to_have_value('6')
+                    page.locator('#replay-period').select_option('custom')
+                    expect(page.locator('#replay-since')).to_be_editable()
+                    page.locator('#replay-period').select_option('48')
+                    assert int(page.locator('#replay-since').input_value()[:4])==expected_end.year-4
+                    page.locator('#replay-period').select_option('full')
+                    expect(page.locator('#replay-until')).to_have_value('')
                     page.locator('#preset-options summary').click();page.locator('#strategy-preset').select_option(saved['key']);page.locator('#load-preset').click()
                     buy=page.locator('#branches-editor .branch').first
                     buy.get_by_label('Condition role',exact=True).first.select_option('trigger')

@@ -25,7 +25,27 @@
   }
   function guard(action) { return async (...args) => { try { error(); await action(...args); } catch (e) { error(e.message); } }; }
   function remember() {
-    try { localStorage.setItem(draftKey, JSON.stringify({model, reportFields: [...reportFields],inputId:$('input-source').value,symbols:[...$('memory-coins').selectedOptions].map(o=>o.value),baselineKey:$('baseline-preset').value,since:$('replay-since').value,until:$('replay-until').value})); } catch (_) { /* Downloads remain available if storage is unavailable. */ }
+    try { localStorage.setItem(draftKey, JSON.stringify({model, reportFields: [...reportFields],inputId:$('input-source').value,symbols:[...$('memory-coins').selectedOptions].map(o=>o.value),baselineKey:$('baseline-preset').value,period:$('replay-period').value,since:$('replay-since').value,until:$('replay-until').value})); } catch (_) { /* Downloads remain available if storage is unavailable. */ }
+  }
+  function applyPeriod() {
+    const period=$('replay-period').value;
+    const custom=period==='custom';
+    for(const id of ['replay-since','replay-until'])$(id).readOnly=!custom;
+    if(custom){$('replay-period-note').textContent='Custom UTC boundaries; From is inclusive and Until is exclusive.';return;}
+    if(period==='full'){
+      $('replay-since').value=$('replay-until').value='';
+      $('replay-period-note').textContent='Uses all available history for each selected coin. No date cutoff.';return;
+    }
+    if(!metadata)return;
+    // Anchor to the selected source, including archived exports, rather than wall time.
+    const end=new Date(Math.ceil(Number(metadata.last)/60000)*60000);
+    const start=new Date(end);const day=start.getUTCDate();
+    start.setUTCDate(1);start.setUTCMonth(start.getUTCMonth()-Number(period));
+    const lastDay=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,0)).getUTCDate();
+    start.setUTCDate(Math.min(day,lastDay));
+    $('replay-since').value=start.toISOString().slice(0,16);
+    $('replay-until').value=end.toISOString().slice(0,16);
+    $('replay-period-note').textContent='Ends at the selected input’s latest candle (UTC). All selected coins use these dates; shorter histories use only available data.';
   }
   function stageExpression(expr,stage){
     if(expr.all||expr.any){const key=expr.all?'all':'any',children=expr[key].map(e=>stageExpression(e,stage)).filter(Boolean);return children.length?{[key]:children}:null;}
@@ -242,7 +262,7 @@
   async function loadInput() {
     const token = ++inputToken; $('run-strategy').disabled = true; $('input-status').textContent = 'Reading selected input…';
     const result = await api('/api/input?id=' + encodeURIComponent($('input-source').value)); if (token !== inputToken) return;
-    metadata = result; $('input-status').textContent = `${result.symbol} · ${result.timeframe} · ${result.candles.toLocaleString()} candles · ${new Date(result.first).toISOString().slice(0,10)} to ${new Date(result.last).toISOString().slice(0,10)} · ${result.feature_columns} stored feature columns`;
+    metadata = result; applyPeriod(); $('input-status').textContent = `${result.symbol} · ${result.timeframe} · ${result.candles.toLocaleString()} candles · ${new Date(result.first).toISOString().slice(0,10)} to ${new Date(result.last).toISOString().slice(0,10)} · ${result.feature_columns} stored feature columns`;
     $('input-heading').textContent = `${result.symbol} · ${result.timeframe} · SPOT RESEARCH`;
     $('memory-batch').hidden=result.mode!=='memory';
     if(result.mode==='memory'){$('memory-symbol').value=result.symbol;$('memory-timeframe').value=result.timeframe;if(!$('memory-coins').selectedOptions.length)for(const o of $('memory-coins').options)o.selected=o.value===result.symbol;}
@@ -308,10 +328,10 @@
   $('save-config').onclick = guard(async () => { const saved=await api('/api/config',{config:configuration()});await refreshCatalog();$('strategy-preset').value=saved.key;$('run-status').textContent='Strategy saved. Previous versions are retained.'; });
   $('export-config').onclick = guard(() => download(configuration(), $('strategy-name').value.replace(/[^a-z0-9_-]/gi,'_')+'.json'));
   $('config-upload').onchange = guard(async e => { const file=e.target.files[0];if(file){const saved=await api('/api/config',{config:JSON.parse(await file.text())});await refreshCatalog();setModel(saved.config);$('strategy-preset').value=saved.key;} });
-  $('input-source').onchange = guard(async()=>{await loadInput();remember();});$('refresh-input').onclick=guard(loadInput);for(const id of ['baseline-preset','replay-since','replay-until'])$(id).onchange=remember; $('report-field-search').oninput = renderFields;
+  $('input-source').onchange = guard(async()=>{await loadInput();remember();});$('refresh-input').onclick=guard(loadInput);$('baseline-preset').onchange=remember;$('replay-period').onchange=()=>{applyPeriod();remember();};for(const id of ['replay-since','replay-until'])$(id).onchange=remember; $('report-field-search').oninput = renderFields;
   $('input-upload').onchange = guard(async e => { const file=e.target.files[0];if(!file)return;$('input-status').textContent='Importing row-source file…';const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));const uploaded=await api('/api/upload',{data:btoa(binary),name:file.name});await refreshCatalog();$('input-source').value=uploaded.id;await loadInput(); });
   $('load-report').onclick = guard(() => loadReport($('saved-report').value));
-  $('use-report-config').onclick = guard(() => { setModel(currentReport.config);reportFields=new Set(currentReport.report_fields||[]);renderFields();for(const [id,key] of [['replay-since','since'],['replay-until','until']])$(id).value=currentReport.contract[key]===null?'':new Date(currentReport.contract[key]).toISOString().slice(0,16);$('strategy-title').scrollIntoView({behavior:'smooth'}); });
+  $('use-report-config').onclick = guard(() => { setModel(currentReport.config);$('replay-period').value='custom';applyPeriod();reportFields=new Set(currentReport.report_fields||[]);renderFields();for(const [id,key] of [['replay-since','since'],['replay-until','until']])$(id).value=currentReport.contract[key]===null?'':new Date(currentReport.contract[key]).toISOString().slice(0,16);$('strategy-title').scrollIntoView({behavior:'smooth'}); });
   $('pin-baseline').onclick = guard(async () => { const saved=await api('/api/config',{config:currentReport.config});await refreshCatalog();$('baseline-preset').value=saved.key;$('run-status').textContent='Report strategy selected as baseline. It will replay on the same inputs and costs as your next run.'; });
   $('run-strategy').onclick = guard(async () => {
     const config=configuration();const baseline=catalog.configurations.find(c=>c.key===$('baseline-preset').value)?.config;
@@ -328,6 +348,6 @@
     reportFields=new Set(draft?.reportFields || []);if(catalog.inputs.some(i=>i.id===draft?.inputId))$('input-source').value=draft.inputId;
     const requested = new URLSearchParams(location.search).get('input');
     if(requested){const id=requested==='default'?catalog.default_input:requested;if(catalog.inputs.some(i=>i.id===id))$('input-source').value=id;history.replaceState(null,'',location.pathname+location.hash);}
-    if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();if(draft?.symbols?.length)for(const o of $('memory-coins').options)o.selected=draft.symbols.includes(o.value);remember();
+    if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-period').value=draft?.period||((draft?.since||draft?.until)?'custom':'full');$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();if(draft?.symbols?.length)for(const o of $('memory-coins').options)o.selected=draft.symbols.includes(o.value);remember();
   })();
 })();

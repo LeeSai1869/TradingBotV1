@@ -48,8 +48,9 @@
 <div id="branches-editor"></div><div class="controls"><button id="add-buy" type="button">+ Another BUY rule</button><button id="add-sell" type="button">+ Another SELL rule</button><button id="add-trailing-sell" type="button">+ Trailing SELL</button></div>
 </section>
 <section class="panel" aria-labelledby="run-title"><h2 id="run-title">3. Test on stored data</h2><div class="controls">
+<label>Test period<select id="replay-period"><option value="full">Full Life · all available history</option><option value="6">Past 6 Months</option><option value="12">Past Year</option><option value="24">Past 2 Years</option><option value="48">Past 4 Years</option><option value="custom">Custom dates</option></select></label>
 <label>From (UTC, inclusive)<input id="replay-since" type="datetime-local"></label>
-<label>Until (UTC, exclusive)<input id="replay-until" type="datetime-local"></label>
+<label>Until (UTC, exclusive)<input id="replay-until" type="datetime-local"></label><p id="replay-period-note" class="muted compact"></p>
 <label>Fee per side (bps)<input id="fee" type="number" min="0" max="9999" step="0.1" value="4"></label>
 <label>Slippage per side (bps)<input id="slippage" type="number" min="0" max="9999" step="0.1" value="2"></label>
 <label>Starting capital<input id="capital" type="number" min="0.01" step="0.01" value="100"></label>
