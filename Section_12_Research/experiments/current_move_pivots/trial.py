@@ -54,4 +54,3 @@ def simulate(rows,*,closes=2,seed=None,reference="current_move"):
                 opposite=dict(price=D(earlier[field]),origin=earlier['open_time']) if earlier else None
         states.append(state(row));previous=row
     return dict(events=events,states=states,final=states[-1])
-
