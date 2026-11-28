@@ -27,10 +27,18 @@
   function remember() {
     try { localStorage.setItem(draftKey, JSON.stringify({model, reportFields: [...reportFields],inputId:$('input-source').value,symbols:[...$('memory-coins').selectedOptions].map(o=>o.value),baselineKey:$('baseline-preset').value,since:$('replay-since').value,until:$('replay-until').value})); } catch (_) { /* Downloads remain available if storage is unavailable. */ }
   }
+  function stageExpression(expr,stage){
+    if(expr.all||expr.any){const key=expr.all?'all':'any',children=expr[key].map(e=>stageExpression(e,stage)).filter(Boolean);return children.length?{[key]:children}:null;}
+    if(expr.not){const child=stageExpression(expr.not,stage);return child?{not:child}:null;}
+    return (expr.stage||'activate')===stage?expr:null;
+  }
+  function configuredExpression(expr){return !!(expr && (expr.field || (expr.all||expr.any||[]).some(configuredExpression) || (expr.not&&configuredExpression(expr.not))));}
+  function positionTrail(branch){return branch.side==='SELL'&&branch.action==='TRAILING_SELL'&&(branch.condition_mode==='position'||(!branch.condition_mode&&(!configuredExpression(branch.when)||(branch.when?.field==='price.close'&&branch.when?.op==='available'&&!branch.when?.lag))));}
+  document.addEventListener('click',e=>{for(const menu of document.querySelectorAll('.field-dropdown[open]'))if(!menu.contains(e.target))menu.open=false;});
   function configuration() {
     const config = {version: 'btc-hour-strategy-analyzer-v1', id: $('strategy-name').value.trim(),
       execution: {fee_bps_per_side: Number($('fee').value), slippage_bps_per_side: Number($('slippage').value), initial_capital: Number($('capital').value),intrabar_path:$('intrabar-path').value},
-      branches: model.branches.filter(b => b.enabled !== false).map(({id, side, when,action,trail,target_profit_pct}) => ({id, side, when: copy(when),...(side==='SELL'&&action?{action,...(trail?{trail:copy(trail)}:{}),...(target_profit_pct!==undefined?{target_profit_pct}:{})}:{})}))};
+      branches: model.branches.filter(b => b.enabled !== false).map(branch => {const {id, side, when,action,trail,target_profit_pct}=branch;return ({id, side,...(branch.activation_timing==='later'&&!positionTrail(branch)?{activation_timing:'later'}:{}), when: positionTrail(branch)?{field:'price.close',op:'available'}:copy(when),...(side==='SELL'&&action?{action,...(trail?{trail:copy(trail)}:{}),...(target_profit_pct!==undefined?{target_profit_pct}:{})}:{})});})};
     if (!config.id) throw Error('Give your strategy a name.');
     if (!config.branches.some(b => b.side === 'BUY') || !config.branches.some(b => b.side === 'SELL')) throw Error('Enable at least one BUY and one SELL branch.');
     function validateRule(expr, side) {
@@ -46,7 +54,7 @@
       if (!['available','missing'].includes(expr.op) && !('other_field' in expr) && (expr.value==='' || expr.value===undefined || (Array.isArray(expr.value)&&expr.value.some(v=>v==='')))) throw Error(`${side}: enter a comparison value.`);
       if (typeof expr.value==='number' && !Number.isFinite(expr.value)) throw Error(`${side}: enter a valid number.`);
     }
-    config.branches.forEach(branch=>validateRule(branch.when,branch.side));
+    config.branches.forEach(branch=>{validateRule(branch.when,branch.side);if(stageExpression(branch.when,'trigger')&&!stageExpression(branch.when,'activate'))throw Error(`${branch.side}: add at least one Activate condition after your Trigger conditions.`);});
     return config;
   }
   function setModel(config) {
@@ -56,16 +64,49 @@
     renderBranches(); remember();
   }
   function fieldSelect(selected, parent, changed) {
-    const search=node('input',undefined,parent,{type:'search',placeholder:'Find a field…','aria-label':'Find condition field'});
-    const select = node('select', undefined, parent); select.setAttribute('aria-label', 'Condition field');
-    const note=node('small','',parent);
-    const render=()=>{select.replaceChildren();const words=search.value.toLowerCase().replace(/previous/g,'prev').replace(/di\+/g,'di_plus').replace(/di[-−]/g,'di_minus').replaceAll('_',' ').split(/\s+/).filter(Boolean),found=fields().filter(f=>{const text=(f.id+' '+human(f.id)).toLowerCase().replaceAll('_',' ');return words.every(w=>text.includes(w));});const shown=found.slice(0,200);const current=fieldInfo(selected);if(current&&!shown.includes(current))shown.unshift(current);const grouped=new Map();
-      for(const info of shown){if(!grouped.has(info.group))grouped.set(info.group,[]);grouped.get(info.group).push(info);}
-      if(!selected)node('option','Choose an indicator or input…',select,{value:''});
-      if(selected&&!current)node('option',human(selected)+' · absent from selected input',select,{value:selected});
-      for(const [group,infos]of grouped){const g=node('optgroup',undefined,select,{label:group});for(const info of infos)node('option',human(info.id),g,{value:info.id});}
-      select.value=selected || '';note.textContent=current?.sample_present===0?'No values available in this input sample. Check coverage before replay.':found.length>200?`${found.length.toLocaleString()} fields match · type to narrow the first 200`:'';};
-    search.oninput=render;render();select.onchange=()=>{selected=select.value;changed(select.value);};return select;
+    const menu=node('details',undefined,parent,{class:'field-dropdown'});
+    const identity='field-options-'+Math.random().toString(36).slice(2);
+    const trigger=node('summary',undefined,menu,{role:'combobox','aria-label':'Choose condition field','aria-haspopup':'listbox','aria-expanded':'false','aria-controls':identity});
+    const panel=node('div',undefined,menu,{class:'field-dropdown-panel'});
+    const search=node('input',undefined,panel,{type:'search',placeholder:'Search indicators and stored inputs…','aria-label':'Search fields',autocomplete:'off'});
+    const results=node('div',undefined,panel,{id:identity,role:'listbox','aria-label':'Available fields'});
+    const note=node('small','',panel,{role:'status'});
+    const availability=node('small','',parent);
+    // The native value remains a change-event bridge for existing integrations.
+    const select=node('select',undefined,parent,{'aria-label':'Condition field','aria-hidden':'true',tabindex:'-1'});select.hidden=true;
+    node('option','Choose an indicator or input…',select,{value:''});
+    if(selected)node('option',human(selected),select,{value:selected});
+    function updateSelection(){
+      if(selected&&![...select.options].some(o=>o.value===selected))node('option',human(selected),select,{value:selected});
+      select.value=selected||'';trigger.textContent=selected?human(selected):'Choose an indicator or input…';
+      const info=fieldInfo(selected);
+      availability.textContent=selected&&!info?'This input is absent from the selected data.':info?.sample_present===0?'No values in this input sample. Check coverage before replay.':'';
+    }
+    function choose(value){selected=value;updateSelection();menu.open=false;changed(value);}
+    function render(){
+      results.replaceChildren();
+      const normalize=text=>text.toLowerCase().replace(/previous/g,'prev').replace(/di\+/g,'di_plus').replace(/di[-−]/g,'di_minus').replaceAll('_',' ');
+      const words=normalize(search.value).split(/\s+/).filter(Boolean);
+      const found=fields().filter(f=>words.every(word=>normalize(f.id+' '+human(f.id)).includes(word)));
+      let groupName,group;
+      for(const f of found.slice(0,200)){
+        if(f.group!==groupName){groupName=f.group;group=node('div',undefined,results,{role:'group','aria-label':groupName||'Inputs'});node('strong',groupName||'Inputs',group);}
+        const option=button(human(f.id),group,()=>choose(f.id));option.setAttribute('role','option');option.setAttribute('aria-selected',String(f.id===selected));option.dataset.field=f.id;
+        option.onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const options=[...results.querySelectorAll('[role="option"]')],i=options.indexOf(option);options[(i+(e.key==='ArrowDown'?1:-1)+options.length)%options.length]?.focus();}};
+      }
+      note.textContent=found.length?`${found.length.toLocaleString()} matching inputs${found.length>200?' · showing 200; narrow your search':''}`:'No matching inputs. Try another name.';
+    }
+    search.oninput=render;
+    search.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();results.querySelector('[role="option"]')?.focus();}};
+    menu.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();menu.open=false;trigger.focus();}});
+    menu.ontoggle=()=>{
+      trigger.setAttribute('aria-expanded',String(menu.open));
+      if(menu.open&&menu.isConnected){
+        for(const other of document.querySelectorAll('.field-dropdown[open]'))if(other!==menu)other.open=false;
+        render();panel.style.left='0px';const overflow=panel.getBoundingClientRect().right-innerWidth+12;if(overflow>0)panel.style.left=-overflow+'px';search.focus();
+      }
+    };
+    select.onchange=()=>choose(select.value);updateSelection();return select;
   }
   function defaultLeaf() { return {field:'',op:'',value:''}; }
   function expressionText(expr) {
@@ -73,7 +114,7 @@
     if (expr.not) return 'NOT ' + expressionText(expr.not);
     if (!expr.field || !expr.op) return 'Choose an indicator, comparison and value.';
     const ops = {eq: 'equals', ne: 'does not equal', gt: '>', gte: '≥', lt: '<', lte: '≤', in: 'is one of', available: 'is available', missing: 'is missing'};
-    return `${human(expr.field)}${expr.lag ? ' ' + expr.lag + ' candles ago' : ''} ${ops[expr.op]} ${expr.other_field ? human(expr.other_field) + (expr.other_lag ? ' ' + expr.other_lag + ' candles ago' : '') : expr.value === undefined ? '' : Array.isArray(expr.value) ? expr.value.join(', ') : String(expr.value)}`;
+    return `${expr.stage==='trigger'?'[Trigger] ':'[Activate] '}${human(expr.field)}${expr.lag ? ' ' + expr.lag + ' candles ago' : ''} ${ops[expr.op]} ${expr.other_field ? human(expr.other_field) + (expr.other_lag ? ' ' + expr.other_lag + ' candles ago' : '') : expr.value === undefined ? '' : Array.isArray(expr.value) ? expr.value.join(', ') : String(expr.value)}`;
   }
   function renderExpression(expr, parent, replace, remove, preview) {
     const changed = () => { preview(); remember(); };
@@ -96,6 +137,8 @@
       return;
     }
     const row = node('div', undefined, parent, {class: 'predicate'});
+    const stage=node('select',undefined,label('Condition role',row),{'aria-label':'Condition role'});
+    node('option','Activate · fire the BUY/SELL',stage,{value:'activate'});node('option','Trigger · remember setup',stage,{value:'trigger'});stage.value=expr.stage||'activate';stage.onchange=()=>{expr.stage=stage.value;renderBranches();remember();};
     fieldSelect(expr.field, node('label', 'Input', row, {class: 'field'}), value => {
       expr.field = value; if (!('other_field' in expr) && expr.op !== 'in' && !['available', 'missing'].includes(expr.op)) {
         expr.value = '';
@@ -149,6 +192,9 @@
         action.onchange=()=>{branch.action=action.value;if(branch.action==='TRAILING_SELL')branch.trail=branch.trail||{distance_pct:.5,activation_profit_pct:1};else delete branch.trail;if(branch.action==='TAKE_PROFIT')branch.target_profit_pct=branch.target_profit_pct??1;else delete branch.target_profit_pct;renderBranches();remember();};
         if(branch.action==='TAKE_PROFIT'){const value=node('input',undefined,label('Take profit at net (%)',heading),{type:'number',min:.001,step:.1});value.value=branch.target_profit_pct??1;value.onchange=()=>{branch.target_profit_pct=Number(value.value);remember();};}
         if(branch.action==='TRAILING_SELL'){
+          const activation=node('select',undefined,label('Trailing activation',heading),{'aria-label':'Trailing activation'});
+          node('option','Profit threshold only · no indicator needed',activation,{value:'position'});node('option','Profit threshold + indicator conditions',activation,{value:'conditions'});
+          activation.value=positionTrail(branch)?'position':'conditions';activation.onchange=()=>{branch.condition_mode=activation.value;renderBranches();remember();};
           branch.trail=branch.trail||{distance_pct:.5,activation_profit_pct:1};
           for(const [key,title,min]of[['activation_profit_pct','Activate at net profit (%)',0],['distance_pct','Trail below highest since entry (%)',.001]]){const value=node('input',undefined,label(title,heading),{type:'number',min,step:.1});value.value=branch.trail[key];value.onchange=()=>{branch.trail[key]=Number(value.value);remember();};}
         }
@@ -156,7 +202,11 @@
       button('Move up', heading, () => { if (index) { [model.branches[index-1], model.branches[index]] = [branch, model.branches[index-1]]; renderBranches(); remember(); } }).disabled = !index;
       button('Duplicate', heading, () => { const b = copy(branch); b.id += '_copy_' + Date.now().toString(36); model.branches.splice(index+1, 0, b); renderBranches(); remember(); });
       button('Delete branch', heading, () => { model.branches.splice(index, 1); renderBranches(); remember(); });
-      const preview = node('p', undefined, box, {class: 'rule-preview'}); const refresh = () => { preview.textContent = expressionText(branch.when); }; refresh();
+      if(!positionTrail(branch)&&stageExpression(branch.when,'trigger')){
+        const timing=node('select',undefined,label('Activate after trigger',heading),{'aria-label':'Activation timing'});node('option','Same or a later candle close',timing,{value:'same_or_later'});node('option','Later candle close only',timing,{value:'later'});timing.value=branch.activation_timing||'same_or_later';timing.onchange=()=>{branch.activation_timing=timing.value;remember();};
+      }
+      const preview = node('p', undefined, box, {class: 'rule-preview'}); const refresh = () => {const trigger=stageExpression(branch.when,'trigger'),activation=stageExpression(branch.when,'activate');preview.textContent = positionTrail(branch)?'While a position is open, arm the trailing exit at the profit threshold above. No indicator condition is required.':trigger?'Trigger: '+expressionText(trigger)+' → remember setup → Activate: '+(activation?expressionText(activation):'add an Activate condition'):expressionText(branch.when); }; refresh();
+      if(positionTrail(branch))return;
       const details=node('details',undefined,box);node('summary','Edit conditions',details);details.open=branch.expanded??index===0;details.ontoggle=()=>{branch.expanded=details.open;remember();};renderExpression(branch.when, details, value => { branch.when = value; }, null, refresh);
     });
   }

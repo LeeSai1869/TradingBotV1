@@ -239,7 +239,7 @@ def update(e):
     else:
         update_confirmed_pair_swings(e)
     state=e['swingPivotRulesState']
-    e['pivotRulesVersion']='confirmed-pair-v1' if state else 'bootstrap'
+    e['pivotRulesVersion']=pivot_rules.RULE_NAME if state else 'bootstrap'
     e['pivotReferenceRange']=pivot_rules.level(state)[1] if state else rt.NA
     e['pivotConfirmationLevel']=pivot_rules.level(state)[0] if state else rt.NA
     e['pivotReverseCloses']=state['streak'] if state else 0
@@ -1214,7 +1214,7 @@ def update(e):
     e['lastStructureCHOCH'] = (rt.arr_get(e['structureCHOCH'], rt.binary('-', rt.arr_size(e['structureCHOCH']), 1)) if rt.truth(rt.binary('>', rt.arr_size(e['structureCHOCH']), 0)) else '')
 
 def update_confirmed_pair_swings(e):
-    """Approved confirmed-pair + two-close rule after legacy first-pair bootstrap."""
+    """Approved current-move + two-close rule after legacy first-pair bootstrap."""
     if 'swingPivotRulesState' not in e.persistent:
         e.initialize('swingPivotRulesState', None)
     state=e['swingPivotRulesState']

@@ -1,13 +1,14 @@
-"""Closed-candle confirmed-pair swing rules; independent of structure/BOS state."""
+"""Closed-candle current-move swing rules; independent of structure/BOS state."""
 from decimal import Decimal
 
-VERSION=1
+VERSION=2
+RULE_NAME="current-move-v2"
 EXPORTS={'pivot_rules_version':'string','pivot_reference_range':'float','pivot_confirmation_level':'float','pivot_reverse_closes':'float'}
 
 
 def level(state):
-    high,low=map(lambda x:Decimal(str(x)),state['pair'])
-    span=abs(high-low);candidate=Decimal(str(state['candidate']['price']))
+    anchor=Decimal(str(state['pair'][-1]));candidate=Decimal(str(state['candidate']['price']))
+    span=abs(candidate-anchor)
     return float(candidate-state['direction']*Decimal('.25')*span),float(span)
 
 
@@ -19,6 +20,7 @@ def seed(pair,direction,price,origin,bar,previous_close,last_close_time):
 
 def advance(state,client,index):
     """Mutate only caller-owned JSON state. Return at most one confirmed pivot."""
+    if state.get('version')!=VERSION:raise ValueError('Pivot checkpoint requires current-move historical repair')
     direction=state['direction'];candidate=state['candidate'];stamp=client['open_time']
     if state['last_close_time'] is not None and stamp<=state['last_close_time']:raise ValueError('Pivot candles must advance chronologically')
     continuous=state['last_close_time'] is not None and stamp==state['last_close_time']+1

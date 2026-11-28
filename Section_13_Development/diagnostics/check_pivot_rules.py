@@ -21,7 +21,7 @@ def status(project,symbol,interval):
             record=conn.execute('SELECT last_time,target,columns FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,interval)).fetchone()
             if record:job=dict(last_time=record[0],target=record[1],columns=json.loads(record[2]))
         return dict(symbol=symbol,interval=interval,latest=dict(latest) if latest else None,repair=job,
-                    status='REPAIR_PENDING' if job else 'UPDATED' if latest and 'pivot_rules_version' in names and latest['pivot_rules_version']=='confirmed-pair-v1' else 'AWAITING_UPDATED_WRITER')
+                    status='REPAIR_PENDING' if job else 'UPDATED' if latest and 'pivot_rules_version' in names and latest['pivot_rules_version']=='current-move-v2' else 'AWAITING_UPDATED_WRITER')
 
 
 def main():

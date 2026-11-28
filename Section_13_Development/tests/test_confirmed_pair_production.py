@@ -19,8 +19,8 @@ ROOT=Path(__file__).resolve().parents[2]
 
 
 class ProductionRules(unittest.TestCase):
-    def test_production_matches_all_528_approved_trial_confirmations_and_restarts(self):
-        spec=importlib.util.spec_from_file_location('trial',ROOT/'Section_12_Research/experiments/pivot_confirmation/trial.py')
+    def test_production_matches_current_move_trial_confirmations_and_restarts(self):
+        spec=importlib.util.spec_from_file_location('trial',ROOT/'Section_12_Research/experiments/current_move_pivots/trial.py')
         trial=importlib.util.module_from_spec(spec);spec.loader.exec_module(trial)
         source=json.loads(gzip.decompress((ROOT/'Section_12_Research/reports/pivot_debug/ENAUSDT-15m-20261126/stored-pivots.json.gz').read_bytes()))
         first=source['candles'][0];s=trial.seed_from_row(first)
@@ -32,7 +32,7 @@ class ProductionRules(unittest.TestCase):
             if event:actual.append(event)
         keys=('type','price','origin_time','confirmation_time','known_time','reference_range','threshold','reverse_closes')
         expected=trial.simulate(source['candles'])['events']
-        self.assertEqual(len(actual),528)
+        self.assertEqual(len(actual),568)
         self.assertEqual([{k:e[k] for k in keys} for e in actual],[{k:e[k] for k in keys} for e in expected])
     def test_new_rule_survives_structure_reset_and_exports_observable_reference(self):
         e=Engine('BTCUSDT','15m')
@@ -44,7 +44,7 @@ class ProductionRules(unittest.TestCase):
         saved=copy.deepcopy(e.context.persistent['swingPivotRulesState'])
         e.context.persistent['activeBOS']=2;e.context.persistent['activeBOSType']='bearishBOS'
         i=100;row=e.step(dict(symbol='BTCUSDT',interval='15m',open_time=i*900000,close_time=(i+1)*900000-1,open=110,high=112,low=108,close=110,volume=10))
-        self.assertEqual(row['pivot_rules_version'],'confirmed-pair-v1')
+        self.assertEqual(row['pivot_rules_version'],'current-move-v2')
         self.assertEqual(e.context.persistent['swingPivotRulesState']['version'],saved['version'])
         self.assertGreater(row['pivot_reference_range'],0)
         self.assertNotEqual(row['candidate_pivot'],0)
@@ -74,8 +74,9 @@ class ProductionRules(unittest.TestCase):
 
 
 class LegacyRuleRepair(unittest.TestCase):
+    fixture_name='legacy-pivot-checkpoint.json.gz'
     def test_old_checkpoint_repair_matches_fresh_engine_and_preserves_unrelated_values(self):
-        fixture=json.loads(gzip.decompress((Path(__file__).with_name('fixtures')/'legacy-pivot-checkpoint.json.gz').read_bytes()))
+        fixture=json.loads(gzip.decompress((Path(__file__).with_name('fixtures')/self.fixture_name).read_bytes()))
         with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
             for store,name in ((features_store,'features'),(klines_store,'klines'),(adcn_store,'ADCN'),(downloader,'klines')):
                 stack.enter_context(patch.object(store,'DB_PATH',Path(directory)/(name+'.db')))

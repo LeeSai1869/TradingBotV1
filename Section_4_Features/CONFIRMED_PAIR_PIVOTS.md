@@ -1,4 +1,4 @@
-# Confirmed-pair pivots and Market Structure display
+# Current-move pivots and Market Structure display
 
 ## Adopted rule
 
@@ -7,8 +7,10 @@ high after the preceding low's origin or the lowest low after the preceding high
 origin. Strictly new extremes replace the candidate. Opposite extremes already
 observed after that origin are retained even if recognition was delayed.
 
-The reversal distance is 25% of the absolute range of the last two **confirmed**
-pivots. It stays fixed until another pivot confirms. Confirmation also needs two
+The reversal distance is 25% of the **current move** between the last confirmed
+opposite pivot and the current candidate. For a candidate high it is
+`0.25 × (candidate high − last confirmed low)`; for a candidate low it is
+`0.25 × (last confirmed high − candidate low)`. A new extreme updates this distance. Confirmation also needs two
 consecutive strictly lower closes for a high or higher closes for a low. The
 current close must satisfy the price-distance condition. Equal/interrupted closes,
 new extremes and missing candle continuity reset close confluence. No candidate
@@ -16,7 +18,7 @@ can confirm on its own origin candle, and a candle cannot confirm both direction
 
 The existing first-pair bootstrap remains because the new reference cannot be
 computed before two confirmed pivots exist. It does not fabricate seed pivots.
-After bootstrap the exported `pivot_rules_version` is `confirmed-pair-v1`; the
+After bootstrap the exported `pivot_rules_version` is `current-move-v2`; the
 new `pivot_reference_range`, `pivot_confirmation_level` and `pivot_reverse_closes`
 fields make the active calculation observable. They describe the current candidate,
 including the new opposite candidate immediately after a confirmation.
@@ -32,6 +34,14 @@ prior cleanup were restored so the checked-in conversion tools and their existin
 tests remain usable; they do not run in the market-data loop.
 
 ## Historical update
+
+This replaces confirmed-pair-v1. Existing v1 checkpoints/partial repairs cannot
+be relabeled or reused as v2 history: the geometry changes which pivots confirm.
+The writer schedules one targeted replay of affected columns from the beginning,
+including replacement of an unfinished older-signature job. Its fair queue and
+unchanged-current-indicator lane remain in place. No manual database deletion or
+second replay command is required. Do not install the older pivot branch again.
+
 
 The existing selective-repair framework detects the changed calculation units
 from their fingerprints. It repairs structure fields and their actual dependency
@@ -80,7 +90,7 @@ Those facts explain missing references/bands independently of pivot confirmation
 
 ## Validation
 
-The production state machine reproduces all 528 approved confirmations in the
+The production state machine reproduces all 568 approved confirmations in the
 seeded 6,000-candle ENA 15m trial. Tests cover checkpoint serialization, 1h/4h pivot
 restart parity on synthetic candles, first-pair bootstrap, producer event identity,
 legacy selective repair versus a fresh full calculation, and preservation of

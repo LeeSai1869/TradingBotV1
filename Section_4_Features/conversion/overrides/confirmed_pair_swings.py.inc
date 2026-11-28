@@ -1,6 +1,6 @@
 
 def update_confirmed_pair_swings(e):
-    """Approved confirmed-pair + two-close rule after legacy first-pair bootstrap."""
+    """Approved current-move + two-close rule after legacy first-pair bootstrap."""
     if 'swingPivotRulesState' not in e.persistent:
         e.initialize('swingPivotRulesState', None)
     state=e['swingPivotRulesState']

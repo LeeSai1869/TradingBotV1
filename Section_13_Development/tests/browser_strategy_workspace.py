@@ -13,6 +13,13 @@ from Section_12_Research.cli.strategy_analyzer_workspace import Workspace, make_
 from test_strategy_analyzer import source, config
 
 
+def choose_field(predicate,field,index=0):
+    menu=predicate.locator('.field-dropdown').nth(index)
+    menu.locator('summary').click()
+    menu.get_by_role('searchbox',name='Search fields').fill(field)
+    menu.locator('[role="option"][data-field="'+field+'"]').click()
+
+
 def main():
     with tempfile.TemporaryDirectory() as folder:
         root=Path(folder);input_file=root/'fixture.json.gz';input_file.write_bytes(gzip.compress(json.dumps(source()).encode()))
@@ -28,6 +35,13 @@ def main():
                 try:
                     page.goto(f'http://127.0.0.1:{server.server_port}/')
                     expect(page.locator('#run-strategy')).to_be_enabled()
+                    # Search is inside the opened field dropdown, with Escape support.
+                    picker=page.locator('.predicate').first.locator('.field-dropdown')
+                    picker.locator('summary').click();picker.get_by_role('searchbox',name='Search fields').fill('RSI')
+                    expect(picker.locator('[role=option][data-field="feature.rsi"]')).to_be_visible()
+                    page.screenshot(path='/tmp/analyzer-field-search.png',full_page=True)
+                    picker.get_by_role('searchbox',name='Search fields').press('Escape')
+                    expect(picker.locator('summary')).to_have_attribute('aria-expanded','false')
                     # A fresh workspace never chooses a preset or trading condition.
                     expect(page.locator('#strategy-preset')).to_have_value('')
                     expect(page.locator('#branches-editor .branch')).to_have_count(2)
@@ -40,7 +54,7 @@ def main():
                     expect(page.locator('#workspace-error')).to_contain_text('choose an indicator')
                     for index,field in enumerate(('feature.buy','feature.sell')):
                         predicate=page.locator('#branches-editor .branch').nth(index).locator('.predicate')
-                        predicate.locator('[aria-label="Condition field"]').select_option(field)
+                        choose_field(predicate,field)
                         predicate.locator('[aria-label="Condition comparison"]').select_option('eq')
                         if index==0:
                             page.locator('#run-strategy').click()
@@ -60,6 +74,20 @@ def main():
                     page.locator('#run-strategy').click()
                     expect(page.locator('#run-status')).to_contain_text('Complete',timeout=20000)
                     expect(page.locator('#trades tr')).to_have_count(3)
+                    page.locator('#add-trailing-sell').click()
+                    trail=page.locator('#branches-editor .branch').last
+                    expect(trail.get_by_label('Trailing activation',exact=True)).to_have_value('position')
+                    expect(trail.locator('.predicate')).to_have_count(0)
+                    expect(trail.locator('.rule-preview')).to_contain_text('No indicator condition is required')
+                    page.locator('#save-config').click();expect(page.locator('#run-status')).to_contain_text('Strategy saved')
+                    page.reload();expect(page.locator('#run-strategy')).to_be_enabled()
+                    trail=page.locator('#branches-editor .branch').last
+                    expect(trail.get_by_label('Trailing activation',exact=True)).to_have_value('position')
+                    trail.get_by_label('Trailing activation',exact=True).select_option('conditions')
+                    expect(trail.locator('.predicate')).to_have_count(1)
+                    page.locator('#save-config').click()
+                    expect(page.locator('#workspace-error')).to_contain_text('SELL: choose an indicator')
+                    trail.get_by_label('Trailing activation',exact=True).select_option('position')
                     page.locator('#preset-options summary').click()
                     page.locator('#strategy-preset').select_option(saved['key']);page.locator('#strategy-preset').dispatch_event('change');page.locator('#load-preset').click()
                     expect(page.locator('#branches-editor .branch')).to_have_count(2)
@@ -68,7 +96,7 @@ def main():
                     buy=page.locator('#branches-editor .branch').first
                     buy.get_by_role('button',name='Group OR',exact=True).click()
                     expect(buy.locator('.group-heading select')).to_have_value('any')
-                    buy.locator('.predicate').nth(1).locator('select[aria-label="Condition field"]').select_option('feature.rsi')
+                    choose_field(buy.locator('.predicate').nth(1),'feature.rsi')
                     buy.locator('.predicate').nth(1).locator('[aria-label="Condition comparison"]').select_option('eq')
                     buy.locator('.predicate').nth(1).locator('input[aria-label="Condition value"]').fill('99')
                     buy.locator('.predicate').nth(1).locator('input[aria-label="Condition value"]').dispatch_event('change')

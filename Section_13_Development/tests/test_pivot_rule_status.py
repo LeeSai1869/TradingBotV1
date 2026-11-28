@@ -20,7 +20,7 @@ class PivotRuleStatus(unittest.TestCase):
             folder=Path(directory)/'storage';folder.mkdir();path=folder/'features.db'
             with sqlite3.connect(path) as c:
                 c.execute('CREATE TABLE features(symbol,interval,open_time,pivot_rules_version,pivot_reference_range)')
-                c.execute("INSERT INTO features VALUES ('ENAUSDT','15m',1,'confirmed-pair-v1',10000)")
+                c.execute("INSERT INTO features VALUES ('ENAUSDT','15m',1,'current-move-v2',10000)")
                 c.execute('CREATE TABLE feature_replay_jobs(symbol,interval,last_time,target,columns)')
             before=path.read_bytes();self.assertEqual(status.status(directory,'ENAUSDT','15m')['status'],'UPDATED');self.assertEqual(before,path.read_bytes())
             with sqlite3.connect(path) as c:c.execute("INSERT INTO feature_replay_jobs VALUES ('ENAUSDT','15m',0,1,'[\"pivot_reference_range\"]')")

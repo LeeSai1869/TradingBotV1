@@ -8,7 +8,7 @@ import math
 import re
 
 from . import pivot_sequences
-from . import strategy_exits
+from . import strategy_exits, strategy_stages
 from .candle_calendar import FRAMES, end as candle_end, latest_closed
 
 VERSION = 'btc-hour-strategy-analyzer-v1'
@@ -56,8 +56,9 @@ def validate_config(config):
                 for child in node[key]:
                     expression(child, depth + 1)
             return
-        if set(node) - {'field', 'op', 'value', 'other_field', 'lag', 'other_lag'}:
+        if set(node) - {'field', 'op', 'value', 'other_field', 'lag', 'other_lag', 'stage'}:
             raise ValueError('Unknown predicate keys')
+        if node.get('stage','activate') not in ('trigger','activate'):raise ValueError('Condition role must be Trigger or Activate')
         for key in ('field', 'other_field'):
             if key in node:
                 name = node[key]
@@ -96,12 +97,13 @@ def validate_config(config):
                 raise ValueError('Ordered comparisons require numeric operands')
 
     for branch in branches:
-        if (not isinstance(branch, dict) or not {'id', 'side', 'when'} <= set(branch) or set(branch)-{'id','side','when','action','trail','target_profit_pct'}
+        if (not isinstance(branch, dict) or not {'id', 'side', 'when'} <= set(branch) or set(branch)-{'id','side','when','action','trail','target_profit_pct','activation_timing'}
                 or not isinstance(branch.get('id'), str) or not branch['id'] or branch['id'] in ids):
             raise ValueError('Branches require unique id, side and when')
         ids.add(branch['id'])
         if branch['side'] not in ('BUY', 'SELL'):
             raise ValueError('Branch side must be BUY or SELL')
+        if branch.get('activation_timing','same_or_later') not in ('same_or_later','later'):raise ValueError('Invalid activation timing')
         action = branch.get('action','MARKET_SELL')
         if action not in ('MARKET_SELL','TRAILING_SELL','TAKE_PROFIT') or branch['side']=='BUY' and ('action' in branch or 'trail' in branch or 'target_profit_pct' in branch):
             raise ValueError('Trailing sell is only available on SELL branches')
@@ -117,6 +119,7 @@ def validate_config(config):
         elif 'target_profit_pct' in branch:
             raise ValueError('Profit target requires a take-profit branch')
         expression(branch['when'])
+        if strategy_stages.project(branch['when'],'activate') is None:raise ValueError('Each branch needs an Activate condition')
     if {b['side'] for b in branches} != {'BUY', 'SELL'}:
         raise ValueError('Provide at least one BUY and one SELL branch')
     execution = config.get('execution', {})
@@ -315,8 +318,10 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                     since=since, until=until, execution=execution, fill='NEXT_CANDLE_OPEN', initial_state='WAIT_BUY')
     config_id = digest(config)
     signals, trades = [], []
+    programs={b['id']:(strategy_stages.project(b['when'],'trigger'),strategy_stages.project(b['when'],'activate')) for b in config['branches']}
+    armed={};setup_events=[]
     diagnostics = {b['id']: dict(side=b['side'], evaluated=0, true=0, false=0, unknown=0, accepted=0,
-                                same_side_suppressed=0, tie_matches=0, missing_fields=Counter()) for b in config['branches']}
+                                same_side_suppressed=0, setups_armed=0, waiting_activation=0, tie_matches=0, missing_fields=Counter()) for b in config['branches']}
     waiting = 'BUY'
     position = pending = None
     invalid_prices = gaps = 0
@@ -330,6 +335,11 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             if reason not in position['censor_reasons']:
                 position['censor_reasons'].append(reason)
 
+    def reset_setups(reason,known_time,completed=None):
+        for identity,setup in armed.items():
+            if identity!=completed:setup_events.append(dict(type='RESET',reason=reason,known_time=known_time,branch_id=identity,side=setup['side']))
+        armed.clear()
+
     for serial, i in enumerate(selected):
         if progress and serial % 5000 == 0:
             progress(dict(complete=serial, total=len(selected), signals=len(signals)))
@@ -337,9 +347,11 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
         valid = memory.price_valid(i)
         gap = i > selected[0] and rows[i - 1]['close_time'] + 1 != row['open_time']
         if gap:
+            reset_setups('PRICE_GAP',row['open_time'])
             gaps += 1
             censor('PRICE_GAP')
         if not valid:
+            reset_setups('INVALID_PRICE',row['open_time'])
             invalid_prices += 1
             censor('INVALID_PRICE')
         if pending:
@@ -367,7 +379,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             continue
         automatic_exit = None
         if risk_budget is not None and position is not None and position['status']=='OPEN':
-            eligible = [b for b in standing if i>0 and rows[i-1]['close_time']+1==row['open_time'] and memory.evaluate(b['when'],i-1,set()) is True]
+            eligible = [b for b in standing if i>0 and rows[i-1]['close_time']+1==row['open_time'] and strategy_stages.match(memory,b,programs[b['id']],i-1,armed,set()) is True]
             was_armed=position.get('trail_branch')
             automatic_exit = strategy_exits.walk(position,row,eligible,fee,slip,execution['intrabar_path'])
             if position.get('trail_branch') and not was_armed:
@@ -383,13 +395,18 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                           fill_status='FILLED', fill_time=known, fill_price=exit_price,
                           fill_time_precision=automatic_exit['precision'], reason=automatic_exit['reason'],
                           inputs={'risk.stop_price': dict(value=strategy_exits.stop(position)[0], missing_reason=None)})
+            setup=armed.get(automatic_exit['branch'])
+            if setup:
+                signal.update(trigger_known_time=setup['known_time'],trigger_inputs=setup['inputs'])
+                setup_events.append(dict(type='ACTIVATE',branch_id=automatic_exit['branch'],side='SELL',known_time=known,trigger_known_time=setup['known_time']))
             signals.append(signal)
             if automatic_exit['branch'] in diagnostics:
                 diagnostics[automatic_exit['branch']]['accepted']+=1
             position.update(status='CLOSED', net_pct=net, outcome='WIN' if net > 0 else 'LOSS' if net < 0 else 'BREAKEVEN',
-                            sell_signal_time=known, sell_branch=automatic_exit['branch'], sell_inputs=signal['inputs'], exit_reason=automatic_exit['reason'],
+                            sell_signal_time=known, sell_branch=automatic_exit['branch'], sell_inputs=signal['inputs'],sell_trigger_time=signal.get('trigger_known_time'),sell_trigger_inputs=signal.get('trigger_inputs'),exit_reason=automatic_exit['reason'],
                             exit=exit_price, exit_time=known, exit_time_precision=signal['fill_time_precision'])
             position = pending = None
+            reset_setups('SIDE_CHANGED',known,automatic_exit['branch'])
             waiting = 'BUY'
             continue
         matches, trail_matches = [], []
@@ -397,7 +414,11 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             stats = diagnostics[branch['id']]
             stats['evaluated'] += 1
             missing = set()
-            result = memory.evaluate(branch['when'], i, missing)
+            before=branch['id'] in armed
+            result = strategy_stages.match(memory,branch,programs[branch['id']],i,armed,missing,allow_arm=branch['side']==waiting)
+            if not before and branch['id'] in armed:
+                stats['setups_armed']+=1;setup_events.append(dict(type='TRIGGER',**armed[branch['id']]))
+            if branch['id'] in armed and result is not True:stats['waiting_activation']+=1
             stats['missing_fields'].update(missing)
             stats['unknown' if result is UNKNOWN else 'true' if result else 'false'] += 1
             if result is True:
@@ -422,6 +443,10 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
         side = waiting
         signal = dict(id=f'{side}:{row["close_time"] + 1}', side=side, candle_open_time=row['open_time'],
                       known_time=row['close_time'] + 1, branch_id=matches[0], matched_branches=matches, fill_status='PENDING')
+        setup=armed.get(matches[0])
+        if setup:
+            signal.update(trigger_known_time=setup['known_time'],trigger_candle_time=setup['candle_open_time'],trigger_inputs=setup['inputs'])
+            setup_events.append(dict(type='ACTIVATE',branch_id=matches[0],side=side,known_time=signal['known_time'],trigger_known_time=setup['known_time']))
         operands = set().union(*(expression_operands(b['when']) for b in config['branches'] if b['id'] in matches))
         operands.update((field, 0) for field in report_fields)
         signal['inputs'] = {f'{field}@lag{lag}': dict(zip(('value', 'missing_reason'), memory.value(i, field, lag)))
@@ -432,12 +457,13 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
             diagnostics[branch_id]['tie_matches'] += 1
         if side == 'BUY':
             position = dict(id=signal['id'], buy_signal_time=signal['known_time'], buy_branch=matches[0],
-                            buy_inputs=signal['inputs'], sell_inputs=None,
+                            buy_inputs=signal['inputs'], buy_trigger_time=signal.get('trigger_known_time'),buy_trigger_inputs=signal.get('trigger_inputs'),sell_inputs=None,
                             sell_signal_time=None, sell_branch=None, entry=None, exit=None, entry_time=None, exit_time=None,
                             status='PENDING', net_pct=None, outcome=None, censor_reasons=[])
             trades.append(position)
         else:
-            position.update(sell_signal_time=signal['known_time'], sell_branch=matches[0], sell_inputs=signal['inputs'])
+            position.update(sell_signal_time=signal['known_time'], sell_branch=matches[0], sell_inputs=signal['inputs'],sell_trigger_time=signal.get('trigger_known_time'),sell_trigger_inputs=signal.get('trigger_inputs'))
+        reset_setups('SIDE_CHANGED',signal['known_time'],matches[0])
         pending = signal
         waiting = 'SELL' if side == 'BUY' else 'BUY'
     if pending:
@@ -452,12 +478,12 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
     missing_features = [field for field in fields if field.startswith('feature.') and field.split('.')[1] not in memory.features]
     result = dict(version=VERSION, config=config, config_digest=config_id, contract=contract,
                   run_id=digest(dict(contract=contract, config_digest=config_id)), candles_scanned=len(selected), candles_evaluated=len(selected)-invalid_prices,
-                  signals=signals, trades=trades, waiting_for=waiting, branch_diagnostics=diagnostics,
+                  signals=signals, trades=trades, setup_events=setup_events,pending_setups=list(armed.values()),waiting_for=waiting, branch_diagnostics=diagnostics,
                   summary=summarize(trades, execution['initial_capital']), yearly=yearly,
                   invalid_price_candles=invalid_prices, price_gaps=gaps, unavailable_feature_fields=missing_features,
                   fields_used=fields, report_fields=report_fields, available_feature_fields=sorted(memory.features),
                   definitions=dict(expression='Three-valued AND/OR/NOT: false AND unknown is false; true OR unknown is true. Missing never becomes zero/neutral',
-                                   branches='All branches evaluated at each valid candle close; configuration order breaks same-side ties. One accepted signal per candle, beginning with BUY, then strictly alternating',
+                                   branches='Conditions marked Trigger latch a branch setup; conditions marked Activate execute at the same or a later known close by default, with optional later-close-only timing. Logical groups are projected within each stage. Setups have no expiry and reset on side changes or missing/invalid price candles. Unmarked branches retain ordinary close matching; configuration order breaks same-side ties. One accepted signal per candle, beginning with BUY, then strictly alternating',
                                    fills='Rule signals fill at the next contiguous valid candle open within the evaluation window; configurable spot fees/slippage, no shorts or forced final exit. New spot candle sources additionally execute the standing risk stop described below',
                                    risk='New spot candle sources enforce a 0.5% net stop budget from entry, adjusted for configured fees/slippage. OHLC stop touches have unknown intrabar timing; adverse opens use the actual modeled open, without clipping losses. Legacy BTC 1h sources retain their original signal-only replay.',
                                    trailing='Trailing SELL branches arm when net liquidation profit reaches the activation threshold AND their condition is known true. Intrabar eligibility uses the previous closed candle; newly true close-time conditions arm for the next candle. Once armed, never disarm. Trail follows the highest raw price since entry. OHLC path is an explicit assumption, not tick reconstruction.',

@@ -38,8 +38,10 @@ class CompleteConversionTests(unittest.TestCase):
             self.assertTrue(callable(module.update))
 
     def test_main_feature_consolidation_preserves_all_packets(self):
-        # Reviewed 700-bar vector with confirmed-pair pivots, close confluence,
+        # Reviewed 700-bar vector with current-move pivots, close confluence,
         # persistent swing tracking across BOS resets and rule-observation exports.
+        # v1 -> v2 review: core EMA/RSI/DMI/ADX/ATR/VP/volume match on all
+        # 700 bars; changed values are pivot geometry and dependent annotations.
         # Legacy checkpoint repair separately verifies unrelated indicator values.
         # Compared against df2daca: liquidity-side classification and early known
         # price distances changed; unrelated outputs matched across all 700 bars.
@@ -62,7 +64,7 @@ class CompleteConversionTests(unittest.TestCase):
             for side in ('support','resistance','inst_support','inst_resistance'):
                 for edge in ('low','high'):packet.pop(f'{side}_zone_{edge}')
             digest.update(json.dumps(packet,sort_keys=True,separators=(',',':')).encode())
-        self.assertEqual(digest.hexdigest(),'3bbd8ae2f23c4ce67f8818b69cdfc825b3a55d93a3b0a594eb0fee33373475a7')
+        self.assertEqual(digest.hexdigest(),'81c4deb3c65dabdf2efd42d0c2138ffb6fc6460c13dc56b9327b78df429444e9')
         from Section_4_Features.features.registry import load
         owners={row['name']:row for row in load()}
         for name in ('liquidity','support_resistance','sessions','order_blocks','trend','momentum','candle','market_structure'):
