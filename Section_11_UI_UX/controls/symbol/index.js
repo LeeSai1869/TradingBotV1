@@ -19,7 +19,7 @@ function toggleFavorite(symbol){
     list.querySelectorAll('.symbol-favorite')[active]?.focus({preventScroll:true});
 }
 let search,list,menu,trigger,active=0,matches=[];
-const names={BTCUSDT:'Bitcoin',ETHUSDT:'Ethereum',SUIUSDT:'Sui',BNBUSDT:'BNB',SOLUSDT:'Solana',XRPUSDT:'XRP',ADAUSDT:'Cardano',DOGEUSDT:'Dogecoin'};
+const names={BTCUSDT:'Bitcoin',ETHUSDT:'Ethereum',SUIUSDT:'Sui',BNBUSDT:'BNB',SOLUSDT:'Solana',XRPUSDT:'XRP',ADAUSDT:'Cardano',DOGEUSDT:'Dogecoin',ENAUSDT:'Ethena'};
 function close(){
     if(menu)menu.hidden=true;
     search?.setAttribute('aria-expanded','false');search?.removeAttribute('aria-activedescendant');
@@ -142,3 +142,11 @@ export async function mount() {
 export async function refresh() { await populate(true); }
 
 export function syncSelection(){sync();}
+
+export function symbolName(symbol) { return names[symbol] ?? ''; }
+
+export function selectSymbol(symbol) {
+    if (![...el().options].some(option => option.value === symbol)) return false;
+    if (el().value !== symbol) choose(symbol);
+    return true;
+}

@@ -1,3 +1,4 @@
+import {mountPriceChange} from './price_change.js';
 import {mountResize} from './resize.js';
 import {mountPivotResearch} from '../pivot_research/index.js';
 import {mountEvents} from '../events/index.js';
@@ -88,11 +89,14 @@ export function mount() {
     toggle=el('button','Analysis',document.getElementById('toolbar'));
     toggle.id='workspace-button';toggle.setAttribute('aria-controls','analysis-panel');toggle.setAttribute('aria-expanded','false');
     const header=el('header','',panel);el('h2','Analysis workspace',header);
-    const close=el('button','Collapse panel',header);close.onclick=()=>setOpen(false);
+    const close=el('button','−',header,'workspace-collapse');
+    close.setAttribute('aria-label','Collapse panel');close.title='Collapse Analysis';
+    close.onclick=()=>setOpen(false);
     const opportunity=el('section','',panel,'workspace-card');el('h3','Best opportunity',opportunity);
     el('p','AI ranking is not connected yet. Opportunities across coins will appear here once the prediction engine is ready.',opportunity);
     const body=el('div','',panel,'workspace-body');
     body.tabIndex=0;body.setAttribute('role','region');body.setAttribute('aria-label','Analysis and chat');
+    mountPriceChange(body);
     hud=el('section','',document.getElementById('chart'),'chart-hud');
     hud.id='chart-hud';hud.setAttribute('aria-label','Comparison HUD');
     hudToggle=el('button','HUD',document.getElementById('toolbar'));

@@ -7,7 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from Section_1_Global_Core.memory_storage.Storage import db
 from Section_1_Global_Core import data_policy
 
-from . import queries, hud, drawing_routes, volume_profile, liquidity
+from . import queries, hud, drawing_routes, volume_profile, liquidity, price_change
 from . import live_candle, admin_routes, alert_routes, mobile_routes, event_routes
 from .settings_catalog import read_coin_catalog
 
@@ -208,6 +208,12 @@ def handle_get(path, raw_qs, server):
         if not symbol or not interval:
             return 400, {"error": "symbol and interval required"}
         return 200, queries.get_flags_current(symbol, interval)
+
+    if path == "/api/price_change":
+        period = qs.get("period", ["24h"])[0]
+        if period not in price_change.PERIODS:
+            return 400, {"error": "Choose 1h, 4h, 24h, or 7d."}
+        return 200, price_change.snapshot(queries.get_symbols(), period)
 
     # ---- symbols ----
     if path == "/api/symbols":

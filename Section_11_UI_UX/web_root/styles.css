@@ -349,3 +349,15 @@ button:hover { background: #333; }
 #chart:has([data-feature-pane="DI"]:hover) .indicator-pane-header[data-feature="DI"] button,
 #chart:has([data-feature-pane="ATR"]:hover) .indicator-pane-header[data-feature="ATR"] button,
 #chart:has([data-feature-pane="Volume"]:hover) .indicator-pane-header[data-feature="Volume"] button {opacity:1;pointer-events:auto;}
+
+.workspace-collapse {min-width:32px;padding-inline:8px;font-size:18px;line-height:1;}
+.price-change > summary {cursor:pointer;font-weight:600;}
+.price-change-controls {display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:12px 0;}
+.price-change-controls label {display:grid;gap:4px;font-size:12px;}
+.price-change table {width:100%;border-collapse:collapse;font-size:12px;}
+.price-change th,.price-change td {padding:6px 4px;border-bottom:1px solid #354154;text-align:left;}
+.price-change th:last-child,.price-change td:last-child {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.price-change td button {padding:3px 0;border:0;background:transparent;text-align:left;}
+.price-change [data-direction="up"] {color:#5ee1ae;}
+.price-change [data-direction="down"] {color:#ff9898;}
+.price-change-stale {display:block;color:#f1c67a;}
