@@ -97,12 +97,13 @@ def validate_config(config):
                 raise ValueError('Ordered comparisons require numeric operands')
 
     for branch in branches:
-        if (not isinstance(branch, dict) or not {'id', 'side', 'when'} <= set(branch) or set(branch)-{'id','side','when','action','trail','target_profit_pct','activation_timing'}
+        if (not isinstance(branch, dict) or not {'id', 'side', 'when'} <= set(branch) or set(branch)-{'id','side','when','action','trail','target_profit_pct','activation_timing','execution_timing'}
                 or not isinstance(branch.get('id'), str) or not branch['id'] or branch['id'] in ids):
             raise ValueError('Branches require unique id, side and when')
         ids.add(branch['id'])
         if branch['side'] not in ('BUY', 'SELL'):
             raise ValueError('Branch side must be BUY or SELL')
+        if branch.get('execution_timing','next_open')!='next_open':raise ValueError('Regular BUY/SELL execution must use next candle open')
         if branch.get('activation_timing','same_or_later') not in ('same_or_later','later'):raise ValueError('Invalid activation timing')
         action = branch.get('action','MARKET_SELL')
         if action not in ('MARKET_SELL','TRAILING_SELL','TAKE_PROFIT') or branch['side']=='BUY' and ('action' in branch or 'trail' in branch or 'target_profit_pct' in branch):

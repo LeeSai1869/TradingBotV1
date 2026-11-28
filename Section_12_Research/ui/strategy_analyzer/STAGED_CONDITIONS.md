@@ -42,3 +42,14 @@ use calendar months ending at the selected source’s latest candle, rounded up
 to the next UTC minute when necessary. Batch coins share those boundaries.
 Shorter histories are not filled with invented data. Custom dates remain editable,
 and the selected preset is retained with the browser draft.
+
+## Execution timing controls
+
+Each regular BUY/SELL branch visibly selects **Open of the next candle after
+activation closes** and saves `execution_timing: next_open`. This is the supported
+closed-candle execution mode. The Trigger activation dropdown separately controls
+whether the trigger and activation may match on the same close or require a
+later close; its labels also state the next-open fill. Older configurations
+without execution_timing keep the same next-open behavior. Trailing SELL and
+take-profit branches instead show **Standing exit**, since their price orders
+can fill within a candle. The built-in risk stop also remains a standing exit.
