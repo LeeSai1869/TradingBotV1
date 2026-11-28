@@ -124,9 +124,12 @@ def validate_config(config):
     if {b['side'] for b in branches} != {'BUY', 'SELL'}:
         raise ValueError('Provide at least one BUY and one SELL branch')
     execution = config.get('execution', {})
-    if not isinstance(execution, dict) or set(execution) - set(EXECUTION):
+    if not isinstance(execution, dict) or set(execution) - (set(EXECUTION)|{'hard_stop_pct'}):
         raise ValueError('Unknown execution options')
     for key, value in (EXECUTION | execution).items():
+        if key=='hard_stop_pct':
+            if value is not None and (not number(value) or not 0<value<100):raise ValueError('Hard stop must be disabled or a percentage between 0 and 100')
+            continue
         if key=='intrabar_path':
             if value not in ('low_first','high_first'):raise ValueError('Choose low_first or high_first OHLC order')
             continue
@@ -298,6 +301,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
     standing = [b for b in config['branches'] if b.get('action') in ('TRAILING_SELL','TAKE_PROFIT')]
     risk_budget = .5 if source.get('version') in ('pivot-candle-source-v1','memory-candle-source-v1') or standing else None
     execution = EXECUTION | config.get('execution', {})
+    if 'hard_stop_pct' in execution:risk_budget=execution['hard_stop_pct']
     for value in (since, until):
         if value is not None and type(value) is not int:
             raise ValueError('Window boundaries must be integer UTC milliseconds')
@@ -379,7 +383,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
         if not valid:
             continue
         automatic_exit = None
-        if risk_budget is not None and position is not None and position['status']=='OPEN':
+        if (risk_budget is not None or standing) and position is not None and position['status']=='OPEN':
             eligible = [b for b in standing if i>0 and rows[i-1]['close_time']+1==row['open_time'] and strategy_stages.match(memory,b,programs[b['id']],i-1,armed,set()) is True]
             was_armed=position.get('trail_branch')
             automatic_exit = strategy_exits.walk(position,row,eligible,fee,slip,execution['intrabar_path'])
@@ -489,7 +493,7 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
                   definitions=dict(expression='Three-valued AND/OR/NOT: false AND unknown is false; true OR unknown is true. Missing never becomes zero/neutral',
                                    branches='Conditions marked Trigger latch a branch setup; conditions marked Activate execute at the same or a later known close by default, with optional later-close-only timing. Logical groups are projected within each stage. Setups have no expiry and reset on side changes or missing/invalid price candles. Unmarked branches retain ordinary close matching; configuration order breaks same-side ties. One accepted signal per candle, beginning with BUY, then strictly alternating',
                                    fills='Rule signals fill at the next contiguous valid candle open within the evaluation window; configurable spot fees/slippage, no shorts or forced final exit. New spot candle sources additionally execute the standing risk stop described below',
-                                   risk='New spot candle sources enforce a 0.5% net stop budget from entry, adjusted for configured fees/slippage. OHLC stop touches have unknown intrabar timing; adverse opens use the actual modeled open, without clipping losses. Legacy BTC 1h sources retain their original signal-only replay.',
+                                   risk='Hard stop is controlled by execution.hard_stop_pct: null disables it; a percentage enables it. Omitted values retain legacy source defaults (0.5% for spot/standing-exit sources). The resolved setting is contract.risk_budget_pct. Fees/slippage are included; adverse opens may exceed the budget. Standing exit touches have unknown intrabar timing.',
                                    trailing='Trailing SELL branches arm when net liquidation profit reaches the activation threshold AND their condition is known true. Intrabar eligibility uses the previous closed candle; newly true close-time conditions arm for the next candle. Once armed, never disarm. Trail follows the highest raw price since entry. OHLC path is an explicit assumption, not tick reconstruction.',
                                    gaps='Missing prices censor held trades and missing next-open fills; preserve alternating signal state, never manufacture a SELL to reset',
                                    success='A completed BUY-to-SELL trade with net return >0 after configured costs',

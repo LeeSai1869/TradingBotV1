@@ -54,6 +54,8 @@
 <label>Fee per side (bps)<input id="fee" type="number" min="0" max="9999" step="0.1" value="4"></label>
 <label>Slippage per side (bps)<input id="slippage" type="number" min="0" max="9999" step="0.1" value="2"></label>
 <label>Starting capital<input id="capital" type="number" min="0.01" step="0.01" value="100"></label>
+<label>Additional hard stop<select id="hard-stop-mode"><option value="source">Keep existing source default</option><option value="off">Off · use configured SELL exits only</option><option value="on">On · net loss percentage</option></select></label>
+<label>Hard stop net loss (%)<input id="hard-stop-pct" type="number" min="0.001" max="99.999" step="0.1" value="0.5"></label>
 <label>Within-candle price order<select id="intrabar-path"><option value="low_first">Open → low → high → close</option><option value="high_first">Open → high → low → close</option></select></label>
 <label>Baseline strategy<select id="baseline-preset"><option value="">No comparison</option></select></label>
 </div><p class="muted">Both versions replay the same chosen input, dates and costs. Starts flat, then BUY → SELL. No repeated same-side entries.</p><p class="muted compact">This editor uses the selected timeframe’s OHLC for exit execution. Research reports using finer 1m/5m prices can have different fills.</p><p id="risk-scope" class="muted compact"></p>

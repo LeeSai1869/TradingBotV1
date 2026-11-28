@@ -95,6 +95,38 @@ class TrailingSell(unittest.TestCase):
         self.assertEqual(t['exit_reason'],'HARD_STOP')
         self.assertAlmostEqual(t['net_pct'],-.5)
 
+    def test_take_profit_only_survives_dip_and_exits_at_target(self):
+        target=dict(id='target',side='SELL',action='TAKE_PROFIT',target_profit_pct=1,when=dict(field='price.close',op='available'))
+        p=source([(100,100.1,99.9,100),(100,100.2,98,99),(99,102,98.5,101)])
+        c=config(target);c['execution']['hard_stop_pct']=None
+        report=a.analyze(p,c);trade=report['trades'][0]
+        self.assertIsNone(report['contract']['risk_budget_pct'])
+        self.assertNotIn('stop_price',trade)
+        self.assertEqual(trade['exit_reason'],'TAKE_PROFIT')
+        self.assertAlmostEqual(trade['net_pct'],1)
+        # Keeping the explicit stop reproduces the earlier loss on the same path.
+        c['execution']['hard_stop_pct']=.5
+        trade=a.analyze(p,c)['trades'][0]
+        self.assertEqual(trade['exit_reason'],'HARD_STOP')
+        self.assertAlmostEqual(trade['net_pct'],-.5)
+
+    def test_no_stop_and_unreached_target_remains_open(self):
+        target=dict(id='target',side='SELL',action='TAKE_PROFIT',target_profit_pct=1,when=dict(field='price.close',op='available'))
+        c=config(target);c['execution']['hard_stop_pct']=None
+        report=a.analyze(source([(100,100.1,99.9,100),(100,100.2,90,91)]),c)
+        self.assertEqual(report['trades'][0]['status'],'OPEN')
+        self.assertEqual(report['summary']['closed'],0)
+
+    def test_disabled_hard_stop_keeps_trailing_order_functional(self):
+        c=config();c['execution']['hard_stop_pct']=None
+        trade=a.analyze(source([(100,100.1,99.9,100),(100,103,98,102)]),c)['trades'][0]
+        self.assertEqual(trade['exit_reason'],'TRAILING_STOP')
+
+    def test_invalid_hard_stop_values_rejected(self):
+        for value in (0,-1,100,True,'off'):
+            c=config();c['execution']['hard_stop_pct']=value
+            with self.assertRaises(ValueError):a.validate_config(c)
+
     def test_settings_validate_and_round_trip(self):
         c=config();self.assertEqual(a.validate_config(copy.deepcopy(c)),c)
         c['branches'][1]['trail']['distance_pct']=0

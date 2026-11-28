@@ -8,7 +8,7 @@
   const draftKey = 'btc-hour-strategy-workspace-draft-v1';
   let previousDraft = null;
   const previousDraftKey=draftKey+'-previous';
-  const blankStrategy = () => ({version:'btc-hour-strategy-analyzer-v1',id:'My strategy',branches:[{id:'buy',side:'BUY',expanded:true,when:{all:[defaultLeaf()]}},{id:'sell',side:'SELL',expanded:true,when:{all:[defaultLeaf()]}}]});
+  const blankStrategy = () => ({version:'btc-hour-strategy-analyzer-v1',id:'My strategy',execution:{hard_stop_pct:null},branches:[{id:'buy',side:'BUY',expanded:true,when:{all:[defaultLeaf()]}},{id:'sell',side:'SELL',expanded:true,when:{all:[defaultLeaf()]}}]});
   const fields = () => metadata?.fields || [];
   const fieldInfo = name => fields().find(f => f.id === name);
   const human = name => StrategyReport.fieldLabel(name);
@@ -55,9 +55,14 @@
   function configuredExpression(expr){return !!(expr && (expr.field || (expr.all||expr.any||[]).some(configuredExpression) || (expr.not&&configuredExpression(expr.not))));}
   function positionTrail(branch){return branch.side==='SELL'&&branch.action==='TRAILING_SELL'&&(branch.condition_mode==='position'||(!branch.condition_mode&&(!configuredExpression(branch.when)||(branch.when?.field==='price.close'&&branch.when?.op==='available'&&!branch.when?.lag))));}
   document.addEventListener('click',e=>{for(const menu of document.querySelectorAll('.field-dropdown[open]'))if(!menu.contains(e.target))menu.open=false;});
+  function hardStopSetting(){return $('hard-stop-mode').value==='source'?{}:{hard_stop_pct:$('hard-stop-mode').value==='off'?null:Number($('hard-stop-pct').value)};}
+  function showHardStop(){
+    const mode=$('hard-stop-mode').value;$('hard-stop-pct').disabled=mode!=='on';
+    $('risk-scope').textContent=mode==='off'?'Additional hard stop: OFF. Only configured SELL exits can close a simulated position. A target may never be reached; an unclosed position remains open.':mode==='on'?`Additional hard stop: ${$('hard-stop-pct').value}% net loss, including costs. This can exit before take profit or trailing activation.`:'Existing source default: '+(metadata?.risk_budget_pct==null?'no source hard stop; standing-exit strategies retain the legacy 0.5% stop.':'0.5% net hard stop, independent of configured SELL exits.');
+  }
   function configuration() {
     const config = {version: 'btc-hour-strategy-analyzer-v1', id: $('strategy-name').value.trim(),
-      execution: {fee_bps_per_side: Number($('fee').value), slippage_bps_per_side: Number($('slippage').value), initial_capital: Number($('capital').value),intrabar_path:$('intrabar-path').value},
+      execution: {fee_bps_per_side: Number($('fee').value), slippage_bps_per_side: Number($('slippage').value), initial_capital: Number($('capital').value),intrabar_path:$('intrabar-path').value,...hardStopSetting()},
       branches: model.branches.filter(b => b.enabled !== false).map(branch => {const {id, side, when,action,trail,target_profit_pct}=branch;return ({id, side,...(!(side==='SELL'&&['TRAILING_SELL','TAKE_PROFIT'].includes(action))?{execution_timing:'next_open'}:{}),...(branch.activation_timing==='later'&&!positionTrail(branch)?{activation_timing:'later'}:{}), when: positionTrail(branch)?{field:'price.close',op:'available'}:copy(when),...(side==='SELL'&&action?{action,...(trail?{trail:copy(trail)}:{}),...(target_profit_pct!==undefined?{target_profit_pct}:{})}:{})});})};
     if (!config.id) throw Error('Give your strategy a name.');
     if (!config.branches.some(b => b.side === 'BUY') || !config.branches.some(b => b.side === 'SELL')) throw Error('Enable at least one BUY and one SELL branch.');
@@ -81,6 +86,8 @@
     model = copy(config); $('strategy-name').value = model.id;
     $('fee').value = model.execution?.fee_bps_per_side ?? 4; $('slippage').value = model.execution?.slippage_bps_per_side ?? 2; $('capital').value = model.execution?.initial_capital ?? 100;
     $('intrabar-path').value=model.execution?.intrabar_path||'low_first';
+    $('hard-stop-mode').value=Object.hasOwn(model.execution||{},'hard_stop_pct')?(model.execution.hard_stop_pct===null?'off':'on'):'source';
+    $('hard-stop-pct').value=model.execution?.hard_stop_pct??.5;showHardStop();
     renderBranches(); remember();
   }
   function fieldSelect(selected, parent, changed) {
@@ -271,7 +278,7 @@
     $('input-heading').textContent = `${result.symbol} · ${result.timeframe} · SPOT RESEARCH`;
     $('memory-batch').hidden=result.mode!=='memory';
     if(result.mode==='memory'){$('memory-symbol').value=result.symbol;$('memory-timeframe').value=result.timeframe;if(!$('memory-coins').selectedOptions.length)for(const o of $('memory-coins').options)o.selected=o.value===result.symbol;}
-    $('risk-scope').textContent = result.risk_budget_pct == null ? 'Legacy snapshot: original signal-rule replay, without the 0.5% stop. Choose a new spot research snapshot for the loss-budget replay.' : 'A 0.5% net loss budget is active from entry, including configured costs. Candle OHLC models stop touches; adverse opens can exceed the budget. SELL branches define your other exits.';
+    showHardStop();
     if(currentReport && (currentReport.contract.source_id!==result.source_id || currentReport.contract.observed_as_of!==result.last)) {
       currentReport=currentReportId=null;$('report-area').replaceChildren();
       $('result-scope').textContent='Run a replay for this input, or explicitly open a saved report.';
@@ -329,7 +336,7 @@
   $('memory-current').onclick=()=>{for(const o of $('memory-coins').options)o.selected=o.value===metadata?.symbol;remember();};
   $('memory-coins').onchange=remember;
   $('strategy-name').onchange = () => { model.id = $('strategy-name').value;remember(); };
-  for (const id of ['fee','slippage','capital','intrabar-path']) $(id).onchange = () => { model.execution={fee_bps_per_side:Number($('fee').value),slippage_bps_per_side:Number($('slippage').value),initial_capital:Number($('capital').value),intrabar_path:$('intrabar-path').value};remember(); };
+  for (const id of ['fee','slippage','capital','intrabar-path','hard-stop-mode','hard-stop-pct']) $(id).onchange = () => { model.execution={fee_bps_per_side:Number($('fee').value),slippage_bps_per_side:Number($('slippage').value),initial_capital:Number($('capital').value),intrabar_path:$('intrabar-path').value,...hardStopSetting()};showHardStop();remember(); };
   $('save-config').onclick = guard(async () => { const saved=await api('/api/config',{config:configuration()});await refreshCatalog();$('strategy-preset').value=saved.key;$('run-status').textContent='Strategy saved. Previous versions are retained.'; });
   $('export-config').onclick = guard(() => download(configuration(), $('strategy-name').value.replace(/[^a-z0-9_-]/gi,'_')+'.json'));
   $('config-upload').onchange = guard(async e => { const file=e.target.files[0];if(file){const saved=await api('/api/config',{config:JSON.parse(await file.text())});await refreshCatalog();setModel(saved.config);$('strategy-preset').value=saved.key;} });

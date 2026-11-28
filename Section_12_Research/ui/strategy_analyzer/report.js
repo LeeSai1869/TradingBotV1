@@ -42,6 +42,7 @@
     $('report-provenance').textContent=`${(d.candles_scanned??d.candles_evaluated).toLocaleString()} candles scanned · ${d.signals.length.toLocaleString()} accepted signals · ${d.workspace?.input_name||`Frozen ${d.contract.symbol||'BTCUSDT'} ${d.contract.timeframe||'1h'} source`}${first?' · '+new Date(first).toISOString().slice(0,10)+' to '+new Date(last).toISOString().slice(0,10):''} · Fee ${d.contract.execution.fee_bps_per_side} bps/side · Slippage ${d.contract.execution.slippage_bps_per_side} bps/side · Candle order ${friendly(d.contract.execution.intrabar_path||'legacy')}`;
     const buyCoverage=Object.values(d.branch_diagnostics||{}).filter(b=>b.side==='BUY');
     const blocked=d.test_status==='BLOCKED_INPUTS'||(!d.signals.length&&buyCoverage.length>0&&buyCoverage.every(b=>b.evaluated>0&&b.unknown===b.evaluated));
+    el('p',d.contract.risk_budget_pct==null?'Additional hard stop: OFF. Configured SELL exits only.':`Additional hard stop: ${d.contract.risk_budget_pct}% net loss. This can exit before take profit or trailing activation.`,root.querySelector('.report-header'),{class:'notice'});
     const summary=blocked?{...d.summary,closed_trade_return_pct:null,closed_trade_balance:null,closed_trade_max_drawdown_pct:null}:d.summary;
     card($('summary'),'Completed trades',summary.closed.toLocaleString(),`${summary.open} open · ${summary.censored} censored`);
     card($('summary'),'Win rate',pct(summary.win_rate_pct),`${summary.wins} wins · ${summary.losses} losses`);

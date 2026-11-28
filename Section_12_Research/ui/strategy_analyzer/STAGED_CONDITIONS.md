@@ -53,3 +53,15 @@ later close; its labels also state the next-open fill. Older configurations
 without execution_timing keep the same next-open behavior. Trailing SELL and
 take-profit branches instead show **Standing exit**, since their price orders
 can fill within a candle. The built-in risk stop also remains a standing exit.
+
+## Additional hard stop in offline tests
+
+The execution panel exposes the additional hard stop independently from SELL
+branches. **Off — use configured SELL exits only** saves hard_stop_pct: null.
+**On** saves a net loss percentage. **Keep existing source default** preserves
+older strategies' behavior, including the former 0.5% spot-source hard stop.
+New blank strategies explicitly disable the additional stop. Existing strategies
+are not silently changed: select Off and save to run a take-profit-only test.
+The report header states the resolved setting. With no hard stop, a target that
+is never reached leaves the simulated position open; losses are not converted
+into completed wins. This setting changes offline replay only.

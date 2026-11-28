@@ -38,6 +38,8 @@ def main():
                     buy=page.locator('#branches-editor .branch').first
                     expect(buy.get_by_label('BUY execution timing',exact=True)).to_have_value('next_open')
                     expect(page.get_by_label('SELL execution timing',exact=True)).to_have_value('next_open')
+                    page.locator('#hard-stop-mode').select_option('off')
+                    expect(page.locator('#risk-scope')).to_contain_text('hard stop: OFF')
                     buy.get_by_label('Condition role',exact=True).first.select_option('trigger')
                     expect(buy.locator('.rule-preview')).to_contain_text('remember setup')
                     expect(buy.get_by_label('Activation timing',exact=True)).to_have_value('same_or_later')
@@ -46,6 +48,7 @@ def main():
                     buy.get_by_label('Condition role',exact=True).nth(1).select_option('activate')
                     page.locator('#save-config').click();expect(page.locator('#run-status')).to_contain_text('Strategy saved')
                     page.reload();expect(page.locator('#run-strategy')).to_be_enabled()
+                    expect(page.locator('#hard-stop-mode')).to_have_value('off')
                     buy=page.locator('#branches-editor .branch').first
                     expect(buy.get_by_label('Condition role',exact=True).first).to_have_value('trigger')
                     expect(buy.get_by_label('Condition role',exact=True).nth(1)).to_have_value('activate')
@@ -57,6 +60,8 @@ def main():
                     expect(page.locator('#detail')).to_contain_text('BUY Trigger remembered')
                     reports=[json.load(gzip.open(path,'rt')) for path in (root/'workspace/runs').glob('*/strategy_analysis.json.gz')]
                     self_report=reports[0];signal=self_report['signals'][0]
+                    assert self_report['config']['execution']['hard_stop_pct'] is None
+                    assert self_report['contract']['risk_budget_pct'] is None
                     assert self_report['config']['branches'][0]['execution_timing']=='next_open'
                     assert self_report['config']['branches'][1]['execution_timing']=='next_open'
                     assert self_report['trades'][0]['entry_time']==data['candles'][3]['open_time']
