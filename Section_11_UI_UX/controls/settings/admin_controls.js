@@ -1,6 +1,6 @@
 import {renderTimeframeDelivery} from '../alerts/index.js';
 // Immediate server policy actions are separate from Apply/Cancel chart styles.
-let session = { role: 'guest', configured: false };
+let session;
 let timeframes = [];
 let loadError = "";
 function el(tag, text, parent) {
@@ -35,12 +35,13 @@ function action(parent, title, disabled, callback) {
     return button;
 }
 function changed(detail) { window.dispatchEvent(new CustomEvent('data-policy-change', {detail})); }
-export function isAdmin() { return session.role === 'admin'; }
+export function isAdmin() { return (session ?? window.AppSession)?.role === 'admin'; }
 export function account(parent) {
+    const account = session ?? window.AppSession ?? {role: 'guest'};
     if (loadError) { message(parent).textContent = loadError; return; }
-    el('p', session.role === 'guest' ? 'Your session has expired. Sign in again.' : `Signed in as ${session.username} (${session.role}).`, parent);
+    el('p', account.role === 'guest' ? 'Your session has expired. Sign in again.' : `Signed in as ${account.username} (${account.role}).`, parent);
     const status = message(parent);
-    action(parent, session.role === 'guest' ? 'Sign in again' : 'Sign out', false, async () => {
+    action(parent, account.role === 'guest' ? 'Sign in again' : 'Sign out', false, async () => {
         try {
             await request('/api/logout', {});
             window.location.reload();
@@ -77,16 +78,16 @@ export function renderTimeframes(parent, refresh) {
         const label=el('label','Status ',line), select=el('select','',label);
         select.setAttribute('aria-label',`${row.interval} download status`);
         for (const value of ['active','inactive']) { const option=el('option',value,select); option.value=value; select.append(option); }
-        select.value=row.status; select.disabled=session.role!=='admin';
+        select.value=row.status; select.disabled=!isAdmin();
         const delivery=el('div','',line);delivery.className='notification-delivery';void renderTimeframeDelivery(delivery,row.interval);
         const status=message(wrap);
         select.onchange=async()=>{
             select.disabled=true;
             try { await request('/api/settings/timeframes',{interval:row.interval,status:select.value}); await load(); changed({}); refresh(); }
             catch(e) {status.textContent=e.message;select.value=row.status;}
-            finally {select.disabled=session.role!=='admin';}
+            finally {select.disabled=!isAdmin();}
         };
-        deleteControl(wrap,{interval:row.interval},session.role!=='admin',async()=>{await load();refresh();});
+        deleteControl(wrap,{interval:row.interval},!isAdmin(),async()=>{await load();refresh();});
     }
 }
 export function coinActions(parent, selection, refresh) {
@@ -95,7 +96,7 @@ export function coinActions(parent, selection, refresh) {
     const single=selection.size===1, symbol=[...selection][0];
     const status=message(parent), buttons=el('div','',parent); buttons.className='settings-coin-actions';
     for (const [title, actionName] of [['Approve / activate','approve'],['Make inactive','inactive'],['Disapprove','disapprove']]) {
-        action(buttons,title,session.role!=='admin'||selection.size===0,async()=>{
+        action(buttons,title,!isAdmin()||selection.size===0,async()=>{
             try {
                 const result=await request('/api/settings/coins/batch',{symbols:[...selection],action:actionName});
                 const failed=result.results.filter(row=>!row.ok);
@@ -107,5 +108,5 @@ export function coinActions(parent, selection, refresh) {
             catch(e) {status.textContent=e.message;}
         });
     }
-    deleteControl(parent,{symbol},session.role!=='admin'||!single,refresh);
+    deleteControl(parent,{symbol},!isAdmin()||!single,refresh);
 }

@@ -46,6 +46,12 @@ class Handler(SimpleHTTPRequestHandler):
         # /controls/, /web_root/ all resolve as real paths.
         super().__init__(*args, directory=str(SECTION_11), **kwargs)
 
+    def translate_path(self, path):
+        file = super().translate_path(path)
+        if urlparse(path).path == "/web_root/vendor/lightweight-charts.js" and not Path(file).is_file():
+            return str(SECTION_11.parent / "packaging/vendor/lightweight-charts.js")
+        return file
+
     def setup(self):
         super().setup()
         self.connection.settimeout(10)

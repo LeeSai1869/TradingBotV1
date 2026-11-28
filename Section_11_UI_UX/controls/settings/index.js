@@ -445,8 +445,7 @@ async function loadRegistry() {
     if (dialog.open && section === "coins") render();
 }
 
-export async function mount() {
-    await admin.load();
+export function mount() {
     try {
         const raw = localStorage.getItem(STORAGE);
         // Preserve server display defaults until the user saves preferences.
@@ -508,8 +507,9 @@ export async function mount() {
         draft = structuredClone(saved); selectedCoins.clear(); message.textContent = ""; render(); dialog.showModal();
         tabs.querySelector('[aria-selected="true"]').focus();
         if (section === "coins" && admin.isAdmin()) void loadRegistry();
+        const wasAdmin = admin.isAdmin();
         void admin.load().then(() => {
-            if (dialog.open && (section === "coins" || section === "timeframes" || item === "Account")) render();
+            if (dialog.open && (wasAdmin !== admin.isAdmin() || section === "coins" || section === "timeframes" || item === "Account")) render();
         }).catch(() => {});
     };
     window.addEventListener('open-feature-settings', event=>{
