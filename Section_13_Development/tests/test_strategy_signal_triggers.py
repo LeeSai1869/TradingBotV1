@@ -82,3 +82,18 @@ class SignalTriggers(unittest.TestCase):
         self.assertEqual(signal['reason'],'TRAILING_STOP')
         self.assertEqual(signal['trigger_known_time'],p['candles'][1]['close_time']+1)
         self.assertEqual(signal['trigger_inputs']['di.di_plus@lag0']['value'],55)
+
+
+class BlockedInputReport(__import__('unittest').TestCase):
+    def test_all_unknown_buy_is_blocked_but_valid_no_match_is_completed(self):
+        from test_strategy_analyzer import source, config
+        from Section_8_Decision_Engine import strategy_analyzer as analyzer
+        data=source()
+        for row in data['candles']:row['feature_valid']=False
+        report=analyzer.analyze(data,config())
+        self.assertEqual(report['test_status'],'BLOCKED_INPUTS')
+        self.assertEqual(report['branch_diagnostics']['buy']['unknown'],len(data['candles']))
+        for row in data['candles']:
+            row['feature_valid']=True
+            row['features']['buy']=0
+        self.assertEqual(analyzer.analyze(data,config())['test_status'],'COMPLETED')

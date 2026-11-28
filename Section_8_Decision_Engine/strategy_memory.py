@@ -40,10 +40,11 @@ def columns(c,table='features'):
 
 
 def version(c,symbol,frame):
-    v=c.execute('SELECT signature,generation FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,frame)).fetchone()
-    pending=bool(c.execute('SELECT 1 FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,frame)).fetchone())
+    v=c.execute('SELECT signature,generation,invalidated_columns FROM feature_calculation_versions WHERE symbol=? AND interval=?',(symbol,frame)).fetchone()
+    job=c.execute('SELECT signature,last_time,target,columns FROM feature_replay_jobs WHERE symbol=? AND interval=?',(symbol,frame)).fetchone()
+    pending=bool(job)
     policy=data_policy.read()
-    return dict(signature=v[0] if v else None,generation=str(v[1]) if v else None,pending=pending,
+    return dict(signature=v[0] if v else None,generation=str(v[1]) if v else None,pending=pending,repair=list(job) if job else None,invalidated=json.loads(v[2]) if v else [],
                 epochs=[policy['epochs'].get('symbol:'+symbol,0),policy['epochs'].get('interval:'+frame,0)])
 
 
@@ -134,7 +135,11 @@ def load(symbol,frame,*,fields=None,since=None,until=None,limit=None,center=None
         select+=['d.'+quote(f) for f in adcn_fields]
         join=' LEFT JOIN adcn.decisions d ON d.symbol=k.symbol AND d.interval=k.interval AND d.open_time=k.open_time' if adcn_fields else ''
         sql='SELECT '+','.join(select)+''' FROM raw.klines k LEFT JOIN features f ON f.symbol=k.symbol AND f.interval=k.interval AND f.open_time=k.open_time'''+join+''' WHERE k.symbol=? AND k.interval=? AND k.open_time>? AND k.open_time<=? AND k.close_time<? ORDER BY k.open_time LIMIT ?'''
-        rows=[];after=lower-1;events={};current=v['signature']==current_signature() and not v['pending']
+        rows=[];after=lower-1;events={};signature=current_signature()
+        current=v['signature']==signature and not v['pending']
+        # A matching selective job certifies the unaffected components. Unknown
+        # generations remain blocked; affected cells use the Core reader mask.
+        compatible=current or bool(v['repair'] and v['repair'][0]==signature)
         c.rollback()
         while True:
             size=min(2048,limit-len(rows)) if limit else 2048
@@ -144,10 +149,12 @@ def load(symbol,frame,*,fields=None,since=None,until=None,limit=None,center=None
                 try:
                     if version(c,symbol,frame)!=v:raise ValueError('Memory generation changed during the read; refresh and retry')
                     batch=c.execute(sql,(symbol,frame,after,last[0],cutoff,size)).fetchall()
+                    projected=[dict(open_time=values[0],**dict(zip(feature_fields,values[8:8+len(feature_fields)]))) for values in batch]
+                    features_store.mask_replays(c,symbol,frame,projected)
                 finally:c.rollback()
-            for values in batch:
-                f=dict(zip(feature_fields,values[8:8+len(feature_fields)]))
-                valid=current and values[0]<=feature_cap and values[7]==3 and f.get('measurement_version')=='shared-v1' and bool(f.get('measurement_config_id'))
+            for values,f in zip(batch,projected):
+                f.pop('open_time')
+                valid=compatible and values[0]<=feature_cap and values[7]==3 and f.get('measurement_version')=='shared-v1' and bool(f.get('measurement_config_id'))
                 row=dict(zip(('open_time','close_time','open','high','low','close','volume'),values[:7]))
                 row.update(features=f,feature_valid=valid,adcn=dict(zip(adcn_fields,values[8+len(feature_fields):])),context={})
                 rows.append(row)
@@ -199,7 +206,7 @@ def load(symbol,frame,*,fields=None,since=None,until=None,limit=None,center=None
         return dict(version='memory-candle-source-v1',symbol=symbol,timeframe=frame,source_id=digest(identity),observed_as_of=cutoff,
                     candles=rows,engine_history=history,native_pivots=sorted(events.values(),key=lambda p:(p['origin_time'],p['known_time'])),
                     exported_feature_columns=feature_fields,adcn_columns=adcn_fields,
-                    memory=dict(first=first[0],last=last[0],feature_through=feature_cap,feature_current=current,context_status=statuses,engine_run_ids=run_ids,
+                    memory=dict(first=first[0],last=last[0],feature_through=feature_cap,feature_current=current,feature_inputs_compatible=compatible,repair=v['repair'],context_status=statuses,engine_run_ids=run_ids,
                                 feature_schema=schema,adcn_schema=adcn_schema,mode='READ_ONLY_STORED_VALUES_NO_CLASSIFIER_REPLAY'),
                     provenance='Read-only stored memory. Only requested strategy fields are loaded; incomplete historical values remain unavailable. No indicator or regime calculations are performed.')
     finally:c.close()

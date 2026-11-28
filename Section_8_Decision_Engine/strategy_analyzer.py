@@ -476,8 +476,11 @@ def analyze(source, config, *, since=None, until=None, report_fields=None, progr
         yearly.append(dict(year=year, **summarize(cohort, execution['initial_capital'])))
     fields = sorted({field for b in config['branches'] for field in expression_fields(b['when'])})
     missing_features = [field for field in fields if field.startswith('feature.') and field.split('.')[1] not in memory.features]
+    buys=[b for b in diagnostics.values() if b['side']=='BUY']
+    blocked=bool(buys) and not signals and all(b['evaluated']>0 and b['unknown']==b['evaluated'] for b in buys)
     result = dict(version=VERSION, config=config, config_digest=config_id, contract=contract,
                   run_id=digest(dict(contract=contract, config_digest=config_id)), candles_scanned=len(selected), candles_evaluated=len(selected)-invalid_prices,
+                  test_status='BLOCKED_INPUTS' if blocked else 'COMPLETED',
                   signals=signals, trades=trades, setup_events=setup_events,pending_setups=list(armed.values()),waiting_for=waiting, branch_diagnostics=diagnostics,
                   summary=summarize(trades, execution['initial_capital']), yearly=yearly,
                   invalid_price_candles=invalid_prices, price_gaps=gaps, unavailable_feature_fields=missing_features,

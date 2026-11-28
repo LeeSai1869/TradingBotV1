@@ -47,6 +47,50 @@ class StrategyMemory(unittest.TestCase):
         c.close();s=m.load('BTCUSDT','1m',fields=['feature.ema50'],limit=4,now_ms=10**9)
         self.assertFalse(s['memory']['feature_current']);self.assertTrue(all(not r['feature_valid'] for r in s['candles']))
 
+    def selective_job(self, columns, through=-1):
+        from Section_4_Features.execution.components import current_signature
+        c=features_store.open_db()
+        with c:
+            c.execute("UPDATE feature_calculation_versions SET signature='',invalidated_columns=? WHERE symbol='BTCUSDT' AND interval='1m'",(json.dumps(columns),))
+            c.execute('INSERT INTO feature_replay_jobs VALUES (?,?,?,?,?,?,?,?)',('BTCUSDT','1m',current_signature(),64*60000,through,'[]',None,json.dumps(columns)))
+        c.close()
+
+    def test_structure_repair_preserves_stored_rsi_and_di_inputs(self):
+        before=m.load('BTCUSDT','1m',fields=['feature.rsi','di.abs_spread'],now_ms=10**9)
+        self.selective_job(['current_structure','structure_events'])
+        after=m.load('BTCUSDT','1m',fields=['feature.rsi','di.abs_spread','feature.current_structure'],now_ms=10**9)
+        self.assertFalse(after['memory']['feature_current'])
+        self.assertTrue(after['memory']['feature_inputs_compatible'])
+        old,new=a.Memory(before),a.Memory(after)
+        for i in range(65):
+            for field in ('feature.rsi','feature.di_plus','feature.di_minus','di.abs_spread'):
+                self.assertEqual(new.value(i,field),old.value(i,field))
+            self.assertIsNone(new.value(i,'feature.current_structure')[0])
+        self.assertIsNotNone(new.value(60,'di.abs_spread')[0])
+        from test_strategy_analyzer import config
+        strategy=config()
+        strategy['branches'][0]['when']={'all':[dict(field='di.abs_spread',op='gte',value=0,stage='trigger'),dict(field='feature.rsi',op='gte',value=0,stage='activate')]}
+        strategy['branches'][1]['when']=dict(field='price.close',op='available')
+        expected,actual=a.analyze(before,strategy),a.analyze(after,strategy)
+        self.assertGreater(len(actual['signals']),0)
+        self.assertEqual(actual['signals'],expected['signals'])
+
+    def test_affected_cells_only_become_available_through_repair_cursor(self):
+        self.selective_job(['rsi','di_minus'],through=40*60000)
+        s=m.load('BTCUSDT','1m',fields=['feature.rsi','feature.ema50','di.abs_spread'],now_ms=10**9)
+        memory=a.Memory(s)
+        self.assertIsNotNone(memory.value(40,'feature.rsi')[0])
+        self.assertIsNone(memory.value(41,'feature.rsi')[0])
+        self.assertIsNone(memory.value(41,'di.abs_spread')[0])
+        self.assertIsNotNone(memory.value(41,'feature.ema50')[0])
+
+    def test_unknown_generation_without_selective_job_stays_blocked(self):
+        c=features_store.open_db()
+        with c:c.execute("UPDATE feature_calculation_versions SET signature='unknown'")
+        c.close()
+        s=m.load('BTCUSDT','1m',fields=['feature.rsi'],now_ms=10**9)
+        self.assertTrue(all(not row['feature_valid'] for row in s['candles']))
+
     def test_date_window_and_warmup_are_bounded(self):
         s=m.load('BTCUSDT','1m',fields=['feature.ema50'],since=50*60000,until=60*60000,warmup=3,now_ms=10**9)
         self.assertGreater(s['candles'][0]['open_time'],40*60000)
