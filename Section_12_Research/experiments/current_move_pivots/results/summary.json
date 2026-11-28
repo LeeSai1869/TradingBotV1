@@ -1,0 +1,258 @@
+{
+  "ENAUSDT_15m": {
+    "candles": 6000,
+    "first_open_ms": 1790296200000,
+    "last_open_ms": 1795695300000,
+    "provenance": {
+      "path": "Section_12_Research/reports/pivot_debug/ENAUSDT-15m-20261126/stored-pivots.json.gz",
+      "sha256": "907d03b74996166af431ce861ae02937bdf7b1a1e3aaefcc9eabf84dbda24e58",
+      "seed_method": "known archived state"
+    },
+    "seed": {
+      "pair": [
+        "0.2252",
+        "0.2222"
+      ],
+      "direction": 1,
+      "candidate": {
+        "price": "0.2299",
+        "origin": 1790296200000
+      }
+    },
+    "summary": {
+      "confirmed_pair_two_closes": {
+        "confirmations": 528,
+        "per_100_candles": 8.8,
+        "median_confirmation_lag_bars": 3.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 3.0402629416598264,
+        "minimum_leg_pct": 0.8542445274959907,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 8,
+        "sideways_windows": 73,
+        "median_confirmations_per_sideways_64_bars": 6
+      },
+      "current_move_only": {
+        "confirmations": 1780,
+        "per_100_candles": 29.666666666666668,
+        "median_confirmation_lag_bars": 1.0,
+        "adjacent_confirmations": 616,
+        "minimum_confirmation_spacing_bars": 1,
+        "median_leg_pct": 1.508120649651967,
+        "minimum_leg_pct": 0.30175015087507573,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 22,
+        "sideways_windows": 73,
+        "median_confirmations_per_sideways_64_bars": 21
+      },
+      "current_move_two_closes": {
+        "confirmations": 568,
+        "per_100_candles": 9.466666666666667,
+        "median_confirmation_lag_bars": 3.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 2.7527527527527553,
+        "minimum_leg_pct": 0.677678949597624,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 9,
+        "sideways_windows": 73,
+        "median_confirmations_per_sideways_64_bars": 7
+      }
+    }
+  },
+  "BTCUSDT_1h": {
+    "candles": 12000,
+    "first_open_ms": 1750694400000,
+    "last_open_ms": 1793890800000,
+    "provenance": {
+      "path": "Section_12_Research/reports/BTC_1h_sequences/source_v1.json.gz",
+      "sha256": "eace04c11a858589d508e5ab639886aa6376b21201b517f6893ce8b7d3272196",
+      "seed_method": "last two archived pivots known at seed boundary; observed opposite extreme"
+    },
+    "seed": {
+      "pair": [
+        98200.0,
+        102613.09
+      ],
+      "direction": -1,
+      "candidate": {
+        "price": "99613.33",
+        "origin": 1750694400000
+      }
+    },
+    "summary": {
+      "confirmed_pair_two_closes": {
+        "confirmations": 1204,
+        "per_100_candles": 10.033333333333333,
+        "median_confirmation_lag_bars": 3.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 1.9447713233459982,
+        "minimum_leg_pct": 0.3046325581395311,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 9,
+        "sideways_windows": 144,
+        "median_confirmations_per_sideways_64_bars": 7.0
+      },
+      "current_move_only": {
+        "confirmations": 3476,
+        "per_100_candles": 28.966666666666665,
+        "median_confirmation_lag_bars": 1.0,
+        "adjacent_confirmations": 1132,
+        "minimum_confirmation_spacing_bars": 1,
+        "median_leg_pct": 0.9459537454868848,
+        "minimum_leg_pct": 0.06946383248731103,
+        "legs_below_0_1_pct": 2,
+        "legs_below_0_25_pct": 124,
+        "peak_confirmations_in_32_bars": 22,
+        "sideways_windows": 144,
+        "median_confirmations_per_sideways_64_bars": 20.0
+      },
+      "current_move_two_closes": {
+        "confirmations": 1280,
+        "per_100_candles": 10.666666666666666,
+        "median_confirmation_lag_bars": 3.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 1.7308877730894512,
+        "minimum_leg_pct": 0.16586863566370744,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 3,
+        "peak_confirmations_in_32_bars": 10,
+        "sideways_windows": 144,
+        "median_confirmations_per_sideways_64_bars": 7.0
+      }
+    }
+  },
+  "synthetic_user_prices": {
+    "candles": 3,
+    "first_open_ms": 0,
+    "last_open_ms": 1800000,
+    "provenance": {
+      "note": "Constructed numeric example, not historical OHLC; assumes .1302 is already confirmed"
+    },
+    "seed": {
+      "pair": [
+        0.5818,
+        0.1302
+      ],
+      "direction": 1,
+      "candidate": {
+        "price": "0.4802",
+        "origin": 0
+      }
+    },
+    "summary": {
+      "confirmed_pair_two_closes": {
+        "confirmations": 0,
+        "per_100_candles": 0.0,
+        "median_confirmation_lag_bars": null,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": null,
+        "median_leg_pct": null,
+        "minimum_leg_pct": null,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 0,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      },
+      "current_move_only": {
+        "confirmations": 1,
+        "per_100_candles": 33.333333333333336,
+        "median_confirmation_lag_bars": 2,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": null,
+        "median_leg_pct": null,
+        "minimum_leg_pct": null,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 1,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      },
+      "current_move_two_closes": {
+        "confirmations": 1,
+        "per_100_candles": 33.333333333333336,
+        "median_confirmation_lag_bars": 2,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": null,
+        "median_leg_pct": null,
+        "minimum_leg_pct": null,
+        "legs_below_0_1_pct": 0,
+        "legs_below_0_25_pct": 0,
+        "peak_confirmations_in_32_bars": 1,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      }
+    }
+  },
+  "synthetic_shrinking": {
+    "candles": 61,
+    "first_open_ms": 0,
+    "last_open_ms": 54000000,
+    "provenance": {
+      "note": "Stress case, not market data"
+    },
+    "seed": {
+      "pair": [
+        100,
+        80
+      ],
+      "direction": 1,
+      "candidate": {
+        "price": "100",
+        "origin": 0
+      }
+    },
+    "summary": {
+      "confirmed_pair_two_closes": {
+        "confirmations": 20,
+        "per_100_candles": 32.78688524590164,
+        "median_confirmation_lag_bars": 2.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 0.020929259104227712,
+        "minimum_leg_pct": 4.0871745280743934e-05,
+        "legs_below_0_1_pct": 12,
+        "legs_below_0_25_pct": 13,
+        "peak_confirmations_in_32_bars": 16,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      },
+      "current_move_only": {
+        "confirmations": 30,
+        "per_100_candles": 49.18032786885246,
+        "median_confirmation_lag_bars": 1.0,
+        "adjacent_confirmations": 4,
+        "minimum_confirmation_spacing_bars": 1,
+        "median_leg_pct": 0.0006539452517035274,
+        "minimum_leg_pct": 3.9913824615756894e-08,
+        "legs_below_0_1_pct": 22,
+        "legs_below_0_25_pct": 23,
+        "peak_confirmations_in_32_bars": 16,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      },
+      "current_move_two_closes": {
+        "confirmations": 30,
+        "per_100_candles": 49.18032786885246,
+        "median_confirmation_lag_bars": 2.0,
+        "adjacent_confirmations": 0,
+        "minimum_confirmation_spacing_bars": 2,
+        "median_leg_pct": 0.0006539452517035274,
+        "minimum_leg_pct": 3.9913824615756894e-08,
+        "legs_below_0_1_pct": 22,
+        "legs_below_0_25_pct": 23,
+        "peak_confirmations_in_32_bars": 16,
+        "sideways_windows": 0,
+        "median_confirmations_per_sideways_64_bars": null
+      }
+    }
+  }
+}
