@@ -9,6 +9,7 @@ import {zoneReadiness} from '../overlays/zones/readiness.js';
 import {HTF,intervalMs} from "../overlays/zones/fvg.js";
 
 const PREFETCH_BARS = 500;
+const PREPEND_DURING_DRAG_BARS = 20;
 const status = () => document.getElementById("status");
 let loadId = 0;
 
@@ -63,20 +64,28 @@ async function loadAll() {
     }
 
     function checkBoundary() {
-        if (rendering || pending || DataCache.loading) return;
+        if (rendering || DataCache.loading) return;
         const range = chart.timeScale().getVisibleLogicalRange();
+        if (pending?.history) {
+            if (range && range.from <= PREPEND_DURING_DRAG_BARS) render();
+            return;
+        }
         DataCache.setVisibleWindow(range);
         latestControl.update(chart, DataCache);
         updateStatus();
         // The preceding page is already part of the render dataset before
         // it enters view. Arrival runs this check again and prepares the next.
-        if (!dragging && range && range.from <= PREFETCH_BARS && DataCache.nextBefore !== null) {
+        if (range && range.from <= PREFETCH_BARS && DataCache.nextBefore !== null) {
             void DataCache.prefetchOlder();
         }
     }
 
     function render() {
-        if (rendering || !pending || (dragging && !pending.reset && !pending.latest)) return;
+        if (rendering || !pending) return;
+        if (dragging && !pending.reset && !pending.latest) {
+            const range = chart.timeScale().getVisibleLogicalRange();
+            if (!pending.history || !range || range.from > PREPEND_DURING_DRAG_BARS) return;
+        }
         const { op, latest, span } = pending;
         const scope = `${DataCache.symbol}:${DataCache.timeframe}`;
         const reset = pending.reset || renderedScope !== scope;
@@ -149,7 +158,8 @@ async function loadAll() {
         }
         const reset=needsRecovery || op === "reload" || op === "loading" || op === "prices";
         pending = { op:pending?.op==='settings'&&!reset?'settings':op==='live'&&pending?pending.op:op, reset: reset || !!pending?.reset,
-            latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span };
+            latest: reset ? false : pending?.latest, span: reset ? undefined : pending?.span,
+            history: !reset && (op === "history" || pending?.history) };
         render();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
@@ -170,7 +180,7 @@ async function loadAll() {
     for (const event of ["pointerup", "pointercancel", "blur"]) window.addEventListener(event, finishDrag);
     window.addEventListener("chart-settings-change", () => {
         pending = { op: "settings", reset: !!pending?.reset,
-            latest: pending?.latest, span: pending?.span };
+            latest: pending?.latest, span: pending?.span, history: pending?.history };
         render();
         const outputs=Composer.config.featureStyles||{};
         const needProfile=!DataCache.volumeProfile&&Object.entries(outputs).some(([k,v])=>k.startsWith('vp_')&&v.visible);

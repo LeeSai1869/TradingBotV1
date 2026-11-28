@@ -6,7 +6,6 @@ const percent = new Intl.NumberFormat(undefined, {
 const orders = {
     highest: (a, b) => b - a,
     lowest: (a, b) => a - b,
-    magnitude: (a, b) => Math.abs(b) - Math.abs(a),
 };
 
 function element(parent, tag, text = '') {
@@ -55,7 +54,6 @@ export function mountPriceChange(parent) {
         button.setAttribute('aria-label', label);
         button.onclick = () => {
             direction = order;
-            sort.value = 'direction';
             render();
         };
         return [order, button];
@@ -66,15 +64,17 @@ export function mountPriceChange(parent) {
     let rows = [], request, direction = 'highest';
 
     function render() {
-        const order = sort.value === 'direction' ? direction : sort.value;
+        const magnitude = sort.value === 'magnitude';
         changeHeader.setAttribute('aria-sort',
-            order === 'lowest' ? 'ascending' : order === 'highest' ? 'descending' : 'other');
-        for (const [value, button] of buttons) button.setAttribute('aria-pressed', String(order === value));
+            magnitude ? 'other' : direction === 'lowest' ? 'ascending' : 'descending');
+        for (const [value, button] of buttons) button.setAttribute('aria-pressed', String(direction === value));
         body.replaceChildren();
         const ranked = [...rows].sort((a, b) => {
             if (a.change_pct === null) return b.change_pct === null ? 0 : 1;
             if (b.change_pct === null) return -1;
-            return orders[order](a.change_pct, b.change_pct);
+            const first = magnitude ? Math.abs(a.change_pct) : a.change_pct;
+            const second = magnitude ? Math.abs(b.change_pct) : b.change_pct;
+            return orders[direction](first, second);
         });
         for (const row of ranked) {
             const line = element(body, 'tr');
