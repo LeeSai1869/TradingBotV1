@@ -141,9 +141,9 @@ class Handler(SimpleHTTPRequestHandler):
             if parsed.path == "/api/open_strategy_workspace":
                 try:
                     url = strategy_workspace.ensure_running()
-                except (ImportError, OSError, ValueError):
+                except (strategy_workspace.StartupError, ImportError, OSError, ValueError) as error:
                     logging.exception("Strategy Analyzer could not start")
-                    self._json({"error": "Strategy Analyzer could not start. Check the chart server log."}, 503)
+                    self._json({"error": f"Strategy Analyzer startup: {error}"}, 503)
                     return
             if not webbrowser.open_new_tab(url):
                 self._json({"error": "Could not open the default browser."}, 503)

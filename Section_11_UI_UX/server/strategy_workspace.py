@@ -1,4 +1,5 @@
 """Start the existing local strategy research workspace on demand."""
+from errno import EADDRINUSE
 from http.client import HTTPConnection, HTTPException
 from importlib import import_module
 from pathlib import Path
@@ -23,15 +24,36 @@ def _running_workspace():
         connection.close()
 
 
+class StartupError(RuntimeError):
+    """A startup problem that can be shown in the local app."""
+
+
 def ensure_running():
     global _server
     with _lock:
-        if _server is not None or _running_workspace():
+        if _server is not None:
+            return f"http://127.0.0.1:{_server.server_port}/"
+        if _running_workspace():
             return URL
         module = ("Section_12_Research.cli.strategy_analyzer_workspace"
                   if (_ROOT / "Section_12_Research/cli/strategy_analyzer_workspace.py").is_file()
                   else "strategy_analyzer_workspace")
-        workspace = import_module(module)
-        _server = workspace.make_server(workspace.Workspace(), port=PORT)
-        Thread(target=_server.serve_forever, name="strategy-workspace", daemon=True).start()
-        return URL
+        try:
+            analyzer = import_module(module)
+        except ModuleNotFoundError as error:
+            if error.name == module:
+                raise StartupError("Strategy Analyzer is missing from this checkout.") from error
+            raise StartupError(f"Strategy Analyzer needs the Python module {error.name}.") from error
+        if not (analyzer.ASSETS / "index.html").is_file():
+            raise StartupError("Strategy Analyzer’s interface files are missing from this checkout.")
+        workspace = analyzer.Workspace()
+        try:
+            server = analyzer.make_server(workspace, port=PORT)
+        except OSError as error:
+            if error.errno != EADDRINUSE:
+                raise
+            # The preferred port belongs to another service. Leave it alone.
+            server = analyzer.make_server(workspace, port=0)
+        Thread(target=server.serve_forever, name="strategy-workspace", daemon=True).start()
+        _server = server
+        return f"http://127.0.0.1:{server.server_port}/"
