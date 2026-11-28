@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse,unquote
 import posixpath
 
-from . import routes,mobile_push,public_access,android_push
+from . import routes,mobile_push,public_access,android_push,strategy_workspace
 
 HERE = Path(__file__).resolve().parent          # Section_11_UI_UX/server/
 SECTION_11 = HERE.parent                        # Section_11_UI_UX/
@@ -129,15 +129,23 @@ class Handler(SimpleHTTPRequestHandler):
             self._json({"error": "Invalid request size"}, 413)
             return
         body = self.rfile.read(length).decode("utf-8") if length else ""
-        if parsed.path == "/api/open_paper_dashboard":
+        if parsed.path in {"/api/open_paper_dashboard", "/api/open_strategy_workspace"}:
             host = self.headers.get("Host")
             port = self.server.server_port
             if (host not in {f"localhost:{port}", f"127.0.0.1:{port}"}
                 or self.client_address[0] not in {"127.0.0.1", "::1"}
                 or self.headers.get("Origin") != f"http://{host}"):
-                self._json({"error": "Open the paper dashboard from the local chart app."}, 403)
+                self._json({"error": "Open this tool from the local chart app."}, 403)
                 return
-            if not webbrowser.open_new_tab("http://127.0.0.1:8002/"):
+            url = "http://127.0.0.1:8002/"
+            if parsed.path == "/api/open_strategy_workspace":
+                try:
+                    url = strategy_workspace.ensure_running()
+                except (ImportError, OSError, ValueError):
+                    logging.exception("Strategy Analyzer could not start")
+                    self._json({"error": "Strategy Analyzer could not start. Check the chart server log."}, 503)
+                    return
+            if not webbrowser.open_new_tab(url):
                 self._json({"error": "Could not open the default browser."}, 503)
                 return
             self._json({"ok": True})

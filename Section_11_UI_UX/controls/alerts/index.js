@@ -302,6 +302,21 @@ export function mount() {
                 dashboard.disabled = false;
             }
         };
+        const analyzer = el('button', 'STRATEGY ANALYZER', toolbar);
+        analyzer.type = 'button';
+        dashboard.after(analyzer);
+        analyzer.onclick = async () => {
+            analyzer.disabled = true;
+            deliveryFeedback.hidden = true;
+            try {
+                await request('/api/open_strategy_workspace', {});
+            } catch (error) {
+                deliveryFeedback.textContent = error.message;
+                deliveryFeedback.hidden = false;
+            } finally {
+                analyzer.disabled = false;
+            }
+        };
     }
     // Polling is independent of chart symbol/viewport; no historical dataset fetches.
     // Initialize the event cursor without replaying old sounds on every reopen.
