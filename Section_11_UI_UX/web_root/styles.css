@@ -361,3 +361,6 @@ button:hover { background: #333; }
 .price-change [data-direction="up"] {color:#5ee1ae;}
 .price-change [data-direction="down"] {color:#ff9898;}
 .price-change-stale {display:block;color:#f1c67a;}
+.price-change-arrows {display:inline-flex;gap:3px;margin-inline-start:6px;}
+.price-change-arrows button {min-width:26px;padding:2px 4px;color:#fff;}
+.price-change-arrows button[aria-pressed="true"] {color:#5ee1ae;border-color:#5ee1ae;}

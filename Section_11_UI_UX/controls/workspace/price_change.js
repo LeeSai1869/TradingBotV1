@@ -33,7 +33,7 @@ export function mountPriceChange(parent) {
     const period = select(controls, 'Period', ['1h', '4h', '24h', '7d'].map(value => [value, value]));
     period.value = '24h';
     const sort = select(controls, 'Sort', [
-        ['highest', 'Highest first'], ['lowest', 'Lowest first'], ['magnitude', 'Biggest move'],
+        ['direction', 'By % Change'], ['magnitude', 'Biggest move'],
     ]);
     const refresh = element(controls, 'button', 'Refresh');
     refresh.type = 'button';
@@ -41,18 +41,40 @@ export function mountPriceChange(parent) {
     table.setAttribute('aria-label', 'Coin price changes');
     const head = element(element(table, 'thead'), 'tr');
     element(head, 'th', 'Coin').scope = 'col';
-    element(head, 'th', '% Change').scope = 'col';
+    const changeHeader = element(head, 'th', '% Change');
+    changeHeader.scope = 'col';
+    const arrows = element(changeHeader, 'span');
+    arrows.className = 'price-change-arrows';
+    const buttons = [
+        ['lowest', '↑', 'Lowest to highest'],
+        ['highest', '↓', 'Highest to lowest'],
+    ].map(([order, icon, label]) => {
+        const button = element(arrows, 'button', icon);
+        button.type = 'button';
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.onclick = () => {
+            direction = order;
+            sort.value = 'direction';
+            render();
+        };
+        return [order, button];
+    });
     const body = element(table, 'tbody');
     const status = element(panel, 'p');
     status.setAttribute('role', 'status');
-    let rows = [], request;
+    let rows = [], request, direction = 'highest';
 
     function render() {
+        const order = sort.value === 'direction' ? direction : sort.value;
+        changeHeader.setAttribute('aria-sort',
+            order === 'lowest' ? 'ascending' : order === 'highest' ? 'descending' : 'other');
+        for (const [value, button] of buttons) button.setAttribute('aria-pressed', String(order === value));
         body.replaceChildren();
         const ranked = [...rows].sort((a, b) => {
             if (a.change_pct === null) return b.change_pct === null ? 0 : 1;
             if (b.change_pct === null) return -1;
-            return orders[sort.value](a.change_pct, b.change_pct);
+            return orders[order](a.change_pct, b.change_pct);
         });
         for (const row of ranked) {
             const line = element(body, 'tr');
@@ -103,4 +125,5 @@ export function mountPriceChange(parent) {
     });
     period.onchange = refresh.onclick = load;
     sort.onchange = render;
+    render();
 }
