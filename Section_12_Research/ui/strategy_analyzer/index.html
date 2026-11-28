@@ -8,11 +8,11 @@
 <header class="topbar"><div><span class="eyebrow" id="input-heading">SPOT · PIVOT RESEARCH</span><h1>Strategy study</h1><p>Inspect pivot properties, compare market conditions, test candle rules.</p></div><span class="badge">Research workspace</span></header>
 <main class="workspace">
 <nav class="workspace-nav" aria-label="Analyzer sections"><a href="#input-title">Input</a><a href="#pivot-title">Chart / pivot discovery</a><a href="#strategy-title">Strategy</a><a href="#run-title">Run / compare</a><a href="#report-area">Results</a></nav>
-<section class="panel" aria-labelledby="input-title"><h2 id="input-title">1. Choose your input</h2><div class="controls">
+<section class="panel" aria-labelledby="input-title"><h2 id="input-title">1. Choose stored data</h2><div class="controls">
 <label>Input · memory or snapshot<select id="input-source"></select></label>
 <button id="refresh-input" type="button">Refresh input</button>
 <label class="file-label">Add a different input<input type="file" id="input-upload" accept=".json,.gz"><small>Spot candle source JSON or JSON.gz</small></label>
-</div><div class="controls"><label>Memory coin<select id="memory-symbol"></select></label><label>Memory timeframe<select id="memory-timeframe"></select></label><button type="button" id="load-memory">Read memory</button><span id="memory-universe" class="muted"></span></div>
+</div><div class="controls"><label>Memory coin<select id="memory-symbol"></select></label><label>Memory timeframe<select id="memory-timeframe"></select></label><button type="button" id="load-memory">Use this coin and timeframe</button><span id="memory-universe" class="muted"></span></div>
 <p id="input-status" role="status">Loading input catalog…</p><p class="muted compact">Memory inputs read stored candles, features, ADCN and analytical outputs. Refresh reads the latest stored values. Historical values still being calculated remain unavailable. Snapshots remain available as separate inputs.</p><details><summary>Available memory and historical context</summary><div id="input-coverage"></div></details></section>
 <section class="panel" aria-labelledby="pivot-title"><h2 id="pivot-title">Chart and pivot discovery</h2>
 <p>Confirmed pivot locations are the reference labels. Compare lows followed by an immediate pivot high at least 1% higher with other candles or lows that did not reach 1%. Use SELL to study the reverse movement from highs.</p>
@@ -35,15 +35,18 @@
 <details><summary>Counts by Regime and Trend</summary><div class="scroll" id="pivot-strata"></div></details>
 <h3>Inspect pivot cases</h3><div class="scroll" id="pivot-cases"></div><div class="controls"><button type="button" id="pivot-prev">Previous cases</button><button type="button" id="pivot-next">Next cases</button><span id="pivot-page"></span></div>
 </section>
-<section class="panel" aria-labelledby="strategy-title"><h2 id="strategy-title">2. Configure your strategy</h2><div class="controls">
-<label>Start from<select id="strategy-preset"></select></label><button id="load-preset" type="button">Load strategy</button>
+<section class="panel" aria-labelledby="strategy-title"><h2 id="strategy-title">2. Build your strategy</h2>
+<p>Use the selected coin and timeframe’s stored data. Define when to buy and when to sell; no preset is required.</p>
+<div class="controls"><button id="new-strategy" class="primary" type="button">Create new strategy</button><button id="undo-new-strategy" type="button" hidden>Restore previous draft</button><span id="strategy-status" role="status"></span></div>
+<details id="preset-options"><summary>Optional: copy a saved strategy or preset</summary><div class="controls"><label>Saved strategy / preset<select id="strategy-preset"></select></label><button id="load-preset" type="button" disabled>Load strategy</button></div><p class="muted compact">Loads an editable copy. Existing saved strategies stay unchanged.</p></details>
+<div class="controls">
 <label>Strategy name<input id="strategy-name" value="My strategy" maxlength="120"></label>
 <button id="save-config" type="button">Save strategy</button><button id="export-config" type="button">Download strategy</button>
 <label class="file-label">Import strategy<input type="file" id="config-upload" accept=".json"></label>
-</div><p class="muted">Branches for the same side are alternatives. A regular SELL exits at the next open. Take profit places a target while its conditions hold. A trailing SELL uses its conditions plus its profit threshold to arm a standing trail; once armed it stays armed. Conditions use closed candles: 0=current, 1=previous, 2=two ago. Other SELL branches can exit earlier.</p>
-<div id="branches-editor"></div><div class="controls"><button id="add-buy" type="button">+ BUY branch</button><button id="add-sell" type="button">+ SELL branch</button><button id="add-trailing-sell" type="button">+ Trailing SELL</button></div>
+</div><p class="muted">Start with one BUY rule and one SELL rule. Add extra rules only if you need alternative entries or exits. Branches for the same side are alternatives. A regular SELL exits at the next open. Take profit places a target while its conditions hold. A trailing SELL uses its conditions plus its profit threshold to arm a standing trail; once armed it stays armed. Conditions use closed candles: 0=current, 1=previous, 2=two ago. Other SELL branches can exit earlier.</p>
+<div id="branches-editor"></div><div class="controls"><button id="add-buy" type="button">+ Another BUY rule</button><button id="add-sell" type="button">+ Another SELL rule</button><button id="add-trailing-sell" type="button">+ Trailing SELL</button></div>
 </section>
-<section class="panel" aria-labelledby="run-title"><h2 id="run-title">3. Replay and compare</h2><div class="controls">
+<section class="panel" aria-labelledby="run-title"><h2 id="run-title">3. Test on stored data</h2><div class="controls">
 <label>From (UTC, inclusive)<input id="replay-since" type="datetime-local"></label>
 <label>Until (UTC, exclusive)<input id="replay-until" type="datetime-local"></label>
 <label>Fee per side (bps)<input id="fee" type="number" min="0" max="9999" step="0.1" value="4"></label>
@@ -55,7 +58,7 @@
 <div id="memory-batch"><div class="controls"><label>Coins to replay from memory<select id="memory-coins" multiple size="5"></select></label><button type="button" id="memory-all">Select all stored coins</button><button type="button" id="memory-current">Use chart coin only</button></div><p class="muted compact">Coins run one at a time on the selected timeframe, each with its own starting capital and position state. Results are reported per coin. The candle order above is an execution assumption for intrabar stops.</p></div>
 <div id="batch-results" class="scroll" aria-live="polite"></div>
 <details><summary>Choose additional indicator values to record in the report</summary><p>These inputs are recorded at accepted BUY/SELL signals. They do not change trading conditions. Add them here to use them as report columns or filters.</p><label>Find report inputs<input id="report-field-search" placeholder="RSI, regime, EMA, 4h…"></label><div id="report-fields" class="field-picker"></div></details>
-<div class="controls"><button id="run-strategy" class="primary" type="button" disabled>Run strategy</button><progress id="run-progress" max="100" value="0" hidden></progress><span id="run-status" role="status"></span></div>
+<div class="controls"><button id="run-strategy" class="primary" type="button" disabled>Run analysis</button><progress id="run-progress" max="100" value="0" hidden></progress><span id="run-status" role="status"></span></div>
 <p id="workspace-error" role="alert" class="error" hidden></p></section>
 <section class="panel"><h2>Saved runs</h2><div class="controls"><label>Report<select id="saved-report"></select></label><button id="load-report" type="button">Open report</button><button id="use-report-config" type="button" disabled>Edit this report’s strategy</button><button id="pin-baseline" type="button" disabled>Use as baseline</button><a id="download-report" hidden>Download full report</a><a id="download-html" hidden>Download offline HTML</a></div><p id="result-scope" class="muted"></p></section>
 <section id="report-area" aria-live="polite"></section>

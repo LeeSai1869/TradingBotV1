@@ -6,6 +6,9 @@
   let catalog, metadata, model, currentReport, currentReportId, inputToken = 0, running = false;
   let reportFields = new Set();
   const draftKey = 'btc-hour-strategy-workspace-draft-v1';
+  let previousDraft = null;
+  const previousDraftKey=draftKey+'-previous';
+  const blankStrategy = () => ({version:'btc-hour-strategy-analyzer-v1',id:'My strategy',branches:[{id:'buy',side:'BUY',expanded:true,when:{all:[defaultLeaf()]}},{id:'sell',side:'SELL',expanded:true,when:{all:[defaultLeaf()]}}]});
   const fields = () => metadata?.fields || [];
   const fieldInfo = name => fields().find(f => f.id === name);
   const human = name => StrategyReport.fieldLabel(name);
@@ -30,6 +33,20 @@
       branches: model.branches.filter(b => b.enabled !== false).map(({id, side, when,action,trail,target_profit_pct}) => ({id, side, when: copy(when),...(side==='SELL'&&action?{action,...(trail?{trail:copy(trail)}:{}),...(target_profit_pct!==undefined?{target_profit_pct}:{})}:{})}))};
     if (!config.id) throw Error('Give your strategy a name.');
     if (!config.branches.some(b => b.side === 'BUY') || !config.branches.some(b => b.side === 'SELL')) throw Error('Enable at least one BUY and one SELL branch.');
+    function validateRule(expr, side) {
+      if (expr.all || expr.any) {
+        const children=expr.all || expr.any;
+        if (!children.length) throw Error(`${side}: add a condition.`);
+        children.forEach(child=>validateRule(child,side));return;
+      }
+      if (expr.not) { validateRule(expr.not,side);return; }
+      if (!expr.field) throw Error(`${side}: choose an indicator or stored input.`);
+      if (!expr.op) throw Error(`${side}: choose a comparison.`);
+      if ('other_field' in expr && !expr.other_field) throw Error(`${side}: choose the other input to compare.`);
+      if (!['available','missing'].includes(expr.op) && !('other_field' in expr) && (expr.value==='' || expr.value===undefined || (Array.isArray(expr.value)&&expr.value.some(v=>v==='')))) throw Error(`${side}: enter a comparison value.`);
+      if (typeof expr.value==='number' && !Number.isFinite(expr.value)) throw Error(`${side}: enter a valid number.`);
+    }
+    config.branches.forEach(branch=>validateRule(branch.when,branch.side));
     return config;
   }
   function setModel(config) {
@@ -44,15 +61,17 @@
     const note=node('small','',parent);
     const render=()=>{select.replaceChildren();const words=search.value.toLowerCase().replace(/previous/g,'prev').replace(/di\+/g,'di_plus').replace(/di[-−]/g,'di_minus').replaceAll('_',' ').split(/\s+/).filter(Boolean),found=fields().filter(f=>{const text=(f.id+' '+human(f.id)).toLowerCase().replaceAll('_',' ');return words.every(w=>text.includes(w));});const shown=found.slice(0,200);const current=fieldInfo(selected);if(current&&!shown.includes(current))shown.unshift(current);const grouped=new Map();
       for(const info of shown){if(!grouped.has(info.group))grouped.set(info.group,[]);grouped.get(info.group).push(info);}
+      if(!selected)node('option','Choose an indicator or input…',select,{value:''});
       if(selected&&!current)node('option',human(selected)+' · absent from selected input',select,{value:selected});
       for(const [group,infos]of grouped){const g=node('optgroup',undefined,select,{label:group});for(const info of infos)node('option',human(info.id),g,{value:info.id});}
-      select.value=selected;note.textContent=found.length>200?`${found.length.toLocaleString()} fields match · type to narrow the first 200`:'';};
+      select.value=selected || '';note.textContent=current?.sample_present===0?'No values available in this input sample. Check coverage before replay.':found.length>200?`${found.length.toLocaleString()} fields match · type to narrow the first 200`:'';};
     search.oninput=render;render();select.onchange=()=>{selected=select.value;changed(select.value);};return select;
   }
-  function defaultLeaf() { return {field: 'di.abs_spread', op: 'gte', value: 10}; }
+  function defaultLeaf() { return {field:'',op:'',value:''}; }
   function expressionText(expr) {
     if (expr.all || expr.any) return '(' + (expr.all || expr.any).map(expressionText).join(expr.all ? ' AND ' : ' OR ') + ')';
     if (expr.not) return 'NOT ' + expressionText(expr.not);
+    if (!expr.field || !expr.op) return 'Choose an indicator, comparison and value.';
     const ops = {eq: 'equals', ne: 'does not equal', gt: '>', gte: '≥', lt: '<', lte: '≤', in: 'is one of', available: 'is available', missing: 'is missing'};
     return `${human(expr.field)}${expr.lag ? ' ' + expr.lag + ' candles ago' : ''} ${ops[expr.op]} ${expr.other_field ? human(expr.other_field) + (expr.other_lag ? ' ' + expr.other_lag + ' candles ago' : '') : expr.value === undefined ? '' : Array.isArray(expr.value) ? expr.value.join(', ') : String(expr.value)}`;
   }
@@ -79,33 +98,34 @@
     const row = node('div', undefined, parent, {class: 'predicate'});
     fieldSelect(expr.field, node('label', 'Input', row, {class: 'field'}), value => {
       expr.field = value; if (!('other_field' in expr) && expr.op !== 'in' && !['available', 'missing'].includes(expr.op)) {
-        const info = fieldInfo(value); expr.value = info?.kind === 'boolean' ? true : info?.kind === 'number' ? 0 : info?.options[0] ?? '';
+        expr.value = '';
       } redraw();
     });
     const op = node('select', undefined, label('Comparison', row)); op.setAttribute('aria-label', 'Condition comparison');
     for (const [v, t] of [['eq', '= equals'], ['ne', '≠ not equal'], ['gt', '> greater than'], ['gte', '≥ at least'], ['lt', '< less than'], ['lte', '≤ at most'], ['in', 'One of'], ['available', 'Available'], ['missing', 'Missing']]) node('option', t, op, {value: v});
+    if (!expr.op) node('option','Choose comparison…',op,{value:''});
     op.value = expr.op;
     op.onchange = () => {
       expr.op = op.value;
       if (['available', 'missing'].includes(expr.op)) { delete expr.value; delete expr.other_field; delete expr.other_lag; }
       else if (expr.op === 'in') { expr.value = Array.isArray(expr.value) ? expr.value : [expr.value ?? fieldInfo(expr.field)?.options[0] ?? '']; delete expr.other_field; delete expr.other_lag; }
-      else if (!('other_field' in expr)) { expr.value = Array.isArray(expr.value) ? expr.value[0] : expr.value ?? 0; if (['gt','gte','lt','lte'].includes(expr.op)) expr.value = Number(expr.value) || 0; }
+      else if (!('other_field' in expr)) { expr.value = Array.isArray(expr.value) ? expr.value[0] : expr.value ?? ''; if (expr.value!=='' && ['gt','gte','lt','lte'].includes(expr.op)) expr.value = Number(expr.value); }
       redraw();
     };
     if (!['available', 'missing'].includes(expr.op)) {
       const mode = node('select', undefined, label('Compare with', row)); node('option', 'A value', mode, {value: 'literal'}); if (expr.op !== 'in') node('option', 'Another input', mode, {value: 'field'});
-      mode.value = expr.other_field ? 'field' : 'literal'; mode.onchange = () => { if (mode.value === 'field') { expr.other_field = 'feature.ema50'; delete expr.value; } else { delete expr.other_field; delete expr.other_lag; expr.value = fieldInfo(expr.field)?.kind === 'number' ? 0 : ''; } redraw(); };
+      mode.value = 'other_field' in expr ? 'field' : 'literal'; mode.onchange = () => { if (mode.value === 'field') { expr.other_field = ''; delete expr.value; } else { delete expr.other_field; delete expr.other_lag; expr.value = ''; } redraw(); };
       const operand = node('label', 'Value / input', row, {class: 'operand'});
-      if (expr.other_field) {
+      if ('other_field' in expr) {
         fieldSelect(expr.other_field, operand, value => { expr.other_field = value; changed(); });
         const lag = node('input', undefined, node('label', 'Other candle: 0=current, 1=previous, 2=two ago', row, {class: 'lag'}), {type: 'number', min: 0, max: 1000,'aria-label':'Other lag'}); lag.value = expr.other_lag || 0; lag.onchange = () => { expr.other_lag = Number(lag.value); changed(); };
       } else {
         const info = fieldInfo(expr.field); let value;
-        if (info?.kind === 'boolean' && expr.op !== 'in') { value = node('select', undefined, operand); node('option', 'true', value); node('option', 'false', value); value.value = String(expr.value); }
+        if (info?.kind === 'boolean' && expr.op !== 'in') { value = node('select', undefined, operand); node('option','Choose a value…',value,{value:''}); node('option', 'true', value); node('option', 'false', value); value.value = String(expr.value); }
         else { value = node('input', undefined, operand, {type: 'text', 'aria-label': 'Condition value'}); value.value = Array.isArray(expr.value) ? expr.value.join(', ') : expr.value ?? ''; if (info?.options.length && expr.op !== 'in') { const id = 'options-' + Math.random().toString(36).slice(2); value.setAttribute('list', id); const dl = node('datalist', undefined, operand, {id}); info.options.forEach(v => node('option', String(v), dl, {value: String(v)})); } }
         value.onchange = () => {
           const convert = v => info?.kind === 'boolean' ? v === 'true' : info?.kind === 'number' || ['gt','gte','lt','lte'].includes(expr.op) ? Number(v) : v;
-          expr.value = expr.op === 'in' ? value.value.split(',').map(v => convert(v.trim())) : convert(value.value); changed();
+          expr.value = value.value.trim()==='' ? '' : expr.op === 'in' ? value.value.split(',').map(v => v.trim()===''?'':convert(v.trim())) : convert(value.value); changed();
         };
       }
     }
@@ -121,7 +141,7 @@
       const heading = node('div', undefined, box, {class: 'branch-heading'});
       const enabled = node('input', undefined, node('label', 'Include', heading, {class: 'enable'}), {type: 'checkbox'}); enabled.checked = branch.enabled !== false;
       enabled.onchange = () => { branch.enabled = enabled.checked; renderBranches(); remember(); };
-      const name = node('input', undefined, node('label', 'Branch name', heading, {class: 'branch-name'})); name.value = branch.id; name.onchange = () => { branch.id = name.value.trim(); remember(); };
+      const name = node('input', undefined, node('label', branch.side==='BUY'?'Entry rule name':'Exit rule name', heading, {class: 'branch-name'})); name.value = branch.id; name.onchange = () => { branch.id = name.value.trim(); remember(); };
       const side = node('select', undefined, label('Signal', heading)); node('option', 'BUY', side); node('option', 'SELL', side); side.value = branch.side;
       side.onchange = () => { branch.side = side.value;if(branch.side==='BUY'){delete branch.action;delete branch.trail;delete branch.target_profit_pct;}renderBranches(); remember(); };
       if(branch.side==='SELL'){
@@ -164,7 +184,8 @@
     selectOptions($('memory-coins'),(catalog.memory?.symbols||[]).map(s=>[s,s]));for(const o of $('memory-coins').options)o.selected=oldSymbols.has(o.value);
     $('memory-universe').textContent=catalog.memory?.error||`${catalog.memory?.symbols.length||0} stored coins · ${catalog.memory?.feature_columns||0} feature columns · ${catalog.memory?.adcn_columns||0} ADCN columns`;
     const configs = catalog.configurations.map(c => [c.key, c.config.id + ' · ' + c.key.slice(0,6)]);
-    selectOptions($('strategy-preset'), configs, preset || catalog.configurations.find(c => c.config.id === 'multi_branch_v1')?.key);
+    selectOptions($('strategy-preset'), configs, preset, 'Choose a saved strategy (optional)');
+    $('load-preset').disabled=!$('strategy-preset').value;
     selectOptions($('baseline-preset'), configs, baseline, 'No comparison');
     selectOptions($('saved-report'), catalog.reports.map(r => [r.id, r.name]), report);
   }
@@ -203,16 +224,37 @@
     if (job.state === 'complete') { await refreshCatalog(); $('saved-report').value = job.report_id; await loadReport(job.report_id); return; }
     await new Promise(resolve => setTimeout(resolve, 600)); return poll(id);
   }
-  $('load-preset').onclick = guard(() => { setModel(catalog.configurations.find(c => c.key === $('strategy-preset').value).config); });
+  $('strategy-preset').onchange=()=>{$('load-preset').disabled=!$('strategy-preset').value;};
+  $('load-preset').onclick = guard(() => {
+    const selected=catalog.configurations.find(c=>c.key===$('strategy-preset').value);
+    if (!selected) throw Error('Choose a saved strategy first.');
+    setModel(selected.config);$('strategy-status').textContent='Editable copy loaded: '+selected.config.id;
+  });
+  $('new-strategy').onclick=()=>{
+    previousDraft={model:copy(model),reportFields:[...reportFields],baseline:$('baseline-preset').value};
+    try { localStorage.setItem(previousDraftKey,JSON.stringify(previousDraft)); } catch (_) {}
+    reportFields=new Set();$('baseline-preset').value='';$('strategy-preset').value='';$('load-preset').disabled=true;
+    setModel(blankStrategy());renderFields();$('undo-new-strategy').hidden=false;
+    $('strategy-status').textContent='New strategy · no preset conditions. Choose your BUY and SELL conditions below.';
+    $('run-status').textContent='';error();$('strategy-name').focus();
+    $('result-scope').textContent=currentReport?'Previous report remains below; run your new strategy to produce new results.':'';
+  };
+  $('undo-new-strategy').onclick=()=>{
+    if(!previousDraft)return;
+    reportFields=new Set(previousDraft.reportFields);$('baseline-preset').value=previousDraft.baseline;
+    setModel(previousDraft.model);renderFields();previousDraft=null;$('undo-new-strategy').hidden=true;
+    try { localStorage.removeItem(previousDraftKey); } catch (_) {}
+    $('strategy-status').textContent='Previous draft restored.';
+  };
   $('add-buy').onclick = () => { model.branches.push({id:'buy_branch_'+Date.now().toString(36),side:'BUY',when:{all:[defaultLeaf()]}});renderBranches();remember(); };
   $('add-sell').onclick = () => { model.branches.push({id:'sell_branch_'+Date.now().toString(36),side:'SELL',when:{all:[defaultLeaf()]}});renderBranches();remember(); };
-  $('add-trailing-sell').onclick=()=>{model.branches.push({id:'trailing_sell_'+Date.now().toString(36),side:'SELL',action:'TRAILING_SELL',trail:{distance_pct:.5,activation_profit_pct:1},when:{field:'price.close',op:'available'}});renderBranches();remember();};
+  $('add-trailing-sell').onclick=()=>{model.branches.push({id:'trailing_sell_'+Date.now().toString(36),side:'SELL',action:'TRAILING_SELL',trail:{distance_pct:.5,activation_profit_pct:1},when:{all:[defaultLeaf()]}});renderBranches();remember();};
   $('load-memory').onclick=guard(async()=>{$('input-source').value=`memory:${$('memory-symbol').value}:${$('memory-timeframe').value}`;if(!$('input-source').value)throw Error('This coin/timeframe has no stored feature scope yet.');await loadInput();remember();});
   $('memory-all').onclick=()=>{for(const o of $('memory-coins').options)o.selected=true;remember();};
   $('memory-current').onclick=()=>{for(const o of $('memory-coins').options)o.selected=o.value===metadata?.symbol;remember();};
   $('memory-coins').onchange=remember;
   $('strategy-name').onchange = () => { model.id = $('strategy-name').value;remember(); };
-  for (const id of ['fee','slippage','capital','intrabar-path']) $(id).onchange = () => { model.execution=configuration().execution;remember(); };
+  for (const id of ['fee','slippage','capital','intrabar-path']) $(id).onchange = () => { model.execution={fee_bps_per_side:Number($('fee').value),slippage_bps_per_side:Number($('slippage').value),initial_capital:Number($('capital').value),intrabar_path:$('intrabar-path').value};remember(); };
   $('save-config').onclick = guard(async () => { const saved=await api('/api/config',{config:configuration()});await refreshCatalog();$('strategy-preset').value=saved.key;$('run-status').textContent='Strategy saved. Previous versions are retained.'; });
   $('export-config').onclick = guard(() => download(configuration(), $('strategy-name').value.replace(/[^a-z0-9_-]/gi,'_')+'.json'));
   $('config-upload').onchange = guard(async e => { const file=e.target.files[0];if(file){const saved=await api('/api/config',{config:JSON.parse(await file.text())});await refreshCatalog();setModel(saved.config);$('strategy-preset').value=saved.key;} });
@@ -229,11 +271,13 @@
     finally { running=false;$('run-strategy').disabled=!metadata;$('run-progress').hidden=true; }
   });
   guard(async () => {
-    await refreshCatalog();let draft;try{draft=JSON.parse(localStorage.getItem(draftKey));}catch(_){}
-    setModel(draft?.model || catalog.configurations.find(c=>c.key===$('strategy-preset').value)?.config || {version:'btc-hour-strategy-analyzer-v1',id:'My strategy',branches:[]});
+    await refreshCatalog();let draft;try{draft=JSON.parse(localStorage.getItem(draftKey));previousDraft=JSON.parse(localStorage.getItem(previousDraftKey));}catch(_){}
+    $('undo-new-strategy').hidden=!previousDraft?.model;
+    setModel(draft?.model || blankStrategy());
+    $('strategy-status').textContent=draft?.model?'Your draft was restored. Use Create new strategy to start blank.':'New strategy · choose your BUY and SELL conditions below.';
     reportFields=new Set(draft?.reportFields || []);if(catalog.inputs.some(i=>i.id===draft?.inputId))$('input-source').value=draft.inputId;
     const requested = new URLSearchParams(location.search).get('input');
     if(requested){const id=requested==='default'?catalog.default_input:requested;if(catalog.inputs.some(i=>i.id===id))$('input-source').value=id;history.replaceState(null,'',location.pathname+location.hash);}
-    if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();if(draft?.symbols?.length)for(const o of $('memory-coins').options)o.selected=draft.symbols.includes(o.value);remember();if(catalog.reports.length&&metadata.risk_budget_pct==null)await loadReport($('saved-report').value);
+    if(catalog.configurations.some(c=>c.key===draft?.baselineKey))$('baseline-preset').value=draft.baselineKey;$('replay-since').value=draft?.since||'';$('replay-until').value=draft?.until||'';await loadInput();if(draft?.symbols?.length)for(const o of $('memory-coins').options)o.selected=draft.symbols.includes(o.value);remember();
   })();
 })();
