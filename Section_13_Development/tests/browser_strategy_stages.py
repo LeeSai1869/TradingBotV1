@@ -61,6 +61,17 @@ def main():
                     assert signal['inputs']['feature.buy@lag0']['value']==0
                     page.screenshot(path='/tmp/strategy-trigger-activate-report.png',full_page=True)
                     page.set_viewport_size(dict(width=390,height=844));page.wait_for_function('document.body.scrollWidth<=innerWidth')
+                    # Legacy all-unknown reports must not imply a zero-return backtest.
+                    from copy import deepcopy
+                    blocked=deepcopy(self_report);blocked.pop('test_status',None)
+                    blocked['signals']=[];blocked['trades']=[]
+                    for stats in blocked['branch_diagnostics'].values():
+                        if stats['side']=='BUY':stats['unknown']=stats['evaluated']
+                    page.evaluate('(report)=>StrategyReport.mount(document.querySelector("#report-area"),report)',blocked)
+                    expect(page.locator('#report-verdict')).to_contain_text('Test blocked by unavailable inputs')
+                    cards=page.locator('#summary .card').filter(has_text='Closed-trade return')
+                    expect(cards.locator('strong')).to_have_text('unavailable')
+                    expect(page.locator('#equity-chart svg')).to_have_count(0)
                     assert not errors,errors
                     print('PASS per-condition roles, validation, persisted draft, remembered trigger, later activation, original evidence and mobile report')
                 finally:browser.close()

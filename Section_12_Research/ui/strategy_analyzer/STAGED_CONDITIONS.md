@@ -20,9 +20,13 @@ condition. Choose **Profit threshold + indicator conditions** for conditional
 eligibility. Search is inside each condition field dropdown.
 
 These controls configure offline analyzer replay; they do not activate a live bot.
-Stored-memory analysis still requires a valid feature generation. Pending feature
-repairs can make that source unavailable until its repair finishes; the editor
-cannot manufacture missing or invalidated features.
+Stored-memory analysis requires a compatible feature generation. A selective
+repair targeting the current formulas leaves unrelated stored fields usable. Core
+repair masks hide affected cells until their repair cursor passes them. Unknown
+generations remain blocked, and analytical engine context keeps its stricter
+generation checks. All-unknown BUY evaluation is reported as BLOCKED_INPUTS,
+with unavailable return/balance cards rather than a zero-return result. No values
+are recalculated or written by this reader.
 
 The accompanying current-move-v2 pivot update needs one automatic targeted
 historical repair. Its geometry differs from confirmed-pair-v1, so the old partial
